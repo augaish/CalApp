@@ -1,12 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Text, type ColorValue } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
-
-function TabIcon({ glyph, color }: { glyph: string; color: ColorValue }) {
-  return <Text style={{ fontSize: 22, color }}>{glyph}</Text>;
-}
 
 export default function TabLayout() {
   const { t } = useTranslation();
@@ -16,7 +12,8 @@ export default function TabLayout() {
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: theme.primary,
-        tabBarInactiveTintColor: theme.textSecondary,
+        tabBarInactiveTintColor: theme.textTertiary,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border },
       }}
     >
@@ -24,14 +21,18 @@ export default function TabLayout() {
         name="index"
         options={{
           title: t('home.today'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="◉" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'today' : 'today-outline'} size={24} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="settings"
         options={{
           title: t('settings.title'),
-          tabBarIcon: ({ color }) => <TabIcon glyph="⚙" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
+          ),
         }}
       />
     </Tabs>

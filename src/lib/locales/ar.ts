@@ -13,6 +13,7 @@ export const ar: TranslationSchema = {
     grams: 'غ',
     loading: 'جارٍ التحميل…',
     error: 'حدث خطأ ما. حاول مرة أخرى.',
+    aiDisclaimer: 'تقديرات الذكاء الاصطناعي قد تكون غير دقيقة. القيم إرشادية وليست نصيحة طبية.',
   },
   onboarding: {
     welcomeTitle: 'أهلاً بك في كال آب',
@@ -102,6 +103,8 @@ export const ar: TranslationSchema = {
     sets: 'مجموعات',
     reps: 'تكرارات',
     logWorkout: 'سجّل هذا التمرين',
+    watchVideo: 'شاهد فيديو تعليمي',
+    videoQuery: 'طريقة استخدام {{name}} في النادي بشكل صحيح',
   },
   settings: {
     title: 'الإعدادات',

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -96,7 +97,9 @@ export default function Onboarding() {
     return (
       <Screen scroll={false}>
         <View style={styles.welcomeCenter}>
-          <Text style={styles.welcomeEmoji}>🥗</Text>
+          <View style={[styles.welcomeBadge, { backgroundColor: theme.cardSubtle }]}>
+            <Ionicons name="nutrition" size={44} color={theme.primary} />
+          </View>
           <Text style={[Type.display, { color: theme.text, fontSize: 34, textAlign: 'center' }]}>
             {t('onboarding.welcomeTitle')}
           </Text>
@@ -203,7 +206,7 @@ export default function Onboarding() {
       }
     >
       {dots}
-      <Title>🎯 {t('onboarding.resultsTitle')}</Title>
+      <Title>{t('onboarding.resultsTitle')}</Title>
       <Subtitle>{t('onboarding.resultsSubtitle')}</Subtitle>
       {targets && (
         <>
@@ -237,7 +240,14 @@ function MacroPill({ label, value, color }: { label: string; value: number; colo
 
 const styles = StyleSheet.create({
   welcomeCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  welcomeEmoji: { fontSize: 72, marginBottom: Spacing.lg },
+  welcomeBadge: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.lg,
+  },
   row: { flexDirection: 'row', gap: Spacing.sm },
   heroCard: {
     alignItems: 'center',

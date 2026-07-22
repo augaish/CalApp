@@ -11,6 +11,7 @@ export const en = {
     grams: 'g',
     loading: 'Loading…',
     error: 'Something went wrong. Please try again.',
+    aiDisclaimer: 'AI estimates can be inaccurate. Values are guidance, not medical advice.',
   },
   onboarding: {
     welcomeTitle: 'Welcome to CalApp',
@@ -100,6 +101,8 @@ export const en = {
     sets: 'sets',
     reps: 'reps',
     logWorkout: 'Log this exercise',
+    watchVideo: 'Watch video tutorial',
+    videoQuery: 'how to use {{name}} gym machine proper form',
   },
   settings: {
     title: 'Settings',

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import {
   ActivityIndicator,
@@ -102,6 +103,7 @@ export function Button({
   label,
   onPress,
   variant = 'primary',
+  icon,
   disabled,
   loading,
   style,
@@ -109,6 +111,7 @@ export function Button({
   label: string;
   onPress: () => void;
   variant?: 'primary' | 'secondary' | 'ghost';
+  icon?: keyof typeof Ionicons.glyphMap;
   disabled?: boolean;
   loading?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -124,14 +127,17 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: bg, opacity: disabled ? 0.4 : 1 },
-        pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
+        pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
         style,
       ]}
     >
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
-        <Text style={{ color: fg, fontSize: 17, fontWeight: '700' }}>{label}</Text>
+        <View style={styles.buttonInner}>
+          {icon ? <Ionicons name={icon} size={20} color={fg} /> : null}
+          <Text style={{ color: fg, fontSize: 17, fontWeight: '700' }}>{label}</Text>
+        </View>
       )}
     </Pressable>
   );
@@ -277,6 +283,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 54,
   },
+  buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   dotsRow: {
     flexDirection: 'row',
     gap: 6,

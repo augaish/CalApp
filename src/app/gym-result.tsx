@@ -1,8 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -16,7 +17,6 @@ export default function GymResult() {
   const router = useRouter();
   const analysis = usePending((s) => s.equipment);
   const photoUri = usePending((s) => s.photoUri);
-  const clear = usePending((s) => s.clear);
   const logWorkout = useAppStore((s) => s.logWorkout);
 
   useEffect(() => {
@@ -25,9 +25,9 @@ export default function GymResult() {
 
   if (!analysis) return null;
 
+  // Pending data is intentionally not cleared on close (see meal-result).
   const save = () => {
     logWorkout(analysis.name, analysis.suggestion.sets, analysis.suggestion.reps);
-    clear();
     if (router.canGoBack()) router.back();
   };
 
@@ -40,7 +40,6 @@ export default function GymResult() {
             label={t('common.done')}
             variant="ghost"
             onPress={() => {
-              clear();
               if (router.canGoBack()) router.back();
             }}
             style={{ marginTop: Spacing.xs }}
@@ -61,9 +60,20 @@ export default function GymResult() {
         ))}
       </View>
 
-      <Section title={`🔧 ${t('gymResult.setup')}`} items={analysis.setupSteps} numbered />
-      <Section title={`✅ ${t('gymResult.formCues')}`} items={analysis.formCues} />
-      <Section title={`⚠️ ${t('gymResult.mistakes')}`} items={analysis.commonMistakes} warning />
+      <Button
+        label={t('gymResult.watchVideo')}
+        icon="logo-youtube"
+        variant="secondary"
+        onPress={() => {
+          const query = encodeURIComponent(t('gymResult.videoQuery', { name: analysis.name }));
+          Linking.openURL(`https://www.youtube.com/results?search_query=${query}`);
+        }}
+        style={styles.videoBtn}
+      />
+
+      <Section icon="options" title={t('gymResult.setup')} items={analysis.setupSteps} numbered />
+      <Section icon="checkmark-circle" title={t('gymResult.formCues')} items={analysis.formCues} />
+      <Section icon="warning" title={t('gymResult.mistakes')} items={analysis.commonMistakes} warning />
 
       <Card style={[styles.suggestCard, { borderColor: theme.primary }]}>
         <Text style={[styles.suggestTitle, { color: theme.primary }]}>
@@ -77,6 +87,10 @@ export default function GymResult() {
           <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{analysis.suggestion.note}</Text>
         ) : null}
       </Card>
+
+      <Text style={[styles.disclaimer, { color: theme.textTertiary }]}>
+        {t('common.aiDisclaimer')}
+      </Text>
     </Screen>
   );
 }
@@ -106,22 +120,26 @@ function Chip({
 }
 
 function Section({
+  icon,
   title,
   items,
   numbered,
   warning,
 }: {
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   items: string[];
   numbered?: boolean;
   warning?: boolean;
 }) {
   const theme = useTheme();
+  const titleColor = warning ? theme.warning : theme.text;
   return (
     <Card>
-      <Text style={[styles.sectionTitle, { color: warning ? theme.warning : theme.text }]}>
-        {title}
-      </Text>
+      <View style={styles.sectionHead}>
+        <Ionicons name={icon} size={18} color={warning ? theme.warning : theme.primary} />
+        <Text style={[styles.sectionTitle, { color: titleColor }]}>{title}</Text>
+      </View>
       {items.map((item, i) => (
         <View key={i} style={styles.bulletRow}>
           <Text style={{ color: theme.primary, fontWeight: '700' }}>
@@ -152,7 +170,15 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: Radius.full,
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: Spacing.sm,
+  },
+  sectionTitle: { fontSize: 16, fontWeight: '700' },
+  videoBtn: { marginBottom: Spacing.md },
+  disclaimer: { fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: Spacing.xs },
   bulletRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: 6 },
   bulletText: { fontSize: 15, lineHeight: 21, flex: 1 },
   suggestCard: { borderWidth: 2 },

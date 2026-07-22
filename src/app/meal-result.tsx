@@ -17,7 +17,6 @@ export default function MealResult() {
   const router = useRouter();
   const analysis = usePending((s) => s.meal);
   const photoUri = usePending((s) => s.photoUri);
-  const clear = usePending((s) => s.clear);
   const logMeal = useAppStore((s) => s.logMeal);
 
   const [items, setItems] = useState<FoodItem[]>(analysis?.items ?? []);
@@ -34,9 +33,11 @@ export default function MealResult() {
 
   const total = items.reduce((sum, i) => sum + i.calories, 0);
 
+  // Note: pending data is NOT cleared on close — clearing re-renders this
+  // screen with empty state and double-fires the back navigation. The next
+  // scan simply overwrites it.
   const save = () => {
     logMeal(items, photoUri ?? undefined);
-    clear();
     if (router.canGoBack()) router.back();
   };
 
@@ -57,7 +58,6 @@ export default function MealResult() {
             label={t('common.cancel')}
             variant="ghost"
             onPress={() => {
-              clear();
               if (router.canGoBack()) router.back();
             }}
             style={{ marginTop: Spacing.xs }}
@@ -107,6 +107,9 @@ export default function MealResult() {
         </Card>
       ))}
 
+      <Text style={[styles.disclaimer, { color: theme.textTertiary }]}>
+        {t('common.aiDisclaimer')}
+      </Text>
     </Screen>
   );
 }
@@ -174,4 +177,5 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   totalValue: { fontSize: 22, fontWeight: '800' },
+  disclaimer: { fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: Spacing.xs },
 });

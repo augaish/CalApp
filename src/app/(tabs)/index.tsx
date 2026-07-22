@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -28,12 +29,14 @@ export default function Home() {
       footer={
         <View style={styles.scanRow}>
           <Button
-            label={`🍽 ${t('home.scanMeal')}`}
+            label={t('home.scanMeal')}
+            icon="camera"
             onPress={() => router.push('/scan?mode=meal')}
             style={{ flex: 1 }}
           />
           <Button
-            label={`🏋️ ${t('home.scanGym')}`}
+            label={t('home.scanGym')}
+            icon="barbell"
             variant="secondary"
             onPress={() => router.push('/scan?mode=gym')}
             style={{ flex: 1 }}
@@ -73,7 +76,7 @@ export default function Home() {
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('home.todaysMeals')}</Text>
       {todaysMeals.length === 0 ? (
         <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Text style={styles.emptyEmoji}>📷</Text>
+          <Ionicons name="camera-outline" size={40} color={theme.textTertiary} />
           <Text style={[Type.body, { color: theme.textSecondary, textAlign: 'center', lineHeight: 23 }]}>
             {t('home.noMeals')}
           </Text>
@@ -83,7 +86,7 @@ export default function Home() {
           <Pressable key={meal.id} onLongPress={() => removeMeal(meal.id)}>
             <Card style={styles.mealCard}>
               <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
-                <Text style={{ fontSize: 22 }}>🍽</Text>
+                <Ionicons name="restaurant" size={20} color={theme.primary} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
