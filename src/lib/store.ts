@@ -12,12 +12,18 @@ import type {
   Profile,
 } from './types';
 
+export interface WaterEntry {
+  at: string;
+  ml: number;
+}
+
 interface AppState {
   language: Language | null;
   profile: Profile | null;
   targets: DailyTargets | null;
   meals: LoggedMeal[];
   workouts: LoggedWorkout[];
+  water: WaterEntry[];
   hydrated: boolean;
 
   setLanguage: (language: Language) => void;
@@ -25,6 +31,7 @@ interface AppState {
   logMeal: (items: FoodItem[], photoUri?: string) => void;
   removeMeal: (id: string) => void;
   logWorkout: (equipmentName: string, sets?: number, reps?: string) => void;
+  logWater: (ml: number) => void;
   setHydrated: () => void;
 }
 
@@ -40,6 +47,7 @@ export const useAppStore = create<AppState>()(
       targets: null,
       meals: [],
       workouts: [],
+      water: [],
       hydrated: false,
 
       setLanguage: (language) => set({ language }),
@@ -56,31 +64,37 @@ export const useAppStore = create<AppState>()(
             ...s.workouts,
           ],
         })),
+      logWater: (ml) =>
+        set((s) => ({ water: [{ at: new Date().toISOString(), ml }, ...s.water] })),
       setHydrated: () => set({ hydrated: true }),
     }),
     {
       name: 'calapp-store',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: ({ language, profile, targets, meals, workouts }) => ({
+      partialize: ({ language, profile, targets, meals, workouts, water }) => ({
         language,
         profile,
         targets,
         meals,
         workouts,
+        water,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
   ),
 );
 
-export function isToday(iso: string): boolean {
+export function isSameDay(iso: string, day: Date): boolean {
   const d = new Date(iso);
-  const now = new Date();
   return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
+    d.getFullYear() === day.getFullYear() &&
+    d.getMonth() === day.getMonth() &&
+    d.getDate() === day.getDate()
   );
+}
+
+export function isToday(iso: string): boolean {
+  return isSameDay(iso, new Date());
 }
 
 export function mealCalories(meal: LoggedMeal): number {
@@ -94,10 +108,10 @@ export interface DayTotals {
   fatG: number;
 }
 
-export function todayTotals(meals: LoggedMeal[]): DayTotals {
+export function totalsForDay(meals: LoggedMeal[], day: Date): DayTotals {
   const totals: DayTotals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
   for (const meal of meals) {
-    if (!isToday(meal.at)) continue;
+    if (!isSameDay(meal.at, day)) continue;
     for (const item of meal.items) {
       totals.calories += item.calories;
       totals.proteinG += item.proteinG;
@@ -106,4 +120,13 @@ export function todayTotals(meals: LoggedMeal[]): DayTotals {
     }
   }
   return totals;
+}
+
+export function waterForDay(entries: WaterEntry[], day: Date): number {
+  return entries.reduce((sum, e) => (isSameDay(e.at, day) ? sum + e.ml : sum), 0);
+}
+
+/** Recommended daily water in ml (~35 ml per kg body weight, rounded to 10). */
+export function waterTargetMl(weightKg: number): number {
+  return Math.round((weightKg * 35) / 10) * 10;
 }

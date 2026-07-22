@@ -23,6 +23,10 @@ export const Colors = {
     carbs: '#F59E0B',
     fat: '#A855F7',
     shadow: '#0A3D2E',
+    gradientStart: '#F5A623',
+    gradientEnd: '#0FA968',
+    onGradient: '#FFFFFF',
+    water: '#38BDF8',
   },
   dark: {
     text: '#F4F7F5',
@@ -41,6 +45,10 @@ export const Colors = {
     carbs: '#FBBF24',
     fat: '#C084FC',
     shadow: '#000000',
+    gradientStart: '#B87A15',
+    gradientEnd: '#0B7A4C',
+    onGradient: '#FFFFFF',
+    water: '#38BDF8',
   },
 } as const;
 
