@@ -86,6 +86,15 @@ export default function Scan() {
         {isMockMode && <Text style={styles.mockBadge}>{t('scan.mockBadge')}</Text>}
       </View>
 
+      <View pointerEvents="none" style={styles.frameWrap}>
+        <View style={styles.frame}>
+          <View style={[styles.corner, styles.cornerTL]} />
+          <View style={[styles.corner, styles.cornerTR]} />
+          <View style={[styles.corner, styles.cornerBL]} />
+          <View style={[styles.corner, styles.cornerBR]} />
+        </View>
+      </View>
+
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.lg }]}>
         {analyzing ? (
           <View style={styles.analyzing}>
@@ -124,6 +133,26 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontWeight: '600',
   },
+  frameWrap: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  frame: { width: '78%', aspectRatio: 1 },
+  corner: {
+    position: 'absolute',
+    width: 36,
+    height: 36,
+    borderColor: 'rgba(255,255,255,0.9)',
+  },
+  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 16 },
+  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 16 },
+  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 16 },
+  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 16 },
   bottomBar: {
     position: 'absolute',
     bottom: 0,

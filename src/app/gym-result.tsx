@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -18,19 +19,35 @@ export default function GymResult() {
   const clear = usePending((s) => s.clear);
   const logWorkout = useAppStore((s) => s.logWorkout);
 
-  if (!analysis) {
-    router.back();
-    return null;
-  }
+  useEffect(() => {
+    if (!analysis && router.canGoBack()) router.back();
+  }, [analysis, router]);
+
+  if (!analysis) return null;
 
   const save = () => {
     logWorkout(analysis.name, analysis.suggestion.sets, analysis.suggestion.reps);
     clear();
-    router.dismissAll();
+    if (router.canGoBack()) router.back();
   };
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <View>
+          <Button label={t('gymResult.logWorkout')} onPress={save} />
+          <Button
+            label={t('common.done')}
+            variant="ghost"
+            onPress={() => {
+              clear();
+              if (router.canGoBack()) router.back();
+            }}
+            style={{ marginTop: Spacing.xs }}
+          />
+        </View>
+      }
+    >
       <Title>{analysis.name}</Title>
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
@@ -44,9 +61,9 @@ export default function GymResult() {
         ))}
       </View>
 
-      <Section title={t('gymResult.setup')} items={analysis.setupSteps} numbered />
-      <Section title={t('gymResult.formCues')} items={analysis.formCues} />
-      <Section title={t('gymResult.mistakes')} items={analysis.commonMistakes} warning />
+      <Section title={`🔧 ${t('gymResult.setup')}`} items={analysis.setupSteps} numbered />
+      <Section title={`✅ ${t('gymResult.formCues')}`} items={analysis.formCues} />
+      <Section title={`⚠️ ${t('gymResult.mistakes')}`} items={analysis.commonMistakes} warning />
 
       <Card style={[styles.suggestCard, { borderColor: theme.primary }]}>
         <Text style={[styles.suggestTitle, { color: theme.primary }]}>
@@ -60,17 +77,6 @@ export default function GymResult() {
           <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{analysis.suggestion.note}</Text>
         ) : null}
       </Card>
-
-      <Button label={t('gymResult.logWorkout')} onPress={save} />
-      <Button
-        label={t('common.done')}
-        variant="ghost"
-        onPress={() => {
-          clear();
-          router.dismissAll();
-        }}
-        style={{ marginTop: Spacing.sm }}
-      />
     </Screen>
   );
 }

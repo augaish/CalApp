@@ -3,7 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { useColorScheme } from 'react-native';
 
-import { deviceLanguage, initI18n, applyRTL } from '@/lib/i18n';
+import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 
 SplashScreen.preventAutoHideAsync();
@@ -15,10 +15,10 @@ export default function RootLayout() {
   const profile = useAppStore((s) => s.profile);
 
   const lang = language ?? deviceLanguage();
-  initI18n(lang);
 
   useEffect(() => {
     if (!hydrated) return;
+    setI18nLanguage(lang);
     applyRTL(lang);
     SplashScreen.hideAsync();
   }, [hydrated, lang]);

@@ -11,20 +11,20 @@ export function deviceLanguage(): Language {
   return getLocales()[0]?.languageCode === 'ar' ? 'ar' : 'en';
 }
 
-export function initI18n(language: Language) {
-  if (!i18n.isInitialized) {
-    // eslint-disable-next-line import/no-named-as-default-member
-    i18n.use(initReactI18next).init({
-      resources: { en: { translation: en }, ar: { translation: ar } },
-      lng: language,
-      fallbackLng: 'en',
-      interpolation: { escapeValue: false },
-    });
-  } else {
+/** Initialized once at module load; language switches happen via setI18nLanguage. */
+// eslint-disable-next-line import/no-named-as-default-member
+i18n.use(initReactI18next).init({
+  resources: { en: { translation: en }, ar: { translation: ar } },
+  lng: deviceLanguage(),
+  fallbackLng: 'en',
+  interpolation: { escapeValue: false },
+});
+
+export function setI18nLanguage(language: Language) {
+  if (i18n.language !== language) {
     // eslint-disable-next-line import/no-named-as-default-member
     i18n.changeLanguage(language);
   }
-  return i18n;
 }
 
 export function isRTL(language: Language): boolean {

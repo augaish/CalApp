@@ -1,11 +1,11 @@
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
-import { Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
@@ -22,10 +22,11 @@ export default function MealResult() {
 
   const [items, setItems] = useState<FoodItem[]>(analysis?.items ?? []);
 
-  if (!analysis) {
-    router.back();
-    return null;
-  }
+  useEffect(() => {
+    if (!analysis && router.canGoBack()) router.back();
+  }, [analysis, router]);
+
+  if (!analysis) return null;
 
   const updateItem = (index: number, patch: Partial<FoodItem>) => {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
@@ -36,11 +37,34 @@ export default function MealResult() {
   const save = () => {
     logMeal(items, photoUri ?? undefined);
     clear();
-    router.dismissAll();
+    if (router.canGoBack()) router.back();
   };
 
   return (
-    <Screen>
+    <Screen
+      footer={
+        <View>
+          <View style={[styles.totalBar, { backgroundColor: theme.cardSubtle }]}>
+            <Text style={[Type.caption, { color: theme.textSecondary }]}>
+              {t('mealResult.totalCalories')}
+            </Text>
+            <Text style={[styles.totalValue, { color: theme.primary }]}>
+              {Math.round(total)} {t('common.kcal')}
+            </Text>
+          </View>
+          <Button label={t('mealResult.logMeal')} onPress={save} />
+          <Button
+            label={t('common.cancel')}
+            variant="ghost"
+            onPress={() => {
+              clear();
+              if (router.canGoBack()) router.back();
+            }}
+            style={{ marginTop: Spacing.xs }}
+          />
+        </View>
+      }
+    >
       <Title>{t('mealResult.title')}</Title>
       <Subtitle>{t('mealResult.editHint')}</Subtitle>
 
@@ -83,23 +107,6 @@ export default function MealResult() {
         </Card>
       ))}
 
-      <Card style={styles.totalCard}>
-        <Text style={{ color: theme.textSecondary }}>{t('mealResult.totalCalories')}</Text>
-        <Text style={[styles.totalValue, { color: theme.primary }]}>
-          {Math.round(total)} {t('common.kcal')}
-        </Text>
-      </Card>
-
-      <Button label={t('mealResult.logMeal')} onPress={save} />
-      <Button
-        label={t('common.cancel')}
-        variant="ghost"
-        onPress={() => {
-          clear();
-          router.back();
-        }}
-        style={{ marginTop: Spacing.sm }}
-      />
     </Screen>
   );
 }
@@ -157,10 +164,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 4,
   },
-  totalCard: {
+  totalBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    marginBottom: Spacing.sm,
   },
   totalValue: { fontSize: 22, fontWeight: '800' },
 });

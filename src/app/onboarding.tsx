@@ -3,18 +3,31 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, Field, OptionRow, Screen, Subtitle, Title } from '@/components/ui';
-import { Spacing } from '@/constants/theme';
+import { Button, Card, Field, OptionRow, Screen, StepDots, Subtitle, Title } from '@/components/ui';
+import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { applyRTL, initI18n } from '@/lib/i18n';
+import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 import { dailyTargets } from '@/lib/tdee';
 import type { ActivityLevel, Goal, Language, Profile, Sex } from '@/lib/types';
 
 type Step = 'language' | 'about' | 'activity' | 'goal' | 'results';
 
-const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'active', 'very_active'];
-const GOALS: Goal[] = ['lose', 'maintain', 'gain'];
+const STEP_INDEX: Record<Step, number> = { language: 0, about: 1, activity: 2, goal: 3, results: 4 };
+
+const ACTIVITY_LEVELS: { key: ActivityLevel; emoji: string }[] = [
+  { key: 'sedentary', emoji: '🪑' },
+  { key: 'light', emoji: '🚶' },
+  { key: 'moderate', emoji: '🏃' },
+  { key: 'active', emoji: '💪' },
+  { key: 'very_active', emoji: '🔥' },
+];
+
+const GOALS: { key: Goal; emoji: string }[] = [
+  { key: 'lose', emoji: '📉' },
+  { key: 'maintain', emoji: '⚖️' },
+  { key: 'gain', emoji: '💪' },
+];
 
 export default function Onboarding() {
   const { t } = useTranslation();
@@ -33,7 +46,7 @@ export default function Onboarding() {
 
   const chooseLanguage = async (lang: Language) => {
     setLanguage(lang);
-    initI18n(lang);
+    setI18nLanguage(lang);
     const needsReload = applyRTL(lang);
     if (needsReload) {
       try {
@@ -57,10 +70,7 @@ export default function Onboarding() {
   };
 
   const submitAbout = () => {
-    const a = parseInt(age, 10);
-    const h = parseFloat(height);
-    const w = parseFloat(weight);
-    if (!a || a < 10 || a > 100 || !h || h < 100 || h > 250 || !w || w < 30 || w > 300) {
+    if (!parsedProfile()) {
       Alert.alert(t('onboarding.invalidInput'));
       return;
     }
@@ -78,94 +88,137 @@ export default function Onboarding() {
 
   const preview = parsedProfile();
   const targets = preview ? dailyTargets(preview) : null;
+  const dots = step === 'language' ? null : (
+    <StepDots total={4} current={STEP_INDEX[step] - 1} />
+  );
 
-  return (
-    <Screen>
-      {step === 'language' && (
-        <View style={styles.center}>
-          <Title>{t('onboarding.welcomeTitle')}</Title>
-          <Subtitle>{t('onboarding.welcomeSubtitle')}</Subtitle>
-          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+  if (step === 'language') {
+    return (
+      <Screen scroll={false}>
+        <View style={styles.welcomeCenter}>
+          <Text style={styles.welcomeEmoji}>🥗</Text>
+          <Text style={[Type.display, { color: theme.text, fontSize: 34, textAlign: 'center' }]}>
+            {t('onboarding.welcomeTitle')}
+          </Text>
+          <Text
+            style={[
+              Type.body,
+              { color: theme.textSecondary, textAlign: 'center', marginTop: Spacing.sm, lineHeight: 24 },
+            ]}
+          >
+            {t('onboarding.welcomeSubtitle')}
+          </Text>
+        </View>
+        <View>
+          <Text style={[Type.caption, { color: theme.textTertiary, textAlign: 'center', marginBottom: Spacing.md }]}>
             {t('onboarding.chooseLanguage')}
           </Text>
-          <Button label="English" onPress={() => chooseLanguage('en')} style={styles.langBtn} />
-          <Button label="العربية" onPress={() => chooseLanguage('ar')} style={styles.langBtn} />
+          <Button label="English" onPress={() => chooseLanguage('en')} style={{ marginBottom: Spacing.sm }} />
+          <Button label="العربية" onPress={() => chooseLanguage('ar')} variant="secondary" />
         </View>
-      )}
+      </Screen>
+    );
+  }
 
-      {step === 'about' && (
-        <View>
-          <Title>{t('onboarding.aboutYou')}</Title>
-          <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-            {t('onboarding.sex')}
-          </Text>
-          <View style={styles.row}>
-            <View style={styles.flex}>
-              <OptionRow label={t('onboarding.male')} selected={sex === 'male'} onPress={() => setSex('male')} />
-            </View>
-            <View style={styles.flex}>
-              <OptionRow label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
-            </View>
+  if (step === 'about') {
+    return (
+      <Screen footer={<Button label={t('common.next')} onPress={submitAbout} />}>
+        {dots}
+        <Title>{t('onboarding.aboutYou')}</Title>
+        <View style={[styles.row, { marginBottom: Spacing.md }]}>
+          <View style={{ flex: 1 }}>
+            <OptionRow emoji="👨" label={t('onboarding.male')} selected={sex === 'male'} onPress={() => setSex('male')} />
           </View>
-          <Field label={t('onboarding.age')} value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} />
-          <Field label={t('onboarding.height')} value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={5} />
-          <Field label={t('onboarding.weight')} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={5} />
-          <Button label={t('common.next')} onPress={submitAbout} />
+          <View style={{ flex: 1 }}>
+            <OptionRow emoji="👩" label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
+          </View>
         </View>
-      )}
+        <Field label={t('onboarding.age')} value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} />
+        <Field label={t('onboarding.height')} value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
+        <Field label={t('onboarding.weight')} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={5} suffix="kg" />
+      </Screen>
+    );
+  }
 
-      {step === 'activity' && (
+  if (step === 'activity') {
+    return (
+      <Screen
+        footer={
+          <View>
+            <Button label={t('common.next')} onPress={() => setStep('goal')} />
+            <Button label={t('common.back')} variant="ghost" onPress={() => setStep('about')} style={{ marginTop: Spacing.xs }} />
+          </View>
+        }
+      >
+        {dots}
+        <Title>{t('onboarding.activityTitle')}</Title>
+        {ACTIVITY_LEVELS.map(({ key, emoji }) => (
+          <OptionRow
+            key={key}
+            emoji={emoji}
+            label={t(`onboarding.activity.${key}`)}
+            description={t(`onboarding.activity.${key}Desc`)}
+            selected={activity === key}
+            onPress={() => setActivity(key)}
+          />
+        ))}
+      </Screen>
+    );
+  }
+
+  if (step === 'goal') {
+    return (
+      <Screen
+        footer={
+          <View>
+            <Button label={t('common.next')} onPress={() => setStep('results')} />
+            <Button label={t('common.back')} variant="ghost" onPress={() => setStep('activity')} style={{ marginTop: Spacing.xs }} />
+          </View>
+        }
+      >
+        {dots}
+        <Title>{t('onboarding.goalTitle')}</Title>
+        {GOALS.map(({ key, emoji }) => (
+          <OptionRow
+            key={key}
+            emoji={emoji}
+            label={t(`onboarding.goals.${key}`)}
+            description={t(`onboarding.goals.${key}Desc`)}
+            selected={goal === key}
+            onPress={() => setGoal(key)}
+          />
+        ))}
+      </Screen>
+    );
+  }
+
+  // results — the peak moment: their personal plan revealed
+  return (
+    <Screen
+      footer={
         <View>
-          <Title>{t('onboarding.activityTitle')}</Title>
-          {ACTIVITY_LEVELS.map((level) => (
-            <OptionRow
-              key={level}
-              label={t(`onboarding.activity.${level}`)}
-              description={t(`onboarding.activity.${level}Desc`)}
-              selected={activity === level}
-              onPress={() => setActivity(level)}
-            />
-          ))}
-          <Button label={t('common.next')} onPress={() => setStep('goal')} style={styles.next} />
-          <Button label={t('common.back')} variant="ghost" onPress={() => setStep('about')} />
+          <Button label={t('onboarding.start')} onPress={finish} />
+          <Button label={t('common.back')} variant="ghost" onPress={() => setStep('goal')} style={{ marginTop: Spacing.xs }} />
         </View>
-      )}
-
-      {step === 'goal' && (
-        <View>
-          <Title>{t('onboarding.goalTitle')}</Title>
-          {GOALS.map((g) => (
-            <OptionRow
-              key={g}
-              label={t(`onboarding.goals.${g}`)}
-              description={t(`onboarding.goals.${g}Desc`)}
-              selected={goal === g}
-              onPress={() => setGoal(g)}
-            />
-          ))}
-          <Button label={t('common.next')} onPress={() => setStep('results')} style={styles.next} />
-          <Button label={t('common.back')} variant="ghost" onPress={() => setStep('activity')} />
-        </View>
-      )}
-
-      {step === 'results' && targets && (
-        <View>
-          <Title>{t('onboarding.resultsTitle')}</Title>
-          <Subtitle>{t('onboarding.resultsSubtitle')}</Subtitle>
-          <Card style={styles.caloriesCard}>
-            <Text style={[styles.caloriesValue, { color: theme.primary }]}>{targets.calories}</Text>
-            <Text style={[styles.caloriesLabel, { color: theme.textSecondary }]}>
-              {t('onboarding.dailyCalories')} ({t('common.kcal')})
+      }
+    >
+      {dots}
+      <Title>🎯 {t('onboarding.resultsTitle')}</Title>
+      <Subtitle>{t('onboarding.resultsSubtitle')}</Subtitle>
+      {targets && (
+        <>
+          <View style={[styles.heroCard, { backgroundColor: theme.primary }, cardShadow(theme.shadow)]}>
+            <Text style={[Type.display, { color: theme.onPrimary }]}>{targets.calories}</Text>
+            <Text style={[Type.caption, { color: theme.onPrimary, opacity: 0.85 }]}>
+              {t('onboarding.dailyCalories')} · {t('common.kcal')}
             </Text>
-          </Card>
+          </View>
           <View style={styles.row}>
             <MacroPill label={t('onboarding.protein')} value={targets.proteinG} color={theme.protein} />
             <MacroPill label={t('onboarding.carbs')} value={targets.carbsG} color={theme.carbs} />
             <MacroPill label={t('onboarding.fat')} value={targets.fatG} color={theme.fat} />
           </View>
-          <Button label={t('onboarding.start')} onPress={finish} style={styles.next} />
-          <Button label={t('common.back')} variant="ghost" onPress={() => setStep('goal')} />
-        </View>
+        </>
       )}
     </Screen>
   );
@@ -174,23 +227,24 @@ export default function Onboarding() {
 function MacroPill({ label, value, color }: { label: string; value: number; color: string }) {
   const theme = useTheme();
   return (
-    <Card style={[styles.flex, styles.macroPill]}>
-      <Text style={[styles.macroValue, { color }]}>{value}g</Text>
-      <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{label}</Text>
+    <Card style={styles.macroPill}>
+      <View style={[styles.macroDot, { backgroundColor: color }]} />
+      <Text style={{ fontSize: 20, fontWeight: '800', color: theme.text }}>{value}g</Text>
+      <Text style={[Type.caption, { color: theme.textSecondary }]}>{label}</Text>
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center' },
-  sectionLabel: { fontSize: 14, fontWeight: '500', marginBottom: 8 },
-  langBtn: { marginBottom: Spacing.sm },
-  row: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
-  flex: { flex: 1 },
-  next: { marginTop: Spacing.md, marginBottom: Spacing.sm },
-  caloriesCard: { alignItems: 'center', paddingVertical: Spacing.lg },
-  caloriesValue: { fontSize: 48, fontWeight: '800' },
-  caloriesLabel: { fontSize: 14, marginTop: 4 },
-  macroPill: { alignItems: 'center' },
-  macroValue: { fontSize: 22, fontWeight: '700' },
+  welcomeCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  welcomeEmoji: { fontSize: 72, marginBottom: Spacing.lg },
+  row: { flexDirection: 'row', gap: Spacing.sm },
+  heroCard: {
+    alignItems: 'center',
+    borderRadius: Radius.xl,
+    paddingVertical: Spacing.xl,
+    marginBottom: Spacing.md,
+  },
+  macroPill: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: Spacing.md },
+  macroDot: { width: 10, height: 10, borderRadius: 5 },
 });

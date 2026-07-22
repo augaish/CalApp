@@ -6,7 +6,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { applyRTL, initI18n } from '@/lib/i18n';
+import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 import type { Language } from '@/lib/types';
 
@@ -21,7 +21,7 @@ export default function Settings() {
   const switchLanguage = (lang: Language) => {
     if (lang === language) return;
     setLanguage(lang);
-    initI18n(lang);
+    setI18nLanguage(lang);
     const needsReload = applyRTL(lang);
     if (needsReload) {
       Alert.alert(t('settings.restartNeeded'), t('settings.restartBody'), [
