@@ -1,0 +1,38 @@
+# Full native release: builds the iOS app in EAS cloud and auto-submits to
+# TestFlight / App Store Connect. Trigger by pushing a version tag (v1.2.0)
+# or manually from the Actions tab.
+name: Release (TestFlight)
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        type: choice
+        default: ios
+        options: [ios, android, all]
+
+jobs:
+  build-and-submit:
+    name: EAS build + submit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - run: >-
+          eas build
+          --platform ${{ github.event.inputs.platform || 'ios' }}
+          --profile production
+          --non-interactive
+          --no-wait
+          --auto-submit

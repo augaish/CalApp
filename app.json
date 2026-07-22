@@ -1,0 +1,65 @@
+{
+  "expo": {
+    "name": "CalApp",
+    "slug": "calapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "calapp",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.augaish.calapp",
+      "supportsTablet": false,
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true
+      }
+    },
+    "android": {
+      "package": "com.augaish.calapp",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/images/android-icon-foreground.png",
+        "backgroundImage": "./assets/images/android-icon-background.png",
+        "monochromeImage": "./assets/images/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "locales": {
+      "en": {
+        "CFBundleDisplayName": "CalApp",
+        "NSCameraUsageDescription": "CalApp uses the camera to analyze your meals and gym equipment."
+      },
+      "ar": {
+        "CFBundleDisplayName": "كال آب",
+        "NSCameraUsageDescription": "يستخدم كال آب الكاميرا لتحليل وجباتك وأجهزة النادي."
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-localization",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "CalApp uses the camera to analyze your meals and gym equipment."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#10B981",
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    }
+  }
+}

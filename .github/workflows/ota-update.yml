@@ -1,0 +1,25 @@
+# Over-the-air JS updates: every push to main ships instantly to installed
+# apps via EAS Update — no App Store review needed for JS/asset changes.
+name: OTA Update
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update:
+    name: EAS Update (production channel)
+    runs-on: ubuntu-latest
+    if: ${{ !startsWith(github.event.head_commit.message, 'release:') }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - run: eas update --channel production --message "${{ github.event.head_commit.message }}" --non-interactive
