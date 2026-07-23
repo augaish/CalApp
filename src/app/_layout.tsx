@@ -12,6 +12,7 @@ export default function RootLayout() {
   const hydrated = useAppStore((s) => s.hydrated);
   const language = useAppStore((s) => s.language);
   const profile = useAppStore((s) => s.profile);
+  const account = useAppStore((s) => s.account);
 
   const lang = language ?? deviceLanguage();
 
@@ -28,10 +29,13 @@ export default function RootLayout() {
     <ThemeProvider value={DefaultTheme}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Protected guard={!profile}>
+        <Stack.Protected guard={!account}>
+          <Stack.Screen name="login" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!account && !profile}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
-        <Stack.Protected guard={!!profile}>
+        <Stack.Protected guard={!!account && !!profile}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="meal-result" options={{ presentation: 'modal' }} />

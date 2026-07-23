@@ -7,6 +7,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { timestampFor, useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
@@ -19,6 +20,7 @@ export default function MealResult() {
   const analysis = usePending((s) => s.meal);
   const photoUri = usePending((s) => s.photoUri);
   const logMeal = useAppStore((s) => s.logMeal);
+  const viewDay = useViewDay((s) => s.day);
 
   const [items, setItems] = useState<FoodItem[]>(analysis?.items ?? []);
 
@@ -39,7 +41,7 @@ export default function MealResult() {
   // scan simply overwrites it.
   // Land on the Food tab so the user sees the meal appear in their log.
   const save = () => {
-    logMeal(items, photoUri ?? undefined);
+    logMeal(items, photoUri ?? undefined, undefined, timestampFor(viewDay));
     successHaptic();
     router.dismissTo('/(tabs)/food');
   };

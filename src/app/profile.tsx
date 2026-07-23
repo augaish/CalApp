@@ -21,6 +21,8 @@ export default function Profile() {
   const setLanguage = useAppStore((s) => s.setLanguage);
   const targets = useAppStore((s) => s.targets);
   const profile = useAppStore((s) => s.profile);
+  const account = useAppStore((s) => s.account);
+  const signOut = useAppStore((s) => s.signOut);
   const remindMeals = useAppStore((s) => s.remindMeals);
   const remindWater = useAppStore((s) => s.remindWater);
   const setRemindMeals = useAppStore((s) => s.setRemindMeals);
@@ -59,9 +61,35 @@ export default function Profile() {
     }
   };
 
+  const confirmSignOut = () => {
+    Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('profile.signOut'), style: 'destructive', onPress: () => signOut() },
+    ]);
+  };
+
   return (
     <Screen>
       <Title>{t('profile.title')}</Title>
+
+      {/* Account */}
+      <Card style={styles.accountCard}>
+        <View style={[styles.avatar, { backgroundColor: theme.cardSubtle }]}>
+          <Ionicons name="person" size={24} color={theme.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: theme.text, fontSize: 17, fontWeight: '700' }}>
+            {account?.name ?? t('profile.guest')}
+          </Text>
+          {account?.email ? (
+            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{account.email}</Text>
+          ) : null}
+        </View>
+        <Pressable onPress={confirmSignOut} hitSlop={8} style={styles.signOutBtn}>
+          <Ionicons name="log-out-outline" size={18} color={theme.danger} />
+          <Text style={{ color: theme.danger, fontWeight: '600' }}>{t('profile.signOut')}</Text>
+        </Pressable>
+      </Card>
 
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.language')}</Text>
       <View style={styles.row}>
@@ -120,11 +148,42 @@ export default function Profile() {
         </View>
       </Card>
 
+      <Text style={[styles.section, { color: theme.textSecondary }]}>
+        {t('profile.connections')}
+      </Text>
+      <Card>
+        <ConnectionRow icon="watch-outline" label={t('profile.appleHealth')} />
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <ConnectionRow icon="fitness-outline" label={t('profile.whoop')} />
+      </Card>
+
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.about')}</Text>
       <Card>
         <Row label={t('settings.version')} value={Constants.expoConfig?.version ?? '1.0.0'} />
       </Card>
     </Screen>
+  );
+}
+
+function ConnectionRow({
+  icon,
+  label,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  return (
+    <View style={styles.connRow}>
+      <Ionicons name={icon} size={22} color={theme.text} />
+      <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>{label}</Text>
+      <View style={[styles.soonBadge, { backgroundColor: theme.cardSubtle }]}>
+        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
+          {t('profile.comingSoon')}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -148,4 +207,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 6,
   },
+  accountCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  signOutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  connRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: 8 },
+  soonBadge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  divider: { height: StyleSheet.hairlineWidth, marginVertical: 4 },
 });

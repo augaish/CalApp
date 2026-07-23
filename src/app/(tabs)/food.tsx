@@ -34,6 +34,7 @@ export default function Food() {
   return (
     <Screen>
       <View style={styles.headerRow}>
+        <Ionicons name="restaurant" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('tabs.food')}</Text>
         <Pressable onPress={() => shift(-1)} hitSlop={10} style={styles.arrow}>
           <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
     marginBottom: Spacing.xs,
   },
   arrow: { padding: 4 },

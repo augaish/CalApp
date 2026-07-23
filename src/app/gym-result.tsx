@@ -8,6 +8,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { timestampFor, useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
 import { useAppStore, workoutBurnEstimate } from '@/lib/store';
@@ -20,6 +21,7 @@ export default function GymResult() {
   const photoUri = usePending((s) => s.photoUri);
   const logWorkout = useAppStore((s) => s.logWorkout);
   const profile = useAppStore((s) => s.profile);
+  const viewDay = useViewDay((s) => s.day);
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -31,7 +33,13 @@ export default function GymResult() {
   // Lands on the Training tab so the workout is visibly logged.
   const save = () => {
     const burned = profile ? workoutBurnEstimate(profile.weightKg) : undefined;
-    logWorkout(analysis.name, analysis.suggestion.sets, analysis.suggestion.reps, burned);
+    logWorkout(
+      analysis.name,
+      analysis.suggestion.sets,
+      analysis.suggestion.reps,
+      burned,
+      timestampFor(viewDay),
+    );
     successHaptic();
     router.dismissTo('/(tabs)/training');
   };

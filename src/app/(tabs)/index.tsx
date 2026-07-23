@@ -19,7 +19,7 @@ import { Ring } from '@/components/ring';
 import { Button, Field } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useViewDay } from '@/lib/day';
+import { timestampFor, useViewDay } from '@/lib/day';
 import {
   burnedForDay,
   isSameDay,
@@ -30,10 +30,11 @@ import {
   waterTargetMl,
 } from '@/lib/store';
 
-function lastSevenDays(): Date[] {
+/** Seven days ending on (and including) the given day. */
+function sevenDaysEnding(end: Date): Date[] {
   const days: Date[] = [];
   for (let i = 6; i >= 0; i--) {
-    const d = new Date();
+    const d = new Date(end);
     d.setDate(d.getDate() - i);
     days.push(d);
   }
@@ -72,7 +73,7 @@ export default function Overview() {
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const streak = streakDays(meals);
 
-  const days = lastSevenDays();
+  const days = sevenDaysEnding(selected);
   const chartLabels = days.map((d) => d.toLocaleDateString(locale, { weekday: 'narrow' }));
   const calValues = days.map((d) => Math.round(totalsForDay(meals, d).calories));
   // Last 8 weight entries oldest→newest, with short date labels for the x-axis.
@@ -88,7 +89,7 @@ export default function Overview() {
       Alert.alert(t('onboarding.invalidInput'));
       return;
     }
-    logWeight(value);
+    logWeight(value, timestampFor(selected));
     setKg('');
   };
 
@@ -260,7 +261,7 @@ export default function Overview() {
             <View style={styles.halfHead}>
               <Ionicons name="flame" size={18} color={theme.carbs} />
               <Text style={[styles.halfTitle, { color: theme.text }]}>
-                {t('training.burnedToday')}
+                {t('training.burned')}
               </Text>
             </View>
             <Text style={[styles.halfValue, { color: theme.text }]}>

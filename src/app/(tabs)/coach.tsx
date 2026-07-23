@@ -59,9 +59,10 @@ export default function Coach() {
       keyboardVerticalOffset={0}
     >
       <View style={{ flex: 1, paddingTop: insets.top + Spacing.md }}>
-        <Text style={[Type.title, { color: theme.text, paddingHorizontal: Spacing.md }]}>
-          {t('coach.title')}
-        </Text>
+        <View style={styles.titleRow}>
+          <Ionicons name="sparkles" size={22} color={theme.primary} />
+          <Text style={[Type.title, { color: theme.text }]}>{t('coach.title')}</Text>
+        </View>
         <ScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
@@ -134,6 +135,12 @@ function Bubble({ role, text }: { role: 'user' | 'assistant'; text: string }) {
 }
 
 const styles = StyleSheet.create({
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: Spacing.md,
+  },
   bubble: {
     maxWidth: '82%',
     borderRadius: Radius.lg,

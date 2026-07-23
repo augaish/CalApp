@@ -19,7 +19,14 @@ export interface WaterEntry {
   ml: number;
 }
 
+export interface Account {
+  name: string;
+  email?: string;
+  provider: 'google' | 'guest';
+}
+
 interface AppState {
+  account: Account | null;
   language: Language | null;
   profile: Profile | null;
   targets: DailyTargets | null;
@@ -31,13 +38,21 @@ interface AppState {
   remindWater: boolean;
   hydrated: boolean;
 
+  setAccount: (account: Account | null) => void;
+  signOut: () => void;
   setLanguage: (language: Language) => void;
   setProfile: (profile: Profile) => void;
-  logMeal: (items: FoodItem[], photoUri?: string, mealType?: MealType) => void;
+  logMeal: (items: FoodItem[], photoUri?: string, mealType?: MealType, at?: string) => void;
   removeMeal: (id: string) => void;
-  logWorkout: (equipmentName: string, sets?: number, reps?: string, caloriesBurned?: number) => void;
-  logWater: (ml: number) => void;
-  logWeight: (kg: number) => void;
+  logWorkout: (
+    equipmentName: string,
+    sets?: number,
+    reps?: string,
+    caloriesBurned?: number,
+    at?: string,
+  ) => void;
+  logWater: (ml: number, at?: string) => void;
+  logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
   setHydrated: () => void;
@@ -59,6 +74,7 @@ function id(): string {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
+      account: null,
       language: null,
       profile: null,
       targets: null,
@@ -70,14 +86,16 @@ export const useAppStore = create<AppState>()(
       remindWater: false,
       hydrated: false,
 
+      setAccount: (account) => set({ account }),
+      signOut: () => set({ account: null }),
       setLanguage: (language) => set({ language }),
       setProfile: (profile) => set({ profile, targets: dailyTargets(profile) }),
-      logMeal: (items, photoUri, mealType) =>
+      logMeal: (items, photoUri, mealType, at) =>
         set((s) => ({
           meals: [
             {
               id: id(),
-              at: new Date().toISOString(),
+              at: at ?? new Date().toISOString(),
               items,
               photoUri,
               mealType: mealType ?? mealTypeForNow(),
@@ -86,17 +104,17 @@ export const useAppStore = create<AppState>()(
           ],
         })),
       removeMeal: (mealId) => set((s) => ({ meals: s.meals.filter((m) => m.id !== mealId) })),
-      logWorkout: (equipmentName, sets, reps, caloriesBurned) =>
+      logWorkout: (equipmentName, sets, reps, caloriesBurned, at) =>
         set((s) => ({
           workouts: [
-            { id: id(), at: new Date().toISOString(), equipmentName, sets, reps, caloriesBurned },
+            { id: id(), at: at ?? new Date().toISOString(), equipmentName, sets, reps, caloriesBurned },
             ...s.workouts,
           ],
         })),
-      logWater: (ml) =>
-        set((s) => ({ water: [{ at: new Date().toISOString(), ml }, ...s.water] })),
-      logWeight: (kg) =>
-        set((s) => ({ weights: [{ at: new Date().toISOString(), kg }, ...s.weights] })),
+      logWater: (ml, at) =>
+        set((s) => ({ water: [{ at: at ?? new Date().toISOString(), ml }, ...s.water] })),
+      logWeight: (kg, at) =>
+        set((s) => ({ weights: [{ at: at ?? new Date().toISOString(), kg }, ...s.weights] })),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
       setHydrated: () => set({ hydrated: true }),
@@ -105,6 +123,7 @@ export const useAppStore = create<AppState>()(
       name: 'calapp-store',
       storage: createJSONStorage(() => AsyncStorage),
       partialize: ({
+        account,
         language,
         profile,
         targets,
@@ -115,6 +134,7 @@ export const useAppStore = create<AppState>()(
         remindMeals,
         remindWater,
       }) => ({
+        account,
         language,
         profile,
         targets,
