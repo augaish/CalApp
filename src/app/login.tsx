@@ -44,7 +44,6 @@ export default function Login() {
             contentFit="contain"
           />
         </View>
-        <Text style={styles.title}>{t('auth.welcomeTitle')}</Text>
         <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
       </View>
 
@@ -81,16 +80,15 @@ const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: Spacing.lg, justifyContent: 'space-between' },
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   logo: {
-    width: 104,
-    height: 104,
-    borderRadius: 52,
+    width: 128,
+    height: 128,
+    borderRadius: 64,
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.lg,
   },
-  logoImg: { width: 68, height: 68 },
-  title: { color: '#FFFFFF', fontSize: 40, fontWeight: '800', letterSpacing: -1 },
+  logoImg: { width: 88, height: 88 },
   subtitle: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 16,

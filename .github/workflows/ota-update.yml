@@ -5,12 +5,13 @@ name: OTA Update
 on:
   push:
     branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   update:
     name: EAS Update (production channel)
     runs-on: ubuntu-latest
-    if: ${{ !startsWith(github.event.head_commit.message, 'release:') }}
+    if: ${{ github.event_name != 'push' || !startsWith(github.event.head_commit.message, 'release:') }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,4 +23,4 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
-      - run: eas update --channel production --message "${{ github.event.head_commit.message }}" --non-interactive
+      - run: eas update --channel production --message "${{ github.event.head_commit.message || format('Manual OTA update ({0})', github.sha) }}" --non-interactive
