@@ -4,8 +4,16 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 import {
+  canonicalKey,
+  cacheEnabled,
+  getCachedEquipment,
+  initDb,
+  setCachedEquipment,
+} from './db.js';
+import {
   coachSystemPrompt,
-  equipmentPrompt,
+  equipmentDetailsPrompt,
+  identifyEquipmentPrompt,
   mealPrompt,
   textMealPrompt,
   type Language,
@@ -19,7 +27,7 @@ const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
 const app = new Hono();
 app.use('*', cors());
 
-app.get('/health', (c) => c.json({ ok: true }));
+app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled }));
 
 interface AnalyzeBody {
   image?: string;
@@ -53,10 +61,22 @@ async function analyze(image: string, prompt: string): Promise<unknown> {
     ],
   });
 
-  const text = response.content.find((b) => b.type === 'text')?.text ?? '';
+  return parseJson(response.content.find((b) => b.type === 'text')?.text ?? '');
+}
+
+/** Text-only completion (no image) — used for cacheable equipment details. */
+async function textCall(prompt: string, maxTokens = 1000): Promise<unknown> {
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return parseJson(response.content.find((b) => b.type === 'text')?.text ?? '');
+}
+
+function parseJson(text: string): unknown {
   // Strip accidental markdown fences before parsing.
-  const cleaned = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-  return JSON.parse(cleaned);
+  return JSON.parse(text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
 }
 
 app.post('/api/analyze-meal', async (c) => {
@@ -75,8 +95,36 @@ app.post('/api/analyze-equipment', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
   try {
-    const result = await analyze(parsed.image, equipmentPrompt(parsed.language));
-    return c.json(result);
+    // Step 1: cheap vision call to identify the machine.
+    const id = (await analyze(parsed.image, identifyEquipmentPrompt(parsed.language))) as {
+      name?: string;
+      confidence?: number;
+    };
+    const name = (id.name ?? '').trim();
+    if (!name) {
+      return c.json({
+        name: parsed.language === 'ar' ? 'لا يوجد جهاز واضح' : 'No equipment detected',
+        primaryMuscles: [],
+        secondaryMuscles: [],
+        setupSteps: [],
+        formCues: [],
+        commonMistakes: [],
+        suggestion: { sets: 0, reps: '', note: '' },
+        confidence: 0,
+      });
+    }
+
+    // Step 2: serve the token-heavy analysis from the shared cache when possible.
+    const key = canonicalKey(name);
+    const cached = await getCachedEquipment(key, parsed.language);
+    if (cached) {
+      return c.json(cached);
+    }
+
+    // Step 3: cache miss — generate details (text only, no image) and store.
+    const details = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500);
+    await setCachedEquipment(key, parsed.language, details);
+    return c.json(details);
   } catch (err) {
     console.error('analyze-equipment failed:', err);
     return c.json({ error: 'analysis_failed' }, 502);
@@ -132,6 +180,17 @@ app.post('/api/coach', async (c) => {
   }
 });
 
-serve({ fetch: app.fetch, port: PORT }, (info) => {
-  console.log(`CalApp AI server listening on :${info.port} (model: ${MODEL})`);
-});
+initDb()
+  .then(() => {
+    serve({ fetch: app.fetch, port: PORT }, (info) => {
+      console.log(
+        `Calgym AI server listening on :${info.port} (model: ${MODEL}, cache: ${cacheEnabled ? 'on' : 'off'})`,
+      );
+    });
+  })
+  .catch((err) => {
+    console.error('DB init failed, starting without cache:', err);
+    serve({ fetch: app.fetch, port: PORT }, (info) => {
+      console.log(`Calgym AI server listening on :${info.port} (model: ${MODEL}, cache: off)`);
+    });
+  });
