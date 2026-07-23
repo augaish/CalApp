@@ -109,7 +109,6 @@ export default function Overview() {
             style={styles.brandLogo}
             contentFit="contain"
           />
-          <Text style={[styles.brandName, { color: theme.onGradient }]}>{t('common.appName')}</Text>
           <View style={{ flex: 1 }} />
           <View style={[styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
             <Ionicons name="flame" size={16} color="#FFD166" />
@@ -361,8 +360,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
-  brandLogo: { width: 26, height: 26 },
-  brandName: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  brandLogo: { width: 30, height: 30 },
   headerCenter: {
     flexDirection: 'row',
     // Fixed LTR order: RN auto-mirrors 'row' for RTL, but the chevron glyphs
