@@ -122,10 +122,18 @@ export default function Training() {
             </Text>
             <View style={styles.chipWrap}>
               {routine.map((m) => (
-                <View key={m} style={[styles.chip, { backgroundColor: theme.cardSubtle }]}>
-                  <Ionicons name="barbell-outline" size={14} color={theme.primary} />
+                <Pressable
+                  key={m}
+                  onPress={() => router.push(`/workout-edit?name=${encodeURIComponent(m)}`)}
+                  style={({ pressed }) => [
+                    styles.chip,
+                    { backgroundColor: theme.cardSubtle },
+                    pressed && { transform: [{ scale: 0.95 }] },
+                  ]}
+                >
+                  <Ionicons name="add" size={14} color={theme.primary} />
                   <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}>{m}</Text>
-                </View>
+                </Pressable>
               ))}
             </View>
           </>

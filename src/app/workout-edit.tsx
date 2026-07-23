@@ -11,7 +11,12 @@ import { useAppStore, workoutBurnEstimate } from '@/lib/store';
 export default function WorkoutEdit() {
   const { t } = useTranslation();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, name: nameParam, sets: setsParam, reps: repsParam } = useLocalSearchParams<{
+    id?: string;
+    name?: string;
+    sets?: string;
+    reps?: string;
+  }>();
 
   const workouts = useAppStore((s) => s.workouts);
   const addWorkout = useAppStore((s) => s.addWorkout);
@@ -22,9 +27,11 @@ export default function WorkoutEdit() {
 
   const existing = id ? workouts.find((w) => w.id === id) : undefined;
 
-  const [name, setName] = useState(existing?.equipmentName ?? '');
-  const [sets, setSets] = useState(existing?.sets ? String(existing.sets) : '');
-  const [reps, setReps] = useState(existing?.reps ?? '');
+  const [name, setName] = useState(existing?.equipmentName ?? nameParam ?? '');
+  const [sets, setSets] = useState(
+    existing?.sets ? String(existing.sets) : (setsParam ?? ''),
+  );
+  const [reps, setReps] = useState(existing?.reps ?? repsParam ?? '');
   const [weight, setWeight] = useState(
     existing?.weightLiftedKg ? String(existing.weightLiftedKg) : '',
   );
@@ -49,12 +56,12 @@ export default function WorkoutEdit() {
         caloriesBurned: profile ? workoutBurnEstimate(profile.weightKg) : undefined,
       });
     }
-    if (router.canGoBack()) router.back();
+    router.dismissTo('/(tabs)/training');
   };
 
   const del = () => {
     if (existing) removeWorkout(existing.id);
-    if (router.canGoBack()) router.back();
+    router.dismissTo('/(tabs)/training');
   };
 
   return (

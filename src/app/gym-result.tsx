@@ -8,10 +8,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { timestampFor, useViewDay } from '@/lib/day';
-import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
-import { useAppStore, workoutBurnEstimate } from '@/lib/store';
 
 export default function GymResult() {
   const { t } = useTranslation();
@@ -19,9 +16,6 @@ export default function GymResult() {
   const router = useRouter();
   const analysis = usePending((s) => s.equipment);
   const photoUri = usePending((s) => s.photoUri);
-  const logWorkout = useAppStore((s) => s.logWorkout);
-  const profile = useAppStore((s) => s.profile);
-  const viewDay = useViewDay((s) => s.day);
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -29,19 +23,15 @@ export default function GymResult() {
 
   if (!analysis) return null;
 
-  // Pending data is intentionally not cleared on close (see meal-result).
-  // Lands on the Training tab so the workout is visibly logged.
+  // "Log this exercise" opens the entry page (prefilled from the scan) so the
+  // user records the actual sets/reps/weight lifted before it's saved.
   const save = () => {
-    const burned = profile ? workoutBurnEstimate(profile.weightKg) : undefined;
-    logWorkout(
-      analysis.name,
-      analysis.suggestion.sets,
-      analysis.suggestion.reps,
-      burned,
-      timestampFor(viewDay),
-    );
-    successHaptic();
-    router.dismissTo('/(tabs)/training');
+    const params = new URLSearchParams({
+      name: analysis.name,
+      sets: String(analysis.suggestion.sets),
+      reps: analysis.suggestion.reps,
+    });
+    router.push(`/workout-edit?${params.toString()}`);
   };
 
   return (
