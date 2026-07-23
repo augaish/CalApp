@@ -12,7 +12,8 @@
       "bundleIdentifier": "com.augaish.calapp",
       "supportsTablet": false,
       "infoPlist": {
-        "CFBundleAllowMixedLocalizations": true
+        "CFBundleAllowMixedLocalizations": true,
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
