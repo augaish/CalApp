@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -38,6 +39,7 @@ export default function MealResult() {
   // scan simply overwrites it.
   const save = () => {
     logMeal(items, photoUri ?? undefined);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (router.canGoBack()) router.back();
   };
 

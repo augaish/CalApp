@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -231,7 +232,10 @@ export default function Home() {
           </View>
           {selectedIsToday && (
             <Pressable
-              onPress={() => logWater(GLASS_ML)}
+              onPress={() => {
+                logWater(GLASS_ML);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
               style={({ pressed }) => [
                 styles.waterAdd,
                 { backgroundColor: theme.cardSubtle },

@@ -3,12 +3,13 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
+import { setMealReminders, setWaterReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
 import type { Language } from '@/lib/types';
 
@@ -20,6 +21,22 @@ export default function Settings() {
   const setLanguage = useAppStore((s) => s.setLanguage);
   const targets = useAppStore((s) => s.targets);
   const profile = useAppStore((s) => s.profile);
+  const remindMeals = useAppStore((s) => s.remindMeals);
+  const remindWater = useAppStore((s) => s.remindWater);
+  const setRemindMeals = useAppStore((s) => s.setRemindMeals);
+  const setRemindWater = useAppStore((s) => s.setRemindWater);
+
+  const toggleReminder = async (kind: 'meals' | 'water', on: boolean) => {
+    const apply = kind === 'meals' ? setMealReminders : setWaterReminders;
+    const save = kind === 'meals' ? setRemindMeals : setRemindWater;
+    const ok = await apply(on);
+    if (on && !ok) {
+      Alert.alert(t('reminders.permissionDenied'));
+      save(false);
+      return;
+    }
+    save(on);
+  };
 
   const switchLanguage = (lang: Language) => {
     if (lang === language) return;
@@ -80,6 +97,28 @@ export default function Settings() {
           </Card>
         </>
       )}
+
+      <Text style={[styles.section, { color: theme.textSecondary }]}>
+        {t('reminders.section')}
+      </Text>
+      <Card>
+        <View style={styles.kvRow}>
+          <Text style={{ color: theme.text, fontSize: 16 }}>{t('reminders.meals')}</Text>
+          <Switch
+            value={remindMeals}
+            onValueChange={(v) => toggleReminder('meals', v)}
+            trackColor={{ true: theme.primary }}
+          />
+        </View>
+        <View style={styles.kvRow}>
+          <Text style={{ color: theme.text, fontSize: 16 }}>{t('reminders.water')}</Text>
+          <Switch
+            value={remindWater}
+            onValueChange={(v) => toggleReminder('water', v)}
+            trackColor={{ true: theme.primary }}
+          />
+        </View>
+      </Card>
 
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.about')}</Text>
       <Card>

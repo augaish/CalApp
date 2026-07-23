@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
@@ -28,6 +29,7 @@ export default function GymResult() {
   // Pending data is intentionally not cleared on close (see meal-result).
   const save = () => {
     logWorkout(analysis.name, analysis.suggestion.sets, analysis.suggestion.reps);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     if (router.canGoBack()) router.back();
   };
 

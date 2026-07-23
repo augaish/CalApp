@@ -27,6 +27,8 @@ interface AppState {
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
+  remindMeals: boolean;
+  remindWater: boolean;
   hydrated: boolean;
 
   setLanguage: (language: Language) => void;
@@ -36,6 +38,8 @@ interface AppState {
   logWorkout: (equipmentName: string, sets?: number, reps?: string) => void;
   logWater: (ml: number) => void;
   logWeight: (kg: number) => void;
+  setRemindMeals: (on: boolean) => void;
+  setRemindWater: (on: boolean) => void;
   setHydrated: () => void;
 }
 
@@ -62,6 +66,8 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       water: [],
       weights: [],
+      remindMeals: false,
+      remindWater: false,
       hydrated: false,
 
       setLanguage: (language) => set({ language }),
@@ -91,12 +97,14 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ water: [{ at: new Date().toISOString(), ml }, ...s.water] })),
       logWeight: (kg) =>
         set((s) => ({ weights: [{ at: new Date().toISOString(), kg }, ...s.weights] })),
+      setRemindMeals: (on) => set({ remindMeals: on }),
+      setRemindWater: (on) => set({ remindWater: on }),
       setHydrated: () => set({ hydrated: true }),
     }),
     {
       name: 'calapp-store',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: ({ language, profile, targets, meals, workouts, water, weights }) => ({
+      partialize: ({
         language,
         profile,
         targets,
@@ -104,6 +112,18 @@ export const useAppStore = create<AppState>()(
         workouts,
         water,
         weights,
+        remindMeals,
+        remindWater,
+      }) => ({
+        language,
+        profile,
+        targets,
+        meals,
+        workouts,
+        water,
+        weights,
+        remindMeals,
+        remindWater,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
