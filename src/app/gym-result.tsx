@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect } from 'react';
@@ -9,6 +8,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
 import { useAppStore, workoutBurnEstimate } from '@/lib/store';
 
@@ -32,7 +32,7 @@ export default function GymResult() {
   const save = () => {
     const burned = profile ? workoutBurnEstimate(profile.weightKg) : undefined;
     logWorkout(analysis.name, analysis.suggestion.sets, analysis.suggestion.reps, burned);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    successHaptic();
     router.dismissTo('/(tabs)/training');
   };
 

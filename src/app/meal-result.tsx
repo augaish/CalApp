@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -8,6 +7,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
 import type { FoodItem } from '@/lib/types';
@@ -40,7 +40,7 @@ export default function MealResult() {
   // Land on the Food tab so the user sees the meal appear in their log.
   const save = () => {
     logMeal(items, photoUri ?? undefined);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    successHaptic();
     router.dismissTo('/(tabs)/food');
   };
 

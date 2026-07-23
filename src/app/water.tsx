@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -17,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { lightHaptic } from '@/lib/feedback';
 import { useAppStore } from '@/lib/store';
 
 const QUICK_ML = [250, 500, 750];
@@ -32,7 +32,7 @@ export default function WaterSheet() {
   const add = (ml: number) => {
     if (!ml || ml <= 0 || ml > 5000) return;
     logWater(Math.round(ml));
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    lightHaptic();
     router.back();
   };
 
