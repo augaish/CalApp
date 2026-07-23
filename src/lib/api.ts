@@ -1,4 +1,4 @@
-import type { EquipmentAnalysis, Language, MealAnalysis } from './types';
+import type { ChatMessage, EquipmentAnalysis, FoodItem, Language, MealAnalysis } from './types';
 
 /**
  * Base URL of the CalApp AI server (see server/ in this repo).
@@ -35,6 +35,51 @@ export async function analyzeEquipment(
 ): Promise<EquipmentAnalysis> {
   if (isMockMode) return mockEquipment(language);
   return post<EquipmentAnalysis>('/api/analyze-equipment', { image: imageBase64, language });
+}
+
+export async function analyzeText(text: string, language: Language): Promise<MealAnalysis> {
+  if (isMockMode) {
+    await delay(1200);
+    const mock = await mockMeal(language);
+    return { ...mock, items: mock.items.slice(0, 1) };
+  }
+  return post<MealAnalysis>('/api/analyze-text', { text, language });
+}
+
+export async function coachChat(messages: ChatMessage[], language: Language): Promise<string> {
+  if (isMockMode) {
+    await delay(900);
+    return ''; // caller substitutes the localized mock reply
+  }
+  const res = await post<{ reply: string }>('/api/coach', { messages, language });
+  return res.reply;
+}
+
+/** Open Food Facts lookup — free public API, called directly from the app. */
+export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
+  const res = await fetch(
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,nutriments`,
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    status: number;
+    product?: {
+      product_name?: string;
+      nutriments?: Record<string, number>;
+    };
+  };
+  if (data.status !== 1 || !data.product) return null;
+  const n = data.product.nutriments ?? {};
+  const kcal = n['energy-kcal_100g'];
+  if (!kcal && kcal !== 0) return null;
+  return {
+    name: data.product.product_name || barcode,
+    calories: Math.round(kcal),
+    proteinG: Math.round(n['proteins_100g'] ?? 0),
+    carbsG: Math.round(n['carbohydrates_100g'] ?? 0),
+    fatG: Math.round(n['fat_100g'] ?? 0),
+    portion: '100 g',
+  };
 }
 
 function delay(ms: number) {

@@ -45,12 +45,25 @@ export interface MealAnalysis {
   notes?: string;
 }
 
+export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+
 export interface LoggedMeal {
   id: string;
   /** ISO date-time when logged */
   at: string;
   items: FoodItem[];
   photoUri?: string;
+  mealType?: MealType;
+}
+
+export interface WeightEntry {
+  at: string;
+  kg: number;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 export interface EquipmentAnalysis {

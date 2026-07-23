@@ -9,13 +9,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeEquipment, analyzeMeal, isMockMode } from '@/lib/api';
+import { analyzeEquipment, analyzeMeal, isMockMode, lookupBarcode } from '@/lib/api';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
 
 export default function Scan() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isGym = mode === 'gym';
+  const isBarcode = mode === 'barcode';
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
@@ -44,6 +45,24 @@ export default function Scan() {
       </View>
     );
   }
+
+  const onBarcode = async (data: string) => {
+    if (analyzing) return;
+    setAnalyzing(true);
+    try {
+      const item = await lookupBarcode(data);
+      if (!item) {
+        Alert.alert(t('barcode.notFound'));
+        setAnalyzing(false);
+        return;
+      }
+      setMeal({ items: [item], confidence: 1 }, null);
+      router.replace('/meal-result');
+    } catch {
+      Alert.alert(t('common.error'));
+      setAnalyzing(false);
+    }
+  };
 
   const capture = async () => {
     if (analyzing || !cameraRef.current) return;
@@ -78,11 +97,25 @@ export default function Scan() {
 
   return (
     <View style={styles.container}>
-      <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+      <CameraView
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        facing="back"
+        barcodeScannerSettings={
+          isBarcode
+            ? { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'] }
+            : undefined
+        }
+        onBarcodeScanned={isBarcode ? ({ data }) => onBarcode(data) : undefined}
+      />
 
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
-        <Text style={styles.title}>{isGym ? t('scan.gymTitle') : t('scan.mealTitle')}</Text>
-        <Text style={styles.hint}>{isGym ? t('scan.gymHint') : t('scan.mealHint')}</Text>
+        <Text style={styles.title}>
+          {isGym ? t('scan.gymTitle') : isBarcode ? t('addMenu.scanBarcode') : t('scan.mealTitle')}
+        </Text>
+        <Text style={styles.hint}>
+          {isGym ? t('scan.gymHint') : isBarcode ? t('barcode.hint') : t('scan.mealHint')}
+        </Text>
         {isMockMode && <Text style={styles.mockBadge}>{t('scan.mockBadge')}</Text>}
       </View>
 
@@ -100,14 +133,20 @@ export default function Scan() {
           <View style={styles.analyzing}>
             <ActivityIndicator color="#fff" size="large" />
             <Text style={styles.analyzingText}>
-              {isGym ? t('scan.analyzingGym') : t('scan.analyzingMeal')}
+              {isBarcode
+                ? t('barcode.searching')
+                : isGym
+                  ? t('scan.analyzingGym')
+                  : t('scan.analyzingMeal')}
             </Text>
           </View>
         ) : (
           <>
-            <Pressable onPress={capture} style={styles.shutterOuter}>
-              <View style={styles.shutterInner} />
-            </Pressable>
+            {!isBarcode && (
+              <Pressable onPress={capture} style={styles.shutterOuter}>
+                <View style={styles.shutterInner} />
+              </Pressable>
+            )}
             <Pressable onPress={() => router.back()} style={styles.cancel}>
               <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>

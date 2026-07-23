@@ -73,6 +73,52 @@ export const en = {
     goal: 'goal',
     water: 'Water',
     ml: 'ml',
+    mealTypes: {
+      breakfast: 'Breakfast',
+      lunch: 'Lunch',
+      dinner: 'Dinner',
+      snack: 'Snacks',
+    },
+  },
+  addMenu: {
+    title: 'Add',
+    scanMeal: 'Scan meal with camera',
+    scanBarcode: 'Scan barcode',
+    describe: 'Describe your meal',
+    scanGym: 'Scan gym equipment',
+  },
+  describe: {
+    title: 'Describe your meal',
+    placeholder: 'e.g. 2 boiled eggs and toast with honey',
+    analyze: 'Analyze',
+  },
+  barcode: {
+    hint: 'Center the barcode in the frame',
+    notFound: 'Product not found. Try scanning it with the camera instead.',
+    searching: 'Looking up product…',
+  },
+  progress: {
+    title: 'Progress',
+    calories7d: 'Calories · last 7 days',
+    water7d: 'Water · last 7 days',
+    weight: 'Weight',
+    logWeight: 'Log weight',
+    kg: 'kg',
+    noWeights: 'Log your weight to see your trend.',
+    workouts: 'Workouts',
+    noWorkouts: 'No workouts logged yet. Scan a machine at the gym!',
+    dayStreak: 'day streak',
+  },
+  coach: {
+    title: 'Coach',
+    intro: "I'm your AI nutrition & training coach. Ask me anything — meals, macros, machines, form.",
+    placeholder: 'Ask me anything…',
+    mockReply:
+      'Demo mode: connect the AI server to chat with your real coach. Meanwhile: protein at every meal, water before coffee, and never skip leg day. 😉',
+  },
+  editProfile: {
+    title: 'Edit profile & goals',
+    save: 'Save changes',
   },
   scan: {
     mealTitle: 'Scan your meal',

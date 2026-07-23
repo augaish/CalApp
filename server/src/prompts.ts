@@ -27,6 +27,36 @@ Rules:
 - Be realistic about portions: estimate from what is visible, not standard servings.`;
 }
 
+export function textMealPrompt(language: Language, text: string): string {
+  return `You are a nutrition analysis expert with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes.
+
+The user described a meal in text: "${text.replace(/"/g, "'")}"
+
+Estimate the foods, portions, calories and macros.
+
+Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
+{
+  "items": [
+    { "name": string, "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "portion": string }
+  ],
+  "confidence": number,
+  "notes": string
+}
+
+Rules:
+- "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
+- "confidence" is 0-1. Use "notes" for one short caveat in ${LANGUAGE_NAME[language]} (or "").
+- If the text is not about food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.`;
+}
+
+export function coachSystemPrompt(language: Language): string {
+  return `You are CalApp Coach, a friendly certified nutrition and fitness coach.
+- Reply in ${LANGUAGE_NAME[language]}.
+- Keep replies short: 2-5 sentences, practical and specific.
+- You know Middle Eastern cuisine and gym training well.
+- Never give medical diagnoses; suggest seeing a professional for medical issues.`;
+}
+
 export function equipmentPrompt(language: Language): string {
   return `You are a certified personal trainer.
 

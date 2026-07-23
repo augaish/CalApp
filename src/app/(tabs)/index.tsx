@@ -12,11 +12,15 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   isSameDay,
   mealCalories,
+  streakDays,
   totalsForDay,
   useAppStore,
   waterForDay,
   waterTargetMl,
 } from '@/lib/store';
+import type { LoggedMeal, MealType } from '@/lib/types';
+
+const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 const GLASS_ML = 250;
 
@@ -55,6 +59,17 @@ export default function Home() {
   const waterMl = waterForDay(water, selected);
   const waterTarget = waterTargetMl(profile.weightKg);
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
+  const streak = streakDays(meals);
+
+  const shiftDay = (delta: number) => {
+    const d = new Date(selected);
+    d.setDate(d.getDate() + delta);
+    if (d.getTime() > Date.now()) return;
+    setSelected(d);
+  };
+
+  const mealsOfType = (type: MealType): LoggedMeal[] =>
+    dayMeals.filter((m) => (m.mealType ?? 'snack') === type);
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -64,11 +79,37 @@ export default function Home() {
         end={{ x: 1, y: 0.6 }}
         style={[styles.gradient, { paddingTop: insets.top + Spacing.sm }]}
       >
-        <Text style={[styles.headerTitle, { color: theme.onGradient }]}>
-          {selectedIsToday
-            ? t('home.today')
-            : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
-        </Text>
+        <View style={styles.headerRow}>
+          <Pressable
+            onPress={() => router.push('/edit-profile')}
+            style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+          >
+            <Ionicons name="person" size={18} color={theme.onGradient} />
+          </Pressable>
+
+          <View style={styles.headerCenter}>
+            <Pressable onPress={() => shiftDay(-1)} hitSlop={10}>
+              <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.85)" />
+            </Pressable>
+            <Text style={[styles.headerTitle, { color: theme.onGradient }]}>
+              {selectedIsToday
+                ? t('home.today')
+                : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
+            </Text>
+            <Pressable onPress={() => shiftDay(1)} hitSlop={10} disabled={selectedIsToday}>
+              <Ionicons
+                name="chevron-forward"
+                size={20}
+                color={selectedIsToday ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)'}
+              />
+            </Pressable>
+          </View>
+
+          <View style={[styles.headerBtn, styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <Ionicons name="flame" size={16} color="#FFD166" />
+            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 14 }}>{streak}</Text>
+          </View>
+        </View>
 
         {/* Week strip */}
         <View style={styles.weekRow}>
@@ -202,77 +243,71 @@ export default function Home() {
           )}
         </View>
 
-        {/* Meals */}
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('home.todaysMeals')}</Text>
-        {dayMeals.length === 0 ? (
+        {/* Meal sections */}
+        {dayMeals.length === 0 && (
           <View style={[styles.empty, { borderColor: theme.border }]}>
             <Ionicons name="camera-outline" size={36} color={theme.textTertiary} />
             <Text style={{ color: theme.textSecondary, textAlign: 'center', lineHeight: 22 }}>
               {t('home.noMeals')}
             </Text>
           </View>
-        ) : (
-          dayMeals.map((meal) => (
-            <Pressable key={meal.id} onLongPress={() => removeMeal(meal.id)}>
-              <View
-                style={[
-                  styles.card,
-                  styles.mealCard,
-                  { backgroundColor: theme.card },
-                  cardShadow(theme.shadow),
-                ]}
-              >
-                <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
-                  <Ionicons name="restaurant" size={18} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
-                    {meal.items.map((i) => i.name).join(' · ')}
-                  </Text>
-                  <Text style={{ color: theme.textTertiary, fontSize: 13 }}>
-                    {new Date(meal.at).toLocaleTimeString(locale, {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
-                </View>
-                <Text style={[styles.mealKcal, { color: theme.primary }]}>
-                  {Math.round(mealCalories(meal))}
-                </Text>
-              </View>
-            </Pressable>
-          ))
         )}
+        {MEAL_TYPES.map((type) => {
+          const sectionMeals = mealsOfType(type);
+          const sectionKcal = sectionMeals.reduce((sum, m) => sum + mealCalories(m), 0);
+          return (
+            <View
+              key={type}
+              style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}
+            >
+              <View style={styles.sectionRow}>
+                <Text style={[styles.sectionName, { color: theme.text }]}>
+                  {t(`home.mealTypes.${type}`)}
+                </Text>
+                {sectionKcal > 0 && (
+                  <Text style={{ color: theme.textSecondary, fontWeight: '700' }}>
+                    {Math.round(sectionKcal)} {t('common.kcal')}
+                  </Text>
+                )}
+                <Pressable
+                  onPress={() => router.push('/add-menu')}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.sectionAdd,
+                    { backgroundColor: theme.cardSubtle },
+                    pressed && { transform: [{ scale: 0.9 }] },
+                  ]}
+                >
+                  <Ionicons name="add" size={18} color={theme.primary} />
+                </Pressable>
+              </View>
+              {sectionMeals.map((meal) => (
+                <Pressable key={meal.id} onLongPress={() => removeMeal(meal.id)}>
+                  <View style={styles.mealRow}>
+                    <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
+                      <Ionicons name="restaurant" size={16} color={theme.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
+                        {meal.items.map((i) => i.name).join(' · ')}
+                      </Text>
+                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                        {new Date(meal.at).toLocaleTimeString(locale, {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
+                    <Text style={[styles.mealKcal, { color: theme.primary }]}>
+                      {Math.round(mealCalories(meal))}
+                    </Text>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          );
+        })}
       </ScrollView>
-
-      {/* Floating action bar */}
-      <View style={[styles.fabBar, { bottom: insets.bottom + Spacing.md }]}>
-        <Pressable
-          onPress={() => router.push('/scan?mode=meal')}
-          style={({ pressed }) => [
-            styles.fabMain,
-            { backgroundColor: theme.text },
-            cardShadow(theme.shadow),
-            pressed && { transform: [{ scale: 0.97 }] },
-          ]}
-        >
-          <Ionicons name="camera" size={22} color={theme.background} />
-          <Text style={[styles.fabMainLabel, { color: theme.background }]}>
-            {t('home.scanMeal')}
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => router.push('/scan?mode=gym')}
-          style={({ pressed }) => [
-            styles.fabRound,
-            { backgroundColor: theme.card },
-            cardShadow(theme.shadow),
-            pressed && { transform: [{ scale: 0.92 }] },
-          ]}
-        >
-          <Ionicons name="barbell" size={24} color={theme.text} />
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -313,12 +348,22 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    textAlign: 'center',
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: Spacing.md,
   },
+  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  headerBtn: {
+    minWidth: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  streakBadge: { flexDirection: 'row', gap: 4, paddingHorizontal: 10 },
+  headerTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   weekRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -368,8 +413,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: Spacing.sm },
+  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  sectionName: { flex: 1, fontSize: 17, fontWeight: '700' },
+  sectionAdd: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
   empty: {
+    marginBottom: Spacing.md,
     alignItems: 'center',
     borderWidth: 1.5,
     borderStyle: 'dashed',

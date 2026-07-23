@@ -1,7 +1,9 @@
+import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -13,6 +15,7 @@ import type { Language } from '@/lib/types';
 export default function Settings() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const router = useRouter();
   const language = useAppStore((s) => s.language) ?? 'en';
   const setLanguage = useAppStore((s) => s.setLanguage);
   const targets = useAppStore((s) => s.targets);
@@ -56,6 +59,17 @@ export default function Settings() {
       {targets && profile && (
         <>
           <Text style={[styles.section, { color: theme.textSecondary }]}>
+            {t('settings.profile')}
+          </Text>
+          <Pressable onPress={() => router.push('/edit-profile')}>
+            <Card style={styles.linkRow}>
+              <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>
+                {t('settings.editProfile')}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+            </Card>
+          </Pressable>
+          <Text style={[styles.section, { color: theme.textSecondary }]}>
             {t('settings.dailyTargets')}
           </Text>
           <Card>
@@ -89,6 +103,7 @@ const styles = StyleSheet.create({
   section: { fontSize: 14, fontWeight: '500', marginBottom: 8, marginTop: Spacing.md },
   row: { flexDirection: 'row', gap: Spacing.sm },
   flex: { flex: 1 },
+  linkRow: { flexDirection: 'row', alignItems: 'center' },
   kvRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

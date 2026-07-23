@@ -9,7 +9,9 @@ import type {
   Language,
   LoggedMeal,
   LoggedWorkout,
+  MealType,
   Profile,
+  WeightEntry,
 } from './types';
 
 export interface WaterEntry {
@@ -24,15 +26,26 @@ interface AppState {
   meals: LoggedMeal[];
   workouts: LoggedWorkout[];
   water: WaterEntry[];
+  weights: WeightEntry[];
   hydrated: boolean;
 
   setLanguage: (language: Language) => void;
   setProfile: (profile: Profile) => void;
-  logMeal: (items: FoodItem[], photoUri?: string) => void;
+  logMeal: (items: FoodItem[], photoUri?: string, mealType?: MealType) => void;
   removeMeal: (id: string) => void;
   logWorkout: (equipmentName: string, sets?: number, reps?: string) => void;
   logWater: (ml: number) => void;
+  logWeight: (kg: number) => void;
   setHydrated: () => void;
+}
+
+/** Default meal type from the hour of day. */
+export function mealTypeForNow(): MealType {
+  const h = new Date().getHours();
+  if (h < 11) return 'breakfast';
+  if (h < 16) return 'lunch';
+  if (h < 22) return 'dinner';
+  return 'snack';
 }
 
 function id(): string {
@@ -48,13 +61,23 @@ export const useAppStore = create<AppState>()(
       meals: [],
       workouts: [],
       water: [],
+      weights: [],
       hydrated: false,
 
       setLanguage: (language) => set({ language }),
       setProfile: (profile) => set({ profile, targets: dailyTargets(profile) }),
-      logMeal: (items, photoUri) =>
+      logMeal: (items, photoUri, mealType) =>
         set((s) => ({
-          meals: [{ id: id(), at: new Date().toISOString(), items, photoUri }, ...s.meals],
+          meals: [
+            {
+              id: id(),
+              at: new Date().toISOString(),
+              items,
+              photoUri,
+              mealType: mealType ?? mealTypeForNow(),
+            },
+            ...s.meals,
+          ],
         })),
       removeMeal: (mealId) => set((s) => ({ meals: s.meals.filter((m) => m.id !== mealId) })),
       logWorkout: (equipmentName, sets, reps) =>
@@ -66,18 +89,21 @@ export const useAppStore = create<AppState>()(
         })),
       logWater: (ml) =>
         set((s) => ({ water: [{ at: new Date().toISOString(), ml }, ...s.water] })),
+      logWeight: (kg) =>
+        set((s) => ({ weights: [{ at: new Date().toISOString(), kg }, ...s.weights] })),
       setHydrated: () => set({ hydrated: true }),
     }),
     {
       name: 'calapp-store',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: ({ language, profile, targets, meals, workouts, water }) => ({
+      partialize: ({ language, profile, targets, meals, workouts, water, weights }) => ({
         language,
         profile,
         targets,
         meals,
         workouts,
         water,
+        weights,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
@@ -129,4 +155,19 @@ export function waterForDay(entries: WaterEntry[], day: Date): number {
 /** Recommended daily water in ml (~35 ml per kg body weight, rounded to 10). */
 export function waterTargetMl(weightKg: number): number {
   return Math.round((weightKg * 35) / 10) * 10;
+}
+
+/** Consecutive days (ending today) with at least one logged meal. */
+export function streakDays(meals: LoggedMeal[]): number {
+  let streak = 0;
+  const day = new Date();
+  for (;;) {
+    if (meals.some((m) => isSameDay(m.at, day))) {
+      streak += 1;
+      day.setDate(day.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
 }

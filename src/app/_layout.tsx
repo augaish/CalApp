@@ -36,6 +36,12 @@ export default function RootLayout() {
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="meal-result" options={{ presentation: 'modal' }} />
           <Stack.Screen name="gym-result" options={{ presentation: 'modal' }} />
+          <Stack.Screen
+            name="add-menu"
+            options={{ presentation: 'transparentModal', animation: 'fade' }}
+          />
+          <Stack.Screen name="describe" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
         </Stack.Protected>
       </Stack>
     </ThemeProvider>
