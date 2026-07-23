@@ -59,11 +59,21 @@ export default function Training() {
   return (
     <Screen
       footer={
-        <Button
-          label={t('training.scanCta')}
-          icon="barbell"
-          onPress={() => router.push('/scan?mode=gym')}
-        />
+        <View style={styles.footerRow}>
+          <Button
+            label={t('training.scanCta')}
+            icon="barbell"
+            onPress={() => router.push('/scan?mode=gym')}
+            style={{ flex: 1 }}
+          />
+          <Button
+            label={t('training.addManual')}
+            icon="create-outline"
+            variant="secondary"
+            onPress={() => router.push('/workout-edit')}
+            style={{ flex: 1 }}
+          />
+        </View>
       }
     >
       <View style={styles.headerRow}>
@@ -153,7 +163,11 @@ export default function Training() {
                 </Text>
               </View>
               {g.items.map((w) => (
-                <View key={w.id} style={styles.workoutRow}>
+                <Pressable
+                  key={w.id}
+                  onPress={() => router.push(`/workout-edit?id=${w.id}`)}
+                  style={({ pressed }) => [styles.workoutRow, pressed && { opacity: 0.6 }]}
+                >
                   <View style={[styles.workoutIcon, { backgroundColor: theme.cardSubtle }]}>
                     <Ionicons name="barbell" size={16} color={theme.primary} />
                   </View>
@@ -161,16 +175,16 @@ export default function Training() {
                     <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
                       {w.equipmentName}
                     </Text>
-                    {w.sets ? (
+                    {w.sets || w.weightLiftedKg ? (
                       <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                        {w.sets} × {w.reps}
+                        {w.sets ? `${w.sets} × ${w.reps}` : ''}
+                        {w.sets && w.weightLiftedKg ? ' · ' : ''}
+                        {w.weightLiftedKg ? `${w.weightLiftedKg} ${t('progress.kg')}` : ''}
                       </Text>
                     ) : null}
                   </View>
-                  <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                    {new Date(w.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </View>
+                  <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                </Pressable>
               ))}
             </Card>
           );
@@ -236,4 +250,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  footerRow: { flexDirection: 'row', gap: Spacing.sm },
 });

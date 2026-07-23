@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -101,43 +102,49 @@ export default function Overview() {
         end={{ x: 1, y: 0.6 }}
         style={[styles.gradient, { paddingTop: insets.top + Spacing.sm }]}
       >
-        <View style={styles.headerRow}>
+        {/* Brand row */}
+        <View style={styles.brandRow}>
+          <Image
+            source={require('../../../assets/images/logo-white.png')}
+            style={styles.brandLogo}
+            contentFit="contain"
+          />
+          <Text style={[styles.brandName, { color: theme.onGradient }]}>{t('common.appName')}</Text>
+          <View style={{ flex: 1 }} />
+          <View style={[styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+            <Ionicons name="flame" size={16} color="#FFD166" />
+            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 14 }}>
+              {streak}
+            </Text>
+          </View>
           <Pressable
             onPress={() => router.push('/profile')}
             style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
           >
             <Ionicons name="person" size={18} color={theme.onGradient} />
           </Pressable>
+        </View>
 
-          <View style={styles.headerCenter}>
-            <Pressable onPress={() => shift(-1)} hitSlop={12}>
-              <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.9)" />
-            </Pressable>
-            <Pressable onPress={() => router.push('/calendar')} hitSlop={8} style={styles.headerDate}>
-              <Text style={[styles.headerTitle, { color: theme.onGradient }]}>
-                {selectedIsToday
-                  ? t('home.today')
-                  : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
-              </Text>
-              <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.9)" />
-            </Pressable>
-            <Pressable onPress={() => shift(1)} hitSlop={12} disabled={selectedIsToday}>
-              <Ionicons
-                name="chevron-forward"
-                size={22}
-                color={selectedIsToday ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)'}
-              />
-            </Pressable>
-          </View>
-
-          <View
-            style={[styles.headerBtn, styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-          >
-            <Ionicons name="flame" size={16} color="#FFD166" />
-            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 14 }}>
-              {streak}
+        {/* Day navigation */}
+        <View style={styles.headerCenter}>
+          <Pressable onPress={() => shift(-1)} hitSlop={12}>
+            <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.9)" />
+          </Pressable>
+          <Pressable onPress={() => router.push('/calendar')} hitSlop={8} style={styles.headerDate}>
+            <Text style={[styles.headerTitle, { color: theme.onGradient }]}>
+              {selectedIsToday
+                ? t('home.today')
+                : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
             </Text>
-          </View>
+            <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.9)" />
+          </Pressable>
+          <Pressable onPress={() => shift(1)} hitSlop={12} disabled={selectedIsToday}>
+            <Ionicons
+              name="chevron-forward"
+              size={22}
+              color={selectedIsToday ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)'}
+            />
+          </Pressable>
         </View>
 
         <View style={styles.weekRow}>
@@ -348,13 +355,21 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: Radius.xl,
     borderBottomRightRadius: Radius.xl,
   },
-  headerRow: {
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
-  headerCenter: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  brandLogo: { width: 26, height: 26 },
+  brandName: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  headerCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
   headerDate: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerBtn: {
     minWidth: 36,
@@ -363,7 +378,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  streakBadge: { flexDirection: 'row', gap: 4, paddingHorizontal: 10 },
+  streakBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    height: 36,
+    borderRadius: 18,
+    paddingHorizontal: 12,
+  },
   headerTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
   weekRow: {
     flexDirection: 'row',

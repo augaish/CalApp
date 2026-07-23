@@ -51,6 +51,9 @@ interface AppState {
     caloriesBurned?: number,
     at?: string,
   ) => void;
+  addWorkout: (entry: Omit<LoggedWorkout, 'id'>) => void;
+  updateWorkout: (id: string, patch: Partial<LoggedWorkout>) => void;
+  removeWorkout: (id: string) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
@@ -111,6 +114,14 @@ export const useAppStore = create<AppState>()(
             ...s.workouts,
           ],
         })),
+      addWorkout: (entry) =>
+        set((s) => ({ workouts: [{ id: id(), ...entry }, ...s.workouts] })),
+      updateWorkout: (workoutId, patch) =>
+        set((s) => ({
+          workouts: s.workouts.map((w) => (w.id === workoutId ? { ...w, ...patch } : w)),
+        })),
+      removeWorkout: (workoutId) =>
+        set((s) => ({ workouts: s.workouts.filter((w) => w.id !== workoutId) })),
       logWater: (ml, at) =>
         set((s) => ({ water: [{ at: at ?? new Date().toISOString(), ml }, ...s.water] })),
       logWeight: (kg, at) =>

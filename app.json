@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CalApp",
+    "name": "Calgym",
     "slug": "calapp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -31,12 +31,12 @@
     },
     "locales": {
       "en": {
-        "CFBundleDisplayName": "CalApp",
-        "NSCameraUsageDescription": "CalApp uses the camera to analyze your meals and gym equipment."
+        "CFBundleDisplayName": "Calgym",
+        "NSCameraUsageDescription": "Calgym uses the camera to analyze your meals and gym equipment."
       },
       "ar": {
-        "CFBundleDisplayName": "كال آب",
-        "NSCameraUsageDescription": "يستخدم كال آب الكاميرا لتحليل وجباتك وأجهزة النادي."
+        "CFBundleDisplayName": "كالجيم",
+        "NSCameraUsageDescription": "يستخدم كالجيم الكاميرا لتحليل وجباتك وأجهزة النادي."
       }
     },
     "plugins": [
@@ -46,7 +46,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "CalApp uses the camera to analyze your meals and gym equipment."
+          "cameraPermission": "Calgym uses the camera to analyze your meals and gym equipment."
         }
       ],
       [
