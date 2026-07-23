@@ -47,6 +47,10 @@ export default function RootLayout() {
             name="water"
             options={{ presentation: 'transparentModal', animation: 'fade' }}
           />
+          <Stack.Screen
+            name="calendar"
+            options={{ presentation: 'transparentModal', animation: 'fade' }}
+          />
         </Stack.Protected>
       </Stack>
     </ThemeProvider>

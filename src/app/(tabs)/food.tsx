@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Screen } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useViewDay } from '@/lib/day';
 import { isSameDay, mealCalories, totalsForDay, useAppStore } from '@/lib/store';
 import type { LoggedMeal, MealType } from '@/lib/types';
 
@@ -21,18 +21,12 @@ export default function Food() {
   const meals = useAppStore((s) => s.meals);
   const targets = useAppStore((s) => s.targets);
   const removeMeal = useAppStore((s) => s.removeMeal);
-  const [selected, setSelected] = useState<Date>(new Date());
+  const selected = useViewDay((s) => s.day);
+  const shift = useViewDay((s) => s.shift);
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const dayMeals = meals.filter((m) => isSameDay(m.at, selected));
   const totals = totalsForDay(meals, selected);
-
-  const shiftDay = (delta: number) => {
-    const d = new Date(selected);
-    d.setDate(d.getDate() + delta);
-    if (d.getTime() > Date.now()) return;
-    setSelected(d);
-  };
 
   const mealsOfType = (type: MealType): LoggedMeal[] =>
     dayMeals.filter((m) => (m.mealType ?? 'snack') === type);
@@ -41,18 +35,20 @@ export default function Food() {
     <Screen>
       <View style={styles.headerRow}>
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('tabs.food')}</Text>
-        <Pressable onPress={() => shiftDay(-1)} hitSlop={10} style={styles.arrow}>
-          <Ionicons name="chevron-back" size={20} color={theme.textSecondary} />
+        <Pressable onPress={() => shift(-1)} hitSlop={10} style={styles.arrow}>
+          <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
         </Pressable>
-        <Text style={[styles.dayLabel, { color: theme.text }]}>
-          {selectedIsToday
-            ? t('home.today')
-            : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-        </Text>
-        <Pressable onPress={() => shiftDay(1)} hitSlop={10} disabled={selectedIsToday} style={styles.arrow}>
+        <Pressable onPress={() => router.push('/calendar')} hitSlop={6}>
+          <Text style={[styles.dayLabel, { color: theme.text }]}>
+            {selectedIsToday
+              ? t('home.today')
+              : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} style={styles.arrow}>
           <Ionicons
             name="chevron-forward"
-            size={20}
+            size={22}
             color={selectedIsToday ? theme.border : theme.textSecondary}
           />
         </Pressable>
@@ -90,7 +86,7 @@ export default function Food() {
                 </Text>
               )}
               <Pressable
-                onPress={() => router.push('/add-menu')}
+                onPress={() => router.push('/add-menu?scope=food')}
                 hitSlop={8}
                 style={({ pressed }) => [
                   styles.sectionAdd,

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter, type Href } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,8 @@ export default function AddMenu() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { scope } = useLocalSearchParams<{ scope?: string }>();
+  const foodOnly = scope === 'food';
 
   const go = (href: Href) => {
     router.back();
@@ -21,7 +23,7 @@ export default function AddMenu() {
   return (
     <Pressable style={styles.backdrop} onPress={() => router.back()}>
       <View style={[styles.content, { paddingBottom: insets.bottom + 96 }]} pointerEvents="box-none">
-        {/* Two hero circles */}
+        {/* Hero circle(s) */}
         <View style={styles.circleRow} pointerEvents="box-none">
           <View style={styles.circleCol}>
             <Pressable
@@ -38,20 +40,22 @@ export default function AddMenu() {
             <Text style={styles.circleLabel}>{t('home.scanMeal')}</Text>
           </View>
 
-          <View style={styles.circleCol}>
-            <Pressable
-              onPress={() => go('/scan?mode=gym')}
-              style={({ pressed }) => [
-                styles.circle,
-                { backgroundColor: '#FFFFFF' },
-                cardShadow(theme.shadow),
-                pressed && { transform: [{ scale: 0.93 }] },
-              ]}
-            >
-              <Ionicons name="barbell" size={34} color={theme.text} />
-            </Pressable>
-            <Text style={styles.circleLabel}>{t('home.scanGym')}</Text>
-          </View>
+          {!foodOnly && (
+            <View style={styles.circleCol}>
+              <Pressable
+                onPress={() => go('/scan?mode=gym')}
+                style={({ pressed }) => [
+                  styles.circle,
+                  { backgroundColor: '#FFFFFF' },
+                  cardShadow(theme.shadow),
+                  pressed && { transform: [{ scale: 0.93 }] },
+                ]}
+              >
+                <Ionicons name="barbell" size={34} color={theme.text} />
+              </Pressable>
+              <Text style={styles.circleLabel}>{t('home.scanGym')}</Text>
+            </View>
+          )}
         </View>
 
         {/* Secondary options */}

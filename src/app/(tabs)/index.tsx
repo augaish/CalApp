@@ -19,6 +19,7 @@ import { Ring } from '@/components/ring';
 import { Button, Field } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useViewDay } from '@/lib/day';
 import {
   burnedForDay,
   isSameDay,
@@ -55,7 +56,9 @@ export default function Overview() {
   const weights = useAppStore((s) => s.weights);
   const logWeight = useAppStore((s) => s.logWeight);
 
-  const [selected, setSelected] = useState<Date>(new Date());
+  const selected = useViewDay((s) => s.day);
+  const setDay = useViewDay((s) => s.setDay);
+  const shift = useViewDay((s) => s.shift);
   const [kg, setKg] = useState('');
 
   if (!targets || !profile) return null;
@@ -72,14 +75,12 @@ export default function Overview() {
   const days = lastSevenDays();
   const chartLabels = days.map((d) => d.toLocaleDateString(locale, { weekday: 'narrow' }));
   const calValues = days.map((d) => Math.round(totalsForDay(meals, d).calories));
-  const weightSeries = [...weights].reverse().map((w) => w.kg);
-
-  const shiftDay = (delta: number) => {
-    const d = new Date(selected);
-    d.setDate(d.getDate() + delta);
-    if (d.getTime() > Date.now()) return;
-    setSelected(d);
-  };
+  // Last 8 weight entries oldest→newest, with short date labels for the x-axis.
+  const recentWeights = [...weights].slice(0, 8).reverse();
+  const weightSeries = recentWeights.map((w) => w.kg);
+  const weightLabels = recentWeights.map((w) =>
+    new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
+  );
 
   const submitWeight = () => {
     const value = parseFloat(kg);
@@ -108,19 +109,22 @@ export default function Overview() {
           </Pressable>
 
           <View style={styles.headerCenter}>
-            <Pressable onPress={() => shiftDay(-1)} hitSlop={10}>
-              <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.85)" />
+            <Pressable onPress={() => shift(-1)} hitSlop={12}>
+              <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.9)" />
             </Pressable>
-            <Text style={[styles.headerTitle, { color: theme.onGradient }]}>
-              {selectedIsToday
-                ? t('home.today')
-                : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
-            </Text>
-            <Pressable onPress={() => shiftDay(1)} hitSlop={10} disabled={selectedIsToday}>
+            <Pressable onPress={() => router.push('/calendar')} hitSlop={8} style={styles.headerDate}>
+              <Text style={[styles.headerTitle, { color: theme.onGradient }]}>
+                {selectedIsToday
+                  ? t('home.today')
+                  : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
+              </Text>
+              <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.9)" />
+            </Pressable>
+            <Pressable onPress={() => shift(1)} hitSlop={12} disabled={selectedIsToday}>
               <Ionicons
                 name="chevron-forward"
-                size={20}
-                color={selectedIsToday ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.85)'}
+                size={22}
+                color={selectedIsToday ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)'}
               />
             </Pressable>
           </View>
@@ -141,7 +145,7 @@ export default function Overview() {
             return (
               <Pressable
                 key={day.toDateString()}
-                onPress={() => setSelected(day)}
+                onPress={() => setDay(day)}
                 style={[
                   styles.dayPill,
                   { backgroundColor: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.18)' },
@@ -279,7 +283,12 @@ export default function Overview() {
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.weight')}</Text>
           {weightSeries.length >= 2 ? (
-            <TrendLine values={weightSeries} color={theme.primary} width={width - Spacing.md * 4} />
+            <TrendLine
+              values={weightSeries}
+              labels={weightLabels}
+              color={theme.primary}
+              width={width - Spacing.md * 4}
+            />
           ) : (
             <Text style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
               {t('progress.noWeights')}
@@ -345,6 +354,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  headerDate: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   headerBtn: {
     minWidth: 36,
     height: 36,

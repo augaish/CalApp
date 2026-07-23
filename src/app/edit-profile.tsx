@@ -1,10 +1,11 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useAppStore } from '@/lib/store';
 import type { ActivityLevel, Goal, Sex } from '@/lib/types';
 
@@ -13,6 +14,7 @@ const GOALS: Goal[] = ['lose', 'maintain', 'gain'];
 
 export default function EditProfile() {
   const { t } = useTranslation();
+  const theme = useTheme();
   const router = useRouter();
   const profile = useAppStore((s) => s.profile);
   const setProfile = useAppStore((s) => s.setProfile);
@@ -50,6 +52,8 @@ export default function EditProfile() {
       <Field label={t('onboarding.age')} value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} />
       <Field label={t('onboarding.height')} value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
       <Field label={t('onboarding.weight')} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={5} suffix="kg" />
+
+      <Text style={[styles.heading, { color: theme.text }]}>{t('onboarding.activityTitle')}</Text>
       {ACTIVITY_LEVELS.map((level) => (
         <OptionRow
           key={level}
@@ -58,7 +62,8 @@ export default function EditProfile() {
           onPress={() => setActivity(level)}
         />
       ))}
-      <View style={{ height: Spacing.sm }} />
+
+      <Text style={[styles.heading, { color: theme.text }]}>{t('onboarding.goalTitle')}</Text>
       {GOALS.map((g) => (
         <OptionRow
           key={g}
@@ -74,4 +79,5 @@ export default function EditProfile() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm },
   flex: { flex: 1 },
+  heading: { fontSize: 17, fontWeight: '700', marginTop: Spacing.sm, marginBottom: Spacing.sm },
 });
