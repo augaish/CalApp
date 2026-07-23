@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,7 +38,11 @@ export default function Login() {
     >
       <View style={styles.hero}>
         <View style={styles.logo}>
-          <Ionicons name="nutrition" size={52} color={theme.onGradient} />
+          <Image
+            source={require('../../assets/images/logo-mark.png')}
+            style={styles.logoImg}
+            contentFit="contain"
+          />
         </View>
         <Text style={styles.title}>{t('auth.welcomeTitle')}</Text>
         <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
@@ -84,6 +89,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: Spacing.lg,
   },
+  logoImg: { width: 68, height: 68 },
   title: { color: '#FFFFFF', fontSize: 40, fontWeight: '800', letterSpacing: -1 },
   subtitle: {
     color: 'rgba(255,255,255,0.9)',
