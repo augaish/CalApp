@@ -1,9 +1,18 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import Svg, { Path } from 'react-native-svg';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui';
@@ -28,6 +37,8 @@ export default function Scan() {
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [analyzing, setAnalyzing] = useState(false);
+  const { width } = useWindowDimensions();
+  const frameSize = Math.round(width * 0.78);
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 
@@ -120,12 +131,7 @@ export default function Scan() {
       </View>
 
       <View pointerEvents="none" style={styles.frameWrap}>
-        <View style={styles.frame}>
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
-        </View>
+        <FrameCorners size={frameSize} />
       </View>
 
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom + Spacing.lg }]}>
@@ -157,6 +163,29 @@ export default function Scan() {
   );
 }
 
+/**
+ * Viewfinder corner brackets drawn in SVG: fixed coordinates, immune to the
+ * automatic left/right style flipping RTL applies to plain Views.
+ */
+function FrameCorners({ size }: { size: number }) {
+  const len = 34;
+  const r = 16;
+  const s = 3;
+  const m = s / 2;
+  const e = size - m;
+  const corner = (d: string) => (
+    <Path d={d} stroke="rgba(255,255,255,0.9)" strokeWidth={s} strokeLinecap="round" fill="none" />
+  );
+  return (
+    <Svg width={size} height={size}>
+      {corner(`M ${m} ${m + len} L ${m} ${m + r} Q ${m} ${m} ${m + r} ${m} L ${m + len} ${m}`)}
+      {corner(`M ${e - len} ${m} L ${e - r} ${m} Q ${e} ${m} ${e} ${m + r} L ${e} ${m + len}`)}
+      {corner(`M ${m} ${e - len} L ${m} ${e - r} Q ${m} ${e} ${m + r} ${e} L ${m + len} ${e}`)}
+      {corner(`M ${e - len} ${e} L ${e - r} ${e} Q ${e} ${e} ${e} ${e - r} L ${e} ${e - len}`)}
+    </Svg>
+  );
+}
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000' },
   topBar: {
@@ -181,17 +210,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  frame: { width: '78%', aspectRatio: 1 },
-  corner: {
-    position: 'absolute',
-    width: 36,
-    height: 36,
-    borderColor: 'rgba(255,255,255,0.9)',
-  },
-  cornerTL: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 16 },
-  cornerTR: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 16 },
-  cornerBL: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 16 },
-  cornerBR: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 16 },
   bottomBar: {
     position: 'absolute',
     bottom: 0,

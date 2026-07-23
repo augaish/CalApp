@@ -37,10 +37,11 @@ export default function MealResult() {
   // Note: pending data is NOT cleared on close — clearing re-renders this
   // screen with empty state and double-fires the back navigation. The next
   // scan simply overwrites it.
+  // Land on the Food tab so the user sees the meal appear in their log.
   const save = () => {
     logMeal(items, photoUri ?? undefined);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (router.canGoBack()) router.back();
+    router.dismissTo('/(tabs)/food');
   };
 
   return (

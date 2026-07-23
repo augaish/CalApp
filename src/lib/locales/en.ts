@@ -80,6 +80,27 @@ export const en = {
       snack: 'Snacks',
     },
   },
+  tabs: {
+    overview: 'Overview',
+    training: 'Training',
+    food: 'Food',
+    ai: 'AI Support',
+  },
+  waterSheet: {
+    title: 'Add water',
+    custom: 'Custom amount',
+    add: 'Add',
+  },
+  training: {
+    burnedToday: 'Burned today',
+    estimated: 'Estimated from your logged exercises',
+    scanCta: 'Scan equipment',
+    syncNote: 'Apple Watch & Whoop sync is coming next.',
+    history: 'History',
+  },
+  profile: {
+    title: 'Profile',
+  },
   addMenu: {
     title: 'Add',
     scanMeal: 'Scan meal with camera',

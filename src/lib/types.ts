@@ -84,4 +84,6 @@ export interface LoggedWorkout {
   equipmentName: string;
   sets?: number;
   reps?: string;
+  /** Rough estimate, kcal */
+  caloriesBurned?: number;
 }

@@ -10,7 +10,7 @@ import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { usePending } from '@/lib/pending';
-import { useAppStore } from '@/lib/store';
+import { useAppStore, workoutBurnEstimate } from '@/lib/store';
 
 export default function GymResult() {
   const { t } = useTranslation();
@@ -19,6 +19,7 @@ export default function GymResult() {
   const analysis = usePending((s) => s.equipment);
   const photoUri = usePending((s) => s.photoUri);
   const logWorkout = useAppStore((s) => s.logWorkout);
+  const profile = useAppStore((s) => s.profile);
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -27,10 +28,12 @@ export default function GymResult() {
   if (!analysis) return null;
 
   // Pending data is intentionally not cleared on close (see meal-result).
+  // Lands on the Training tab so the workout is visibly logged.
   const save = () => {
-    logWorkout(analysis.name, analysis.suggestion.sets, analysis.suggestion.reps);
+    const burned = profile ? workoutBurnEstimate(profile.weightKg) : undefined;
+    logWorkout(analysis.name, analysis.suggestion.sets, analysis.suggestion.reps, burned);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    if (router.canGoBack()) router.back();
+    router.dismissTo('/(tabs)/training');
   };
 
   return (

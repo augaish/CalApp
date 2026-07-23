@@ -82,6 +82,27 @@ export const ar: TranslationSchema = {
       snack: 'وجبات خفيفة',
     },
   },
+  tabs: {
+    overview: 'نظرة عامة',
+    training: 'التمرين',
+    food: 'الطعام',
+    ai: 'الدعم الذكي',
+  },
+  waterSheet: {
+    title: 'إضافة ماء',
+    custom: 'كمية مخصصة',
+    add: 'إضافة',
+  },
+  training: {
+    burnedToday: 'المحروق اليوم',
+    estimated: 'تقدير من تمارينك المسجلة',
+    scanCta: 'مسح جهاز رياضي',
+    syncNote: 'مزامنة Apple Watch وWhoop قادمة قريباً.',
+    history: 'السجل',
+  },
+  profile: {
+    title: 'الملف الشخصي',
+  },
   addMenu: {
     title: 'إضافة',
     scanMeal: 'تصوير وجبة بالكاميرا',

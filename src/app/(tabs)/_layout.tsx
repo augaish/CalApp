@@ -23,18 +23,18 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: t('home.today'),
+          title: t('tabs.overview'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'today' : 'today-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'grid' : 'grid-outline'} size={23} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="progress"
+        name="training"
         options={{
-          title: t('progress.title'),
+          title: t('tabs.training'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'stats-chart' : 'stats-chart-outline'} size={23} color={color} />
+            <Ionicons name={focused ? 'barbell' : 'barbell-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -48,31 +48,31 @@ export default function TabLayout() {
                 onPress={() => router.push('/add-menu')}
                 style={({ pressed }) => [
                   styles.fab,
-                  { backgroundColor: theme.text },
+                  { backgroundColor: theme.primary },
                   pressed && { transform: [{ scale: 0.93 }] },
                 ]}
               >
-                <Ionicons name="add" size={30} color={theme.background} />
+                <Ionicons name="add" size={30} color={theme.onPrimary} />
               </Pressable>
             </View>
           ),
         }}
       />
       <Tabs.Screen
-        name="coach"
+        name="food"
         options={{
-          title: t('coach.title'),
+          title: t('tabs.food'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'chatbubbles' : 'chatbubbles-outline'} size={23} color={color} />
+            <Ionicons name={focused ? 'restaurant' : 'restaurant-outline'} size={22} color={color} />
           ),
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="coach"
         options={{
-          title: t('settings.title'),
+          title: t('tabs.ai'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={23} color={color} />
+            <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} size={22} color={color} />
           ),
         }}
       />

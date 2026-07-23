@@ -1,7 +1,7 @@
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
@@ -9,7 +9,6 @@ import { useAppStore } from '@/lib/store';
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
   const hydrated = useAppStore((s) => s.hydrated);
   const language = useAppStore((s) => s.language);
   const profile = useAppStore((s) => s.profile);
@@ -26,7 +25,8 @@ export default function RootLayout() {
   if (!hydrated) return null;
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+    <ThemeProvider value={DefaultTheme}>
+      <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={!profile}>
           <Stack.Screen name="onboarding" />
@@ -42,6 +42,11 @@ export default function RootLayout() {
           />
           <Stack.Screen name="describe" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
+          <Stack.Screen
+            name="water"
+            options={{ presentation: 'transparentModal', animation: 'fade' }}
+          />
         </Stack.Protected>
       </Stack>
     </ThemeProvider>

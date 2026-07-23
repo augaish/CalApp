@@ -13,7 +13,7 @@ import { setMealReminders, setWaterReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
 import type { Language } from '@/lib/types';
 
-export default function Settings() {
+export default function Profile() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
@@ -61,7 +61,7 @@ export default function Settings() {
 
   return (
     <Screen>
-      <Title>{t('settings.title')}</Title>
+      <Title>{t('profile.title')}</Title>
 
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.language')}</Text>
       <View style={styles.row}>

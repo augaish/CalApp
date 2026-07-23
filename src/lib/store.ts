@@ -35,7 +35,7 @@ interface AppState {
   setProfile: (profile: Profile) => void;
   logMeal: (items: FoodItem[], photoUri?: string, mealType?: MealType) => void;
   removeMeal: (id: string) => void;
-  logWorkout: (equipmentName: string, sets?: number, reps?: string) => void;
+  logWorkout: (equipmentName: string, sets?: number, reps?: string, caloriesBurned?: number) => void;
   logWater: (ml: number) => void;
   logWeight: (kg: number) => void;
   setRemindMeals: (on: boolean) => void;
@@ -86,10 +86,10 @@ export const useAppStore = create<AppState>()(
           ],
         })),
       removeMeal: (mealId) => set((s) => ({ meals: s.meals.filter((m) => m.id !== mealId) })),
-      logWorkout: (equipmentName, sets, reps) =>
+      logWorkout: (equipmentName, sets, reps, caloriesBurned) =>
         set((s) => ({
           workouts: [
-            { id: id(), at: new Date().toISOString(), equipmentName, sets, reps },
+            { id: id(), at: new Date().toISOString(), equipmentName, sets, reps, caloriesBurned },
             ...s.workouts,
           ],
         })),
@@ -175,6 +175,21 @@ export function waterForDay(entries: WaterEntry[], day: Date): number {
 /** Recommended daily water in ml (~35 ml per kg body weight, rounded to 10). */
 export function waterTargetMl(weightKg: number): number {
   return Math.round((weightKg * 35) / 10) * 10;
+}
+
+/**
+ * Rough strength-training burn estimate for one logged machine exercise:
+ * MET 5.0 for ~10 minutes → kcal = MET × 3.5 × kg / 200 × minutes.
+ */
+export function workoutBurnEstimate(weightKg: number): number {
+  return Math.round(((5 * 3.5 * weightKg) / 200) * 10);
+}
+
+export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
+  return workouts.reduce(
+    (sum, w) => (isSameDay(w.at, day) ? sum + (w.caloriesBurned ?? 0) : sum),
+    0,
+  );
 }
 
 /** Consecutive days (ending today) with at least one logged meal. */

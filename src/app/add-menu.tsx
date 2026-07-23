@@ -18,77 +18,102 @@ export default function AddMenu() {
     router.push(href);
   };
 
-  const options: { icon: keyof typeof Ionicons.glyphMap; label: string; href: Href }[] = [
-    { icon: 'camera', label: t('addMenu.scanMeal'), href: '/scan?mode=meal' },
-    { icon: 'barcode', label: t('addMenu.scanBarcode'), href: '/scan?mode=barcode' },
-    { icon: 'create', label: t('addMenu.describe'), href: '/describe' },
-    { icon: 'barbell', label: t('addMenu.scanGym'), href: '/scan?mode=gym' },
-  ];
-
   return (
     <Pressable style={styles.backdrop} onPress={() => router.back()}>
-      <Pressable
-        onPress={(e) => e.stopPropagation()}
-        style={[
-          styles.sheet,
-          { backgroundColor: theme.background, paddingBottom: insets.bottom + Spacing.lg },
-        ]}
-      >
-        <View style={[styles.handle, { backgroundColor: theme.border }]} />
-        <Text style={[styles.title, { color: theme.text }]}>{t('addMenu.title')}</Text>
-        {options.map((opt) => (
+      <View style={[styles.content, { paddingBottom: insets.bottom + 96 }]} pointerEvents="box-none">
+        {/* Two hero circles */}
+        <View style={styles.circleRow} pointerEvents="box-none">
+          <View style={styles.circleCol}>
+            <Pressable
+              onPress={() => go('/scan?mode=meal')}
+              style={({ pressed }) => [
+                styles.circle,
+                { backgroundColor: theme.primary },
+                cardShadow(theme.shadow),
+                pressed && { transform: [{ scale: 0.93 }] },
+              ]}
+            >
+              <Ionicons name="camera" size={34} color={theme.onPrimary} />
+            </Pressable>
+            <Text style={styles.circleLabel}>{t('home.scanMeal')}</Text>
+          </View>
+
+          <View style={styles.circleCol}>
+            <Pressable
+              onPress={() => go('/scan?mode=gym')}
+              style={({ pressed }) => [
+                styles.circle,
+                { backgroundColor: '#FFFFFF' },
+                cardShadow(theme.shadow),
+                pressed && { transform: [{ scale: 0.93 }] },
+              ]}
+            >
+              <Ionicons name="barbell" size={34} color={theme.text} />
+            </Pressable>
+            <Text style={styles.circleLabel}>{t('home.scanGym')}</Text>
+          </View>
+        </View>
+
+        {/* Secondary options */}
+        <View style={styles.pillRow} pointerEvents="box-none">
           <Pressable
-            key={opt.icon}
-            onPress={() => go(opt.href)}
+            onPress={() => go('/scan?mode=barcode')}
             style={({ pressed }) => [
-              styles.option,
-              { backgroundColor: theme.card },
-              cardShadow(theme.shadow),
-              pressed && { transform: [{ scale: 0.98 }] },
+              styles.pill,
+              { backgroundColor: 'rgba(255,255,255,0.95)' },
+              pressed && { transform: [{ scale: 0.96 }] },
             ]}
           >
-            <View style={[styles.optionIcon, { backgroundColor: theme.cardSubtle }]}>
-              <Ionicons name={opt.icon} size={22} color={theme.primary} />
-            </View>
-            <Text style={[styles.optionLabel, { color: theme.text }]}>{opt.label}</Text>
-            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+            <Ionicons name="barcode" size={18} color={theme.text} />
+            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('addMenu.scanBarcode')}</Text>
           </Pressable>
-        ))}
-      </Pressable>
+          <Pressable
+            onPress={() => go('/describe')}
+            style={({ pressed }) => [
+              styles.pill,
+              { backgroundColor: 'rgba(255,255,255,0.95)' },
+              pressed && { transform: [{ scale: 0.96 }] },
+            ]}
+          >
+            <Ionicons name="create" size={18} color={theme.text} />
+            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('addMenu.describe')}</Text>
+          </Pressable>
+        </View>
+      </View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
-  sheet: {
-    borderTopLeftRadius: Radius.xl,
-    borderTopRightRadius: Radius.xl,
-    padding: Spacing.md,
-  },
-  handle: {
-    alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    marginBottom: Spacing.md,
-  },
-  title: { fontSize: 20, fontWeight: '700', marginBottom: Spacing.md },
-  option: {
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  content: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: Spacing.lg },
+  circleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    minHeight: 60,
+    justifyContent: 'space-evenly',
+    marginBottom: Spacing.lg,
   },
-  optionIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  circleCol: { alignItems: 'center', gap: Spacing.sm },
+  circle: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  optionLabel: { flex: 1, fontSize: 16, fontWeight: '600' },
+  circleLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
+  pillRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+  },
+  pill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    minHeight: 44,
+  },
+  pillLabel: { fontSize: 14, fontWeight: '600' },
 });

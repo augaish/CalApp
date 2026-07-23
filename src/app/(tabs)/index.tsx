@@ -1,29 +1,33 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TrendLine, WeekBars } from '@/components/charts';
 import { Ring } from '@/components/ring';
+import { Button, Field } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  burnedForDay,
   isSameDay,
-  mealCalories,
   streakDays,
   totalsForDay,
   useAppStore,
   waterForDay,
   waterTargetMl,
 } from '@/lib/store';
-import type { LoggedMeal, MealType } from '@/lib/types';
-
-const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-
-const GLASS_ML = 250;
 
 function lastSevenDays(): Date[] {
   const days: Date[] = [];
@@ -35,32 +39,40 @@ function lastSevenDays(): Date[] {
   return days;
 }
 
-export default function Home() {
+export default function Overview() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
 
   const profile = useAppStore((s) => s.profile);
   const targets = useAppStore((s) => s.targets);
   const meals = useAppStore((s) => s.meals);
   const water = useAppStore((s) => s.water);
-  const removeMeal = useAppStore((s) => s.removeMeal);
-  const logWater = useAppStore((s) => s.logWater);
+  const workouts = useAppStore((s) => s.workouts);
+  const weights = useAppStore((s) => s.weights);
+  const logWeight = useAppStore((s) => s.logWeight);
 
   const [selected, setSelected] = useState<Date>(new Date());
+  const [kg, setKg] = useState('');
 
   if (!targets || !profile) return null;
 
   const totals = totalsForDay(meals, selected);
   const remaining = targets.calories - totals.calories;
   const over = remaining < 0;
-  const dayMeals = meals.filter((m) => isSameDay(m.at, selected));
   const waterMl = waterForDay(water, selected);
   const waterTarget = waterTargetMl(profile.weightKg);
+  const burned = burnedForDay(workouts, selected);
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const streak = streakDays(meals);
+
+  const days = lastSevenDays();
+  const chartLabels = days.map((d) => d.toLocaleDateString(locale, { weekday: 'narrow' }));
+  const calValues = days.map((d) => Math.round(totalsForDay(meals, d).calories));
+  const weightSeries = [...weights].reverse().map((w) => w.kg);
 
   const shiftDay = (delta: number) => {
     const d = new Date(selected);
@@ -69,8 +81,15 @@ export default function Home() {
     setSelected(d);
   };
 
-  const mealsOfType = (type: MealType): LoggedMeal[] =>
-    dayMeals.filter((m) => (m.mealType ?? 'snack') === type);
+  const submitWeight = () => {
+    const value = parseFloat(kg);
+    if (!value || value < 30 || value > 300) {
+      Alert.alert(t('onboarding.invalidInput'));
+      return;
+    }
+    logWeight(value);
+    setKg('');
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
@@ -82,7 +101,7 @@ export default function Home() {
       >
         <View style={styles.headerRow}>
           <Pressable
-            onPress={() => router.push('/edit-profile')}
+            onPress={() => router.push('/profile')}
             style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
           >
             <Ionicons name="person" size={18} color={theme.onGradient} />
@@ -106,15 +125,18 @@ export default function Home() {
             </Pressable>
           </View>
 
-          <View style={[styles.headerBtn, styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+          <View
+            style={[styles.headerBtn, styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+          >
             <Ionicons name="flame" size={16} color="#FFD166" />
-            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 14 }}>{streak}</Text>
+            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 14 }}>
+              {streak}
+            </Text>
           </View>
         </View>
 
-        {/* Week strip */}
         <View style={styles.weekRow}>
-          {lastSevenDays().map((day) => {
+          {days.map((day) => {
             const active = isSameDay(day.toISOString(), selected);
             return (
               <Pressable
@@ -143,7 +165,6 @@ export default function Home() {
           })}
         </View>
 
-        {/* Calorie hero: eaten | ring | goal */}
         <View style={styles.heroRow}>
           <View style={styles.heroSide}>
             <Text style={[styles.heroSideValue, { color: theme.onGradient }]}>
@@ -180,137 +201,104 @@ export default function Home() {
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{
-          padding: Spacing.md,
-          paddingBottom: 120 + insets.bottom,
-        }}
+        contentContainerStyle={{ padding: Spacing.md, paddingBottom: insets.bottom + Spacing.xl }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Macro strip */}
+        {/* Macros */}
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <View style={styles.macroRow}>
-            <MacroCol
-              letterColor={theme.protein}
-              label={t('home.protein')}
-              value={totals.proteinG}
-              target={targets.proteinG}
-            />
-            <MacroCol
-              letterColor={theme.carbs}
-              label={t('home.carbs')}
-              value={totals.carbsG}
-              target={targets.carbsG}
-            />
-            <MacroCol
-              letterColor={theme.fat}
-              label={t('home.fat')}
-              value={totals.fatG}
-              target={targets.fatG}
-            />
+            <MacroCol letterColor={theme.protein} label={t('home.protein')} value={totals.proteinG} target={targets.proteinG} />
+            <MacroCol letterColor={theme.carbs} label={t('home.carbs')} value={totals.carbsG} target={targets.carbsG} />
+            <MacroCol letterColor={theme.fat} label={t('home.fat')} value={totals.fatG} target={targets.fatG} />
           </View>
         </View>
 
-        {/* Water */}
-        <View
-          style={[
-            styles.card,
-            styles.waterCard,
-            { backgroundColor: theme.card },
-            cardShadow(theme.shadow),
-          ]}
-        >
-          <View style={[styles.waterIcon, { backgroundColor: 'rgba(56,189,248,0.14)' }]}>
-            <Ionicons name="water" size={22} color={theme.water} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.waterTitle, { color: theme.text }]}>{t('home.water')}</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 14 }}>
-              <Text style={{ color: theme.text, fontWeight: '800' }}>{waterMl}</Text>
-              {' / '}
-              {waterTarget} {t('home.ml')}
-            </Text>
-          </View>
-          {selectedIsToday && (
-            <Pressable
-              onPress={() => {
-                logWater(GLASS_ML);
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              }}
-              style={({ pressed }) => [
-                styles.waterAdd,
-                { backgroundColor: theme.cardSubtle },
-                pressed && { transform: [{ scale: 0.92 }] },
-              ]}
-            >
-              <Ionicons name="add" size={22} color={theme.primary} />
-            </Pressable>
-          )}
-        </View>
-
-        {/* Meal sections */}
-        {dayMeals.length === 0 && (
-          <View style={[styles.empty, { borderColor: theme.border }]}>
-            <Ionicons name="camera-outline" size={36} color={theme.textTertiary} />
-            <Text style={{ color: theme.textSecondary, textAlign: 'center', lineHeight: 22 }}>
-              {t('home.noMeals')}
-            </Text>
-          </View>
-        )}
-        {MEAL_TYPES.map((type) => {
-          const sectionMeals = mealsOfType(type);
-          const sectionKcal = sectionMeals.reduce((sum, m) => sum + mealCalories(m), 0);
-          return (
-            <View
-              key={type}
-              style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}
-            >
-              <View style={styles.sectionRow}>
-                <Text style={[styles.sectionName, { color: theme.text }]}>
-                  {t(`home.mealTypes.${type}`)}
-                </Text>
-                {sectionKcal > 0 && (
-                  <Text style={{ color: theme.textSecondary, fontWeight: '700' }}>
-                    {Math.round(sectionKcal)} {t('common.kcal')}
-                  </Text>
-                )}
-                <Pressable
-                  onPress={() => router.push('/add-menu')}
-                  hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.sectionAdd,
-                    { backgroundColor: theme.cardSubtle },
-                    pressed && { transform: [{ scale: 0.9 }] },
-                  ]}
-                >
-                  <Ionicons name="add" size={18} color={theme.primary} />
-                </Pressable>
-              </View>
-              {sectionMeals.map((meal) => (
-                <Pressable key={meal.id} onLongPress={() => removeMeal(meal.id)}>
-                  <View style={styles.mealRow}>
-                    <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
-                      <Ionicons name="restaurant" size={16} color={theme.primary} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
-                        {meal.items.map((i) => i.name).join(' · ')}
-                      </Text>
-                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                        {new Date(meal.at).toLocaleTimeString(locale, {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </Text>
-                    </View>
-                    <Text style={[styles.mealKcal, { color: theme.primary }]}>
-                      {Math.round(mealCalories(meal))}
-                    </Text>
-                  </View>
-                </Pressable>
-              ))}
+        {/* Water + burned side by side */}
+        <View style={styles.halfRow}>
+          <Pressable
+            onPress={() => router.push('/water')}
+            disabled={!selectedIsToday}
+            style={({ pressed }) => [
+              styles.card,
+              styles.half,
+              { backgroundColor: theme.card },
+              cardShadow(theme.shadow),
+              pressed && { transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <View style={styles.halfHead}>
+              <Ionicons name="water" size={18} color={theme.water} />
+              <Text style={[styles.halfTitle, { color: theme.text }]}>{t('home.water')}</Text>
+              {selectedIsToday && (
+                <View style={[styles.halfAdd, { backgroundColor: theme.cardSubtle }]}>
+                  <Ionicons name="add" size={16} color={theme.primary} />
+                </View>
+              )}
             </View>
-          );
-        })}
+            <Text style={[styles.halfValue, { color: theme.text }]}>
+              {waterMl}
+              <Text style={[styles.halfTarget, { color: theme.textTertiary }]}>
+                /{waterTarget} {t('home.ml')}
+              </Text>
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => router.push('/(tabs)/training')}
+            style={({ pressed }) => [
+              styles.card,
+              styles.half,
+              { backgroundColor: theme.card },
+              cardShadow(theme.shadow),
+              pressed && { transform: [{ scale: 0.98 }] },
+            ]}
+          >
+            <View style={styles.halfHead}>
+              <Ionicons name="flame" size={18} color={theme.carbs} />
+              <Text style={[styles.halfTitle, { color: theme.text }]}>
+                {t('training.burnedToday')}
+              </Text>
+            </View>
+            <Text style={[styles.halfValue, { color: theme.text }]}>
+              {burned}
+              <Text style={[styles.halfTarget, { color: theme.textTertiary }]}>
+                {' '}
+                {t('common.kcal')}
+              </Text>
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Calories week chart */}
+        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.calories7d')}</Text>
+          <WeekBars values={calValues} target={targets.calories} labels={chartLabels} color={theme.primary} />
+        </View>
+
+        {/* Weight */}
+        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.weight')}</Text>
+          {weightSeries.length >= 2 ? (
+            <TrendLine values={weightSeries} color={theme.primary} width={width - Spacing.md * 4} />
+          ) : (
+            <Text style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
+              {t('progress.noWeights')}
+            </Text>
+          )}
+          <View style={styles.weightRow}>
+            <View style={{ flex: 1 }}>
+              <Field
+                label={t('progress.logWeight')}
+                value={kg}
+                onChangeText={setKg}
+                keyboardType="decimal-pad"
+                maxLength={5}
+                suffix={t('progress.kg')}
+              />
+            </View>
+            <Button label="+" onPress={submitWeight} style={styles.weightBtn} />
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -337,9 +325,7 @@ function MacroCol({
         <Text style={{ color: theme.textTertiary }}>/{target}</Text>
       </Text>
       <View style={[styles.macroTrack, { backgroundColor: theme.border }]}>
-        <View
-          style={[styles.macroFill, { backgroundColor: letterColor, width: `${pct * 100}%` }]}
-        />
+        <View style={[styles.macroFill, { backgroundColor: letterColor, width: `${pct * 100}%` }]} />
       </View>
     </View>
   );
@@ -374,13 +360,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginBottom: Spacing.lg,
   },
-  dayPill: {
-    flex: 1,
-    alignItems: 'center',
-    borderRadius: Radius.md,
-    paddingVertical: 8,
-    gap: 2,
-  },
+  dayPill: { flex: 1, alignItems: 'center', borderRadius: Radius.md, paddingVertical: 8, gap: 2 },
   dayName: { fontSize: 11, fontWeight: '600' },
   dayNum: { fontSize: 15, fontWeight: '700' },
   heroRow: {
@@ -393,94 +373,24 @@ const styles = StyleSheet.create({
   heroSideValue: { fontSize: 24, fontWeight: '800' },
   heroSideLabel: { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
   ringValue: { fontSize: 34, fontWeight: '800' },
-  card: {
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.md,
-  },
+  card: { borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md },
+  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.md },
   macroRow: { flexDirection: 'row', gap: Spacing.md },
   macroTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
   macroFill: { height: 5, borderRadius: 3 },
-  waterCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  waterIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+  halfRow: { flexDirection: 'row', gap: Spacing.sm },
+  half: { flex: 1 },
+  halfHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  halfTitle: { fontSize: 13, fontWeight: '700', flex: 1 },
+  halfAdd: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  waterTitle: { fontSize: 16, fontWeight: '700', marginBottom: 2 },
-  waterAdd: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  sectionName: { flex: 1, fontSize: 17, fontWeight: '700' },
-  sectionAdd: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mealRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  empty: {
-    marginBottom: Spacing.md,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: Radius.lg,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  mealCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingVertical: 12,
-    marginBottom: Spacing.sm,
-  },
-  mealAvatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mealName: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
-  mealKcal: { fontSize: 17, fontWeight: '800' },
-  fabBar: {
-    position: 'absolute',
-    left: Spacing.md,
-    right: Spacing.md,
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    alignItems: 'center',
-  },
-  fabMain: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: Radius.full,
-    paddingVertical: 16,
-    minHeight: 54,
-  },
-  fabMainLabel: { fontSize: 16, fontWeight: '700' },
-  fabRound: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  halfValue: { fontSize: 20, fontWeight: '800' },
+  halfTarget: { fontSize: 12, fontWeight: '600' },
+  weightRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm },
+  weightBtn: { minWidth: 54, marginBottom: Spacing.md },
 });
