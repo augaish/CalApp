@@ -59,6 +59,8 @@ interface AppState {
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
   setHydrated: () => void;
+  /** Wipes all local data and returns to the login/onboarding flow. */
+  resetAll: () => void;
 }
 
 /** Default meal type from the hour of day. */
@@ -129,6 +131,19 @@ export const useAppStore = create<AppState>()(
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
       setHydrated: () => set({ hydrated: true }),
+      resetAll: () =>
+        set({
+          account: null,
+          language: null,
+          profile: null,
+          targets: null,
+          meals: [],
+          workouts: [],
+          water: [],
+          weights: [],
+          remindMeals: false,
+          remindWater: false,
+        }),
     }),
     {
       name: 'calapp-store',

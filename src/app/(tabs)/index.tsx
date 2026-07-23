@@ -365,6 +365,11 @@ const styles = StyleSheet.create({
   brandName: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
   headerCenter: {
     flexDirection: 'row',
+    // Fixed LTR order: RN auto-mirrors 'row' for RTL, but the chevron glyphs
+    // are static and don't flip with it, which points them the wrong way.
+    // Locking this row to ltr keeps prev/next glyphs matching their meaning
+    // in both languages.
+    direction: 'ltr',
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.sm,

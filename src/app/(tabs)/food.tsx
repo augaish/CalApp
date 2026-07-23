@@ -36,23 +36,25 @@ export default function Food() {
       <View style={styles.headerRow}>
         <Ionicons name="restaurant" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('tabs.food')}</Text>
-        <Pressable onPress={() => shift(-1)} hitSlop={10} style={styles.arrow}>
-          <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
-        </Pressable>
-        <Pressable onPress={() => router.push('/calendar')} hitSlop={6}>
-          <Text style={[styles.dayLabel, { color: theme.text }]}>
-            {selectedIsToday
-              ? t('home.today')
-              : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-          </Text>
-        </Pressable>
-        <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} style={styles.arrow}>
-          <Ionicons
-            name="chevron-forward"
-            size={22}
-            color={selectedIsToday ? theme.border : theme.textSecondary}
-          />
-        </Pressable>
+        <View style={styles.dayNavGroup}>
+          <Pressable onPress={() => shift(-1)} hitSlop={10} style={styles.arrow}>
+            <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
+          </Pressable>
+          <Pressable onPress={() => router.push('/calendar')} hitSlop={6}>
+            <Text style={[styles.dayLabel, { color: theme.text }]}>
+              {selectedIsToday
+                ? t('home.today')
+                : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} style={styles.arrow}>
+            <Ionicons
+              name="chevron-forward"
+              size={22}
+              color={selectedIsToday ? theme.border : theme.textSecondary}
+            />
+          </Pressable>
+        </View>
       </View>
 
       <Text style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
@@ -134,6 +136,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.sm,
     marginBottom: Spacing.xs,
+  },
+  dayNavGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    // Fixed LTR order: prevents RN's RTL row-mirroring from pointing the
+    // static chevron glyphs the wrong way. See index.tsx headerCenter.
+    direction: 'ltr',
   },
   arrow: { padding: 4 },
   dayLabel: { fontSize: 15, fontWeight: '700', minWidth: 64, textAlign: 'center' },

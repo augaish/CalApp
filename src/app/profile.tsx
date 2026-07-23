@@ -23,6 +23,7 @@ export default function Profile() {
   const profile = useAppStore((s) => s.profile);
   const account = useAppStore((s) => s.account);
   const signOut = useAppStore((s) => s.signOut);
+  const resetAll = useAppStore((s) => s.resetAll);
   const remindMeals = useAppStore((s) => s.remindMeals);
   const remindWater = useAppStore((s) => s.remindWater);
   const setRemindMeals = useAppStore((s) => s.setRemindMeals);
@@ -65,6 +66,13 @@ export default function Profile() {
     Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('profile.signOut'), style: 'destructive', onPress: () => signOut() },
+    ]);
+  };
+
+  const confirmReset = () => {
+    Alert.alert(t('settings.resetData'), t('settings.resetDataConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('settings.reset'), style: 'destructive', onPress: () => resetAll() },
     ]);
   };
 
@@ -161,6 +169,15 @@ export default function Profile() {
       <Card>
         <Row label={t('settings.version')} value={Constants.expoConfig?.version ?? '1.0.0'} />
       </Card>
+
+      <Pressable onPress={confirmReset}>
+        <Card style={[styles.linkRow, { borderColor: theme.danger, borderWidth: 1 }]}>
+          <Ionicons name="trash-outline" size={18} color={theme.danger} />
+          <Text style={{ color: theme.danger, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('settings.resetData')}
+          </Text>
+        </Card>
+      </Pressable>
     </Screen>
   );
 }

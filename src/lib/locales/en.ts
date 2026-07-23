@@ -238,6 +238,10 @@ export const en = {
     restartNow: 'Reload now',
     about: 'About',
     version: 'Version',
+    resetData: 'Reset all data',
+    resetDataConfirm:
+      'This deletes all your local meals, workouts, water, weight logs and signs you out. This cannot be undone.',
+    reset: 'Reset',
   },
 };
 

@@ -148,6 +148,9 @@ const styles = StyleSheet.create({
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: Spacing.md },
   monthRow: {
     flexDirection: 'row',
+    // Fixed LTR order: RN auto-mirrors 'row' for RTL, but the chevron
+    // glyphs are static and don't flip with it. See Overview headerCenter.
+    direction: 'ltr',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: Spacing.md,
