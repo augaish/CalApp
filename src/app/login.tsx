@@ -37,13 +37,11 @@ export default function Login() {
       style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + Spacing.lg }]}
     >
       <View style={styles.hero}>
-        <View style={styles.logo}>
-          <Image
-            source={require('../../assets/images/logo-mark.png')}
-            style={styles.logoImg}
-            contentFit="contain"
-          />
-        </View>
+        <Image
+          source={require('../../assets/images/logo-tile.png')}
+          style={styles.logoImg}
+          contentFit="contain"
+        />
         <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
       </View>
 
@@ -79,16 +77,7 @@ export default function Login() {
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: Spacing.lg, justifyContent: 'space-between' },
   hero: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  logo: {
-    width: 128,
-    height: 128,
-    borderRadius: 64,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
-  },
-  logoImg: { width: 88, height: 88 },
+  logoImg: { width: 128, height: 128, borderRadius: 28, marginBottom: Spacing.lg },
   subtitle: {
     color: 'rgba(255,255,255,0.9)',
     fontSize: 16,

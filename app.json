@@ -6,6 +6,9 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "updates": {
+      "url": "https://u.expo.dev/5712e171-778c-472d-8681-debf40460713"
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "calapp",

@@ -105,7 +105,7 @@ export default function Overview() {
         {/* Brand row */}
         <View style={styles.brandRow}>
           <Image
-            source={require('../../../assets/images/logo-white.png')}
+            source={require('../../../assets/images/logo-tile.png')}
             style={styles.brandLogo}
             contentFit="contain"
           />
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
-  brandLogo: { width: 30, height: 30 },
+  brandLogo: { width: 36, height: 36, borderRadius: 9 },
   headerCenter: {
     flexDirection: 'row',
     // Fixed LTR order: RN auto-mirrors 'row' for RTL, but the chevron glyphs
