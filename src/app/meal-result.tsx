@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
+import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
-import { useAppStore } from '@/lib/store';
-import type { FoodItem } from '@/lib/types';
+import { mealTypeForNow, useAppStore } from '@/lib/store';
+import type { FoodItem, MealType } from '@/lib/types';
 
 export default function MealResult() {
   const { t } = useTranslation();
@@ -23,6 +23,7 @@ export default function MealResult() {
   const viewDay = useViewDay((s) => s.day);
 
   const [items, setItems] = useState<FoodItem[]>(analysis?.items ?? []);
+  const [mealType, setMealType] = useState<MealType>(mealTypeForNow());
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -41,7 +42,7 @@ export default function MealResult() {
   // scan simply overwrites it.
   // Land on the Food tab so the user sees the meal appear in their log.
   const save = () => {
-    logMeal(items, photoUri ?? undefined, undefined, timestampFor(viewDay));
+    logMeal(items, photoUri ?? undefined, mealType, timestampFor(viewDay));
     successHaptic();
     router.dismissTo('/(tabs)/food');
   };
@@ -75,6 +76,11 @@ export default function MealResult() {
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
 
+      <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+        {t('mealResult.mealType')}
+      </Text>
+      <MealTypePicker value={mealType} onChange={setMealType} />
+
       {analysis.confidence < 0.6 && (
         <Card style={{ borderColor: theme.warning }}>
           <Text style={{ color: theme.warning }}>{t('mealResult.lowConfidence')}</Text>
@@ -84,7 +90,11 @@ export default function MealResult() {
       {items.map((item, index) => (
         <Card key={index}>
           <View style={styles.itemHeader}>
-            <Text style={[styles.itemName, { color: theme.text }]}>{item.name}</Text>
+            <TextInput
+              defaultValue={item.name}
+              onChangeText={(text) => updateItem(index, { name: text })}
+              style={[styles.itemNameInput, { color: theme.text, borderColor: theme.border }]}
+            />
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
           </View>
           <View style={styles.numRow}>
@@ -160,7 +170,13 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
     gap: Spacing.sm,
   },
-  itemName: { fontSize: 17, fontWeight: '600', flex: 1 },
+  itemNameInput: {
+    fontSize: 17,
+    fontWeight: '600',
+    flex: 1,
+    borderBottomWidth: 1,
+    paddingVertical: 4,
+  },
   numRow: { flexDirection: 'row', gap: Spacing.sm },
   numBox: { flex: 1 },
   numInput: {

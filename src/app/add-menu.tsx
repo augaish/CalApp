@@ -82,6 +82,17 @@ export default function AddMenu() {
             <Ionicons name="create" size={18} color={theme.text} />
             <Text style={[styles.pillLabel, { color: theme.text }]}>{t('addMenu.describe')}</Text>
           </Pressable>
+          <Pressable
+            onPress={() => go('/food-edit')}
+            style={({ pressed }) => [
+              styles.pill,
+              { backgroundColor: 'rgba(255,255,255,0.95)' },
+              pressed && { transform: [{ scale: 0.96 }] },
+            ]}
+          >
+            <Ionicons name="pencil" size={18} color={theme.text} />
+            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('training.addManual')}</Text>
+          </Pressable>
         </View>
       </View>
     </Pressable>
@@ -107,6 +118,7 @@ const styles = StyleSheet.create({
   circleLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
   pillRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'center',
     gap: Spacing.sm,
   },

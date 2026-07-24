@@ -45,6 +45,7 @@ export default function RootLayout() {
             options={{ presentation: 'transparentModal', animation: 'fade' }}
           />
           <Stack.Screen name="describe" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="food-edit" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
           <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
           <Stack.Screen name="workout-edit" options={{ presentation: 'modal' }} />

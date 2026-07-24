@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Pressable,
@@ -269,6 +270,48 @@ export function MacroTile({
   );
 }
 
+/** Segmented selector for Breakfast / Lunch / Dinner / Snacks. */
+const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+export type MealTypeValue = (typeof MEAL_TYPES)[number];
+
+export function MealTypePicker({
+  value,
+  onChange,
+}: {
+  value: MealTypeValue;
+  onChange: (v: MealTypeValue) => void;
+}) {
+  const t = useTheme();
+  const { t: translate } = useTranslation();
+  return (
+    <View style={styles.mealTypeRow}>
+      {MEAL_TYPES.map((type) => {
+        const active = value === type;
+        return (
+          <Pressable
+            key={type}
+            onPress={() => onChange(type)}
+            style={[
+              styles.mealTypeChip,
+              { backgroundColor: active ? t.primary : t.card, borderColor: active ? t.primary : t.border },
+            ]}
+          >
+            <Text
+              style={{
+                color: active ? t.onPrimary : t.textSecondary,
+                fontSize: 13,
+                fontWeight: '700',
+              }}
+            >
+              {translate(`home.mealTypes.${type}`)}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: Radius.lg,
@@ -284,6 +327,16 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  mealTypeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  mealTypeChip: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderRadius: Radius.full,
+    paddingVertical: 10,
+    minHeight: 40,
+  },
   dotsRow: {
     flexDirection: 'row',
     gap: 6,

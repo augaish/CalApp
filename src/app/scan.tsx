@@ -26,6 +26,7 @@ export default function Scan() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isGym = mode === 'gym';
   const isBarcode = mode === 'barcode';
+  const isPhoto = mode === 'photo';
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
@@ -33,6 +34,7 @@ export default function Scan() {
   const language = useAppStore((s) => s.language) ?? 'en';
   const setMeal = usePending((s) => s.setMeal);
   const setEquipment = usePending((s) => s.setEquipment);
+  const setCapturedPhoto = usePending((s) => s.setCapturedPhoto);
 
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
@@ -91,7 +93,11 @@ export default function Scan() {
       });
       const base64 = saved.base64 ?? '';
 
-      if (isGym) {
+      if (isPhoto) {
+        // Plain capture for the manual food form — no AI call.
+        setCapturedPhoto(saved.uri);
+        router.back();
+      } else if (isGym) {
         const analysis = await analyzeEquipment(base64, language);
         setEquipment(analysis, saved.uri);
         router.replace('/gym-result');
@@ -122,12 +128,18 @@ export default function Scan() {
 
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
         <Text style={styles.title}>
-          {isGym ? t('scan.gymTitle') : isBarcode ? t('addMenu.scanBarcode') : t('scan.mealTitle')}
+          {isGym
+            ? t('scan.gymTitle')
+            : isBarcode
+              ? t('addMenu.scanBarcode')
+              : isPhoto
+                ? t('foodEdit.addPhoto')
+                : t('scan.mealTitle')}
         </Text>
         <Text style={styles.hint}>
           {isGym ? t('scan.gymHint') : isBarcode ? t('barcode.hint') : t('scan.mealHint')}
         </Text>
-        {isMockMode && <Text style={styles.mockBadge}>{t('scan.mockBadge')}</Text>}
+        {isMockMode && !isPhoto && <Text style={styles.mockBadge}>{t('scan.mockBadge')}</Text>}
       </View>
 
       <View pointerEvents="none" style={styles.frameWrap}>

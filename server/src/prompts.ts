@@ -6,9 +6,14 @@ const LANGUAGE_NAME: Record<Language, string> = {
 };
 
 export function mealPrompt(language: Language): string {
-  return `You are a nutrition analysis expert with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes (kabsa, mandi, machboos, foul, molokhia, shawarma, etc.).
+  return `You are a meticulous nutrition analyst with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes (kabsa, mandi, machboos, foul, molokhia, shawarma, etc.).
 
 Analyze the food in this photo. Identify each distinct dish or item, estimate the visible portion size, and estimate calories and macros for that portion.
+
+IDENTIFY CAREFULLY before answering:
+- Look at colour, texture, cut surface, seeds, rind and surrounding context — not just overall shape or colour.
+- Watch out for easily-confused foods: watermelon vs tomato vs strawberry vs bell pepper; sweet potato vs potato vs pumpkin; lime vs lemon; zucchini vs cucumber; dates vs olives; labneh vs yogurt vs hummus. A red/pink round item with black seeds and a green rind is watermelon, not tomato.
+- If two foods are genuinely hard to tell apart, pick the more likely one, lower the confidence, and say so in "notes".
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 {
@@ -21,7 +26,7 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 
 Rules:
 - "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
-- "confidence" is 0-1 for the overall analysis.
+- "confidence" is 0-1 for the overall analysis; use lower values when identification is uncertain.
 - Use "notes" for a single short caveat in ${LANGUAGE_NAME[language]} (or "" if none).
 - If the image contains no food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.
 - Be realistic about portions: estimate from what is visible, not standard servings.`;
