@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,9 +8,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useViewDay } from '@/lib/day';
+import { useAppStore } from '@/lib/store';
 
 function startOfMonth(d: Date): Date {
   return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+
+function dayKey(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 function sameDay(a: Date, b: Date): boolean {
@@ -22,7 +28,7 @@ function sameDay(a: Date, b: Date): boolean {
 }
 
 export default function Calendar() {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -30,7 +36,13 @@ export default function Calendar() {
 
   const day = useViewDay((s) => s.day);
   const setDay = useViewDay((s) => s.setDay);
+  const workouts = useAppStore((s) => s.workouts);
+  const meals = useAppStore((s) => s.meals);
   const [month, setMonth] = useState<Date>(startOfMonth(day));
+
+  // Days that have activity, for the calendar dots.
+  const workoutDays = useMemo(() => new Set(workouts.map((w) => dayKey(w.at))), [workouts]);
+  const mealDays = useMemo(() => new Set(meals.map((m) => dayKey(m.at))), [meals]);
 
   const today = new Date();
   const firstWeekday = month.getDay();
@@ -96,12 +108,26 @@ export default function Calendar() {
           ))}
         </View>
 
+        <View style={styles.legendRow}>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: theme.primary }]} />
+            <Text style={[styles.legendText, { color: theme.textSecondary }]}>{t('tabs.training')}</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.dot, { backgroundColor: theme.carbs }]} />
+            <Text style={[styles.legendText, { color: theme.textSecondary }]}>{t('home.todaysMeals')}</Text>
+          </View>
+        </View>
+
         <View style={styles.grid}>
           {cells.map((d, i) => {
             if (!d) return <View key={i} style={styles.cell} />;
             const isSelected = sameDay(d, day);
             const isToday = sameDay(d, today);
             const isFuture = d.getTime() > today.getTime() && !isToday;
+            const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+            const hasWorkout = workoutDays.has(key);
+            const hasMeal = mealDays.has(key);
             return (
               <Pressable
                 key={i}
@@ -128,6 +154,18 @@ export default function Calendar() {
                   >
                     {d.getDate()}
                   </Text>
+                </View>
+                <View style={styles.dotRow}>
+                  {hasWorkout && (
+                    <View
+                      style={[styles.dot, { backgroundColor: isSelected ? theme.onPrimary : theme.primary }]}
+                    />
+                  )}
+                  {hasMeal && (
+                    <View
+                      style={[styles.dot, { backgroundColor: isSelected ? theme.onPrimary : theme.carbs }]}
+                    />
+                  )}
                 </View>
               </Pressable>
             );
@@ -159,6 +197,9 @@ const styles = StyleSheet.create({
   monthLabel: { fontSize: 17, fontWeight: '700' },
   weekdayRow: { flexDirection: 'row', marginBottom: Spacing.sm },
   weekday: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600' },
+  legendRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.sm },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  legendText: { fontSize: 12, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
   dayCircle: {
@@ -168,4 +209,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  dotRow: {
+    position: 'absolute',
+    bottom: 4,
+    flexDirection: 'row',
+    gap: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dot: { width: 5, height: 5, borderRadius: 2.5 },
 });
