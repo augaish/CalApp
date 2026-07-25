@@ -91,7 +91,7 @@ export default function AddMenu() {
             ]}
           >
             <Ionicons name="pencil" size={18} color={theme.text} />
-            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('training.addManual')}</Text>
+            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('addMenu.manual')}</Text>
           </Pressable>
         </View>
       </View>

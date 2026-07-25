@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { matchExerciseByName } from '@/lib/exercises';
+import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
+import { useAppStore } from '@/lib/store';
 
 export default function GymResult() {
   const { t } = useTranslation();
@@ -16,6 +19,15 @@ export default function GymResult() {
   const router = useRouter();
   const analysis = usePending((s) => s.equipment);
   const photoUri = usePending((s) => s.photoUri);
+  const custom = useAppStore((s) => s.exercises);
+  const addExercise = useAppStore((s) => s.addExercise);
+
+  // If this machine is already in the library (built-in or saved earlier), we
+  // reuse it — no need to keep it around or spend AI tokens next time.
+  const matched = useMemo(
+    () => (analysis ? matchExerciseByName(analysis.name, custom) : undefined),
+    [analysis, custom],
+  );
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -23,22 +35,46 @@ export default function GymResult() {
 
   if (!analysis) return null;
 
-  // "Log this exercise" opens the entry page (prefilled from the scan) so the
-  // user records the actual sets/reps/weight lifted before it's saved.
-  const save = () => {
-    const params = new URLSearchParams({
+  // Turn the scan into (or reuse) a reusable library exercise.
+  const ensureExercise = (): string => {
+    if (matched) return matched.id;
+    const description = [...analysis.setupSteps, ...analysis.formCues].map((s) => `• ${s}`).join('\n');
+    return addExercise({
       name: analysis.name,
-      sets: String(analysis.suggestion.sets),
-      reps: analysis.suggestion.reps,
+      category: 'fullBody',
+      type: 'weight_reps',
+      photoUri: photoUri ?? undefined,
+      description,
+      source: 'scan',
     });
-    router.push(`/workout-edit?${params.toString()}`);
+  };
+
+  // "Log this exercise" → opens the per-set Track page for this exercise.
+  const logIt = () => {
+    const id = ensureExercise();
+    router.replace(`/exercise-detail?id=${encodeURIComponent(id)}`);
+  };
+
+  const saveOnly = () => {
+    ensureExercise();
+    successHaptic();
+    Alert.alert(t('gymResult.savedToLibrary'));
   };
 
   return (
     <Screen
       footer={
         <View>
-          <Button label={t('gymResult.logWorkout')} onPress={save} />
+          <Button label={t('gymResult.logWorkout')} icon="add" onPress={logIt} />
+          {!matched && (
+            <Button
+              label={t('gymResult.saveToLibrary')}
+              variant="secondary"
+              icon="bookmark-outline"
+              onPress={saveOnly}
+              style={{ marginTop: Spacing.xs }}
+            />
+          )}
           <Button
             label={t('common.done')}
             variant="ghost"
@@ -51,6 +87,18 @@ export default function GymResult() {
       }
     >
       <Title>{analysis.name}</Title>
+
+      {matched && (
+        <Card style={{ backgroundColor: theme.cardSubtle }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
+            <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.text, fontWeight: '700' }}>{t('gymResult.matchedTitle')}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('gymResult.matchedBody')}</Text>
+            </View>
+          </View>
+        </Card>
+      )}
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
 

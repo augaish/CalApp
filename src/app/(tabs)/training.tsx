@@ -1,27 +1,30 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Screen } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useViewDay } from '@/lib/day';
+import { exerciseName, findExercise } from '@/lib/exercises';
+import { successHaptic } from '@/lib/feedback';
 import { burnedForDay, isSameDay, useAppStore } from '@/lib/store';
-import type { LoggedWorkout } from '@/lib/types';
+import type { Exercise, LoggedWorkout } from '@/lib/types';
 
-/** Machines most frequently trained on the same weekday as `day`. */
-function routineFor(workouts: LoggedWorkout[], day: Date): string[] {
+/** Exercises most frequently trained on the same weekday as `day`. */
+function routineFor(workouts: LoggedWorkout[], day: Date): { id: string; name: string }[] {
   const weekday = day.getDay();
-  const counts = new Map<string, number>();
+  const counts = new Map<string, { name: string; n: number }>();
   for (const w of workouts) {
     if (new Date(w.at).getDay() !== weekday) continue;
-    counts.set(w.equipmentName, (counts.get(w.equipmentName) ?? 0) + 1);
+    const cur = counts.get(w.exerciseId);
+    counts.set(w.exerciseId, { name: w.exerciseName, n: (cur?.n ?? 0) + 1 });
   }
   return [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .sort((a, b) => b[1].n - a[1].n)
     .slice(0, 4)
-    .map(([name]) => name);
+    .map(([id, v]) => ({ id, name: v.name }));
 }
 
 /** Group workouts into date buckets, newest first. */
@@ -40,13 +43,29 @@ function groupByDay(workouts: LoggedWorkout[]): { key: string; date: Date; items
   return groups;
 }
 
+/** Short one-line summary of a logged exercise: sets · top load. */
+function summarize(w: LoggedWorkout, sets: string, top: string, kg: string): string {
+  const parts = [`${w.sets.length} ${sets}`];
+  if (w.type === 'weight_reps') {
+    const best = Math.max(0, ...w.sets.map((s) => s.weightKg ?? 0));
+    if (best > 0) parts.push(`${top} ${best} ${kg}`);
+  } else if (w.type === 'bodyweight_reps') {
+    const best = Math.max(0, ...w.sets.map((s) => s.reps ?? 0));
+    if (best > 0) parts.push(`${top} ${best}`);
+  }
+  return parts.join(' · ');
+}
+
 export default function Training() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const locale = i18n.language === 'ar' ? 'ar' : 'en';
+  const lang = i18n.language === 'ar' ? 'ar' : 'en';
+  const locale = lang;
 
   const workouts = useAppStore((s) => s.workouts);
+  const custom = useAppStore((s) => s.exercises);
+  const repeatLastSession = useAppStore((s) => s.repeatLastSession);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
@@ -55,22 +74,42 @@ export default function Training() {
   const routine = routineFor(workouts, selected);
   const groups = groupByDay(workouts);
   const weekday = selected.toLocaleDateString(locale, { weekday: 'long' });
+  const kg = t('progress.kg');
+
+  // Resolve a logged exercise's display name live (localized) when it still
+  // exists in the library; fall back to the snapshot taken at log time.
+  const nameOf = (w: LoggedWorkout): string => {
+    const ex = findExercise(w.exerciseId, custom);
+    return ex ? exerciseName(ex, lang) : w.exerciseName;
+  };
+
+  const openExercise = (id: string) => router.push(`/exercise-detail?id=${encodeURIComponent(id)}`);
+
+  const repeat = () => {
+    const n = repeatLastSession(selected);
+    if (n === 0) {
+      Alert.alert(t('training.noPrevious'));
+      return;
+    }
+    successHaptic();
+    Alert.alert(t('training.repeated', { count: n }));
+  };
 
   return (
     <Screen
       footer={
         <View style={styles.footerRow}>
           <Button
-            label={t('training.scanCta')}
-            icon="barbell"
-            onPress={() => router.push('/scan?mode=gym')}
+            label={t('training.addExercise')}
+            icon="add"
+            onPress={() => router.push('/exercise-library')}
             style={{ flex: 1 }}
           />
           <Button
-            label={t('training.addManual')}
-            icon="create-outline"
+            label={t('training.scanCta')}
+            icon="barbell"
             variant="secondary"
-            onPress={() => router.push('/workout-edit')}
+            onPress={() => router.push('/scan?mode=gym')}
             style={{ flex: 1 }}
           />
         </View>
@@ -114,19 +153,27 @@ export default function Training() {
         </View>
       </Card>
 
-      {/* Routine insight */}
+      {/* Routine insight + repeat last session */}
       <Card>
-        <Text style={[styles.cardTitle, { color: theme.text }]}>{t('training.routine')}</Text>
+        <View style={styles.routineHead}>
+          <Text style={[styles.cardTitle, { color: theme.text, flex: 1 }]}>{t('training.routine')}</Text>
+          <Pressable onPress={repeat} hitSlop={8} style={styles.repeatBtn}>
+            <Ionicons name="repeat" size={16} color={theme.primary} />
+            <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
+              {t('training.repeatLast')}
+            </Text>
+          </Pressable>
+        </View>
         {routine.length > 0 ? (
           <>
             <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: Spacing.sm }}>
               {t('training.routineHint', { weekday })}
             </Text>
             <View style={styles.chipWrap}>
-              {routine.map((m) => (
+              {routine.map((r) => (
                 <Pressable
-                  key={m}
-                  onPress={() => router.push(`/workout-edit?name=${encodeURIComponent(m)}`)}
+                  key={r.id}
+                  onPress={() => openExercise(r.id)}
                   style={({ pressed }) => [
                     styles.chip,
                     { backgroundColor: theme.cardSubtle },
@@ -134,7 +181,12 @@ export default function Training() {
                   ]}
                 >
                   <Ionicons name="add" size={14} color={theme.primary} />
-                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}>{m}</Text>
+                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}>
+                    {(() => {
+                      const ex: Exercise | undefined = findExercise(r.id, custom);
+                      return ex ? exerciseName(ex, lang) : r.name;
+                    })()}
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -175,7 +227,7 @@ export default function Training() {
               {g.items.map((w) => (
                 <Pressable
                   key={w.id}
-                  onPress={() => router.push(`/workout-edit?id=${w.id}`)}
+                  onPress={() => openExercise(w.exerciseId)}
                   style={({ pressed }) => [styles.workoutRow, pressed && { opacity: 0.6 }]}
                 >
                   <View style={[styles.workoutIcon, { backgroundColor: theme.cardSubtle }]}>
@@ -183,15 +235,11 @@ export default function Training() {
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
-                      {w.equipmentName}
+                      {nameOf(w)}
                     </Text>
-                    {w.sets || w.weightLiftedKg ? (
-                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                        {w.sets ? `${w.sets} × ${w.reps}` : ''}
-                        {w.sets && w.weightLiftedKg ? ' · ' : ''}
-                        {w.weightLiftedKg ? `${w.weightLiftedKg} ${t('progress.kg')}` : ''}
-                      </Text>
-                    ) : null}
+                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                      {summarize(w, t('training.sets'), t('training.top'), kg)}
+                    </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
                 </Pressable>
@@ -232,6 +280,8 @@ const styles = StyleSheet.create({
   burnValue: { fontSize: 26, fontWeight: '800' },
   burnUnit: { fontSize: 14, fontWeight: '600' },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
+  routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  repeatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.sm },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   chip: {
     flexDirection: 'row',

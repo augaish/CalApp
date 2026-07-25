@@ -270,6 +270,79 @@ export function MacroTile({
   );
 }
 
+/**
+ * Big +/- stepper for logging a numeric value (weight, reps, seconds). The
+ * value sits in a centered field you can also type into; steppers are laid out
+ * LTR so the − is always on the left even in Arabic.
+ */
+export function Stepper({
+  label,
+  value,
+  onChange,
+  step = 1,
+  min = 0,
+  max = 9999,
+  decimals = 0,
+  suffix,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  step?: number;
+  min?: number;
+  max?: number;
+  decimals?: number;
+  suffix?: string;
+}) {
+  const t = useTheme();
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
+  const fmt = (v: number) => (decimals > 0 ? v.toFixed(decimals) : String(Math.round(v)));
+  return (
+    <View style={{ flex: 1 }}>
+      <Text style={[Type.caption, { color: t.textSecondary, marginBottom: 6, textAlign: 'center' }]}>
+        {label}
+      </Text>
+      <View style={[styles.stepperRow, { direction: 'ltr' }]}>
+        <Pressable
+          onPress={() => onChange(clamp(Number((value - step).toFixed(3))))}
+          style={({ pressed }) => [
+            styles.stepperBtn,
+            { backgroundColor: t.cardSubtle, borderColor: t.border },
+            pressed && { transform: [{ scale: 0.94 }] },
+          ]}
+        >
+          <Ionicons name="remove" size={22} color={t.primary} />
+        </Pressable>
+        <View style={styles.stepperValueWrap}>
+          <TextInput
+            value={fmt(value)}
+            onChangeText={(txt) => {
+              const n = decimals > 0 ? parseFloat(txt) : parseInt(txt, 10);
+              onChange(Number.isFinite(n) ? clamp(n) : 0);
+            }}
+            keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
+            selectTextOnFocus
+            style={[styles.stepperValue, { color: t.text }]}
+          />
+          {suffix ? (
+            <Text style={{ color: t.textTertiary, fontSize: 13, fontWeight: '600' }}>{suffix}</Text>
+          ) : null}
+        </View>
+        <Pressable
+          onPress={() => onChange(clamp(Number((value + step).toFixed(3))))}
+          style={({ pressed }) => [
+            styles.stepperBtn,
+            { backgroundColor: t.cardSubtle, borderColor: t.border },
+            pressed && { transform: [{ scale: 0.94 }] },
+          ]}
+        >
+          <Ionicons name="add" size={22} color={t.primary} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 /** Segmented selector for Breakfast / Lunch / Dinner / Snacks. */
 const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
 export type MealTypeValue = (typeof MEAL_TYPES)[number];
@@ -327,6 +400,23 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   buttonInner: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  stepperBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperValueWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  stepperValue: { fontSize: 28, fontWeight: '800', textAlign: 'center', minWidth: 70, padding: 0 },
   mealTypeRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   mealTypeChip: {
     flex: 1,
