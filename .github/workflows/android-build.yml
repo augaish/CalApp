@@ -1,0 +1,40 @@
+# Android test build: produces a directly-installable APK in the EAS cloud and
+# prints its download link in the run log — share that link with an Android
+# tester (no Google Play needed). Trigger manually from the Actions tab.
+#
+# NOTE: the `preview` profile uses the `preview` EAS environment. Make sure
+# EXPO_PUBLIC_API_URL is set there (copy it from production), otherwise the
+# build runs in demo mode with mocked AI results.
+name: Android Build (APK)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile'
+        type: choice
+        default: preview
+        options: [preview, production]
+
+jobs:
+  build:
+    name: EAS build (Android APK)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      # No --no-wait: waiting lets EAS print the installable APK URL at the end.
+      - run: >-
+          eas build
+          --platform android
+          --profile ${{ github.event.inputs.profile || 'preview' }}
+          --non-interactive
+      - run: echo "::notice::Open the build URL above in the run log, then share the APK link with your Android tester."
