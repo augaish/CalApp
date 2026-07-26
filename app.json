@@ -51,6 +51,7 @@
       }
     },
     "plugins": [
+      "./plugins/withAndroidLintFix",
       "expo-router",
       "expo-localization",
       "expo-notifications",
