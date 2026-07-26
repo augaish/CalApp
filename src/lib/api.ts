@@ -2,10 +2,13 @@ import type { ChatMessage, EquipmentAnalysis, FoodItem, Language, MealAnalysis }
 
 /**
  * Base URL of the CalApp AI server (see server/ in this repo).
- * Set via EXPO_PUBLIC_API_URL in .env / eas.json. When unset, the app runs in
- * demo mode with mocked results so the full flow is testable without a backend.
+ * Overridable via EXPO_PUBLIC_API_URL (e.g. to point a dev build at a local
+ * server), but defaults to the production server so the app never silently
+ * drops into demo mode when the env var fails to inject at bundle time. The
+ * URL is not a secret — the Anthropic key lives only on the server.
  */
-const API_URL = process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '');
+const DEFAULT_API_URL = 'https://calapp-production-ab20.up.railway.app';
+const API_URL = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 
 export const isMockMode = !API_URL;
 
