@@ -128,12 +128,21 @@ export default function Profile() {
           <Text style={[styles.section, { color: theme.textSecondary }]}>
             {t('settings.dailyTargets')}
           </Text>
-          <Card>
-            <Row label={t('onboarding.dailyCalories')} value={`${targets.calories} ${t('common.kcal')}`} />
-            <Row label={t('onboarding.protein')} value={`${targets.proteinG} ${t('common.grams')}`} />
-            <Row label={t('onboarding.carbs')} value={`${targets.carbsG} ${t('common.grams')}`} />
-            <Row label={t('onboarding.fat')} value={`${targets.fatG} ${t('common.grams')}`} />
-          </Card>
+          <Pressable onPress={() => router.push('/edit-targets')}>
+            <Card>
+              <Row label={t('onboarding.dailyCalories')} value={`${targets.calories} ${t('common.kcal')}`} />
+              <Row label={t('onboarding.protein')} value={`${targets.proteinG} ${t('common.grams')}`} />
+              <Row label={t('onboarding.carbs')} value={`${targets.carbsG} ${t('common.grams')}`} />
+              <Row label={t('onboarding.fat')} value={`${targets.fatG} ${t('common.grams')}`} />
+              <View style={[styles.editHint, { borderTopColor: theme.border }]}>
+                <Ionicons name="create-outline" size={16} color={theme.primary} />
+                <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '600', flex: 1 }}>
+                  {t('editTargets.edit')}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+              </View>
+            </Card>
+          </Pressable>
         </>
       )}
 
@@ -244,6 +253,14 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: Spacing.sm },
   flex: { flex: 1 },
   linkRow: { flexDirection: 'row', alignItems: 'center' },
+  editHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   kvRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',

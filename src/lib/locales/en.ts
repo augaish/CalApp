@@ -312,6 +312,12 @@ export const en = {
     title: 'Edit profile & goals',
     save: 'Save changes',
   },
+  editTargets: {
+    title: 'Edit daily targets',
+    edit: 'Edit targets',
+    reset: 'Reset to recommended',
+    hint: 'Set your own numbers, or reset to the values we calculated from your profile.',
+  },
   reminders: {
     section: 'Reminders',
     meals: 'Meal reminders',

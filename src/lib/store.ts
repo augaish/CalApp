@@ -57,6 +57,8 @@ interface AppState {
   signOut: () => void;
   setLanguage: (language: Language) => void;
   setProfile: (profile: Profile) => void;
+  /** Manually override the daily calorie/macro targets. */
+  setTargets: (targets: DailyTargets) => void;
   logMeal: (items: FoodItem[], photoUri?: string, mealType?: MealType, at?: string) => void;
   removeMeal: (id: string) => void;
   /** Adds a custom/scan exercise to the library; returns its new id. */
@@ -141,6 +143,7 @@ export const useAppStore = create<AppState>()(
       signOut: () => set({ account: null }),
       setLanguage: (language) => set({ language }),
       setProfile: (profile) => set({ profile, targets: dailyTargets(profile) }),
+      setTargets: (targets) => set({ targets }),
       logMeal: (items, photoUri, mealType, at) =>
         set((s) => ({
           meals: [
