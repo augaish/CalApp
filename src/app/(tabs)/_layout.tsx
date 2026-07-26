@@ -1,14 +1,41 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
+import { enableDefaultReminders } from '@/lib/reminders';
+import { useAppStore } from '@/lib/store';
 
 export default function TabLayout() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
+
+  const remindersInitialized = useAppStore((s) => s.remindersInitialized);
+  const setRemindMeals = useAppStore((s) => s.setRemindMeals);
+  const setRemindWater = useAppStore((s) => s.setRemindWater);
+  const setRemindWorkouts = useAppStore((s) => s.setRemindWorkouts);
+  const setRemindersInitialized = useAppStore((s) => s.setRemindersInitialized);
+
+  // Auto-enable reminders on first entry into the app (one permission prompt).
+  // Users can turn any of them off in Profile afterwards.
+  useEffect(() => {
+    if (remindersInitialized) return;
+    let cancelled = false;
+    (async () => {
+      const res = await enableDefaultReminders();
+      if (cancelled) return;
+      setRemindMeals(res.meals);
+      setRemindWater(res.water);
+      setRemindWorkouts(res.workouts);
+      setRemindersInitialized();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [remindersInitialized, setRemindMeals, setRemindWater, setRemindWorkouts, setRemindersInitialized]);
 
   return (
     <Tabs

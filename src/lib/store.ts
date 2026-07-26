@@ -43,6 +43,8 @@ interface AppState {
   remindMeals: boolean;
   remindWater: boolean;
   remindWorkouts: boolean;
+  /** Reminders have been auto-scheduled once (permission requested on first run). */
+  remindersInitialized: boolean;
   /** First-run welcome carousel has been seen. */
   tutorialSeen: boolean;
   /** User dismissed the Getting-started checklist on Overview. */
@@ -82,6 +84,7 @@ interface AppState {
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
   setRemindWorkouts: (on: boolean) => void;
+  setRemindersInitialized: () => void;
   setTutorialSeen: () => void;
   dismissChecklist: () => void;
   setTourSeen: () => void;
@@ -118,9 +121,10 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       water: [],
       weights: [],
-      remindMeals: false,
-      remindWater: false,
-      remindWorkouts: false,
+      remindMeals: true,
+      remindWater: true,
+      remindWorkouts: true,
+      remindersInitialized: false,
       tutorialSeen: false,
       checklistDismissed: false,
       tourSeen: false,
@@ -308,6 +312,7 @@ export const useAppStore = create<AppState>()(
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
       setRemindWorkouts: (on) => set({ remindWorkouts: on }),
+      setRemindersInitialized: () => set({ remindersInitialized: true }),
       setTutorialSeen: () => set({ tutorialSeen: true }),
       dismissChecklist: () => set({ checklistDismissed: true }),
       setTourSeen: () => set({ tourSeen: true }),
@@ -325,9 +330,10 @@ export const useAppStore = create<AppState>()(
           workouts: [],
           water: [],
           weights: [],
-          remindMeals: false,
-          remindWater: false,
-          remindWorkouts: false,
+          remindMeals: true,
+          remindWater: true,
+          remindWorkouts: true,
+          remindersInitialized: false,
           tutorialSeen: false,
           checklistDismissed: false,
           tourSeen: false,
@@ -352,6 +358,7 @@ export const useAppStore = create<AppState>()(
         remindMeals,
         remindWater,
         remindWorkouts,
+        remindersInitialized,
         tutorialSeen,
         checklistDismissed,
         tourSeen,
@@ -369,6 +376,7 @@ export const useAppStore = create<AppState>()(
         remindMeals,
         remindWater,
         remindWorkouts,
+        remindersInitialized,
         tutorialSeen,
         checklistDismissed,
         tourSeen,

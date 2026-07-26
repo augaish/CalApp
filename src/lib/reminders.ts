@@ -71,6 +71,21 @@ export async function setMealReminders(enabled: boolean): Promise<boolean> {
   return true;
 }
 
+/**
+ * First-run: request permission once and schedule all reminder types.
+ * Returns which types ended up enabled (all false if permission was denied).
+ */
+export async function enableDefaultReminders(): Promise<{
+  meals: boolean;
+  water: boolean;
+  workouts: boolean;
+}> {
+  const meals = await setMealReminders(true);
+  const water = await setWaterReminders(true);
+  const workouts = await setWorkoutReminders(true);
+  return { meals, water, workouts };
+}
+
 export async function setWorkoutReminders(enabled: boolean): Promise<boolean> {
   const mod = notifications();
   if (!mod) return !enabled;
