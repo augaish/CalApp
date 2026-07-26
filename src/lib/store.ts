@@ -290,9 +290,15 @@ export const useAppStore = create<AppState>()(
         if (state.workouts.some((w) => w.exerciseId === exercise.id && isSameDay(w.at, day))) {
           return; // already logged that day
         }
-        const src = state.workouts
-          .filter((w) => w.exerciseId === exercise.id && !isSameDay(w.at, day))
-          .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())[0];
+        // Most recent earlier session for this exercise — by id first, then by
+        // name (so a matching record under a different entry still counts).
+        const byDate = (a: LoggedWorkout, b: LoggedWorkout) =>
+          new Date(b.at).getTime() - new Date(a.at).getTime();
+        const norm = (v: string) => v.trim().toLowerCase();
+        const prior = state.workouts.filter((w) => !isSameDay(w.at, day)).sort(byDate);
+        const src =
+          prior.find((w) => w.exerciseId === exercise.id) ??
+          prior.find((w) => norm(w.exerciseName) === norm(exercise.name));
         const bodyKg = state.profile?.weightKg ?? 75;
         const base: WorkoutSet[] = src
           ? src.sets.map((st) => ({ ...st, done: true, isPR: false }))
@@ -540,8 +546,8 @@ function setScore(s: WorkoutSet, type: LoggedWorkout['type']): number {
   return (s.weightKg ?? 0) * 1000 + (s.reps ?? 0);
 }
 
-/** Flags the single best set in a session as the PR (highest score, first wins ties). */
-function markPRs(sets: WorkoutSet[], type: LoggedWorkout['type']): WorkoutSet[] {
+/** Index of the best set in a session (highest score; first wins ties), or -1. */
+export function bestSetIndex(sets: WorkoutSet[], type: LoggedWorkout['type']): number {
   let bestIdx = -1;
   let best = 0;
   sets.forEach((s, i) => {
@@ -551,7 +557,13 @@ function markPRs(sets: WorkoutSet[], type: LoggedWorkout['type']): WorkoutSet[] 
       bestIdx = i;
     }
   });
-  return sets.map((s, i) => ({ ...s, isPR: i === bestIdx && best > 0 }));
+  return bestIdx;
+}
+
+/** Flags the single best set in a session as the PR (highest score, first wins ties). */
+function markPRs(sets: WorkoutSet[], type: LoggedWorkout['type']): WorkoutSet[] {
+  const bestIdx = bestSetIndex(sets, type);
+  return sets.map((s, i) => ({ ...s, isPR: i === bestIdx }));
 }
 
 /** Best set score for an exercise across all sessions before `day` (for PR badges). */

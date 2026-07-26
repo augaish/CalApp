@@ -21,7 +21,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
-import { historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
+import { bestSetIndex, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
 type Tab = 'track' | 'history' | 'graph';
@@ -358,6 +358,7 @@ function TrackTab({
         <Card>
           {sets.map((s, i) => {
             const active = editingIndex === i;
+            const isBest = i === bestSetIndex(sets, type);
             return (
               <Pressable
                 key={i}
@@ -376,7 +377,7 @@ function TrackTab({
                     <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
                       {setLabel(s, type, kg)}
                     </Text>
-                    {s.isPR && <Ionicons name="trophy" size={14} color={theme.carbs} />}
+                    {isBest && <Ionicons name="trophy" size={14} color={theme.carbs} />}
                   </View>
                   {s.comment ? (
                     <Text style={{ color: theme.textTertiary, fontSize: 12 }} numberOfLines={1}>
@@ -428,7 +429,7 @@ function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; typ
               <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
                 {setLabel(s, type, kg)}
               </Text>
-              {s.isPR && <Ionicons name="trophy" size={13} color={theme.carbs} />}
+              {i === bestSetIndex(w.sets, w.type) && <Ionicons name="trophy" size={13} color={theme.carbs} />}
               {type === 'weight_reps' && (s.weightKg ?? 0) > 0 && (s.reps ?? 0) > 0 ? (
                 <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                   {t('track.est1rm')} {est1RM(s.weightKg ?? 0, s.reps ?? 0)}
