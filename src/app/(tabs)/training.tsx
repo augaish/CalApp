@@ -84,6 +84,7 @@ export default function Training() {
   const schedule = useAppStore((s) => s.schedule);
   const repeatLastSession = useAppStore((s) => s.repeatLastSession);
   const copyExerciseFromLast = useAppStore((s) => s.copyExerciseFromLast);
+  const removeWorkout = useAppStore((s) => s.removeWorkout);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
@@ -104,6 +105,12 @@ export default function Training() {
   };
 
   const openExercise = (id: string) => router.push(`/exercise-detail?id=${encodeURIComponent(id)}`);
+
+  const confirmDeleteWorkout = (id: string) =>
+    Alert.alert(t('training.deleteWorkoutConfirm'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: () => removeWorkout(id) },
+    ]);
 
   const repeat = () => {
     const n = repeatLastSession(selected);
@@ -319,24 +326,31 @@ export default function Training() {
                 </Text>
               </View>
               {g.items.map((w) => (
-                <Pressable
-                  key={w.id}
-                  onPress={() => openExercise(w.exerciseId)}
-                  style={({ pressed }) => [styles.workoutRow, pressed && { opacity: 0.6 }]}
-                >
-                  <View style={[styles.workoutIcon, { backgroundColor: theme.cardSubtle }]}>
-                    <Ionicons name="barbell" size={16} color={theme.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
-                      {nameOf(w)}
-                    </Text>
-                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                      {summarize(w, t('training.sets'), t('training.top'), kg)}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-                </Pressable>
+                <View key={w.id} style={styles.workoutRow}>
+                  <Pressable
+                    onPress={() => openExercise(w.exerciseId)}
+                    style={({ pressed }) => [styles.workoutTap, pressed && { opacity: 0.6 }]}
+                  >
+                    <View style={[styles.workoutIcon, { backgroundColor: theme.cardSubtle }]}>
+                      <Ionicons name="barbell" size={16} color={theme.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                        {nameOf(w)}
+                      </Text>
+                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                        {summarize(w, t('training.sets'), t('training.top'), kg)}
+                      </Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => confirmDeleteWorkout(w.id)}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                  </Pressable>
+                </View>
               ))}
             </Card>
           );
@@ -415,6 +429,8 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     paddingVertical: 8,
   },
+  workoutTap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
+  deleteBtn: { padding: 4 },
   workoutIcon: {
     width: 36,
     height: 36,

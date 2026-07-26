@@ -9,6 +9,7 @@ export const ar: TranslationSchema = {
     cancel: 'إلغاء',
     retry: 'إعادة المحاولة',
     done: 'تم',
+    delete: 'حذف',
     kcal: 'سعرة',
     grams: 'غ',
     loading: 'جارٍ التحميل…',
@@ -68,6 +69,7 @@ export const ar: TranslationSchema = {
     scanMeal: 'مسح وجبة',
     scanGym: 'مسح جهاز رياضي',
     todaysMeals: 'الوجبات',
+    deleteMealConfirm: 'حذف هذه الوجبة؟ لا يمكن التراجع.',
     noMeals: 'لم تسجل أي وجبة بعد. امسح وجبتك الأولى!',
     overTarget: 'زيادة',
     kcalLeft: 'سعرة متبقية',
@@ -112,6 +114,7 @@ export const ar: TranslationSchema = {
     todaysPlan: 'خطة اليوم',
     buildSchedule: 'أنشئ جدولاً أسبوعياً',
     last: 'آخر مرة',
+    deleteWorkoutConfirm: 'حذف هذا التمرين المسجّل؟ لا يمكن التراجع.',
   },
   schedule: {
     title: 'الجدول الأسبوعي',

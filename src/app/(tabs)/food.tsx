@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Screen } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
@@ -30,6 +30,12 @@ export default function Food() {
 
   const mealsOfType = (type: MealType): LoggedMeal[] =>
     dayMeals.filter((m) => (m.mealType ?? 'snack') === type);
+
+  const confirmDelete = (id: string) =>
+    Alert.alert(t('home.deleteMealConfirm'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: () => removeMeal(id) },
+    ]);
 
   return (
     <Screen>
@@ -101,27 +107,32 @@ export default function Food() {
               </Pressable>
             </View>
             {sectionMeals.map((meal) => (
-              <Pressable key={meal.id} onLongPress={() => removeMeal(meal.id)}>
-                <View style={styles.mealRow}>
-                  <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
-                    <Ionicons name="restaurant" size={16} color={theme.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
-                      {meal.items.map((i) => i.name).join(' · ')}
-                    </Text>
-                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                      {new Date(meal.at).toLocaleTimeString(locale, {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                  </View>
-                  <Text style={[styles.mealKcal, { color: theme.primary }]}>
-                    {Math.round(mealCalories(meal))}
+              <View key={meal.id} style={styles.mealRow}>
+                <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
+                  <Ionicons name="restaurant" size={16} color={theme.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
+                    {meal.items.map((i) => i.name).join(' · ')}
+                  </Text>
+                  <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                    {new Date(meal.at).toLocaleTimeString(locale, {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
                   </Text>
                 </View>
-              </Pressable>
+                <Text style={[styles.mealKcal, { color: theme.primary }]}>
+                  {Math.round(mealCalories(meal))}
+                </Text>
+                <Pressable
+                  onPress={() => confirmDelete(meal.id)}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
+                >
+                  <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                </Pressable>
+              </View>
             ))}
           </Card>
         );
@@ -180,4 +191,5 @@ const styles = StyleSheet.create({
   },
   mealName: { fontSize: 16, fontWeight: '600', marginBottom: 2 },
   mealKcal: { fontSize: 17, fontWeight: '800' },
+  deleteBtn: { padding: 4, marginStart: 4 },
 });

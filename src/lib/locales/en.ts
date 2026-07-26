@@ -7,6 +7,7 @@ export const en = {
     cancel: 'Cancel',
     retry: 'Retry',
     done: 'Done',
+    delete: 'Delete',
     kcal: 'kcal',
     grams: 'g',
     loading: 'Loading…',
@@ -66,6 +67,7 @@ export const en = {
     scanMeal: 'Scan meal',
     scanGym: 'Scan equipment',
     todaysMeals: 'Meals',
+    deleteMealConfirm: 'Delete this meal? This cannot be undone.',
     noMeals: 'No meals logged yet. Scan your first meal!',
     overTarget: 'over',
     kcalLeft: 'kcal left',
@@ -110,6 +112,7 @@ export const en = {
     todaysPlan: "Today's plan",
     buildSchedule: 'Build a weekly schedule',
     last: 'Last',
+    deleteWorkoutConfirm: 'Delete this exercise entry? This cannot be undone.',
   },
   schedule: {
     title: 'Weekly schedule',
