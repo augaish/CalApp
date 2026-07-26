@@ -64,14 +64,40 @@ export function coachSystemPrompt(language: Language): string {
 
 /** Cheap first pass: just identify the machine (small output = few tokens). */
 export function identifyEquipmentPrompt(language: Language): string {
-  return `Identify the gym equipment in this photo.
+  return `Identify the specific gym equipment in this photo. Look carefully at the seat, pads, cable path, handle, and body position — many machines look similar.
+
+Distinguish commonly-confused machines instead of defaulting to the most common one:
+- Lat pulldown (seated, pulling a high bar DOWN from overhead) vs Seated cable row / low row (pulling a handle horizontally toward the torso) vs Shoulder/overhead press (pressing UP overhead) vs Chest press (pressing forward) vs Pec deck (arms sweeping together).
+- Leg press vs Hack squat vs Leg extension vs Leg curl.
+- Only answer "lat pulldown" if the user is clearly pulling a bar downward from above.
 
 Respond with ONLY valid JSON, no markdown fences:
 { "name": string, "confidence": number }
 
 - "name" is the common machine name in ${LANGUAGE_NAME[language]}.
-- "confidence" is 0-1.
+- "confidence" is 0-1. Lower it when the machine is ambiguous or partly out of frame.
 - If there is no gym equipment, set name to "" and confidence 0.`;
+}
+
+/** Text-only: infer an exercise's muscle group, measure type and how-to. */
+export function exerciseInfoPrompt(language: Language, name: string): string {
+  return `You are a certified personal trainer. A user is adding this exercise to their log: "${name.replace(/"/g, "'")}".
+
+Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
+{
+  "category": "chest" | "back" | "shoulders" | "biceps" | "triceps" | "legs" | "glutes" | "core" | "forearms" | "cardio" | "fullBody",
+  "type": "weight_reps" | "bodyweight_reps" | "time" | "distance_time",
+  "primaryMuscles": string[],
+  "description": string,
+  "confidence": number
+}
+
+Rules:
+- "category" and "type" MUST be one of the exact slug values listed above (English slugs, lowercase).
+- Choose "type": weight_reps for weighted lifts, bodyweight_reps for bodyweight moves (push-ups, pull-ups), time for holds (plank), distance_time for cardio (running, rowing).
+- "primaryMuscles" and "description" must be written in ${LANGUAGE_NAME[language]}.
+- "description" is 1-3 short sentences of form cues / how to perform it.
+- "confidence" is 0-1; if the name is not a real exercise, set confidence 0 and category "fullBody".`;
 }
 
 /** Full analysis for a known machine name (no image needed → cacheable). */

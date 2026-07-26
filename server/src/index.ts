@@ -13,6 +13,7 @@ import {
 import {
   coachSystemPrompt,
   equipmentDetailsPrompt,
+  exerciseInfoPrompt,
   identifyEquipmentPrompt,
   mealPrompt,
   textMealPrompt,
@@ -146,6 +147,20 @@ app.post('/api/analyze-text', async (c) => {
     return c.json(JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')));
   } catch (err) {
     console.error('analyze-text failed:', err);
+    return c.json({ error: 'analysis_failed' }, 502);
+  }
+});
+
+app.post('/api/analyze-exercise', async (c) => {
+  const body = await c.req.json<{ name?: string; language?: string }>().catch(() => ({}) as never);
+  const name = (body.name ?? '').trim().slice(0, 120);
+  if (name.length < 2) return c.json({ error: 'invalid_request' }, 400);
+  const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  try {
+    const result = await textCall(exerciseInfoPrompt(language, name), 600);
+    return c.json(result);
+  } catch (err) {
+    console.error('analyze-exercise failed:', err);
     return c.json({ error: 'analysis_failed' }, 502);
   }
 });

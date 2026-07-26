@@ -107,6 +107,18 @@ export const en = {
     noPrevious: 'No previous session to repeat yet.',
     repeated: '{{count}} exercises copied to this day.',
     emptyDay: 'Nothing logged for this day. Add an exercise to start.',
+    todaysPlan: "Today's plan",
+    buildSchedule: 'Build a weekly schedule',
+    last: 'Last',
+  },
+  schedule: {
+    title: 'Weekly schedule',
+    subtitle: 'Assign exercises to each weekday. They appear on Training every matching day.',
+    dayName: 'Day name (optional)',
+    dayNamePlaceholder: '{{weekday}} — e.g. Push day',
+    exercisesFor: 'Exercises · {{weekday}}',
+    emptyDay: 'No exercises yet. Add some below.',
+    addExercise: 'Add exercise',
   },
   exercises: {
     title: 'Exercises',
@@ -153,6 +165,8 @@ export const en = {
     delete: 'Delete exercise',
     deleteConfirm: 'Delete this exercise? Its logged sessions stay in your history.',
     nameRequired: 'Please enter an exercise name.',
+    autofill: 'Auto-fill with AI',
+    autofillNeedsName: 'Enter a name or paste a video link first.',
   },
   track: {
     track: 'Track',

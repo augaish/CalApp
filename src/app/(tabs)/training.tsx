@@ -9,8 +9,24 @@ import { useTheme } from '@/hooks/use-theme';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
-import { burnedForDay, isSameDay, useAppStore } from '@/lib/store';
-import type { Exercise, LoggedWorkout } from '@/lib/types';
+import { burnedForDay, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
+import type { Exercise, ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
+
+/** Short label of the best (heaviest) set in a session, for the plan preview. */
+function bestSetLabel(w: LoggedWorkout, type: ExerciseType, kg: string): string {
+  const best = w.sets.reduce<WorkoutSet | undefined>((b, s) => {
+    if (!b) return s;
+    if (type === 'weight_reps') return (s.weightKg ?? 0) >= (b.weightKg ?? 0) ? s : b;
+    if (type === 'bodyweight_reps') return (s.reps ?? 0) >= (b.reps ?? 0) ? s : b;
+    if (type === 'time') return (s.seconds ?? 0) >= (b.seconds ?? 0) ? s : b;
+    return (s.distanceM ?? 0) >= (b.distanceM ?? 0) ? s : b;
+  }, undefined);
+  if (!best) return '';
+  if (type === 'weight_reps') return `${best.weightKg ?? 0} ${kg} × ${best.reps ?? 0}`;
+  if (type === 'bodyweight_reps') return `× ${best.reps ?? 0}`;
+  if (type === 'time') return `${best.seconds ?? 0}s`;
+  return `${best.distanceM ?? 0} m`;
+}
 
 /** Exercises most frequently trained on the same weekday as `day`. */
 function routineFor(workouts: LoggedWorkout[], day: Date): { id: string; name: string }[] {
@@ -65,9 +81,13 @@ export default function Training() {
 
   const workouts = useAppStore((s) => s.workouts);
   const custom = useAppStore((s) => s.exercises);
+  const schedule = useAppStore((s) => s.schedule);
   const repeatLastSession = useAppStore((s) => s.repeatLastSession);
+  const copyExerciseFromLast = useAppStore((s) => s.copyExerciseFromLast);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
+
+  const plan = schedule[selected.getDay()];
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = burnedForDay(workouts, selected);
@@ -93,6 +113,18 @@ export default function Training() {
     }
     successHaptic();
     Alert.alert(t('training.repeated', { count: n }));
+  };
+
+  // Check-off a planned exercise: quick-log its last session; if there's no
+  // history to copy, open the exercise so the user can log it by hand.
+  const checkOff = (exId: string) => {
+    if (workoutFor(workouts, exId, selected)) {
+      openExercise(exId);
+      return;
+    }
+    const ok = copyExerciseFromLast(exId, selected);
+    if (ok) successHaptic();
+    else openExercise(exId);
   };
 
   return (
@@ -152,6 +184,68 @@ export default function Training() {
           </Text>
         </View>
       </Card>
+
+      {/* Today's plan (from the weekly schedule) */}
+      {plan && plan.exerciseIds.length > 0 ? (
+        <Card>
+          <View style={styles.routineHead}>
+            <Ionicons name="calendar" size={18} color={theme.primary} />
+            <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
+              {plan.title || t('training.todaysPlan')}
+            </Text>
+            <Pressable onPress={() => router.push('/schedule')} hitSlop={8}>
+              <Ionicons name="create-outline" size={18} color={theme.textSecondary} />
+            </Pressable>
+          </View>
+          <View style={{ marginTop: Spacing.sm }}>
+            {plan.exerciseIds.map((exId) => {
+              const ex = findExercise(exId, custom);
+              const doneToday = !!workoutFor(workouts, exId, selected);
+              const last = historyFor(workouts, exId).find((w) => !isSameDay(w.at, selected));
+              const preview = last ? bestSetLabel(last, last.type, kg) : '';
+              return (
+                <View key={exId} style={styles.planRow}>
+                  <Pressable onPress={() => checkOff(exId)} hitSlop={8}>
+                    <View
+                      style={[
+                        styles.checkBox,
+                        doneToday
+                          ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                          : { borderColor: theme.border },
+                      ]}
+                    >
+                      {doneToday && <Ionicons name="checkmark" size={15} color={theme.onPrimary} />}
+                    </View>
+                  </Pressable>
+                  <Pressable style={{ flex: 1 }} onPress={() => openExercise(exId)}>
+                    <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                      {ex ? exerciseName(ex, lang) : exId}
+                    </Text>
+                    {preview ? (
+                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                        {t('training.last')}: {preview}
+                      </Text>
+                    ) : null}
+                  </Pressable>
+                  <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                </View>
+              );
+            })}
+          </View>
+        </Card>
+      ) : (
+        <Pressable onPress={() => router.push('/schedule')}>
+          <Card>
+            <View style={styles.buildScheduleRow}>
+              <Ionicons name="calendar-outline" size={20} color={theme.primary} />
+              <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>
+                {t('training.buildSchedule')}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+            </View>
+          </Card>
+        </Pressable>
+      )}
 
       {/* Routine insight + repeat last session */}
       <Card>
@@ -282,6 +376,16 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
   routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   repeatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.sm },
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 8 },
+  checkBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buildScheduleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   chip: {
     flexDirection: 'row',

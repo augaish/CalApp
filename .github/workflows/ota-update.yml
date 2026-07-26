@@ -34,9 +34,11 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
+      # --environment injects EXPO_PUBLIC_* vars (e.g. the API URL) into the JS
+      # bundle. Without it the update ships in demo mode with mocked AI results.
       - name: EAS Update (production channel)
         if: ${{ github.event_name == 'push' || inputs.channel == 'both' || inputs.channel == 'production' }}
-        run: eas update --channel production --message "${{ github.event.head_commit.message || format('Manual OTA update ({0})', github.sha) }}" --non-interactive
+        run: eas update --channel production --environment production --message "${{ github.event.head_commit.message || format('Manual OTA update ({0})', github.sha) }}" --non-interactive
       - name: EAS Update (preview channel)
         if: ${{ github.event_name == 'push' || inputs.channel == 'both' || inputs.channel == 'preview' }}
-        run: eas update --channel preview --message "${{ github.event.head_commit.message || format('Manual OTA update ({0})', github.sha) }}" --non-interactive
+        run: eas update --channel preview --environment preview --message "${{ github.event.head_commit.message || format('Manual OTA update ({0})', github.sha) }}" --non-interactive

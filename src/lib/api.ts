@@ -37,6 +37,45 @@ export async function analyzeEquipment(
   return post<EquipmentAnalysis>('/api/analyze-equipment', { image: imageBase64, language });
 }
 
+export interface ExerciseInfo {
+  category: string;
+  type: string;
+  primaryMuscles: string[];
+  description: string;
+  confidence: number;
+}
+
+/** AI-fill an exercise's muscle group, measure type and how-to from its name. */
+export async function analyzeExercise(name: string, language: Language): Promise<ExerciseInfo> {
+  if (isMockMode) {
+    await delay(900);
+    return {
+      category: 'fullBody',
+      type: 'weight_reps',
+      primaryMuscles: [],
+      description: language === 'ar' ? 'نتيجة تجريبية — اربط الخادم.' : 'Demo result — connect the server.',
+      confidence: 0,
+    };
+  }
+  return post<ExerciseInfo>('/api/analyze-exercise', { name, language });
+}
+
+/** Best-effort YouTube/Vimeo video title via free oEmbed (no API key). */
+export async function fetchVideoTitle(url: string): Promise<string | null> {
+  try {
+    const isVimeo = /vimeo\.com/.test(url);
+    const endpoint = isVimeo
+      ? `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`
+      : `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`;
+    const res = await fetch(endpoint);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { title?: string };
+    return data.title?.trim() || null;
+  } catch {
+    return null;
+  }
+}
+
 export async function analyzeText(text: string, language: Language): Promise<MealAnalysis> {
   if (isMockMode) {
     await delay(1200);

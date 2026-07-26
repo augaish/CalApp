@@ -109,6 +109,18 @@ export const ar: TranslationSchema = {
     noPrevious: 'لا توجد جلسة سابقة لتكرارها بعد.',
     repeated: 'تم نسخ {{count}} تمارين إلى هذا اليوم.',
     emptyDay: 'لا شيء مسجّل لهذا اليوم. أضف تمريناً للبدء.',
+    todaysPlan: 'خطة اليوم',
+    buildSchedule: 'أنشئ جدولاً أسبوعياً',
+    last: 'آخر مرة',
+  },
+  schedule: {
+    title: 'الجدول الأسبوعي',
+    subtitle: 'خصّص تمارين لكل يوم من الأسبوع. تظهر في التمرين كل يوم مطابق.',
+    dayName: 'اسم اليوم (اختياري)',
+    dayNamePlaceholder: '{{weekday}} — مثال: يوم الدفع',
+    exercisesFor: 'تمارين · {{weekday}}',
+    emptyDay: 'لا توجد تمارين بعد. أضف بعضها بالأسفل.',
+    addExercise: 'إضافة تمرين',
   },
   exercises: {
     title: 'التمارين',
@@ -155,6 +167,8 @@ export const ar: TranslationSchema = {
     delete: 'حذف التمرين',
     deleteConfirm: 'حذف هذا التمرين؟ ستبقى جلساتك المسجّلة في السجل.',
     nameRequired: 'يرجى إدخال اسم التمرين.',
+    autofill: 'تعبئة تلقائية بالذكاء الاصطناعي',
+    autofillNeedsName: 'أدخل اسماً أو الصق رابط فيديو أولاً.',
   },
   track: {
     track: 'تسجيل',

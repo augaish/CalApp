@@ -35,6 +35,8 @@ interface AppState {
   meals: LoggedMeal[];
   /** User-made & scan-saved exercises (built-ins live in code, not here). */
   exercises: Exercise[];
+  /** Recurring weekly plan: weekday (0=Sun … 6=Sat) → exercises for that day. */
+  schedule: Record<number, { title?: string; exerciseIds: string[] }>;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -63,6 +65,11 @@ interface AppState {
   removeWorkout: (id: string) => void;
   /** Clone the most recent previous training day's exercises/sets onto `day`. */
   repeatLastSession: (day: Date) => number;
+  addToSchedule: (weekday: number, exerciseId: string) => void;
+  removeFromSchedule: (weekday: number, exerciseId: string) => void;
+  setScheduleTitle: (weekday: number, title: string) => void;
+  /** Quick-log a scheduled exercise by cloning its last session onto `day`. */
+  copyExerciseFromLast: (exerciseId: string, day: Date) => boolean;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
@@ -94,6 +101,7 @@ export const useAppStore = create<AppState>()(
       targets: null,
       meals: [],
       exercises: [],
+      schedule: {},
       workouts: [],
       water: [],
       weights: [],
@@ -222,6 +230,60 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ workouts: [...cloned, ...s.workouts] }));
         return cloned.length;
       },
+      addToSchedule: (weekday, exerciseId) =>
+        set((s) => {
+          const cur = s.schedule[weekday] ?? { exerciseIds: [] };
+          if (cur.exerciseIds.includes(exerciseId)) return {};
+          return {
+            schedule: {
+              ...s.schedule,
+              [weekday]: { ...cur, exerciseIds: [...cur.exerciseIds, exerciseId] },
+            },
+          };
+        }),
+      removeFromSchedule: (weekday, exerciseId) =>
+        set((s) => {
+          const cur = s.schedule[weekday];
+          if (!cur) return {};
+          return {
+            schedule: {
+              ...s.schedule,
+              [weekday]: { ...cur, exerciseIds: cur.exerciseIds.filter((x) => x !== exerciseId) },
+            },
+          };
+        }),
+      setScheduleTitle: (weekday, title) =>
+        set((s) => {
+          const cur = s.schedule[weekday] ?? { exerciseIds: [] };
+          return { schedule: { ...s.schedule, [weekday]: { ...cur, title: title.trim() || undefined } } };
+        }),
+      copyExerciseFromLast: (exerciseId, day) => {
+        const state = get();
+        if (state.workouts.some((w) => w.exerciseId === exerciseId && isSameDay(w.at, day))) {
+          return false; // already logged today
+        }
+        const src = state.workouts
+          .filter((w) => w.exerciseId === exerciseId && !isSameDay(w.at, day))
+          .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())[0];
+        if (!src) return false; // nothing to copy — user logs it manually
+        const bodyKg = state.profile?.weightKg ?? 75;
+        const sets = markPRs(src.sets.map((st) => ({ ...st, done: true, isPR: false })), src.type);
+        set((s) => ({
+          workouts: [
+            {
+              id: id(),
+              at: stampFor(day),
+              exerciseId,
+              exerciseName: src.exerciseName,
+              type: src.type,
+              sets,
+              caloriesBurned: workoutBurn(sets.length, bodyKg),
+            },
+            ...s.workouts,
+          ],
+        }));
+        return true;
+      },
       logWater: (ml, at) =>
         set((s) => ({ water: [{ at: at ?? new Date().toISOString(), ml }, ...s.water] })),
       logWeight: (kg, at) =>
@@ -237,6 +299,7 @@ export const useAppStore = create<AppState>()(
           targets: null,
           meals: [],
           exercises: [],
+          schedule: {},
           workouts: [],
           water: [],
           weights: [],
@@ -256,6 +319,7 @@ export const useAppStore = create<AppState>()(
         targets,
         meals,
         exercises,
+        schedule,
         workouts,
         water,
         weights,
@@ -268,6 +332,7 @@ export const useAppStore = create<AppState>()(
         targets,
         meals,
         exercises,
+        schedule,
         workouts,
         water,
         weights,
@@ -414,14 +479,15 @@ function stampFor(day: Date): string {
 }
 
 /**
- * Comparable load of a set for PR detection: weight×reps volume for lifts,
- * reps for bodyweight, duration for time, distance for cardio.
+ * Comparable load of a set for PR detection. For lifts the trophy goes to the
+ * heaviest set (weight ranks first, reps only break ties) — that's what users
+ * expect. Bodyweight → reps, time → duration, cardio → distance.
  */
 function setScore(s: WorkoutSet, type: LoggedWorkout['type']): number {
   if (type === 'bodyweight_reps') return s.reps ?? 0;
   if (type === 'time') return s.seconds ?? 0;
   if (type === 'distance_time') return s.distanceM ?? 0;
-  return (s.weightKg ?? 0) * (s.reps ?? 0);
+  return (s.weightKg ?? 0) * 1000 + (s.reps ?? 0);
 }
 
 /** Flags the single best set in a session as the PR (highest score, first wins ties). */

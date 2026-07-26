@@ -3,11 +3,12 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { analyzeExercise, fetchVideoTitle } from '@/lib/api';
 import { findExercise, MUSCLE_GROUPS } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
@@ -15,6 +16,7 @@ import { useAppStore } from '@/lib/store';
 import type { ExerciseType, MuscleGroup } from '@/lib/types';
 
 const TYPES: ExerciseType[] = ['weight_reps', 'bodyweight_reps', 'time', 'distance_time'];
+const isUrl = (s: string) => /^https?:\/\/\S+$/.test(s.trim());
 
 export default function ExerciseEdit() {
   const { t } = useTranslation();
@@ -23,11 +25,13 @@ export default function ExerciseEdit() {
   const { id } = useLocalSearchParams<{ id?: string }>();
 
   const custom = useAppStore((s) => s.exercises);
+  const language = useAppStore((s) => s.language) ?? 'en';
   const addExercise = useAppStore((s) => s.addExercise);
   const updateExercise = useAppStore((s) => s.updateExercise);
   const removeExercise = useAppStore((s) => s.removeExercise);
   const capturedPhoto = usePending((s) => s.capturedPhoto);
   const setCapturedPhoto = usePending((s) => s.setCapturedPhoto);
+  const [aiBusy, setAiBusy] = useState(false);
 
   const existing = id ? findExercise(id, custom) : undefined;
   const editable = !existing || existing.source !== 'builtin';
@@ -65,6 +69,35 @@ export default function ExerciseEdit() {
     } else {
       const newId = addExercise(patch);
       router.replace(`/exercise-detail?id=${encodeURIComponent(newId)}`);
+    }
+  };
+
+  const autofill = async () => {
+    if (aiBusy) return;
+    setAiBusy(true);
+    try {
+      let seed = name.trim();
+      // No name yet but a video link is present → use its title as the seed.
+      if (seed.length < 2 && isUrl(video)) {
+        const title = await fetchVideoTitle(video.trim());
+        if (title) {
+          seed = title;
+          setName(title);
+        }
+      }
+      if (seed.length < 2) {
+        Alert.alert(t('exerciseEdit.autofillNeedsName'));
+        return;
+      }
+      const info = await analyzeExercise(seed, language);
+      if ((MUSCLE_GROUPS as string[]).includes(info.category)) setCategory(info.category as MuscleGroup);
+      if ((TYPES as string[]).includes(info.type)) setType(info.type as ExerciseType);
+      if (info.description?.trim()) setDescription(info.description.trim());
+      successHaptic();
+    } catch {
+      Alert.alert(t('common.error'));
+    } finally {
+      setAiBusy(false);
     }
   };
 
@@ -112,6 +145,17 @@ export default function ExerciseEdit() {
         maxLength={60}
         editable={editable}
       />
+
+      {editable && (
+        <Button
+          label={t('exerciseEdit.autofill')}
+          icon="sparkles"
+          variant="secondary"
+          loading={aiBusy}
+          onPress={autofill}
+          style={{ marginBottom: Spacing.md }}
+        />
+      )}
 
       {/* Category */}
       <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>
@@ -188,6 +232,14 @@ export default function ExerciseEdit() {
           keyboardType="url"
           editable={editable}
         />
+        {isUrl(video) && (
+          <Pressable onPress={() => Linking.openURL(video.trim())} style={styles.watchRow}>
+            <Ionicons name="logo-youtube" size={18} color={theme.danger} />
+            <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+              {t('gymResult.watchVideo')}
+            </Text>
+          </Pressable>
+        )}
       </View>
 
       {existing && existing.source !== 'builtin' ? (
@@ -224,4 +276,5 @@ const styles = StyleSheet.create({
   },
   textAreaWrap: { borderWidth: 1, borderRadius: Radius.sm, padding: Spacing.md },
   textArea: { fontSize: 16, minHeight: 90, textAlignVertical: 'top', padding: 0 },
+  watchRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: -Spacing.sm, marginBottom: Spacing.sm },
 });

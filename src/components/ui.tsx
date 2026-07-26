@@ -296,7 +296,19 @@ export function Stepper({
 }) {
   const t = useTheme();
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
-  const fmt = (v: number) => (decimals > 0 ? v.toFixed(decimals) : String(Math.round(v)));
+  const fmt = (v: number) => (decimals > 0 ? String(v) : String(Math.round(v)));
+  // While the field is focused we show the raw text the user is typing, so
+  // intermediate values like "7." or "6" aren't reformatted out from under them.
+  const [editing, setEditing] = React.useState(false);
+  const [text, setText] = React.useState('');
+  const display = editing ? text : fmt(value);
+
+  const bump = (delta: number) => {
+    const next = clamp(Number((value + delta).toFixed(3)));
+    onChange(next);
+    setText(fmt(next));
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <Text style={[Type.caption, { color: t.textSecondary, marginBottom: 6, textAlign: 'center' }]}>
@@ -304,7 +316,7 @@ export function Stepper({
       </Text>
       <View style={[styles.stepperRow, { direction: 'ltr' }]}>
         <Pressable
-          onPress={() => onChange(clamp(Number((value - step).toFixed(3))))}
+          onPress={() => bump(-step)}
           style={({ pressed }) => [
             styles.stepperBtn,
             { backgroundColor: t.cardSubtle, borderColor: t.border },
@@ -315,10 +327,21 @@ export function Stepper({
         </Pressable>
         <View style={styles.stepperValueWrap}>
           <TextInput
-            value={fmt(value)}
-            onChangeText={(txt) => {
-              const n = decimals > 0 ? parseFloat(txt) : parseInt(txt, 10);
+            value={display}
+            onFocus={() => {
+              setText(fmt(value));
+              setEditing(true);
+            }}
+            onBlur={() => {
+              setEditing(false);
+              const n = decimals > 0 ? parseFloat(text) : parseInt(text, 10);
               onChange(Number.isFinite(n) ? clamp(n) : 0);
+            }}
+            onChangeText={(txt) => {
+              const cleaned = txt.replace(decimals > 0 ? /[^0-9.]/g : /[^0-9]/g, '');
+              setText(cleaned);
+              const n = decimals > 0 ? parseFloat(cleaned) : parseInt(cleaned, 10);
+              if (Number.isFinite(n)) onChange(clamp(n));
             }}
             keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
             selectTextOnFocus
@@ -329,7 +352,7 @@ export function Stepper({
           ) : null}
         </View>
         <Pressable
-          onPress={() => onChange(clamp(Number((value + step).toFixed(3))))}
+          onPress={() => bump(step)}
           style={({ pressed }) => [
             styles.stepperBtn,
             { backgroundColor: t.cardSubtle, borderColor: t.border },

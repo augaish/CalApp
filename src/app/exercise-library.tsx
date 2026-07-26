@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -7,6 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { lightHaptic } from '@/lib/feedback';
 import { allExercises, exerciseName, MUSCLE_GROUPS } from '@/lib/exercises';
 import { useAppStore } from '@/lib/store';
 import type { Exercise, MuscleGroup } from '@/lib/types';
@@ -17,6 +18,20 @@ export default function ExerciseLibrary() {
   const router = useRouter();
   const lang = i18n.language === 'ar' ? 'ar' : 'en';
   const custom = useAppStore((s) => s.exercises);
+  const addToSchedule = useAppStore((s) => s.addToSchedule);
+
+  const { pick, weekday } = useLocalSearchParams<{ pick?: string; weekday?: string }>();
+  const pickForSchedule = pick === 'schedule';
+
+  const onPickExercise = (ex: Exercise) => {
+    if (pickForSchedule) {
+      addToSchedule(Number(weekday), ex.id);
+      lightHaptic();
+      router.back();
+    } else {
+      router.push(`/exercise-detail?id=${encodeURIComponent(ex.id)}`);
+    }
+  };
 
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<MuscleGroup | 'all'>('all');
@@ -124,7 +139,7 @@ export default function ExerciseLibrary() {
               {g.items.map((ex, i) => (
                 <Pressable
                   key={ex.id}
-                  onPress={() => router.push(`/exercise-detail?id=${encodeURIComponent(ex.id)}`)}
+                  onPress={() => onPickExercise(ex)}
                   style={({ pressed }) => [
                     styles.row,
                     i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
@@ -141,7 +156,7 @@ export default function ExerciseLibrary() {
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
                     {exerciseName(ex, lang)}
                   </Text>
-                  <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                  <Ionicons name={pickForSchedule ? 'add-circle' : 'chevron-forward'} size={16} color={pickForSchedule ? theme.primary : theme.textTertiary} />
                 </Pressable>
               ))}
             </View>
