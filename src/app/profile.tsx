@@ -9,7 +9,7 @@ import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
-import { setMealReminders, setWaterReminders } from '@/lib/reminders';
+import { setMealReminders, setWaterReminders, setWorkoutReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
 import type { Language } from '@/lib/types';
 
@@ -27,12 +27,16 @@ export default function Profile() {
   const replayTour = useAppStore((s) => s.replayTour);
   const remindMeals = useAppStore((s) => s.remindMeals);
   const remindWater = useAppStore((s) => s.remindWater);
+  const remindWorkouts = useAppStore((s) => s.remindWorkouts);
   const setRemindMeals = useAppStore((s) => s.setRemindMeals);
   const setRemindWater = useAppStore((s) => s.setRemindWater);
+  const setRemindWorkouts = useAppStore((s) => s.setRemindWorkouts);
 
-  const toggleReminder = async (kind: 'meals' | 'water', on: boolean) => {
-    const apply = kind === 'meals' ? setMealReminders : setWaterReminders;
-    const save = kind === 'meals' ? setRemindMeals : setRemindWater;
+  const toggleReminder = async (kind: 'meals' | 'water' | 'workouts', on: boolean) => {
+    const apply =
+      kind === 'meals' ? setMealReminders : kind === 'water' ? setWaterReminders : setWorkoutReminders;
+    const save =
+      kind === 'meals' ? setRemindMeals : kind === 'water' ? setRemindWater : setRemindWorkouts;
     const ok = await apply(on);
     if (on && !ok) {
       Alert.alert(t('reminders.permissionDenied'));
@@ -152,6 +156,14 @@ export default function Profile() {
           <Switch
             value={remindWater}
             onValueChange={(v) => toggleReminder('water', v)}
+            trackColor={{ true: theme.primary }}
+          />
+        </View>
+        <View style={styles.kvRow}>
+          <Text style={{ color: theme.text, fontSize: 16 }}>{t('reminders.workouts')}</Text>
+          <Switch
+            value={remindWorkouts}
+            onValueChange={(v) => toggleReminder('workouts', v)}
             trackColor={{ true: theme.primary }}
           />
         </View>

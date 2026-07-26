@@ -42,6 +42,7 @@ interface AppState {
   weights: WeightEntry[];
   remindMeals: boolean;
   remindWater: boolean;
+  remindWorkouts: boolean;
   /** First-run welcome carousel has been seen. */
   tutorialSeen: boolean;
   /** User dismissed the Getting-started checklist on Overview. */
@@ -80,6 +81,7 @@ interface AppState {
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
+  setRemindWorkouts: (on: boolean) => void;
   setTutorialSeen: () => void;
   dismissChecklist: () => void;
   setTourSeen: () => void;
@@ -118,6 +120,7 @@ export const useAppStore = create<AppState>()(
       weights: [],
       remindMeals: false,
       remindWater: false,
+      remindWorkouts: false,
       tutorialSeen: false,
       checklistDismissed: false,
       tourSeen: false,
@@ -304,6 +307,7 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ weights: [{ at: at ?? new Date().toISOString(), kg }, ...s.weights] })),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
+      setRemindWorkouts: (on) => set({ remindWorkouts: on }),
       setTutorialSeen: () => set({ tutorialSeen: true }),
       dismissChecklist: () => set({ checklistDismissed: true }),
       setTourSeen: () => set({ tourSeen: true }),
@@ -323,6 +327,7 @@ export const useAppStore = create<AppState>()(
           weights: [],
           remindMeals: false,
           remindWater: false,
+          remindWorkouts: false,
           tutorialSeen: false,
           checklistDismissed: false,
           tourSeen: false,
@@ -346,6 +351,7 @@ export const useAppStore = create<AppState>()(
         weights,
         remindMeals,
         remindWater,
+        remindWorkouts,
         tutorialSeen,
         checklistDismissed,
         tourSeen,
@@ -362,6 +368,7 @@ export const useAppStore = create<AppState>()(
         weights,
         remindMeals,
         remindWater,
+        remindWorkouts,
         tutorialSeen,
         checklistDismissed,
         tourSeen,

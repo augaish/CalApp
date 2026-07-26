@@ -31,6 +31,7 @@ function notifications(): NotificationsModule | null {
 
 const MEAL_IDS = ['reminder-breakfast', 'reminder-lunch', 'reminder-dinner'];
 const WATER_IDS = ['reminder-water-1', 'reminder-water-2', 'reminder-water-3'];
+const WORKOUT_ID = 'reminder-workout';
 
 const MEAL_SCHEDULE: { id: string; key: string; hour: number; minute: number }[] = [
   { id: MEAL_IDS[0], key: 'breakfast', hour: 8, minute: 30 },
@@ -67,6 +68,27 @@ export async function setMealReminders(enabled: boolean): Promise<boolean> {
       },
     });
   }
+  return true;
+}
+
+export async function setWorkoutReminders(enabled: boolean): Promise<boolean> {
+  const mod = notifications();
+  if (!mod) return !enabled;
+  await mod.cancelScheduledNotificationAsync(WORKOUT_ID);
+  if (!enabled) return true;
+  if (!(await requestPermission(mod))) return false;
+  await mod.scheduleNotificationAsync({
+    identifier: WORKOUT_ID,
+    content: {
+      title: i18n.t('reminders.workoutTitle'),
+      body: i18n.t('reminders.workoutBody'),
+    },
+    trigger: {
+      type: mod.SchedulableTriggerInputTypes.DAILY,
+      hour: 18,
+      minute: 0,
+    },
+  });
   return true;
 }
 

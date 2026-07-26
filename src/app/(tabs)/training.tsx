@@ -122,11 +122,13 @@ export default function Training() {
     Alert.alert(t('training.repeated', { count: n }));
   };
 
-  // Check-off a planned exercise: quick-log its last session; if there's no
-  // history to copy, open the exercise so the user can log it by hand.
+  // Toggle a planned exercise done/undone for the selected day. Checking
+  // quick-logs from the last session (or opens it to log by hand when there's
+  // nothing to copy); unchecking removes that day's entry.
   const checkOff = (exId: string) => {
-    if (workoutFor(workouts, exId, selected)) {
-      openExercise(exId);
+    const existing = workoutFor(workouts, exId, selected);
+    if (existing) {
+      removeWorkout(existing.id);
       return;
     }
     const ok = copyExerciseFromLast(exId, selected);
