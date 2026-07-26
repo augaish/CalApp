@@ -13,6 +13,7 @@ export default function RootLayout() {
   const language = useAppStore((s) => s.language);
   const profile = useAppStore((s) => s.profile);
   const account = useAppStore((s) => s.account);
+  const tutorialSeen = useAppStore((s) => s.tutorialSeen);
 
   const lang = language ?? deviceLanguage();
 
@@ -35,7 +36,10 @@ export default function RootLayout() {
         <Stack.Protected guard={!!account && !profile}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
-        <Stack.Protected guard={!!account && !!profile}>
+        <Stack.Protected guard={!!account && !!profile && !tutorialSeen}>
+          <Stack.Screen name="welcome" />
+        </Stack.Protected>
+        <Stack.Protected guard={!!account && !!profile && !!tutorialSeen}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen name="meal-result" options={{ presentation: 'modal' }} />

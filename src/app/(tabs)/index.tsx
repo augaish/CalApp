@@ -56,6 +56,9 @@ export default function Overview() {
   const water = useAppStore((s) => s.water);
   const workouts = useAppStore((s) => s.workouts);
   const weights = useAppStore((s) => s.weights);
+  const schedule = useAppStore((s) => s.schedule);
+  const checklistDismissed = useAppStore((s) => s.checklistDismissed);
+  const dismissChecklist = useAppStore((s) => s.dismissChecklist);
   const logWeight = useAppStore((s) => s.logWeight);
 
   const selected = useViewDay((s) => s.day);
@@ -83,6 +86,16 @@ export default function Overview() {
   const weightLabels = recentWeights.map((w) =>
     new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
   );
+
+  // First-run activation checklist — derived from real data, auto-hides once complete.
+  const checklist = [
+    { key: 'scanMeal', icon: 'camera' as const, done: meals.length > 0, onPress: () => router.push('/scan?mode=meal') },
+    { key: 'logWorkout', icon: 'barbell' as const, done: workouts.length > 0, onPress: () => router.push('/exercise-library') },
+    { key: 'buildSchedule', icon: 'calendar' as const, done: Object.values(schedule).some((d) => d.exerciseIds.length > 0), onPress: () => router.push('/schedule') },
+    { key: 'logWater', icon: 'water' as const, done: water.length > 0, onPress: () => router.push('/water') },
+  ];
+  const checklistDone = checklist.filter((c) => c.done).length;
+  const showChecklist = !checklistDismissed && checklistDone < checklist.length;
 
   const submitWeight = () => {
     const value = parseFloat(kg);
@@ -215,6 +228,55 @@ export default function Overview() {
         contentContainerStyle={{ padding: Spacing.md, paddingBottom: insets.bottom + Spacing.xl }}
         showsVerticalScrollIndicator={false}
       >
+        {/* First-run getting-started checklist */}
+        {showChecklist && (
+          <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+            <View style={styles.checklistHead}>
+              <Ionicons name="rocket" size={18} color={theme.primary} />
+              <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
+                {t('checklist.title')}
+              </Text>
+              <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '700' }}>
+                {t('checklist.progress', { done: checklistDone, total: checklist.length })}
+              </Text>
+              <Pressable onPress={dismissChecklist} hitSlop={8} style={{ padding: 2 }}>
+                <Ionicons name="close" size={18} color={theme.textTertiary} />
+              </Pressable>
+            </View>
+            <View style={{ marginTop: Spacing.sm }}>
+              {checklist.map((item) => (
+                <Pressable
+                  key={item.key}
+                  onPress={item.onPress}
+                  style={({ pressed }) => [styles.checklistRow, pressed && { opacity: 0.6 }]}
+                >
+                  <View
+                    style={[
+                      styles.checkCircle,
+                      item.done
+                        ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                        : { borderColor: theme.border },
+                    ]}
+                  >
+                    {item.done && <Ionicons name="checkmark" size={14} color={theme.onPrimary} />}
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      color: item.done ? theme.textTertiary : theme.text,
+                      fontWeight: '600',
+                      textDecorationLine: item.done ? 'line-through' : 'none',
+                    }}
+                  >
+                    {t(`checklist.${item.key}`)}
+                  </Text>
+                  {!item.done && <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+        )}
+
         {/* Macros */}
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <View style={styles.macroRow}>
@@ -412,6 +474,16 @@ const styles = StyleSheet.create({
   card: { borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.md },
   macroRow: { flexDirection: 'row', gap: Spacing.md },
+  checklistHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  checklistRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 9 },
+  checkCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   macroTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
   macroFill: { height: 5, borderRadius: 3 },
   halfRow: { flexDirection: 'row', gap: Spacing.sm },

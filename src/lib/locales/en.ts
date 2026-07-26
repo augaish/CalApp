@@ -82,6 +82,39 @@ export const en = {
       snack: 'Snacks',
     },
   },
+  tutorial: {
+    skip: 'Skip',
+    next: 'Next',
+    start: 'Get started',
+    slides: {
+      meal: {
+        title: 'Snap your meals',
+        body: 'Point your camera at any plate — Calgym reads the calories and macros in seconds.',
+      },
+      gym: {
+        title: 'Scan any machine',
+        body: 'Not sure how to use it? Scan the equipment for the muscles worked, proper form, and a video.',
+      },
+      plan: {
+        title: 'Plan & track',
+        body: 'Log every set, build a weekly schedule, and watch your calories, weight and PRs improve.',
+      },
+      coach: {
+        title: 'Your AI coach',
+        body: 'Ask anything about food or training — in Arabic or English, any time.',
+      },
+    },
+  },
+  checklist: {
+    title: 'Getting started',
+    dismiss: 'Dismiss',
+    progress: '{{done}}/{{total}} done',
+    allSet: "You're all set! 🎉",
+    scanMeal: 'Scan your first meal',
+    logWorkout: 'Log your first workout',
+    buildSchedule: 'Build your weekly schedule',
+    logWater: 'Log some water',
+  },
   tabs: {
     overview: 'Overview',
     training: 'Training',

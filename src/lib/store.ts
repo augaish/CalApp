@@ -42,6 +42,10 @@ interface AppState {
   weights: WeightEntry[];
   remindMeals: boolean;
   remindWater: boolean;
+  /** First-run welcome carousel has been seen. */
+  tutorialSeen: boolean;
+  /** User dismissed the Getting-started checklist on Overview. */
+  checklistDismissed: boolean;
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -74,6 +78,8 @@ interface AppState {
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
+  setTutorialSeen: () => void;
+  dismissChecklist: () => void;
   setHydrated: () => void;
   /** Wipes all local data and returns to the login/onboarding flow. */
   resetAll: () => void;
@@ -107,6 +113,8 @@ export const useAppStore = create<AppState>()(
       weights: [],
       remindMeals: false,
       remindWater: false,
+      tutorialSeen: false,
+      checklistDismissed: false,
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -290,6 +298,8 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ weights: [{ at: at ?? new Date().toISOString(), kg }, ...s.weights] })),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
+      setTutorialSeen: () => set({ tutorialSeen: true }),
+      dismissChecklist: () => set({ checklistDismissed: true }),
       setHydrated: () => set({ hydrated: true }),
       resetAll: () =>
         set({
@@ -305,6 +315,8 @@ export const useAppStore = create<AppState>()(
           weights: [],
           remindMeals: false,
           remindWater: false,
+          tutorialSeen: false,
+          checklistDismissed: false,
         }),
     }),
     {
@@ -325,6 +337,8 @@ export const useAppStore = create<AppState>()(
         weights,
         remindMeals,
         remindWater,
+        tutorialSeen,
+        checklistDismissed,
       }) => ({
         account,
         language,
@@ -338,6 +352,8 @@ export const useAppStore = create<AppState>()(
         weights,
         remindMeals,
         remindWater,
+        tutorialSeen,
+        checklistDismissed,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
