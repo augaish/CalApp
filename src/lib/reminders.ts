@@ -1,11 +1,5 @@
 import i18n from './i18n';
-import {
-  isSameDay,
-  mealTypesLogged,
-  totalsForDay,
-  useAppStore,
-  workoutStreakDays,
-} from './store';
+import { isSameDay, useAppStore, workoutStreakDays } from './store';
 import type { MealType } from './types';
 
 /**
@@ -110,14 +104,15 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
 
   const now = new Date();
 
-  // Water — friendly recurring reminders.
+  // Water — recurring; fires daily even if the app is never opened.
   if (s.remindWater) {
     for (let i = 0; i < WATER_HOURS.length; i++) {
       await daily(`rem-water-${i + 1}`, WATER_HOURS[i], 0, i18n.t('reminders.waterTitle'), i18n.t('reminders.waterBody'));
     }
   }
 
-  // Workout — a nudge at the user's usual training hour, plus a streak saver.
+  // Workout — recurring nudge at the user's usual training hour, plus a
+  // conditional streak saver (only meaningful when a streak is live).
   if (s.remindWorkouts) {
     const hour = usualWorkoutHour(s.workouts);
     await daily('rem-workout', hour, 0, i18n.t('reminders.workoutTitle'), i18n.t('reminders.workoutBody'));
@@ -130,41 +125,20 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
     }
   }
 
-  // Meal prompts — only for meals not yet logged today, at their usual time.
+  // Meal prompts + evening check-in — recurring so they fire without the app
+  // being opened. Copy reads fine whether or not the meal was already logged.
   if (s.remindMeals) {
-    const logged = mealTypesLogged(s.meals, now);
     for (const type of ['breakfast', 'lunch', 'dinner'] as MealType[]) {
-      if (logged.has(type)) continue;
-      const t = MEAL_PROMPT[type as 'breakfast' | 'lunch' | 'dinner'];
-      const at = todayAt(t.hour, t.minute);
-      if (!at) continue;
-      await once(
+      const time = MEAL_PROMPT[type as 'breakfast' | 'lunch' | 'dinner'];
+      await daily(
         `rem-meal-${type}`,
-        at,
+        time.hour,
+        time.minute,
         i18n.t('reminders.mealPromptTitle', { meal: i18n.t(`home.mealTypes.${type}`) }),
         i18n.t('reminders.mealPromptBody'),
       );
     }
-
-    // Evening macro summary — remaining calories / protein for today.
-    const macroAt = todayAt(21, 0);
-    if (macroAt && s.targets) {
-      const totals = totalsForDay(s.meals, now);
-      const kcalLeft = Math.round(s.targets.calories - totals.calories);
-      const proteinLeft = Math.round(s.targets.proteinG - totals.proteinG);
-      const done = kcalLeft <= 0 && proteinLeft <= 0;
-      await once(
-        'rem-macro',
-        macroAt,
-        done ? i18n.t('reminders.macroDoneTitle') : i18n.t('reminders.macroTitle'),
-        done
-          ? i18n.t('reminders.macroDoneBody')
-          : i18n.t('reminders.macroBody', {
-              kcal: Math.max(0, kcalLeft),
-              protein: Math.max(0, proteinLeft),
-            }),
-      );
-    }
+    await daily('rem-macro', 21, 0, i18n.t('reminders.macroTitle'), i18n.t('reminders.eveningBody'));
   }
 
   return { granted: true };

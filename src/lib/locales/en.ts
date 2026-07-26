@@ -325,6 +325,7 @@ export const en = {
     mealPromptTitle: 'Log your {{meal}}? 🍽',
     mealPromptBody: 'Takes a few seconds and keeps your day on track.',
     macroTitle: 'Evening check-in ✨',
+    eveningBody: 'See how your day went — your remaining calories and protein are on the Overview.',
     macroBody: '{{kcal}} kcal and {{protein}}g protein left today — you’ve got this.',
     macroDoneTitle: 'Goals hit! 🎉',
     macroDoneBody: "You've reached today's calorie and protein targets. Nice work!",

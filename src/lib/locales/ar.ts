@@ -327,6 +327,7 @@ export const ar: TranslationSchema = {
     mealPromptTitle: 'سجّل {{meal}}؟ 🍽',
     mealPromptBody: 'يستغرق ثوانٍ ويُبقي يومك على المسار.',
     macroTitle: 'مراجعة المساء ✨',
+    eveningBody: 'اطّلع على يومك — سعراتك وبروتينك المتبقّي في النظرة العامة.',
     macroBody: 'تبقّى {{kcal}} سعرة و{{protein}} غ بروتين اليوم — تقدر عليها.',
     macroDoneTitle: 'تحقّقت أهدافك! 🎉',
     macroDoneBody: 'وصلت لهدف السعرات والبروتين اليوم. عمل رائع!',
