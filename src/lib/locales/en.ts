@@ -121,7 +121,8 @@ export const en = {
     dayNamePlaceholder: '{{weekday}} — e.g. Push day',
     exercisesFor: 'Exercises · {{weekday}}',
     emptyDay: 'No exercises yet. Add some below.',
-    addExercise: 'Add exercise',
+    fromHistory: 'Add from your history',
+    addExercise: 'Browse all exercises',
   },
   exercises: {
     title: 'Exercises',

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -25,12 +25,28 @@ export default function ScheduleScreen() {
 
   const schedule = useAppStore((s) => s.schedule);
   const custom = useAppStore((s) => s.exercises);
+  const workouts = useAppStore((s) => s.workouts);
+  const addToSchedule = useAppStore((s) => s.addToSchedule);
   const removeFromSchedule = useAppStore((s) => s.removeFromSchedule);
   const setScheduleTitle = useAppStore((s) => s.setScheduleTitle);
   const viewDay = useViewDay((s) => s.day);
 
   const [weekday, setWeekday] = useState<number>(viewDay.getDay());
   const day = schedule[weekday] ?? { exerciseIds: [] };
+
+  // Distinct exercises the user has actually logged, newest first — the
+  // one-tap "add from history" source. Excludes ones already on this day.
+  const historyExercises = useMemo(() => {
+    const seen = new Set<string>();
+    const out: { id: string; name: string }[] = [];
+    for (const w of workouts) {
+      if (seen.has(w.exerciseId)) continue;
+      seen.add(w.exerciseId);
+      out.push({ id: w.exerciseId, name: w.exerciseName });
+    }
+    return out;
+  }, [workouts]);
+  const historyToAdd = historyExercises.filter((h) => !day.exerciseIds.includes(h.id));
 
   return (
     <Screen footer={<Button label={t('common.done')} onPress={() => router.back()} />}>
@@ -120,12 +136,42 @@ export default function ScheduleScreen() {
         </View>
       )}
 
+      {/* One-tap add from previously logged exercises */}
+      {historyToAdd.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: theme.text, marginTop: Spacing.md }]}>
+            {t('schedule.fromHistory')}
+          </Text>
+          <View style={styles.chipWrap}>
+            {historyToAdd.map((h) => {
+              const ex = findExercise(h.id, custom);
+              return (
+                <Pressable
+                  key={h.id}
+                  onPress={() => addToSchedule(weekday, h.id)}
+                  style={({ pressed }) => [
+                    styles.historyChip,
+                    { backgroundColor: theme.cardSubtle },
+                    pressed && { transform: [{ scale: 0.95 }] },
+                  ]}
+                >
+                  <Ionicons name="add" size={15} color={theme.primary} />
+                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+                    {ex ? exerciseName(ex, lang) : h.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </>
+      )}
+
       <Button
         label={t('schedule.addExercise')}
-        icon="add"
+        icon="search"
         variant="secondary"
         onPress={() => router.push(`/exercise-library?pick=schedule&weekday=${weekday}`)}
-        style={{ marginTop: Spacing.sm }}
+        style={{ marginTop: Spacing.md }}
       />
     </Screen>
   );
@@ -154,6 +200,15 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   sectionTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  historyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderRadius: Radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
   listCard: { borderRadius: Radius.md, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
   rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },

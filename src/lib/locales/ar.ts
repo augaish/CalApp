@@ -123,7 +123,8 @@ export const ar: TranslationSchema = {
     dayNamePlaceholder: '{{weekday}} — مثال: يوم الدفع',
     exercisesFor: 'تمارين · {{weekday}}',
     emptyDay: 'لا توجد تمارين بعد. أضف بعضها بالأسفل.',
-    addExercise: 'إضافة تمرين',
+    fromHistory: 'أضف من سجلك',
+    addExercise: 'تصفّح كل التمارين',
   },
   exercises: {
     title: 'التمارين',
