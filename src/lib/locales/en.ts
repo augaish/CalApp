@@ -105,6 +105,22 @@ export const en = {
       },
     },
   },
+  tour: {
+    banner: 'New here? Take a 20-second tour',
+    ring: {
+      title: 'Your daily calories',
+      body: 'Eaten, remaining, and your goal — at a glance. Tap the date to view any day.',
+    },
+    week: {
+      title: 'Jump to any day',
+      body: 'Tap a day to view or log meals and workouts for it.',
+    },
+    add: {
+      title: 'Add anything here',
+      body: 'The center + button scans a meal or gym machine, or lets you add one manually.',
+    },
+    replay: 'Replay tour',
+  },
   checklist: {
     title: 'Getting started',
     dismiss: 'Dismiss',

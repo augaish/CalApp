@@ -46,6 +46,8 @@ interface AppState {
   tutorialSeen: boolean;
   /** User dismissed the Getting-started checklist on Overview. */
   checklistDismissed: boolean;
+  /** Spotlight coach-mark tour has been seen/skipped. */
+  tourSeen: boolean;
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -80,6 +82,9 @@ interface AppState {
   setRemindWater: (on: boolean) => void;
   setTutorialSeen: () => void;
   dismissChecklist: () => void;
+  setTourSeen: () => void;
+  /** Re-arm the coach-mark tour (from Profile → Replay tour). */
+  replayTour: () => void;
   setHydrated: () => void;
   /** Wipes all local data and returns to the login/onboarding flow. */
   resetAll: () => void;
@@ -115,6 +120,7 @@ export const useAppStore = create<AppState>()(
       remindWater: false,
       tutorialSeen: false,
       checklistDismissed: false,
+      tourSeen: false,
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -300,6 +306,8 @@ export const useAppStore = create<AppState>()(
       setRemindWater: (on) => set({ remindWater: on }),
       setTutorialSeen: () => set({ tutorialSeen: true }),
       dismissChecklist: () => set({ checklistDismissed: true }),
+      setTourSeen: () => set({ tourSeen: true }),
+      replayTour: () => set({ tourSeen: false }),
       setHydrated: () => set({ hydrated: true }),
       resetAll: () =>
         set({
@@ -317,6 +325,7 @@ export const useAppStore = create<AppState>()(
           remindWater: false,
           tutorialSeen: false,
           checklistDismissed: false,
+          tourSeen: false,
         }),
     }),
     {
@@ -339,6 +348,7 @@ export const useAppStore = create<AppState>()(
         remindWater,
         tutorialSeen,
         checklistDismissed,
+        tourSeen,
       }) => ({
         account,
         language,
@@ -354,6 +364,7 @@ export const useAppStore = create<AppState>()(
         remindWater,
         tutorialSeen,
         checklistDismissed,
+        tourSeen,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },

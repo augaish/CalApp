@@ -24,6 +24,7 @@ export default function Profile() {
   const account = useAppStore((s) => s.account);
   const signOut = useAppStore((s) => s.signOut);
   const resetAll = useAppStore((s) => s.resetAll);
+  const replayTour = useAppStore((s) => s.replayTour);
   const remindMeals = useAppStore((s) => s.remindMeals);
   const remindWater = useAppStore((s) => s.remindWater);
   const setRemindMeals = useAppStore((s) => s.setRemindMeals);
@@ -166,6 +167,20 @@ export default function Profile() {
       </Card>
 
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.about')}</Text>
+      <Pressable
+        onPress={() => {
+          replayTour();
+          router.back();
+        }}
+      >
+        <Card style={styles.linkRow}>
+          <Ionicons name="sparkles-outline" size={18} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('tour.replay')}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
       <Card>
         <Row label={t('settings.version')} value={Constants.expoConfig?.version ?? '1.0.0'} />
       </Card>

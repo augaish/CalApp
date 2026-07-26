@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TrendLine, WeekBars } from '@/components/charts';
+import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
 import { Ring } from '@/components/ring';
 import { Button, Field } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
@@ -47,7 +48,7 @@ export default function Overview() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
 
   const profile = useAppStore((s) => s.profile);
@@ -59,12 +60,20 @@ export default function Overview() {
   const schedule = useAppStore((s) => s.schedule);
   const checklistDismissed = useAppStore((s) => s.checklistDismissed);
   const dismissChecklist = useAppStore((s) => s.dismissChecklist);
+  const tourSeen = useAppStore((s) => s.tourSeen);
+  const setTourSeen = useAppStore((s) => s.setTourSeen);
   const logWeight = useAppStore((s) => s.logWeight);
 
   const selected = useViewDay((s) => s.day);
   const setDay = useViewDay((s) => s.setDay);
   const shift = useViewDay((s) => s.shift);
   const [kg, setKg] = useState('');
+
+  // Coach-tour hooks must run before the early return below (rules of hooks).
+  const ringRef = useRef<View>(null);
+  const weekRef = useRef<View>(null);
+  const [tourSteps, setTourSteps] = useState<TourStep[] | null>(null);
+  const [tourIndex, setTourIndex] = useState(0);
 
   if (!targets || !profile) return null;
 
@@ -96,6 +105,40 @@ export default function Overview() {
   ];
   const checklistDone = checklist.filter((c) => c.done).length;
   const showChecklist = !checklistDismissed && checklistDone < checklist.length;
+
+  // Spotlight coach-tour: measure the elements we own, then walk through them.
+  const measureRect = (ref: React.RefObject<View | null>) =>
+    new Promise<TourRect | null>((resolve) => {
+      const node = ref.current;
+      if (!node) return resolve(null);
+      node.measureInWindow((x, y, w, h) =>
+        resolve(w ? { x, y, width: w, height: h } : null),
+      );
+    });
+
+  const startTour = async () => {
+    const ring = await measureRect(ringRef);
+    const week = await measureRect(weekRef);
+    // The center + FAB sits bottom-centre, straddling the tab bar's top edge.
+    const fab: TourRect = { x: width / 2 - 34, y: height - insets.bottom - 82, width: 68, height: 68 };
+    setTourSteps([
+      { rect: ring, title: t('tour.ring.title'), body: t('tour.ring.body') },
+      { rect: week, title: t('tour.week.title'), body: t('tour.week.body') },
+      { rect: fab, title: t('tour.add.title'), body: t('tour.add.body') },
+    ]);
+    setTourIndex(0);
+  };
+
+  const endTour = () => {
+    setTourSteps(null);
+    setTourIndex(0);
+    setTourSeen();
+  };
+
+  const advanceTour = () => {
+    if (tourSteps && tourIndex < tourSteps.length - 1) setTourIndex((i) => i + 1);
+    else endTour();
+  };
 
   const submitWeight = () => {
     const value = parseFloat(kg);
@@ -159,7 +202,7 @@ export default function Overview() {
           </Pressable>
         </View>
 
-        <View style={styles.weekRow}>
+        <View ref={weekRef} collapsable={false} style={styles.weekRow}>
           {days.map((day) => {
             const active = isSameDay(day.toISOString(), selected);
             return (
@@ -197,22 +240,24 @@ export default function Overview() {
             <Text style={styles.heroSideLabel}>{t('home.eaten')}</Text>
           </View>
 
-          <Ring
-            size={150}
-            strokeWidth={11}
-            progress={targets.calories > 0 ? totals.calories / targets.calories : 0}
-            color="rgba(255,255,255,0.95)"
-            trackColor="rgba(255,255,255,0.25)"
-          >
-            <View style={{ alignItems: 'center' }}>
-              <Text style={[styles.ringValue, { color: theme.onGradient }]}>
-                {Math.abs(Math.round(remaining))}
-              </Text>
-              <Text style={styles.heroSideLabel}>
-                {over ? `${t('common.kcal')} ${t('home.overTarget')}` : t('home.kcalLeft')}
-              </Text>
-            </View>
-          </Ring>
+          <View ref={ringRef} collapsable={false}>
+            <Ring
+              size={150}
+              strokeWidth={11}
+              progress={targets.calories > 0 ? totals.calories / targets.calories : 0}
+              color="rgba(255,255,255,0.95)"
+              trackColor="rgba(255,255,255,0.25)"
+            >
+              <View style={{ alignItems: 'center' }}>
+                <Text style={[styles.ringValue, { color: theme.onGradient }]}>
+                  {Math.abs(Math.round(remaining))}
+                </Text>
+                <Text style={styles.heroSideLabel}>
+                  {over ? `${t('common.kcal')} ${t('home.overTarget')}` : t('home.kcalLeft')}
+                </Text>
+              </View>
+            </Ring>
+          </View>
 
           <View style={styles.heroSide}>
             <Text style={[styles.heroSideValue, { color: theme.onGradient }]}>
@@ -228,6 +273,24 @@ export default function Overview() {
         contentContainerStyle={{ padding: Spacing.md, paddingBottom: insets.bottom + Spacing.xl }}
         showsVerticalScrollIndicator={false}
       >
+        {/* Optional spotlight tour invite */}
+        {!tourSeen && !tourSteps && (
+          <Pressable
+            onPress={startTour}
+            style={({ pressed }) => [
+              styles.tourBanner,
+              { backgroundColor: theme.cardSubtle, borderColor: theme.primary },
+              pressed && { opacity: 0.8 },
+            ]}
+          >
+            <Ionicons name="sparkles" size={18} color={theme.primary} />
+            <Text style={{ color: theme.primary, fontWeight: '700', flex: 1 }}>{t('tour.banner')}</Text>
+            <Pressable onPress={setTourSeen} hitSlop={8}>
+              <Ionicons name="close" size={18} color={theme.textTertiary} />
+            </Pressable>
+          </Pressable>
+        )}
+
         {/* First-run getting-started checklist */}
         {showChecklist && (
           <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
@@ -378,6 +441,10 @@ export default function Overview() {
           </View>
         </View>
       </ScrollView>
+
+      {tourSteps && (
+        <CoachTour steps={tourSteps} index={tourIndex} onNext={advanceTour} onSkip={endTour} />
+      )}
     </View>
   );
 }
@@ -474,6 +541,16 @@ const styles = StyleSheet.create({
   card: { borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.md },
   macroRow: { flexDirection: 'row', gap: Spacing.md },
+  tourBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+    marginBottom: Spacing.md,
+  },
   checklistHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   checklistRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 9 },
   checkCircle: {
