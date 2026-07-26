@@ -84,7 +84,7 @@ export default function Training() {
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const repeatLastSession = useAppStore((s) => s.repeatLastSession);
-  const copyExerciseFromLast = useAppStore((s) => s.copyExerciseFromLast);
+  const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const removeWorkout = useAppStore((s) => s.removeWorkout);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
@@ -123,22 +123,23 @@ export default function Training() {
     Alert.alert(t('training.repeated', { count: n }));
   };
 
-  // Toggle a planned exercise done/undone for the selected day. Checking
-  // quick-logs from the last session (or opens it to log by hand when there's
-  // nothing to copy); unchecking removes that day's entry.
+  // Pure done/undone toggle for the checkbox — never navigates. Checking marks
+  // it done (cloning the last session's sets, or an empty "done" set when
+  // there's no history); unchecking removes that day's entry. Reps are filled
+  // by tapping the name/arrow, which opens the exercise.
   const checkOff = (exId: string) => {
     const existing = workoutFor(workouts, exId, selected);
     if (existing) {
       removeWorkout(existing.id);
       return;
     }
-    const ok = copyExerciseFromLast(exId, selected);
-    if (ok) {
-      successHaptic();
-      useCelebrate.getState().celebrate(t('celebrate.workoutDone'));
-    } else {
-      openExercise(exId);
-    }
+    const ex = findExercise(exId, custom);
+    markExerciseDone(
+      { id: exId, name: ex ? exerciseName(ex, lang) : exId, type: ex?.type ?? 'weight_reps' },
+      selected,
+    );
+    successHaptic();
+    useCelebrate.getState().celebrate(t('celebrate.workoutDone'));
   };
 
   return (
@@ -231,17 +232,22 @@ export default function Training() {
                       {doneToday && <Ionicons name="checkmark" size={15} color={theme.onPrimary} />}
                     </View>
                   </Pressable>
-                  <Pressable style={{ flex: 1 }} onPress={() => openExercise(exId)}>
-                    <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
-                      {ex ? exerciseName(ex, lang) : exId}
-                    </Text>
-                    {preview ? (
-                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                        {t('training.last')}: {preview}
+                  <Pressable
+                    style={({ pressed }) => [styles.planTap, pressed && { opacity: 0.6 }]}
+                    onPress={() => openExercise(exId)}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                        {ex ? exerciseName(ex, lang) : exId}
                       </Text>
-                    ) : null}
+                      {preview ? (
+                        <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                          {t('training.last')}: {preview}
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
                   </Pressable>
-                  <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
                 </View>
               );
             })}
@@ -398,6 +404,7 @@ const styles = StyleSheet.create({
   routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   repeatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.sm },
   planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 8 },
+  planTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   checkBox: {
     width: 26,
     height: 26,

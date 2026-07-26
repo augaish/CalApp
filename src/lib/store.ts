@@ -77,8 +77,15 @@ interface AppState {
   addToSchedule: (weekday: number, exerciseId: string) => void;
   removeFromSchedule: (weekday: number, exerciseId: string) => void;
   setScheduleTitle: (weekday: number, title: string) => void;
-  /** Quick-log a scheduled exercise by cloning its last session onto `day`. */
-  copyExerciseFromLast: (exerciseId: string, day: Date) => boolean;
+  /**
+   * Mark a planned exercise done for `day` (checkbox on): clones its last
+   * session's sets when available, otherwise records a single empty "done"
+   * set. No-op if it's already logged that day.
+   */
+  markExerciseDone: (
+    exercise: { id: string; name: string; type: LoggedWorkout['type'] },
+    day: Date,
+  ) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
@@ -278,32 +285,33 @@ export const useAppStore = create<AppState>()(
           const cur = s.schedule[weekday] ?? { exerciseIds: [] };
           return { schedule: { ...s.schedule, [weekday]: { ...cur, title: title.trim() || undefined } } };
         }),
-      copyExerciseFromLast: (exerciseId, day) => {
+      markExerciseDone: (exercise, day) => {
         const state = get();
-        if (state.workouts.some((w) => w.exerciseId === exerciseId && isSameDay(w.at, day))) {
-          return false; // already logged today
+        if (state.workouts.some((w) => w.exerciseId === exercise.id && isSameDay(w.at, day))) {
+          return; // already logged that day
         }
         const src = state.workouts
-          .filter((w) => w.exerciseId === exerciseId && !isSameDay(w.at, day))
+          .filter((w) => w.exerciseId === exercise.id && !isSameDay(w.at, day))
           .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())[0];
-        if (!src) return false; // nothing to copy — user logs it manually
         const bodyKg = state.profile?.weightKg ?? 75;
-        const sets = markPRs(src.sets.map((st) => ({ ...st, done: true, isPR: false })), src.type);
+        const base: WorkoutSet[] = src
+          ? src.sets.map((st) => ({ ...st, done: true, isPR: false }))
+          : [{ done: true }];
+        const sets = markPRs(base, exercise.type);
         set((s) => ({
           workouts: [
             {
               id: id(),
               at: stampFor(day),
-              exerciseId,
-              exerciseName: src.exerciseName,
-              type: src.type,
+              exerciseId: exercise.id,
+              exerciseName: exercise.name,
+              type: exercise.type,
               sets,
               caloriesBurned: workoutBurn(sets.length, bodyKg),
             },
             ...s.workouts,
           ],
         }));
-        return true;
       },
       logWater: (ml, at) =>
         set((s) => ({ water: [{ at: at ?? new Date().toISOString(), ml }, ...s.water] })),
