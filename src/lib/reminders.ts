@@ -1,9 +1,17 @@
 import i18n from './i18n';
+import {
+  isSameDay,
+  mealTypesLogged,
+  totalsForDay,
+  useAppStore,
+  workoutStreakDays,
+} from './store';
+import type { MealType } from './types';
 
 /**
  * expo-notifications is loaded lazily so an installed binary that predates
- * the native module doesn't crash at import time — reminder toggles simply
- * report "unavailable" until the app is rebuilt.
+ * the native module doesn't crash at import time — reminders simply report
+ * "unavailable" until the app is rebuilt.
  */
 type NotificationsModule = typeof import('expo-notifications');
 
@@ -29,17 +37,25 @@ function notifications(): NotificationsModule | null {
   return cached;
 }
 
-const MEAL_IDS = ['reminder-breakfast', 'reminder-lunch', 'reminder-dinner'];
-const WATER_IDS = ['reminder-water-1', 'reminder-water-2', 'reminder-water-3'];
-const WORKOUT_ID = 'reminder-workout';
-
-const MEAL_SCHEDULE: { id: string; key: string; hour: number; minute: number }[] = [
-  { id: MEAL_IDS[0], key: 'breakfast', hour: 8, minute: 30 },
-  { id: MEAL_IDS[1], key: 'lunch', hour: 13, minute: 0 },
-  { id: MEAL_IDS[2], key: 'dinner', hour: 19, minute: 30 },
+// Every notification this module manages — cancelled and rebuilt on each sync.
+const MANAGED_IDS = [
+  'rem-water-1',
+  'rem-water-2',
+  'rem-water-3',
+  'rem-workout',
+  'rem-streak',
+  'rem-meal-breakfast',
+  'rem-meal-lunch',
+  'rem-meal-dinner',
+  'rem-macro',
 ];
 
 const WATER_HOURS = [10, 15, 20];
+const MEAL_PROMPT: Record<'breakfast' | 'lunch' | 'dinner', { hour: number; minute: number }> = {
+  breakfast: { hour: 9, minute: 0 },
+  lunch: { hour: 13, minute: 30 },
+  dinner: { hour: 20, minute: 0 },
+};
 
 async function requestPermission(mod: NotificationsModule): Promise<boolean> {
   const settings = await mod.getPermissionsAsync();
@@ -48,84 +64,108 @@ async function requestPermission(mod: NotificationsModule): Promise<boolean> {
   return req.granted;
 }
 
-export async function setMealReminders(enabled: boolean): Promise<boolean> {
-  const mod = notifications();
-  if (!mod) return !enabled;
-  for (const id of MEAL_IDS) await mod.cancelScheduledNotificationAsync(id);
-  if (!enabled) return true;
-  if (!(await requestPermission(mod))) return false;
-  for (const meal of MEAL_SCHEDULE) {
-    await mod.scheduleNotificationAsync({
-      identifier: meal.id,
-      content: {
-        title: i18n.t(`reminders.${meal.key}Title`),
-        body: i18n.t(`reminders.${meal.key}Body`),
-      },
-      trigger: {
-        type: mod.SchedulableTriggerInputTypes.DAILY,
-        hour: meal.hour,
-        minute: meal.minute,
-      },
-    });
-  }
-  return true;
+/** Median hour the user usually logs workouts, or 18:00 until there's history. */
+function usualWorkoutHour(workouts: { at: string }[]): number {
+  const hours = workouts.map((w) => new Date(w.at).getHours()).sort((a, b) => a - b);
+  if (hours.length < 3) return 18;
+  return hours[Math.floor(hours.length / 2)];
+}
+
+/** A Date at hour:minute today, or null if that time has already passed. */
+function todayAt(hour: number, minute: number): Date | null {
+  const d = new Date();
+  d.setHours(hour, minute, 0, 0);
+  return d.getTime() > Date.now() ? d : null;
 }
 
 /**
- * First-run: request permission once and schedule all reminder types.
- * Returns which types ended up enabled (all false if permission was denied).
+ * Recompute and reschedule all reminders from the current on-device state.
+ * Called on first launch, on app foreground, and after each log. Baseline
+ * water/workout reminders repeat daily; meal prompts, the streak saver and the
+ * macro summary are conditional and only scheduled for today when still due.
  */
-export async function enableDefaultReminders(): Promise<{
-  meals: boolean;
-  water: boolean;
-  workouts: boolean;
-}> {
-  const meals = await setMealReminders(true);
-  const water = await setWaterReminders(true);
-  const workouts = await setWorkoutReminders(true);
-  return { meals, water, workouts };
-}
-
-export async function setWorkoutReminders(enabled: boolean): Promise<boolean> {
+export async function syncReminders(): Promise<{ granted: boolean }> {
   const mod = notifications();
-  if (!mod) return !enabled;
-  await mod.cancelScheduledNotificationAsync(WORKOUT_ID);
-  if (!enabled) return true;
-  if (!(await requestPermission(mod))) return false;
-  await mod.scheduleNotificationAsync({
-    identifier: WORKOUT_ID,
-    content: {
-      title: i18n.t('reminders.workoutTitle'),
-      body: i18n.t('reminders.workoutBody'),
-    },
-    trigger: {
-      type: mod.SchedulableTriggerInputTypes.DAILY,
-      hour: 18,
-      minute: 0,
-    },
-  });
-  return true;
-}
+  if (!mod) return { granted: false };
 
-export async function setWaterReminders(enabled: boolean): Promise<boolean> {
-  const mod = notifications();
-  if (!mod) return !enabled;
-  for (const id of WATER_IDS) await mod.cancelScheduledNotificationAsync(id);
-  if (!enabled) return true;
-  if (!(await requestPermission(mod))) return false;
-  for (let i = 0; i < WATER_HOURS.length; i++) {
-    await mod.scheduleNotificationAsync({
-      identifier: WATER_IDS[i],
-      content: {
-        title: i18n.t('reminders.waterTitle'),
-        body: i18n.t('reminders.waterBody'),
-      },
-      trigger: {
-        type: mod.SchedulableTriggerInputTypes.DAILY,
-        hour: WATER_HOURS[i],
-        minute: 0,
-      },
+  const s = useAppStore.getState();
+  const anyOn = s.remindMeals || s.remindWater || s.remindWorkouts;
+
+  for (const id of MANAGED_IDS) await mod.cancelScheduledNotificationAsync(id);
+  if (!anyOn) return { granted: true };
+  if (!(await requestPermission(mod))) return { granted: false };
+
+  const daily = (id: string, hour: number, minute: number, title: string, body: string) =>
+    mod.scheduleNotificationAsync({
+      identifier: id,
+      content: { title, body },
+      trigger: { type: mod.SchedulableTriggerInputTypes.DAILY, hour, minute },
     });
+  const once = (id: string, date: Date, title: string, body: string) =>
+    mod.scheduleNotificationAsync({
+      identifier: id,
+      content: { title, body },
+      trigger: { type: mod.SchedulableTriggerInputTypes.DATE, date },
+    });
+
+  const now = new Date();
+
+  // Water — friendly recurring reminders.
+  if (s.remindWater) {
+    for (let i = 0; i < WATER_HOURS.length; i++) {
+      await daily(`rem-water-${i + 1}`, WATER_HOURS[i], 0, i18n.t('reminders.waterTitle'), i18n.t('reminders.waterBody'));
+    }
   }
-  return true;
+
+  // Workout — a nudge at the user's usual training hour, plus a streak saver.
+  if (s.remindWorkouts) {
+    const hour = usualWorkoutHour(s.workouts);
+    await daily('rem-workout', hour, 0, i18n.t('reminders.workoutTitle'), i18n.t('reminders.workoutBody'));
+
+    const streak = workoutStreakDays(s.workouts);
+    const trainedToday = s.workouts.some((w) => isSameDay(w.at, now));
+    const streakAt = todayAt(20, 30);
+    if (streak >= 2 && !trainedToday && streakAt) {
+      await once('rem-streak', streakAt, i18n.t('reminders.streakTitle'), i18n.t('reminders.streakBody', { count: streak }));
+    }
+  }
+
+  // Meal prompts — only for meals not yet logged today, at their usual time.
+  if (s.remindMeals) {
+    const logged = mealTypesLogged(s.meals, now);
+    for (const type of ['breakfast', 'lunch', 'dinner'] as MealType[]) {
+      if (logged.has(type)) continue;
+      const t = MEAL_PROMPT[type as 'breakfast' | 'lunch' | 'dinner'];
+      const at = todayAt(t.hour, t.minute);
+      if (!at) continue;
+      await once(
+        `rem-meal-${type}`,
+        at,
+        i18n.t('reminders.mealPromptTitle', { meal: i18n.t(`home.mealTypes.${type}`) }),
+        i18n.t('reminders.mealPromptBody'),
+      );
+    }
+
+    // Evening macro summary — remaining calories / protein for today.
+    const macroAt = todayAt(21, 0);
+    if (macroAt && s.targets) {
+      const totals = totalsForDay(s.meals, now);
+      const kcalLeft = Math.round(s.targets.calories - totals.calories);
+      const proteinLeft = Math.round(s.targets.proteinG - totals.proteinG);
+      const done = kcalLeft <= 0 && proteinLeft <= 0;
+      await once(
+        'rem-macro',
+        macroAt,
+        done ? i18n.t('reminders.macroDoneTitle') : i18n.t('reminders.macroTitle'),
+        done
+          ? i18n.t('reminders.macroDoneBody')
+          : i18n.t('reminders.macroBody', {
+              kcal: Math.max(0, kcalLeft),
+              protein: Math.max(0, proteinLeft),
+            }),
+      );
+    }
+  }
+
+  return { granted: true };
 }

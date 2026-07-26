@@ -7,6 +7,7 @@ import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
@@ -44,6 +45,7 @@ export default function MealResult() {
   const save = () => {
     logMeal(items, photoUri ?? undefined, mealType, timestampFor(viewDay));
     successHaptic();
+    useCelebrate.getState().celebrate(t('celebrate.mealLogged'));
     router.dismissTo('/(tabs)/food');
   };
 

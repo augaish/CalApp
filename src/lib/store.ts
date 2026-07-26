@@ -591,3 +591,27 @@ export function streakDays(meals: LoggedMeal[]): number {
   }
   return streak;
 }
+
+/** Consecutive days (ending today) with at least one logged workout. */
+export function workoutStreakDays(workouts: LoggedWorkout[]): number {
+  let streak = 0;
+  const day = new Date();
+  for (;;) {
+    if (workouts.some((w) => isSameDay(w.at, day))) {
+      streak += 1;
+      day.setDate(day.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+/** Meal types already logged on `day`. */
+export function mealTypesLogged(meals: LoggedMeal[], day: Date): Set<MealType> {
+  const set = new Set<MealType>();
+  for (const m of meals) {
+    if (isSameDay(m.at, day)) set.add(m.mealType ?? 'snack');
+  }
+  return set;
+}

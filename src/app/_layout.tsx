@@ -3,6 +3,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { Celebration } from '@/components/celebration';
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 
@@ -66,6 +67,7 @@ export default function RootLayout() {
           />
         </Stack.Protected>
       </Stack>
+      <Celebration />
     </ThemeProvider>
   );
 }

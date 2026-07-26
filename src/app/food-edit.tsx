@@ -7,6 +7,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, MealTypePicker, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
+import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
@@ -50,6 +51,7 @@ export default function FoodEdit() {
       timestampFor(viewDay),
     );
     successHaptic();
+    useCelebrate.getState().celebrate(t('celebrate.mealLogged'));
     setCapturedPhoto(null);
     router.dismissTo('/(tabs)/food');
   };

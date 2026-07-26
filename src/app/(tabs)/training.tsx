@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Button, Card, Screen } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
@@ -132,8 +133,12 @@ export default function Training() {
       return;
     }
     const ok = copyExerciseFromLast(exId, selected);
-    if (ok) successHaptic();
-    else openExercise(exId);
+    if (ok) {
+      successHaptic();
+      useCelebrate.getState().celebrate(t('celebrate.workoutDone'));
+    } else {
+      openExercise(exId);
+    }
   };
 
   return (

@@ -9,7 +9,7 @@ import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
-import { setMealReminders, setWaterReminders, setWorkoutReminders } from '@/lib/reminders';
+import { syncReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
 import type { Language } from '@/lib/types';
 
@@ -33,17 +33,15 @@ export default function Profile() {
   const setRemindWorkouts = useAppStore((s) => s.setRemindWorkouts);
 
   const toggleReminder = async (kind: 'meals' | 'water' | 'workouts', on: boolean) => {
-    const apply =
-      kind === 'meals' ? setMealReminders : kind === 'water' ? setWaterReminders : setWorkoutReminders;
     const save =
       kind === 'meals' ? setRemindMeals : kind === 'water' ? setRemindWater : setRemindWorkouts;
-    const ok = await apply(on);
-    if (on && !ok) {
+    save(on);
+    const { granted } = await syncReminders();
+    if (on && !granted) {
       Alert.alert(t('reminders.permissionDenied'));
       save(false);
-      return;
+      await syncReminders();
     }
-    save(on);
   };
 
   const switchLanguage = (lang: Language) => {

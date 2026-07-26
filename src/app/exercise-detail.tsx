@@ -17,6 +17,7 @@ import { TrendLine } from '@/components/charts';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
@@ -103,6 +104,7 @@ export default function ExerciseDetail() {
       setNote('');
     } else {
       logSet({ id: exercise.id, name: exerciseName(exercise, lang), type }, buildSet(), timestampFor(viewDay));
+      useCelebrate.getState().celebrate(t('celebrate.setLogged'));
     }
   };
 

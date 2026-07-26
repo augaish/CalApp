@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
-import { enableDefaultReminders } from '@/lib/reminders';
+import { syncReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
 
 export default function TabLayout() {
@@ -18,24 +18,41 @@ export default function TabLayout() {
   const setRemindWater = useAppStore((s) => s.setRemindWater);
   const setRemindWorkouts = useAppStore((s) => s.setRemindWorkouts);
   const setRemindersInitialized = useAppStore((s) => s.setRemindersInitialized);
+  // Re-sync whenever logged data changes so conditional reminders (streak
+  // saver, meal prompts, macro summary) stay accurate.
+  const mealCount = useAppStore((s) => s.meals.length);
+  const workoutCount = useAppStore((s) => s.workouts.length);
+  const waterCount = useAppStore((s) => s.water.length);
 
-  // Auto-enable reminders on first entry into the app (one permission prompt).
-  // Users can turn any of them off in Profile afterwards.
+  // First launch: request permission once and schedule everything. If denied,
+  // reflect the reminder toggles as off. Users manage them in Profile after.
   useEffect(() => {
     if (remindersInitialized) return;
     let cancelled = false;
     (async () => {
-      const res = await enableDefaultReminders();
+      const { granted } = await syncReminders();
       if (cancelled) return;
-      setRemindMeals(res.meals);
-      setRemindWater(res.water);
-      setRemindWorkouts(res.workouts);
+      if (!granted) {
+        setRemindMeals(false);
+        setRemindWater(false);
+        setRemindWorkouts(false);
+      }
       setRemindersInitialized();
     })();
     return () => {
       cancelled = true;
     };
   }, [remindersInitialized, setRemindMeals, setRemindWater, setRemindWorkouts, setRemindersInitialized]);
+
+  // Keep reminders fresh on foreground and after each log.
+  useEffect(() => {
+    if (!remindersInitialized) return;
+    void syncReminders();
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') void syncReminders();
+    });
+    return () => sub.remove();
+  }, [remindersInitialized, mealCount, workoutCount, waterCount]);
 
   return (
     <Tabs
