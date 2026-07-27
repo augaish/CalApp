@@ -2,6 +2,7 @@ import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Celebration } from '@/components/celebration';
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
@@ -28,8 +29,9 @@ export default function RootLayout() {
   if (!hydrated) return null;
 
   return (
-    <ThemeProvider value={DefaultTheme}>
-      <StatusBar style="light" />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={DefaultTheme}>
+        <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Protected guard={!account}>
           <Stack.Screen name="login" />
@@ -72,6 +74,7 @@ export default function RootLayout() {
         </Stack.Protected>
       </Stack>
       <Celebration />
-    </ThemeProvider>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

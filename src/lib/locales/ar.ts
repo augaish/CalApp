@@ -392,6 +392,9 @@ export const ar: TranslationSchema = {
     item: 'الصنف',
     mealType: 'الوجبة',
     amountEaten: 'الكمية المأكولة',
+    editHint2: 'اضغط أي قيمة لتصحيحها، أو اضبط الحصة، أو اسحب الصنف لليسار لحذفه.',
+    portion: 'الحصة',
+    noItems: 'لا توجد أصناف. ارجع أو ألغِ للتجاهل.',
   },
   mealEdit: {
     title: 'تعديل الوجبة',
