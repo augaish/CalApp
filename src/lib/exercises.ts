@@ -123,6 +123,13 @@ const SEEDS: Seed[] = [
   // Forearms
   { id: 'reverse-curl-cable', en: 'Cable Reverse Curl', ar: 'مرجحة عكسية بالكابل', category: 'forearms', aliases: ['reverse curl cable', 'cable reverse curl', 'مرجحة عكسية كابل'] },
   { id: 'wrist-curl-cable', en: 'Cable Wrist Curl', ar: 'مرجحة الرسغ بالكابل', category: 'forearms', aliases: ['wrist curl cable', 'cable wrist curl', 'مرجحة رسغ كابل'] },
+
+  // ── Added library (round 2) ────────────────────────────
+  { id: 'machine-bent-over-row', en: 'Machine Bent-Over Row', ar: 'تجديف منحنٍ بالجهاز', category: 'back', aliases: ['machine bent over row', 'chest supported row machine', 'تجديف بالجهاز'] },
+  { id: 'rear-delt-pec-deck', en: 'Rear Delt Pec Deck', ar: 'جهاز الرفرفة الخلفية (بيك دِك عكسي)', category: 'shoulders', aliases: ['rear delt pec deck', 'reverse pec deck', 'rear delt machine', 'بيك دك عكسي'] },
+  { id: 'calf-press-leg-press', en: 'Calf Press on Leg Press', ar: 'ضغط السمانة على جهاز الأرجل', category: 'legs', aliases: ['calf press on leg press', 'calf press', 'leg press calf raise', 'ضغط سمانة'] },
+  { id: 'hanging-knee-raise', en: 'Hanging Knee Raise', ar: 'رفع الركبتين معلقاً', category: 'core', type: 'bodyweight_reps', aliases: ['hanging knee raise', 'knee raise', 'رفع ركبتين'] },
+  { id: 'reverse-crunch', en: 'Reverse Crunch', ar: 'الكرنش العكسي', category: 'core', type: 'bodyweight_reps', aliases: ['reverse crunch', 'كرنش عكسي'] },
 ];
 
 export const BUILTIN_EXERCISES: Exercise[] = SEEDS.map((s) => ({
