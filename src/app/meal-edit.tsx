@@ -8,6 +8,7 @@ import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/compone
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
+import { useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { useAppStore } from '@/lib/store';
 import type { FoodItem, MealType } from '@/lib/types';
@@ -38,6 +39,7 @@ export default function MealEdit() {
   const meal = useAppStore((s) => s.meals.find((m) => m.id === id));
   const updateMeal = useAppStore((s) => s.updateMeal);
   const duplicateMeal = useAppStore((s) => s.duplicateMeal);
+  const setViewDay = useViewDay((s) => s.setDay);
 
   const [items, setItems] = useState<FoodItem[]>(() => (meal ? meal.items.map((i) => ({ ...i })) : []));
   const [mealType, setMealType] = useState<MealType>(meal?.mealType ?? 'snack');
@@ -77,19 +79,29 @@ export default function MealEdit() {
   };
 
   const isToday = sameDay(day, new Date());
+  const dayLabel = isToday
+    ? t('home.today')
+    : day.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
+
+  // After any action, jump the Food tab to the affected day so the result is
+  // visible immediately (otherwise a copy made on "today" is hidden behind the
+  // day you were viewing).
+  const finish = (target: Date, message: string) => {
+    successHaptic();
+    useCelebrate.getState().celebrate(message);
+    setViewDay(target);
+    router.dismissTo('/(tabs)/food');
+  };
 
   const save = () => {
     updateMeal(meal.id, { items, mealType, at: stampDay(day, meal.at) });
-    successHaptic();
-    useCelebrate.getState().celebrate(t('mealEdit.saved'));
-    router.back();
+    finish(day, t('mealEdit.saved'));
   };
 
-  const duplicate = () => {
-    duplicateMeal(meal.id, stampDay(day, meal.at), mealType);
-    successHaptic();
-    useCelebrate.getState().celebrate(t('mealEdit.duplicated'));
-    router.back();
+  // Duplicate to an explicit target day (keeps the original untouched).
+  const duplicateTo = (target: Date) => {
+    duplicateMeal(meal.id, stampDay(target, meal.at), mealType);
+    finish(target, t('mealEdit.duplicated'));
   };
 
   const total = items.reduce((sum, i) => sum + i.calories, 0);
@@ -108,10 +120,10 @@ export default function MealEdit() {
           </View>
           <Button label={t('mealEdit.save')} onPress={save} />
           <Button
-            label={t('mealEdit.duplicate')}
+            label={t('mealEdit.duplicateTo', { day: dayLabel })}
             icon="copy-outline"
             variant="secondary"
-            onPress={duplicate}
+            onPress={() => duplicateTo(day)}
             style={{ marginTop: Spacing.xs }}
           />
         </View>
@@ -133,19 +145,24 @@ export default function MealEdit() {
       </Text>
       <MealTypePicker value={mealType} onChange={setMealType} />
 
-      {/* Move to day */}
-      <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-        {t('mealEdit.day')}
-      </Text>
+      {/* Move / duplicate target day */}
+      <View style={styles.dayHeaderRow}>
+        <Text style={[Type.caption, { color: theme.textSecondary, flex: 1 }]}>
+          {t('mealEdit.day')}
+        </Text>
+        {!isToday && (
+          <Pressable onPress={() => setDay(new Date())} hitSlop={8}>
+            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
+              {t('mealEdit.jumpToday')}
+            </Text>
+          </Pressable>
+        )}
+      </View>
       <View style={[styles.dayRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Pressable onPress={() => shiftDay(-1)} hitSlop={10} style={styles.arrow}>
           <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
         </Pressable>
-        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
-          {isToday
-            ? t('home.today')
-            : day.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })}
-        </Text>
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{dayLabel}</Text>
         <Pressable onPress={() => shiftDay(1)} hitSlop={10} disabled={isToday} style={styles.arrow}>
           <Ionicons
             name="chevron-forward"
@@ -206,6 +223,7 @@ function NumBox({
 
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  dayHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
   dayRow: {
     flexDirection: 'row',
     alignItems: 'center',
