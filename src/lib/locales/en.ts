@@ -394,7 +394,7 @@ export const en = {
     item: 'Item',
     mealType: 'Meal',
     amountEaten: 'Amount eaten',
-    editHint2: 'Tap any value to correct it, set the portion, or swipe an item left to delete it.',
+    editHint2: 'Tap any value to correct it, set the portion, or tap the trash icon to remove an item.',
     portion: 'Portion',
     noItems: 'No items left. Swipe back or cancel to discard.',
   },

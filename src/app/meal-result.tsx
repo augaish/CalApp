@@ -201,6 +201,13 @@ export default function MealResult() {
               style={[styles.itemNameInput, { color: theme.text, borderColor: theme.border }]}
             />
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
+            <Pressable
+              onPress={() => removeItem(index)}
+              hitSlop={8}
+              style={({ pressed }) => [styles.itemDelete, pressed && { opacity: 0.5 }]}
+            >
+              <Ionicons name="trash-outline" size={20} color={theme.danger} />
+            </Pressable>
           </View>
           {item._base && (
             <View style={styles.portionRow}>
@@ -329,6 +336,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingVertical: 4,
   },
+  itemDelete: { padding: 2 },
   portionRow: {
     flexDirection: 'row',
     alignItems: 'center',
