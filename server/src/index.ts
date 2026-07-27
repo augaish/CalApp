@@ -30,6 +30,54 @@ app.use('*', cors());
 
 app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled }));
 
+/**
+ * Shareable workout-plan link. Someone taps `/s?d=<base64url>` (sent over
+ * WhatsApp etc.); this page bounces them into the app via the `calapp://`
+ * deep link, with a manual button as a fallback. The payload is opaque to the
+ * server — it's decoded and applied entirely on-device.
+ */
+app.get('/s', (c) => {
+  const raw = c.req.query('d') ?? '';
+  // base64url only — reject anything else so nothing untrusted is injected.
+  const data = /^[A-Za-z0-9_-]+$/.test(raw) ? raw : '';
+  const deepLink = `calapp://schedule-import?d=${data}`;
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Calgym workout plan</title>
+<style>
+  body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:#F5F3FA; color:#2A2440; display:flex; min-height:100vh; align-items:center;
+    justify-content:center; text-align:center; padding:24px; }
+  .card { max-width:360px; }
+  h1 { font-size:22px; margin:16px 0 8px; }
+  p { color:#6B6480; line-height:1.5; margin:0 0 24px; }
+  a.btn { display:inline-block; background:#6D5AAB; color:#fff; text-decoration:none;
+    font-weight:700; padding:14px 28px; border-radius:14px; }
+  .logo { width:64px; height:64px; border-radius:16px;
+    background:linear-gradient(135deg,#9B86D4,#7FB89B); margin:0 auto; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"></div>
+    <h1>Calgym workout plan</h1>
+    <p>Open this shared plan in the Calgym app to add it to your week.</p>
+    <a class="btn" id="open" href="${deepLink}">Open in Calgym</a>
+  </div>
+  <script>
+    var link = ${JSON.stringify(deepLink)};
+    if (link.indexOf('calapp://schedule-import?d=') === 0 && link.length > 'calapp://schedule-import?d='.length) {
+      setTimeout(function () { window.location.href = link; }, 300);
+    }
+  </script>
+</body>
+</html>`;
+  return c.html(html);
+});
+
 interface AnalyzeBody {
   image?: string;
   language?: string;

@@ -61,6 +61,13 @@ interface AppState {
   setTargets: (targets: DailyTargets) => void;
   logMeal: (items: FoodItem[], photoUri?: string, mealType?: MealType, at?: string) => void;
   removeMeal: (id: string) => void;
+  /** Edit a logged meal in place (items, meal type, and/or date-time). */
+  updateMeal: (
+    id: string,
+    patch: { items?: FoodItem[]; mealType?: MealType; at?: string },
+  ) => void;
+  /** Copy a logged meal to a target day (ISO) and optional meal type. */
+  duplicateMeal: (id: string, at: string, mealType?: MealType) => void;
   /** Adds a custom/scan exercise to the library; returns its new id. */
   addExercise: (input: Omit<Exercise, 'id' | 'source'> & { source?: Exercise['source'] }) => string;
   updateExercise: (id: string, patch: Partial<Exercise>) => void;
@@ -79,6 +86,11 @@ interface AppState {
   addToSchedule: (weekday: number, exerciseId: string) => void;
   removeFromSchedule: (weekday: number, exerciseId: string) => void;
   setScheduleTitle: (weekday: number, title: string) => void;
+  /** Replace the weekly plan with a shared one, recreating custom exercises. */
+  importSchedule: (payload: {
+    schedule: Record<number, { title?: string; exerciseIds: string[] }>;
+    exercises: Exercise[];
+  }) => void;
   /**
    * Mark a planned exercise done for `day` (checkbox on): clones its last
    * session's sets when available, otherwise records a single empty "done"
@@ -158,6 +170,36 @@ export const useAppStore = create<AppState>()(
           ],
         })),
       removeMeal: (mealId) => set((s) => ({ meals: s.meals.filter((m) => m.id !== mealId) })),
+      updateMeal: (mealId, patch) =>
+        set((s) => ({
+          meals: s.meals.map((m) =>
+            m.id === mealId
+              ? {
+                  ...m,
+                  ...(patch.items ? { items: patch.items } : {}),
+                  ...(patch.mealType ? { mealType: patch.mealType } : {}),
+                  ...(patch.at ? { at: patch.at } : {}),
+                }
+              : m,
+          ),
+        })),
+      duplicateMeal: (mealId, at, mealType) =>
+        set((s) => {
+          const src = s.meals.find((m) => m.id === mealId);
+          if (!src) return {};
+          return {
+            meals: [
+              {
+                id: id(),
+                at,
+                items: src.items.map((i) => ({ ...i })),
+                photoUri: src.photoUri,
+                mealType: mealType ?? src.mealType ?? mealTypeForNow(),
+              },
+              ...s.meals,
+            ],
+          };
+        }),
       addExercise: (input) => {
         const exId = `custom:${id()}`;
         set((s) => ({
@@ -287,6 +329,19 @@ export const useAppStore = create<AppState>()(
         set((s) => {
           const cur = s.schedule[weekday] ?? { exerciseIds: [] };
           return { schedule: { ...s.schedule, [weekday]: { ...cur, title: title.trim() || undefined } } };
+        }),
+      importSchedule: (payload) =>
+        set((s) => {
+          // Recreate any non-built-in exercises the plan references that this
+          // device doesn't already have (matched by id).
+          const have = new Set(s.exercises.map((e) => e.id));
+          const incoming = (payload.exercises ?? []).filter(
+            (e) => e.source !== 'builtin' && !have.has(e.id),
+          );
+          return {
+            exercises: [...s.exercises, ...incoming],
+            schedule: payload.schedule ?? {},
+          };
         }),
       markExerciseDone: (exercise, day) => {
         const state = get();

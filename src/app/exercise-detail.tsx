@@ -19,7 +19,7 @@ import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
-import { exerciseName, findExercise } from '@/lib/exercises';
+import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { bestSetIndex, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
@@ -171,8 +171,8 @@ export default function ExerciseDetail() {
       </View>
 
       <View style={styles.metaRow}>
-        <View style={[styles.tag, { backgroundColor: theme.cardSubtle }]}>
-          <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
+        <View style={[styles.tag, { backgroundColor: MUSCLE_COLORS[exercise.category] + '22' }]}>
+          <Text style={{ color: MUSCLE_COLORS[exercise.category], fontSize: 12, fontWeight: '700' }}>
             {t(`muscles.${exercise.category}`)}
           </Text>
         </View>

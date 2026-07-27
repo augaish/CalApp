@@ -108,23 +108,28 @@ export default function Food() {
             </View>
             {sectionMeals.map((meal) => (
               <View key={meal.id} style={styles.mealRow}>
-                <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
-                  <Ionicons name="restaurant" size={16} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
-                    {meal.items.map((i) => i.name).join(' · ')}
+                <Pressable
+                  onPress={() => router.push(`/meal-edit?id=${encodeURIComponent(meal.id)}`)}
+                  style={({ pressed }) => [styles.mealTap, pressed && { opacity: 0.6 }]}
+                >
+                  <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
+                    <Ionicons name="restaurant" size={16} color={theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
+                      {meal.items.map((i) => i.name).join(' · ')}
+                    </Text>
+                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                      {new Date(meal.at).toLocaleTimeString(locale, {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                  </View>
+                  <Text style={[styles.mealKcal, { color: theme.primary }]}>
+                    {Math.round(mealCalories(meal))}
                   </Text>
-                  <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                    {new Date(meal.at).toLocaleTimeString(locale, {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                  </Text>
-                </View>
-                <Text style={[styles.mealKcal, { color: theme.primary }]}>
-                  {Math.round(mealCalories(meal))}
-                </Text>
+                </Pressable>
                 <Pressable
                   onPress={() => confirmDelete(meal.id)}
                   hitSlop={8}
@@ -182,6 +187,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
     marginTop: Spacing.md,
   },
+  mealTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   mealAvatar: {
     width: 42,
     height: 42,

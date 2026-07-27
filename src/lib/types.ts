@@ -36,6 +36,13 @@ export interface FoodItem {
   fatG: number;
   /** e.g. "1 cup", "200 g" — in the user's language */
   portion: string;
+  /**
+   * Per-100g macros. Set for barcode / packaged items so the user can enter
+   * how many grams they actually ate and have the macros scale automatically.
+   */
+  basePer100?: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  /** Grams eaten — drives scaling when `basePer100` is present. */
+  gramsEaten?: number;
 }
 
 export interface MealAnalysis {

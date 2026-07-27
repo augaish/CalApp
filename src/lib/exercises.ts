@@ -87,6 +87,42 @@ const SEEDS: Seed[] = [
   { id: 'cycling', en: 'Stationary Bike', ar: 'الدراجة الثابتة', category: 'cardio', type: 'distance_time', aliases: ['bike', 'cycling', 'دراجة', 'سايكل'] },
   { id: 'elliptical', en: 'Elliptical', ar: 'الجهاز الإهليلجي', category: 'cardio', type: 'distance_time', aliases: ['elliptical', 'أوربتراك'] },
   { id: 'rowing', en: 'Rowing Machine', ar: 'جهاز التجديف', category: 'cardio', type: 'distance_time', aliases: ['rowing', 'rower', 'جهاز تجديف'] },
+
+  // ── Added library (Calgym request) ─────────────────────
+  // Chest
+  { id: 'decline-chest-press', en: 'Decline Chest Press', ar: 'ضغط صدر منحدر', category: 'chest', aliases: ['decline chest press', 'decline press', 'ضغط صدر منحدر', 'ديكلاين'] },
+  { id: 'incline-dumbbell-press', en: 'Incline Dumbbell Press', ar: 'ضغط دمبل مائل', category: 'chest', aliases: ['incline chest dumbbell', 'incline dumbbell press', 'ضغط دمبل مائل'] },
+  { id: 'pec-fly-cable', en: 'Cable Pec Fly', ar: 'تفتيح الصدر بالكابل', category: 'chest', aliases: ['pec fly cable', 'cable fly', 'تفتيح كابل', 'بيك فلاي'] },
+  // Back
+  { id: 'seated-row-close-grip', en: 'Seated Cable Row (Close Grip)', ar: 'تجديف كابل بقبضة ضيقة', category: 'back', aliases: ['seated row cable close grip', 'close grip row', 'تجديف قبضة ضيقة'] },
+  { id: 'lat-pulldown-close-grip', en: 'Lat Pulldown (Close Grip)', ar: 'سحب علوي بقبضة ضيقة', category: 'back', aliases: ['close grip lat pulldown', 'close grip pulldown', 'سحب علوي ضيق'] },
+  { id: 'mckenzie-press-up', en: 'McKenzie Press Up', ar: 'تمديد الظهر (مكينزي)', category: 'back', type: 'bodyweight_reps', aliases: ['mckenzie press up', 'press up', 'back extension floor', 'مكينزي'] },
+  // Shoulders
+  { id: 'lateral-raise-cable', en: 'Cable Lateral Raise', ar: 'رفرفة جانبية بالكابل', category: 'shoulders', aliases: ['lateral raise cable', 'cable side raise', 'رفرفة كابل'] },
+  { id: 'seated-shoulder-press', en: 'Seated Shoulder Press', ar: 'ضغط كتف جالس', category: 'shoulders', aliases: ['seated shoulder press', 'seated press', 'ضغط كتف جالس', 'جهاز ضغط كتف'] },
+  { id: 'rear-delt-cross-cable', en: 'Rear Delt Cross Cable', ar: 'تفتيح خلفي متقاطع بالكابل', category: 'shoulders', aliases: ['rear delt cross cable', 'reverse cable fly', 'تفتيح خلفي كابل'] },
+  { id: 'shrug-dumbbell', en: 'Dumbbell Shrug', ar: 'هز الأكتاف بالدمبل', category: 'shoulders', aliases: ['shrugs dumbbell', 'dumbbell shrug', 'هز أكتاف دمبل'] },
+  // Biceps
+  { id: 'behind-body-cable-curl', en: 'Behind-the-Body Cable Curl', ar: 'مرجحة كابل خلف الجسم', category: 'biceps', aliases: ['behind body cable curl', 'bayesian curl', 'مرجحة كابل خلفية'] },
+  { id: 'preacher-curl-dumbbell', en: 'Dumbbell Preacher Curl', ar: 'مرجحة كرسي القسيس بالدمبل', category: 'biceps', aliases: ['preacher curl dumbbell', 'dumbbell preacher', 'بريتشر دمبل'] },
+  // Triceps
+  { id: 'pushdown-triangle', en: 'Triangle Bar Pushdown', ar: 'دفع الترايسبس بالمقبض المثلث', category: 'triceps', aliases: ['push down triangle', 'v-bar pushdown', 'دفع مثلث'] },
+  // Legs
+  { id: 'bulgarian-split-squat', en: 'Bulgarian Split Squat', ar: 'سكوات بلغاري', category: 'legs', aliases: ['bulgarian split squat', 'split squat', 'سكوات بلغاري'] },
+  { id: 'hack-squat', en: 'Hack Squat', ar: 'هاك سكوات', category: 'legs', aliases: ['hack squat', 'hack squat calf', 'هاك سكوات'] },
+  { id: 'seated-calf-raise', en: 'Seated Calf Raise', ar: 'رفع السمانة جالساً', category: 'legs', aliases: ['seated calf raise', 'رفع سمانة جالس'] },
+  // Glutes
+  { id: 'hip-thrust-machine', en: 'Hip Thrust Machine', ar: 'جهاز دفع الحوض', category: 'glutes', aliases: ['hip thrust machine', 'جهاز هيب ثرست', 'جهاز دفع حوض'] },
+  { id: 'glute-master', en: 'Glute Master', ar: 'جهاز مدرب المؤخرة', category: 'glutes', aliases: ['glute master', 'glute machine', 'جهاز جلوت'] },
+  // Core
+  { id: 'bird-dog', en: 'Bird Dog', ar: 'وضعية الطائر والكلب', category: 'core', type: 'bodyweight_reps', aliases: ['bird dog', 'بيرد دوق'] },
+  { id: 'one-leg-stretch', en: 'Single-Leg Stretch', ar: 'تمديد الساق الواحدة', category: 'core', type: 'bodyweight_reps', aliases: ['one leg stretch', 'single leg stretch', 'تمديد ساق'] },
+  { id: 'iso-hold', en: 'Iso Hold', ar: 'ثبات إيزومتري', category: 'core', type: 'time', aliases: ['iso hold', 'isometric hold', 'ثبات'] },
+  { id: 'cat-cow', en: 'Cat-Cow', ar: 'وضعية القط والبقرة', category: 'core', type: 'bodyweight_reps', aliases: ['cat cow', 'كات كاو'] },
+  { id: 'dead-bug', en: 'Dead Bug', ar: 'وضعية الحشرة الميتة', category: 'core', type: 'bodyweight_reps', aliases: ['dead bug', 'ديد بق'] },
+  // Forearms
+  { id: 'reverse-curl-cable', en: 'Cable Reverse Curl', ar: 'مرجحة عكسية بالكابل', category: 'forearms', aliases: ['reverse curl cable', 'cable reverse curl', 'مرجحة عكسية كابل'] },
+  { id: 'wrist-curl-cable', en: 'Cable Wrist Curl', ar: 'مرجحة الرسغ بالكابل', category: 'forearms', aliases: ['wrist curl cable', 'cable wrist curl', 'مرجحة رسغ كابل'] },
 ];
 
 export const BUILTIN_EXERCISES: Exercise[] = SEEDS.map((s) => ({
@@ -114,6 +150,21 @@ export const MUSCLE_GROUPS: MuscleGroup[] = [
   'cardio',
   'fullBody',
 ];
+
+/** Distinct accent color per muscle group (used on chips, tags, the library). */
+export const MUSCLE_COLORS: Record<MuscleGroup, string> = {
+  chest: '#E5574E', // red
+  back: '#3FA96A', // green
+  shoulders: '#E8B93B', // yellow
+  biceps: '#4C86E0', // blue
+  triceps: '#9B6DD6', // violet
+  legs: '#E8863B', // orange
+  glutes: '#E06AA6', // pink
+  core: '#2CB8A6', // teal
+  forearms: '#B98A4E', // amber/brown
+  cardio: '#3FB6D6', // cyan
+  fullBody: '#8C7BC7', // lavender
+};
 
 /** Localized display name for an exercise. */
 export function exerciseName(ex: Exercise, lang: Language): string {

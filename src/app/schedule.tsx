@@ -2,13 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { SERVER_URL } from '@/lib/api';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
+import { lightHaptic } from '@/lib/feedback';
+import { encodeSchedule } from '@/lib/share';
 import { useAppStore } from '@/lib/store';
 
 /** Labels for weekdays 0–6 in the active locale (Jan 7 2024 was a Sunday). */
@@ -34,6 +37,26 @@ export default function ScheduleScreen() {
   const [weekday, setWeekday] = useState<number>(viewDay.getDay());
   const day = schedule[weekday] ?? { exerciseIds: [] };
 
+  const sharePlan = async () => {
+    const hasAny = Object.values(schedule).some((d) => d.exerciseIds.length > 0);
+    if (!hasAny) {
+      Alert.alert(t('schedule.shareEmpty'));
+      return;
+    }
+    // Carry along only the custom / scan exercises the plan actually uses.
+    const referenced = new Set<string>();
+    Object.values(schedule).forEach((d) => d.exerciseIds.forEach((exId) => referenced.add(exId)));
+    const exported = custom.filter((e) => referenced.has(e.id));
+    const data = encodeSchedule({ v: 1, schedule, exercises: exported });
+    const url = `${SERVER_URL}/s?d=${data}`;
+    lightHaptic();
+    try {
+      await Share.share({ message: `${t('schedule.shareMessage')}\n${url}` });
+    } catch {
+      // user cancelled the share sheet — no-op
+    }
+  };
+
   // Distinct exercises the user has actually logged, newest first — the
   // one-tap "add from history" source. Excludes ones already on this day.
   const historyExercises = useMemo(() => {
@@ -53,6 +76,9 @@ export default function ScheduleScreen() {
       <View style={styles.header}>
         <Ionicons name="calendar" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('schedule.title')}</Text>
+        <Pressable onPress={sharePlan} hitSlop={10} style={{ marginEnd: Spacing.sm }}>
+          <Ionicons name="share-outline" size={22} color={theme.primary} />
+        </Pressable>
         <Pressable onPress={() => router.back()} hitSlop={10}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>

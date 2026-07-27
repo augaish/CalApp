@@ -8,7 +8,7 @@ import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
-import { allExercises, exerciseName, MUSCLE_GROUPS } from '@/lib/exercises';
+import { allExercises, exerciseName, MUSCLE_COLORS, MUSCLE_GROUPS } from '@/lib/exercises';
 import { useAppStore } from '@/lib/store';
 import type { Exercise, MuscleGroup } from '@/lib/types';
 
@@ -105,16 +105,20 @@ export default function ExerciseLibrary() {
       >
         {(['all', ...MUSCLE_GROUPS] as const).map((cat) => {
           const active = category === cat;
+          const accent = cat === 'all' ? theme.primary : MUSCLE_COLORS[cat];
           return (
             <Pressable
               key={cat}
               onPress={() => setCategory(cat)}
               style={[
                 styles.filterChip,
-                { backgroundColor: active ? theme.primary : theme.card, borderColor: active ? theme.primary : theme.border },
+                { backgroundColor: active ? accent : theme.card, borderColor: active ? accent : theme.border },
               ]}
             >
-              <Text style={{ color: active ? theme.onPrimary : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
+              {cat !== 'all' && !active && (
+                <View style={[styles.chipDot, { backgroundColor: accent }]} />
+              )}
+              <Text style={{ color: active ? '#fff' : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
                 {cat === 'all' ? t('exercises.all') : t(`muscles.${cat}`)}
               </Text>
             </Pressable>
@@ -134,7 +138,10 @@ export default function ExerciseLibrary() {
       ) : (
         grouped.map((g) => (
           <View key={g.cat} style={{ marginBottom: Spacing.sm }}>
-            <Text style={[styles.groupTitle, { color: theme.textSecondary }]}>{t(`muscles.${g.cat}`)}</Text>
+            <View style={styles.groupTitleRow}>
+              <View style={[styles.groupDot, { backgroundColor: MUSCLE_COLORS[g.cat] }]} />
+              <Text style={[styles.groupTitle, { color: MUSCLE_COLORS[g.cat] }]}>{t(`muscles.${g.cat}`)}</Text>
+            </View>
             <View style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
               {g.items.map((ex, i) => (
                 <Pressable
@@ -146,11 +153,11 @@ export default function ExerciseLibrary() {
                     pressed && { opacity: 0.6 },
                   ]}
                 >
-                  <View style={[styles.rowIcon, { backgroundColor: theme.cardSubtle }]}>
+                  <View style={[styles.rowIcon, { backgroundColor: MUSCLE_COLORS[ex.category] + '22' }]}>
                     <Ionicons
                       name={ex.source === 'builtin' ? 'barbell-outline' : ex.source === 'scan' ? 'camera-outline' : 'create-outline'}
                       size={16}
-                      color={theme.primary}
+                      color={MUSCLE_COLORS[ex.category]}
                     />
                   </View>
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
@@ -182,12 +189,18 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, fontSize: 16, padding: 0 },
   filterRow: { gap: Spacing.xs, paddingEnd: Spacing.md },
   filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     borderWidth: 1,
     borderRadius: Radius.full,
     paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  groupTitle: { fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: Spacing.xs, textTransform: 'uppercase', letterSpacing: 0.4 },
+  chipDot: { width: 8, height: 8, borderRadius: 4 },
+  groupTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginTop: Spacing.xs },
+  groupDot: { width: 9, height: 9, borderRadius: 4.5 },
+  groupTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
   groupCard: { borderRadius: Radius.md, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
   rowIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

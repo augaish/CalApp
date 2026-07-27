@@ -10,6 +10,9 @@ import type { ChatMessage, EquipmentAnalysis, FoodItem, Language, MealAnalysis }
 const DEFAULT_API_URL = 'https://calapp-production-ab20.up.railway.app';
 const API_URL = (process.env.EXPO_PUBLIC_API_URL || DEFAULT_API_URL).replace(/\/$/, '');
 
+/** Public base URL of the server — used to build shareable schedule links. */
+export const SERVER_URL = API_URL || DEFAULT_API_URL;
+
 export const isMockMode = !API_URL;
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -114,13 +117,20 @@ export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
   const n = data.product.nutriments ?? {};
   const kcal = n['energy-kcal_100g'];
   if (!kcal && kcal !== 0) return null;
-  return {
-    name: data.product.product_name || barcode,
+  const per100 = {
     calories: Math.round(kcal),
     proteinG: Math.round(n['proteins_100g'] ?? 0),
     carbsG: Math.round(n['carbohydrates_100g'] ?? 0),
     fatG: Math.round(n['fat_100g'] ?? 0),
+  };
+  // Default to a 100 g serving; the user can dial in the real grams and the
+  // macros scale from `basePer100` on the review screen.
+  return {
+    name: data.product.product_name || barcode,
+    ...per100,
     portion: '100 g',
+    basePer100: per100,
+    gramsEaten: 100,
   };
 }
 

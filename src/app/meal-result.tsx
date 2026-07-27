@@ -36,6 +36,26 @@ export default function MealResult() {
     setItems((prev) => prev.map((item, i) => (i === index ? { ...item, ...patch } : item)));
   };
 
+  // Barcode / packaged items carry per-100g macros; scale them to the grams
+  // the user actually ate.
+  const setGrams = (index: number, grams: number) => {
+    setItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== index || !item.basePer100) return item;
+        const f = grams / 100;
+        return {
+          ...item,
+          gramsEaten: grams,
+          portion: `${Math.round(grams)} g`,
+          calories: Math.round(item.basePer100.calories * f),
+          proteinG: Math.round(item.basePer100.proteinG * f),
+          carbsG: Math.round(item.basePer100.carbsG * f),
+          fatG: Math.round(item.basePer100.fatG * f),
+        };
+      }),
+    );
+  };
+
   const total = items.reduce((sum, i) => sum + i.calories, 0);
 
   // Note: pending data is NOT cleared on close — clearing re-renders this
@@ -99,23 +119,45 @@ export default function MealResult() {
             />
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
           </View>
+          {item.basePer100 && (
+            <View style={[styles.gramsRow, { backgroundColor: theme.cardSubtle }]}>
+              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
+                {t('mealResult.amountEaten')}
+              </Text>
+              <TextInput
+                defaultValue={String(Math.round(item.gramsEaten ?? 100))}
+                keyboardType="number-pad"
+                maxLength={4}
+                onChangeText={(text) => setGrams(index, parseInt(text, 10) || 0)}
+                style={[
+                  styles.gramsInput,
+                  { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },
+                ]}
+              />
+              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{t('common.grams')}</Text>
+            </View>
+          )}
           <View style={styles.numRow}>
             <NumBox
+              key={`c${item.gramsEaten ?? ''}`}
               label={t('common.kcal')}
               value={item.calories}
               onChange={(v) => updateItem(index, { calories: v })}
             />
             <NumBox
+              key={`p${item.gramsEaten ?? ''}`}
               label={t('home.protein')}
               value={item.proteinG}
               onChange={(v) => updateItem(index, { proteinG: v })}
             />
             <NumBox
+              key={`ca${item.gramsEaten ?? ''}`}
               label={t('home.carbs')}
               value={item.carbsG}
               onChange={(v) => updateItem(index, { carbsG: v })}
             />
             <NumBox
+              key={`f${item.gramsEaten ?? ''}`}
               label={t('home.fat')}
               value={item.fatG}
               onChange={(v) => updateItem(index, { fatG: v })}
@@ -178,6 +220,25 @@ const styles = StyleSheet.create({
     flex: 1,
     borderBottomWidth: 1,
     paddingVertical: 4,
+  },
+  gramsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    marginBottom: Spacing.sm,
+  },
+  gramsInput: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    minWidth: 72,
   },
   numRow: { flexDirection: 'row', gap: Spacing.sm },
   numBox: { flex: 1 },
