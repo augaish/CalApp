@@ -167,6 +167,7 @@ export const en = {
     todaysPlan: "Today's plan",
     buildSchedule: 'Build a weekly schedule',
     last: 'Last',
+    best: 'Best',
     planTarget: 'Target: {{count}} × {{detail}}',
     deleteWorkoutConfirm: 'Delete this exercise entry? This cannot be undone.',
   },

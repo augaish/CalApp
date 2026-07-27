@@ -71,8 +71,22 @@ export default function ExerciseDetail() {
   const today = exercise ? workoutFor(workouts, exercise.id, viewDay) : undefined;
   const todaySets = today?.sets ?? [];
 
-  // Seed the steppers once (lazy initial state) from the most recent logged set.
-  const lastSet = exercise ? historyFor(workouts, exercise.id).flatMap((w) => w.sets)[0] : undefined;
+  // Seed the steppers once (lazy initial state) from your HIGHEST logged set so
+  // you start from the record to beat (progressive overload), not whatever the
+  // last set happened to be.
+  const setVal = (s: WorkoutSet): number =>
+    exercise?.type === 'weight_reps'
+      ? (s.weightKg ?? 0) * 1000 + (s.reps ?? 0)
+      : exercise?.type === 'bodyweight_reps'
+        ? (s.reps ?? 0)
+        : exercise?.type === 'time'
+          ? (s.seconds ?? 0)
+          : (s.distanceM ?? 0);
+  const lastSet = exercise
+    ? historyFor(workouts, exercise.id)
+        .flatMap((w) => w.sets)
+        .reduce<WorkoutSet | undefined>((b, s) => (!b || setVal(s) > setVal(b) ? s : b), undefined)
+    : undefined;
   const repsSeed = exercise && (exercise.type === 'weight_reps' || exercise.type === 'bodyweight_reps') ? 10 : 0;
 
   const [tab, setTab] = useState<Tab>('track');

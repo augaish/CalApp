@@ -88,6 +88,12 @@ interface AppState {
   updateSet: (workoutId: string, index: number, patch: Partial<WorkoutSet>) => void;
   removeSet: (workoutId: string, index: number) => void;
   removeWorkout: (id: string) => void;
+  /**
+   * Toggle whether a logged workout counts as trained. Unchecking keeps the
+   * sets/record but marks them not-done and zeroes the burned calories;
+   * re-checking marks them done and restores the burn.
+   */
+  setWorkoutTrained: (workoutId: string, trained: boolean) => void;
   /** Clone the most recent previous training day's exercises/sets onto `day`. */
   repeatLastSession: (day: Date) => number;
   addToSchedule: (weekday: number, exerciseId: string) => void;
@@ -289,6 +295,21 @@ export const useAppStore = create<AppState>()(
         }),
       removeWorkout: (workoutId) =>
         set((s) => ({ workouts: s.workouts.filter((w) => w.id !== workoutId) })),
+      setWorkoutTrained: (workoutId, trained) =>
+        set((s) => {
+          const bodyKg = s.profile?.weightKg ?? 75;
+          return {
+            workouts: s.workouts.map((w) => {
+              if (w.id !== workoutId) return w;
+              const sets = w.sets.map((st) => ({ ...st, done: trained }));
+              return {
+                ...w,
+                sets,
+                caloriesBurned: trained ? workoutBurn(sets.length, bodyKg) : 0,
+              };
+            }),
+          };
+        }),
       repeatLastSession: (day) => {
         const state = get();
         // Most recent day strictly before `day` that has any workout.
@@ -374,26 +395,30 @@ export const useAppStore = create<AppState>()(
         if (state.workouts.some((w) => w.exerciseId === exercise.id && isSameDay(w.at, day))) {
           return; // already logged that day
         }
-        // Most recent earlier session for this exercise — by id first, then by
-        // name (so a matching record under a different entry still counts).
-        const byDate = (a: LoggedWorkout, b: LoggedWorkout) =>
-          new Date(b.at).getTime() - new Date(a.at).getTime();
+        // Best (highest) earlier session for this exercise — matched by id
+        // first, then by name — so next time you pick up from your record to
+        // beat, not just whatever you did last.
         const norm = (v: string) => v.trim().toLowerCase();
-        const prior = state.workouts.filter((w) => !isSameDay(w.at, day)).sort(byDate);
-        const src =
-          prior.find((w) => w.exerciseId === exercise.id) ??
-          prior.find((w) => norm(w.exerciseName) === norm(exercise.name));
+        const priors = state.workouts.filter(
+          (w) =>
+            !isSameDay(w.at, day) &&
+            (w.exerciseId === exercise.id || norm(w.exerciseName) === norm(exercise.name)),
+        );
+        const sessionBest = (w: LoggedWorkout) =>
+          Math.max(0, ...w.sets.map((st) => setScore(st, w.type)));
+        const src = priors.reduce<LoggedWorkout | undefined>(
+          (best, w) => (!best || sessionBest(w) > sessionBest(best) ? w : best),
+          undefined,
+        );
         const bodyKg = state.profile?.weightKg ?? 75;
-        // Prefer the sets planned for this weekday (the plan IS the actual —
-        // checking logs exactly what you planned, editable afterwards); else
-        // clone the last session; else a single empty done set.
+        // Seed order: your best prior session (progressive overload) → else the
+        // sets planned for this weekday → else a single empty done set.
         const planned = state.schedule[day.getDay()]?.plans?.[exercise.id];
-        const base: WorkoutSet[] =
-          planned && planned.length > 0
+        const base: WorkoutSet[] = src
+          ? src.sets.map((st) => ({ ...st, done: true, isPR: false }))
+          : planned && planned.length > 0
             ? planned.map((p) => ({ ...p, done: true, isPR: false }))
-            : src
-              ? src.sets.map((st) => ({ ...st, done: true, isPR: false }))
-              : [{ done: true }];
+            : [{ done: true }];
         const sets = markPRs(base, exercise.type);
         set((s) => ({
           workouts: [

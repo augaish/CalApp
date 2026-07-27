@@ -169,6 +169,7 @@ export const ar: TranslationSchema = {
     todaysPlan: 'خطة اليوم',
     buildSchedule: 'أنشئ جدولاً أسبوعياً',
     last: 'آخر مرة',
+    best: 'الأفضل',
     planTarget: 'الهدف: {{count}} × {{detail}}',
     deleteWorkoutConfirm: 'حذف هذا التمرين المسجّل؟ لا يمكن التراجع.',
   },

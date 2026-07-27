@@ -29,6 +29,22 @@ function bestSetLabel(w: LoggedWorkout, type: ExerciseType, kg: string): string 
   return `${best.distanceM ?? 0} m`;
 }
 
+/** Numeric "best set" score of a session, for picking the highest prior. */
+function sessionTopScore(w: LoggedWorkout): number {
+  return Math.max(
+    0,
+    ...w.sets.map((s) =>
+      w.type === 'weight_reps'
+        ? (s.weightKg ?? 0) * 1000 + (s.reps ?? 0)
+        : w.type === 'bodyweight_reps'
+          ? (s.reps ?? 0)
+          : w.type === 'time'
+            ? (s.seconds ?? 0)
+            : (s.distanceM ?? 0),
+    ),
+  );
+}
+
 /** Exercises most frequently trained on the same weekday as `day`. */
 function routineFor(workouts: LoggedWorkout[], day: Date): { id: string; name: string }[] {
   const weekday = day.getDay();
@@ -86,6 +102,7 @@ export default function Training() {
   const repeatLastSession = useAppStore((s) => s.repeatLastSession);
   const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const removeWorkout = useAppStore((s) => s.removeWorkout);
+  const setWorkoutTrained = useAppStore((s) => s.setWorkoutTrained);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
@@ -123,14 +140,19 @@ export default function Training() {
     Alert.alert(t('training.repeated', { count: n }));
   };
 
-  // Pure done/undone toggle for the checkbox — never navigates. Checking marks
-  // it done (cloning the last session's sets, or an empty "done" set when
-  // there's no history); unchecking removes that day's entry. Reps are filled
-  // by tapping the name/arrow, which opens the exercise.
+  // Done/undone toggle for the checkbox — never navigates and never loses your
+  // numbers. First check logs the session (seeded from your best prior record).
+  // Unchecking KEEPS the same record but marks it not-trained (no calories);
+  // re-checking marks it trained again. Reps are edited via the name/arrow.
   const checkOff = (exId: string) => {
     const existing = workoutFor(workouts, exId, selected);
     if (existing) {
-      removeWorkout(existing.id);
+      const trained = existing.sets.some((s) => s.done);
+      setWorkoutTrained(existing.id, !trained);
+      if (!trained) {
+        successHaptic();
+        useCelebrate.getState().celebrate(t('celebrate.workoutDone'));
+      }
       return;
     }
     const ex = findExercise(exId, custom);
@@ -215,10 +237,17 @@ export default function Training() {
           <View style={{ marginTop: Spacing.sm }}>
             {plan.exerciseIds.map((exId) => {
               const ex = findExercise(exId, custom);
-              const doneToday = !!workoutFor(workouts, exId, selected);
+              const wToday = workoutFor(workouts, exId, selected);
+              const doneToday = !!wToday && wToday.sets.some((s) => s.done);
               const planned = plan.plans?.[exId] ?? [];
-              const last = historyFor(workouts, exId).find((w) => !isSameDay(w.at, selected));
-              const preview = last ? bestSetLabel(last, last.type, kg) : '';
+              // Highest previous session — the record to beat.
+              const best = historyFor(workouts, exId)
+                .filter((w) => !isSameDay(w.at, selected))
+                .reduce<LoggedWorkout | undefined>(
+                  (b, w) => (!b || sessionTopScore(w) > sessionTopScore(b) ? w : b),
+                  undefined,
+                );
+              const preview = best ? bestSetLabel(best, best.type, kg) : '';
               return (
                 <View key={exId} style={styles.planRow}>
                   <Pressable onPress={() => checkOff(exId)} hitSlop={8}>
@@ -241,7 +270,11 @@ export default function Training() {
                       <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
                         {ex ? exerciseName(ex, lang) : exId}
                       </Text>
-                      {planned.length > 0 ? (
+                      {preview ? (
+                        <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                          {t('training.best')}: {preview}
+                        </Text>
+                      ) : planned.length > 0 ? (
                         <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600' }}>
                           {t('training.planTarget', {
                             count: planned.length,
@@ -251,10 +284,6 @@ export default function Training() {
                               kg,
                             ),
                           })}
-                        </Text>
-                      ) : preview ? (
-                        <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                          {t('training.last')}: {preview}
                         </Text>
                       ) : null}
                     </View>
