@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Path } from 'react-native-svg';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import * as ImagePicker from 'expo-image-picker';
+import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -23,6 +23,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { analyzeEquipment, analyzeMeal, isMockMode, lookupBarcode } from '@/lib/api';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
+
+// Gallery picking needs the expo-image-picker native module, which only exists
+// in a build that bundled it. Detect it WITHOUT importing the package (its
+// module throws at import time when the native side is missing), so older
+// builds that receive this JS over-the-air keep working — the button is simply
+// hidden until they install the new build.
+const galleryAvailable = requireOptionalNativeModule('ExponentImagePicker') != null;
 
 export default function Scan() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
@@ -127,16 +134,18 @@ export default function Scan() {
   };
 
   // Analyze a picture the user already took (meal / equipment / manual photo).
+  // Loaded lazily so the module's native binding is only touched when present.
   const pickFromGallery = async () => {
-    if (analyzing) return;
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      quality: 0.8,
-    });
-    const asset = result.canceled ? undefined : result.assets?.[0];
-    if (!asset) return;
-    setAnalyzing(true);
+    if (analyzing || !galleryAvailable) return;
     try {
+      const ImagePicker = await import('expo-image-picker');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+      });
+      const asset = result.canceled ? undefined : result.assets?.[0];
+      if (!asset) return;
+      setAnalyzing(true);
       await processImage(asset.uri);
     } catch {
       Alert.alert(t('common.error'));
@@ -194,10 +203,14 @@ export default function Scan() {
           <>
             {!isBarcode && (
               <View style={styles.controlsRow}>
-                <Pressable onPress={pickFromGallery} style={styles.galleryBtn}>
-                  <Ionicons name="images-outline" size={26} color="#fff" />
-                  <Text style={styles.galleryText}>{t('scan.gallery')}</Text>
-                </Pressable>
+                {galleryAvailable ? (
+                  <Pressable onPress={pickFromGallery} style={styles.galleryBtn}>
+                    <Ionicons name="images-outline" size={26} color="#fff" />
+                    <Text style={styles.galleryText}>{t('scan.gallery')}</Text>
+                  </Pressable>
+                ) : (
+                  <View style={styles.galleryBtn} />
+                )}
                 <Pressable onPress={capture} style={styles.shutterOuter}>
                   <View style={styles.shutterInner} />
                 </Pressable>
