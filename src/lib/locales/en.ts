@@ -310,7 +310,10 @@ export const en = {
   },
   barcode: {
     hint: 'Center the barcode in the frame',
-    notFound: 'Product not found. Try scanning it with the camera instead.',
+    notFoundTitle: 'Product not in the database',
+    notFound: "This barcode isn't in the free food database yet. You can add it by hand or snap a photo instead.",
+    enterManually: 'Enter manually',
+    usePhoto: 'Use camera',
     searching: 'Looking up product…',
   },
   progress: {

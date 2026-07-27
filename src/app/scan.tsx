@@ -65,8 +65,17 @@ export default function Scan() {
     try {
       const item = await lookupBarcode(data);
       if (!item) {
-        Alert.alert(t('barcode.notFound'));
-        setAnalyzing(false);
+        Alert.alert(t('barcode.notFoundTitle'), t('barcode.notFound'), [
+          {
+            text: t('barcode.enterManually'),
+            onPress: () => router.replace('/food-edit'),
+          },
+          {
+            text: t('barcode.usePhoto'),
+            onPress: () => router.replace('/scan?mode=photo'),
+          },
+          { text: t('common.cancel'), style: 'cancel', onPress: () => setAnalyzing(false) },
+        ]);
         return;
       }
       setMeal({ items: [item], confidence: 1 }, null);

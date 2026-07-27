@@ -103,30 +103,43 @@ export async function coachChat(messages: ChatMessage[], language: Language): Pr
 /** Open Food Facts lookup — free public API, called directly from the app. */
 export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
   const res = await fetch(
-    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,nutriments`,
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_en,brands,nutriments`,
+    // OFF asks every client to identify itself; without a User-Agent requests
+    // are throttled/blocked and legit products come back as "not found".
+    { headers: { 'User-Agent': 'Calgym/1.0 (calapp; food tracker)' } },
   );
   if (!res.ok) return null;
   const data = (await res.json()) as {
     status: number;
     product?: {
       product_name?: string;
+      product_name_en?: string;
+      brands?: string;
       nutriments?: Record<string, number>;
     };
   };
   if (data.status !== 1 || !data.product) return null;
   const n = data.product.nutriments ?? {};
-  const kcal = n['energy-kcal_100g'];
-  if (!kcal && kcal !== 0) return null;
+  // Prefer kcal; fall back to kJ (energy_100g / energy-kj_100g) → kcal so
+  // products that only store kilojoules still resolve.
+  let kcal = n['energy-kcal_100g'];
+  if (kcal == null) {
+    const kj = n['energy-kj_100g'] ?? n['energy_100g'];
+    if (kj != null) kcal = kj / 4.184;
+  }
+  if (kcal == null) return null;
   const per100 = {
     calories: Math.round(kcal),
     proteinG: Math.round(n['proteins_100g'] ?? 0),
     carbsG: Math.round(n['carbohydrates_100g'] ?? 0),
     fatG: Math.round(n['fat_100g'] ?? 0),
   };
+  const label =
+    data.product.product_name_en || data.product.product_name || data.product.brands || barcode;
   // Default to a 100 g serving; the user can dial in the real grams and the
   // macros scale from `basePer100` on the review screen.
   return {
-    name: data.product.product_name || barcode,
+    name: label,
     ...per100,
     portion: '100 g',
     basePer100: per100,
