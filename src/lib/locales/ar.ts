@@ -378,6 +378,7 @@ export const ar: TranslationSchema = {
     gymTitle: 'صوّر الجهاز',
     mealHint: 'ضع الطبق في منتصف الإطار',
     gymHint: 'صوّر الجهاز كاملاً',
+    gallery: 'المعرض',
     analyzing: 'جارٍ التحليل…',
     analyzingMeal: 'جارٍ التعرف على طعامك…',
     analyzingGym: 'جارٍ التعرف على الجهاز…',

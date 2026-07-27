@@ -1,6 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Path } from 'react-native-svg';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -86,35 +88,56 @@ export default function Scan() {
     }
   };
 
+  // Downscale, then either stash the photo (manual form) or run AI analysis.
+  const processImage = async (uri: string) => {
+    const context = ImageManipulator.manipulate(uri);
+    context.resize({ width: 1024 });
+    const rendered = await context.renderAsync();
+    const saved = await rendered.saveAsync({
+      base64: true,
+      compress: 0.7,
+      format: SaveFormat.JPEG,
+    });
+    const base64 = saved.base64 ?? '';
+
+    if (isPhoto) {
+      setCapturedPhoto(saved.uri);
+      router.back();
+    } else if (isGym) {
+      const analysis = await analyzeEquipment(base64, language);
+      setEquipment(analysis, saved.uri);
+      router.replace('/gym-result');
+    } else {
+      const analysis = await analyzeMeal(base64, language);
+      setMeal(analysis, saved.uri);
+      router.replace('/meal-result');
+    }
+  };
+
   const capture = async () => {
     if (analyzing || !cameraRef.current) return;
     setAnalyzing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      // Downscale before upload: keeps API fast and cheap without hurting accuracy.
-      const context = ImageManipulator.manipulate(photo.uri);
-      context.resize({ width: 1024 });
-      const rendered = await context.renderAsync();
-      const saved = await rendered.saveAsync({
-        base64: true,
-        compress: 0.7,
-        format: SaveFormat.JPEG,
-      });
-      const base64 = saved.base64 ?? '';
+      await processImage(photo.uri);
+    } catch {
+      Alert.alert(t('common.error'));
+      setAnalyzing(false);
+    }
+  };
 
-      if (isPhoto) {
-        // Plain capture for the manual food form — no AI call.
-        setCapturedPhoto(saved.uri);
-        router.back();
-      } else if (isGym) {
-        const analysis = await analyzeEquipment(base64, language);
-        setEquipment(analysis, saved.uri);
-        router.replace('/gym-result');
-      } else {
-        const analysis = await analyzeMeal(base64, language);
-        setMeal(analysis, saved.uri);
-        router.replace('/meal-result');
-      }
+  // Analyze a picture the user already took (meal / equipment / manual photo).
+  const pickFromGallery = async () => {
+    if (analyzing) return;
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    const asset = result.canceled ? undefined : result.assets?.[0];
+    if (!asset) return;
+    setAnalyzing(true);
+    try {
+      await processImage(asset.uri);
     } catch {
       Alert.alert(t('common.error'));
       setAnalyzing(false);
@@ -170,8 +193,22 @@ export default function Scan() {
         ) : (
           <>
             {!isBarcode && (
-              <Pressable onPress={capture} style={styles.shutterOuter}>
-                <View style={styles.shutterInner} />
+              <View style={styles.controlsRow}>
+                <Pressable onPress={pickFromGallery} style={styles.galleryBtn}>
+                  <Ionicons name="images-outline" size={26} color="#fff" />
+                  <Text style={styles.galleryText}>{t('scan.gallery')}</Text>
+                </Pressable>
+                <Pressable onPress={capture} style={styles.shutterOuter}>
+                  <View style={styles.shutterInner} />
+                </Pressable>
+                {/* Spacer keeps the shutter centered opposite the gallery button. */}
+                <View style={styles.galleryBtn} />
+              </View>
+            )}
+            {isBarcode && (
+              <Pressable onPress={() => router.replace('/scan?mode=photo')} style={styles.galleryBtn}>
+                <Ionicons name="camera-outline" size={26} color="#fff" />
+                <Text style={styles.galleryText}>{t('barcode.usePhoto')}</Text>
               </Pressable>
             )}
             <Pressable onPress={() => router.back()} style={styles.cancel}>
@@ -240,6 +277,15 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
+  controlsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingHorizontal: Spacing.xl,
+  },
+  galleryBtn: { width: 64, alignItems: 'center', gap: 3 },
+  galleryText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   shutterOuter: {
     width: 76,
     height: 76,

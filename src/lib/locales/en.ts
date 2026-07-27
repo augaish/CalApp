@@ -376,6 +376,7 @@ export const en = {
     gymTitle: 'Scan equipment',
     mealHint: 'Center the plate in the frame',
     gymHint: 'Capture the whole machine',
+    gallery: 'Gallery',
     analyzing: 'Analyzing…',
     analyzingMeal: 'Identifying your food…',
     analyzingGym: 'Identifying the equipment…',

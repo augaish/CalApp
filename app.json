@@ -62,6 +62,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Calgym uses your photos to analyze meals and gym equipment you've already photographed."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#6D5AAB",
