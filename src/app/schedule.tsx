@@ -139,6 +139,7 @@ export default function ScheduleScreen() {
         <View style={[styles.listCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           {day.exerciseIds.map((exId, i) => {
             const ex = findExercise(exId, custom);
+            const planned = day.plans?.[exId] ?? [];
             return (
               <View
                 key={exId}
@@ -147,12 +148,27 @@ export default function ScheduleScreen() {
                   i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                 ]}
               >
-                <View style={[styles.rowIcon, { backgroundColor: theme.cardSubtle }]}>
-                  <Ionicons name="barbell" size={15} color={theme.primary} />
-                </View>
-                <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
-                  {ex ? exerciseName(ex, lang) : exId}
-                </Text>
+                <Pressable
+                  style={({ pressed }) => [styles.rowTap, pressed && { opacity: 0.6 }]}
+                  onPress={() =>
+                    router.push(`/schedule-plan?weekday=${weekday}&id=${encodeURIComponent(exId)}`)
+                  }
+                >
+                  <View style={[styles.rowIcon, { backgroundColor: theme.cardSubtle }]}>
+                    <Ionicons name="barbell" size={15} color={theme.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                      {ex ? exerciseName(ex, lang) : exId}
+                    </Text>
+                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                      {planned.length > 0
+                        ? t('schedule.setsPlanned', { count: planned.length })
+                        : t('schedule.addSets')}
+                    </Text>
+                  </View>
+                  <Ionicons name="create-outline" size={17} color={theme.textSecondary} />
+                </Pressable>
                 <Pressable onPress={() => removeFromSchedule(weekday, exId)} hitSlop={8} style={{ padding: 4 }}>
                   <Ionicons name="close-circle" size={20} color={theme.textTertiary} />
                 </Pressable>
@@ -237,6 +253,7 @@ const styles = StyleSheet.create({
   },
   listCard: { borderRadius: Radius.md, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
+  rowTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   empty: {
     alignItems: 'center',

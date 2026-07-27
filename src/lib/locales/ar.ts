@@ -169,6 +169,7 @@ export const ar: TranslationSchema = {
     todaysPlan: 'خطة اليوم',
     buildSchedule: 'أنشئ جدولاً أسبوعياً',
     last: 'آخر مرة',
+    planTarget: 'الهدف: {{count}} × {{detail}}',
     deleteWorkoutConfirm: 'حذف هذا التمرين المسجّل؟ لا يمكن التراجع.',
   },
   schedule: {
@@ -182,6 +183,16 @@ export const ar: TranslationSchema = {
     addExercise: 'تصفّح كل التمارين',
     shareEmpty: 'أضف بعض التمارين إلى أسبوعك قبل المشاركة.',
     shareMessage: 'هذا جدول تمريني في كالجيم — افتح الرابط لإضافته إلى تطبيقك:',
+    setsPlanned: '{{count}} مجموعات مخططة · اضغط للتعديل',
+    addSets: 'اضغط لتخطيط المجموعات المستهدفة',
+  },
+  schedulePlan: {
+    title: 'تخطيط المجموعات',
+    hint: 'أضف مجموعاتك وتكراراتك المستهدفة. هذه خطتك — لا شيء يُعتبر منجزاً حتى تؤشّره في يوم التمرين.',
+    addSet: 'إضافة مجموعة مخططة',
+    save: 'حفظ الخطة',
+    planned: 'المجموعات المخططة ({{count}})',
+    emptyHint: 'لا توجد مجموعات مخططة بعد. اضبط التكرارات بالأعلى ثم اضغط «إضافة مجموعة مخططة».',
   },
   scheduleImport: {
     title: 'استيراد جدول التمرين',
@@ -199,6 +210,7 @@ export const ar: TranslationSchema = {
     myExercises: 'تماريني',
     noResults: 'لا توجد تمارين. أنشئ واحداً بالأسفل.',
     count: '{{count}} تمرين',
+    doneAdding: 'تم ({{count}} مضافة)',
   },
   muscles: {
     chest: 'الصدر',

@@ -1,4 +1,4 @@
-import type { Exercise } from './types';
+import type { Exercise, PlannedSet } from './types';
 
 /**
  * Payload embedded in a shareable schedule link. Custom / scan exercises are
@@ -8,7 +8,10 @@ import type { Exercise } from './types';
 export interface SharedSchedule {
   v: 1;
   title?: string;
-  schedule: Record<number, { title?: string; exerciseIds: string[] }>;
+  schedule: Record<
+    number,
+    { title?: string; exerciseIds: string[]; plans?: Record<string, PlannedSet[]> }
+  >;
   exercises: Exercise[];
 }
 

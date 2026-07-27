@@ -11,6 +11,7 @@ import type {
   LoggedMeal,
   LoggedWorkout,
   MealType,
+  PlannedSet,
   Profile,
   WeightEntry,
   WorkoutSet,
@@ -35,8 +36,14 @@ interface AppState {
   meals: LoggedMeal[];
   /** User-made & scan-saved exercises (built-ins live in code, not here). */
   exercises: Exercise[];
-  /** Recurring weekly plan: weekday (0=Sun … 6=Sat) → exercises for that day. */
-  schedule: Record<number, { title?: string; exerciseIds: string[] }>;
+  /**
+   * Recurring weekly plan: weekday (0=Sun … 6=Sat) → exercises for that day,
+   * plus optional planned target sets per exercise (`plans`).
+   */
+  schedule: Record<
+    number,
+    { title?: string; exerciseIds: string[]; plans?: Record<string, PlannedSet[]> }
+  >;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -86,9 +93,14 @@ interface AppState {
   addToSchedule: (weekday: number, exerciseId: string) => void;
   removeFromSchedule: (weekday: number, exerciseId: string) => void;
   setScheduleTitle: (weekday: number, title: string) => void;
+  /** Set (or clear, with []) the planned target sets for a scheduled exercise. */
+  setPlannedSets: (weekday: number, exerciseId: string, sets: PlannedSet[]) => void;
   /** Replace the weekly plan with a shared one, recreating custom exercises. */
   importSchedule: (payload: {
-    schedule: Record<number, { title?: string; exerciseIds: string[] }>;
+    schedule: Record<
+      number,
+      { title?: string; exerciseIds: string[]; plans?: Record<string, PlannedSet[]> }
+    >;
     exercises: Exercise[];
   }) => void;
   /**
@@ -318,12 +330,26 @@ export const useAppStore = create<AppState>()(
         set((s) => {
           const cur = s.schedule[weekday];
           if (!cur) return {};
+          const plans = { ...(cur.plans ?? {}) };
+          delete plans[exerciseId];
           return {
             schedule: {
               ...s.schedule,
-              [weekday]: { ...cur, exerciseIds: cur.exerciseIds.filter((x) => x !== exerciseId) },
+              [weekday]: {
+                ...cur,
+                exerciseIds: cur.exerciseIds.filter((x) => x !== exerciseId),
+                plans,
+              },
             },
           };
+        }),
+      setPlannedSets: (weekday, exerciseId, sets) =>
+        set((s) => {
+          const cur = s.schedule[weekday] ?? { exerciseIds: [] };
+          const plans = { ...(cur.plans ?? {}) };
+          if (sets.length === 0) delete plans[exerciseId];
+          else plans[exerciseId] = sets;
+          return { schedule: { ...s.schedule, [weekday]: { ...cur, plans } } };
         }),
       setScheduleTitle: (weekday, title) =>
         set((s) => {

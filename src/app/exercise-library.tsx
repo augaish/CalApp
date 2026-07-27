@@ -19,15 +19,21 @@ export default function ExerciseLibrary() {
   const lang = i18n.language === 'ar' ? 'ar' : 'en';
   const custom = useAppStore((s) => s.exercises);
   const addToSchedule = useAppStore((s) => s.addToSchedule);
+  const removeFromSchedule = useAppStore((s) => s.removeFromSchedule);
+  const schedule = useAppStore((s) => s.schedule);
 
   const { pick, weekday } = useLocalSearchParams<{ pick?: string; weekday?: string }>();
   const pickForSchedule = pick === 'schedule';
+  const wd = Number(weekday);
+  const picked = pickForSchedule ? (schedule[wd]?.exerciseIds ?? []) : [];
 
+  // In schedule pick-mode, tapping toggles the exercise in/out of that day and
+  // KEEPS you here so you can add several in a row. Tap Done to go back.
   const onPickExercise = (ex: Exercise) => {
     if (pickForSchedule) {
-      addToSchedule(Number(weekday), ex.id);
+      if (picked.includes(ex.id)) removeFromSchedule(wd, ex.id);
+      else addToSchedule(wd, ex.id);
       lightHaptic();
-      router.back();
     } else {
       router.push(`/exercise-detail?id=${encodeURIComponent(ex.id)}`);
     }
@@ -64,11 +70,23 @@ export default function ExerciseLibrary() {
   return (
     <Screen
       footer={
-        <Button
-          label={t('exercises.newExercise')}
-          icon="add"
-          onPress={() => router.push('/exercise-edit')}
-        />
+        pickForSchedule ? (
+          <View style={{ gap: Spacing.xs }}>
+            <Button label={t('exercises.doneAdding', { count: picked.length })} onPress={() => router.back()} />
+            <Button
+              label={t('exercises.newExercise')}
+              icon="add"
+              variant="secondary"
+              onPress={() => router.push('/exercise-edit')}
+            />
+          </View>
+        ) : (
+          <Button
+            label={t('exercises.newExercise')}
+            icon="add"
+            onPress={() => router.push('/exercise-edit')}
+          />
+        )
       }
     >
       <View style={styles.header}>
@@ -101,7 +119,7 @@ export default function ExerciseLibrary() {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.filterRow}
-        style={{ marginBottom: Spacing.sm }}
+        style={styles.filterScroll}
       >
         {(['all', ...MUSCLE_GROUPS] as const).map((cat) => {
           const active = category === cat;
@@ -163,7 +181,15 @@ export default function ExerciseLibrary() {
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
                     {exerciseName(ex, lang)}
                   </Text>
-                  <Ionicons name={pickForSchedule ? 'add-circle' : 'chevron-forward'} size={16} color={pickForSchedule ? theme.primary : theme.textTertiary} />
+                  {pickForSchedule ? (
+                    <Ionicons
+                      name={picked.includes(ex.id) ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={22}
+                      color={picked.includes(ex.id) ? theme.primary : theme.textTertiary}
+                    />
+                  ) : (
+                    <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                  )}
                 </Pressable>
               ))}
             </View>
@@ -187,15 +213,18 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   searchInput: { flex: 1, fontSize: 16, padding: 0 },
-  filterRow: { gap: Spacing.xs, paddingEnd: Spacing.md },
+  // flexGrow:0 stops this horizontal strip from absorbing the Screen's spare
+  // vertical space (which stretched the chips into tall pills on short lists).
+  filterScroll: { flexGrow: 0, marginBottom: Spacing.sm },
+  filterRow: { gap: Spacing.xs, paddingEnd: Spacing.md, alignItems: 'center' },
   filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    height: 38,
     borderWidth: 1,
     borderRadius: Radius.full,
     paddingHorizontal: 14,
-    paddingVertical: 8,
   },
   chipDot: { width: 8, height: 8, borderRadius: 4 },
   groupTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginTop: Spacing.xs },

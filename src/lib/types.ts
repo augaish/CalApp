@@ -122,6 +122,14 @@ export interface Exercise {
 }
 
 /** One recorded set inside a logged exercise. */
+/** A target set defined ahead of time in the weekly schedule (no "done"). */
+export interface PlannedSet {
+  weightKg?: number;
+  reps?: number;
+  seconds?: number;
+  distanceM?: number;
+}
+
 export interface WorkoutSet {
   weightKg?: number;
   reps?: number;

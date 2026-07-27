@@ -167,6 +167,7 @@ export const en = {
     todaysPlan: "Today's plan",
     buildSchedule: 'Build a weekly schedule',
     last: 'Last',
+    planTarget: 'Target: {{count}} × {{detail}}',
     deleteWorkoutConfirm: 'Delete this exercise entry? This cannot be undone.',
   },
   schedule: {
@@ -180,6 +181,16 @@ export const en = {
     addExercise: 'Browse all exercises',
     shareEmpty: 'Add some exercises to your week before sharing.',
     shareMessage: 'Here is my Calgym workout plan — open the link to add it to your app:',
+    setsPlanned: '{{count}} sets planned · tap to edit',
+    addSets: 'Tap to plan target sets',
+  },
+  schedulePlan: {
+    title: 'Plan sets',
+    hint: 'Add your target sets and reps. This is your plan — nothing is marked done until you check it on the training day.',
+    addSet: 'Add planned set',
+    save: 'Save plan',
+    planned: 'Planned sets ({{count}})',
+    emptyHint: 'No sets planned yet. Set the reps above and tap “Add planned set”.',
   },
   scheduleImport: {
     title: 'Import workout plan',
@@ -197,6 +208,7 @@ export const en = {
     myExercises: 'My exercises',
     noResults: 'No exercises found. Create one below.',
     count: '{{count}} exercises',
+    doneAdding: 'Done ({{count}} added)',
   },
   muscles: {
     chest: 'Chest',

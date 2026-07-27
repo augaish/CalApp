@@ -216,6 +216,7 @@ export default function Training() {
             {plan.exerciseIds.map((exId) => {
               const ex = findExercise(exId, custom);
               const doneToday = !!workoutFor(workouts, exId, selected);
+              const planned = plan.plans?.[exId] ?? [];
               const last = historyFor(workouts, exId).find((w) => !isSameDay(w.at, selected));
               const preview = last ? bestSetLabel(last, last.type, kg) : '';
               return (
@@ -240,7 +241,18 @@ export default function Training() {
                       <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
                         {ex ? exerciseName(ex, lang) : exId}
                       </Text>
-                      {preview ? (
+                      {planned.length > 0 ? (
+                        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600' }}>
+                          {t('training.planTarget', {
+                            count: planned.length,
+                            detail: bestSetLabel(
+                              { sets: planned.map((p) => ({ ...p, done: false })) } as LoggedWorkout,
+                              ex?.type ?? 'weight_reps',
+                              kg,
+                            ),
+                          })}
+                        </Text>
+                      ) : preview ? (
                         <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                           {t('training.last')}: {preview}
                         </Text>
