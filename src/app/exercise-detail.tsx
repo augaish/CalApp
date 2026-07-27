@@ -53,9 +53,11 @@ export default function ExerciseDetail() {
 
   const custom = useAppStore((s) => s.exercises);
   const workouts = useAppStore((s) => s.workouts);
+  const schedule = useAppStore((s) => s.schedule);
   const logSet = useAppStore((s) => s.logSet);
   const updateSet = useAppStore((s) => s.updateSet);
   const removeSet = useAppStore((s) => s.removeSet);
+  const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const viewDay = useViewDay((s) => s.day);
 
   const exercise = id ? findExercise(id, custom) : undefined;
@@ -70,6 +72,24 @@ export default function ExerciseDetail() {
   );
   const today = exercise ? workoutFor(workouts, exercise.id, viewDay) : undefined;
   const todaySets = today?.sets ?? [];
+
+  // Opening a scheduled exercise that isn't logged yet pre-fills its sets from
+  // your best record / plan, but marks them NOT trained (no calories) — so an
+  // unchecked plan item shows the same reps as a checked one. Tick it on the
+  // Training plan to count it as done.
+  useEffect(() => {
+    if (!exercise || today) return;
+    const day = schedule[viewDay.getDay()];
+    if (!day?.exerciseIds.includes(exercise.id)) return;
+    const hasHistory = historyFor(workouts, exercise.id).some((w) => !isSameDay(w.at, viewDay));
+    const planned = day.plans?.[exercise.id];
+    if (!hasHistory && !(planned && planned.length > 0)) return;
+    markExerciseDone(
+      { id: exercise.id, name: exerciseName(exercise, lang), type: exercise.type },
+      viewDay,
+      false,
+    );
+  }, [exercise, today, schedule, viewDay, workouts, lang, markExerciseDone]);
 
   // Seed the steppers once (lazy initial state) from your HIGHEST logged set so
   // you start from the record to beat (progressive overload), not whatever the

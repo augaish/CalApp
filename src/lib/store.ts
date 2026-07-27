@@ -117,6 +117,8 @@ interface AppState {
   markExerciseDone: (
     exercise: { id: string; name: string; type: LoggedWorkout['type'] },
     day: Date,
+    /** false seeds the record but leaves it not-trained (no burn). */
+    trained?: boolean,
   ) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
@@ -390,7 +392,7 @@ export const useAppStore = create<AppState>()(
             schedule: payload.schedule ?? {},
           };
         }),
-      markExerciseDone: (exercise, day) => {
+      markExerciseDone: (exercise, day, trained = true) => {
         const state = get();
         if (state.workouts.some((w) => w.exerciseId === exercise.id && isSameDay(w.at, day))) {
           return; // already logged that day
@@ -415,10 +417,10 @@ export const useAppStore = create<AppState>()(
         // sets planned for this weekday → else a single empty done set.
         const planned = state.schedule[day.getDay()]?.plans?.[exercise.id];
         const base: WorkoutSet[] = src
-          ? src.sets.map((st) => ({ ...st, done: true, isPR: false }))
+          ? src.sets.map((st) => ({ ...st, done: trained, isPR: false }))
           : planned && planned.length > 0
-            ? planned.map((p) => ({ ...p, done: true, isPR: false }))
-            : [{ done: true }];
+            ? planned.map((p) => ({ ...p, done: trained, isPR: false }))
+            : [{ done: trained }];
         const sets = markPRs(base, exercise.type);
         set((s) => ({
           workouts: [
@@ -429,7 +431,7 @@ export const useAppStore = create<AppState>()(
               exerciseName: exercise.name,
               type: exercise.type,
               sets,
-              caloriesBurned: workoutBurn(sets.length, bodyKg),
+              caloriesBurned: trained ? workoutBurn(sets.length, bodyKg) : 0,
             },
             ...s.workouts,
           ],
