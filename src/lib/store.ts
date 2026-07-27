@@ -384,9 +384,16 @@ export const useAppStore = create<AppState>()(
           prior.find((w) => w.exerciseId === exercise.id) ??
           prior.find((w) => norm(w.exerciseName) === norm(exercise.name));
         const bodyKg = state.profile?.weightKg ?? 75;
-        const base: WorkoutSet[] = src
-          ? src.sets.map((st) => ({ ...st, done: true, isPR: false }))
-          : [{ done: true }];
+        // Prefer the sets planned for this weekday (the plan IS the actual —
+        // checking logs exactly what you planned, editable afterwards); else
+        // clone the last session; else a single empty done set.
+        const planned = state.schedule[day.getDay()]?.plans?.[exercise.id];
+        const base: WorkoutSet[] =
+          planned && planned.length > 0
+            ? planned.map((p) => ({ ...p, done: true, isPR: false }))
+            : src
+              ? src.sets.map((st) => ({ ...st, done: true, isPR: false }))
+              : [{ done: true }];
         const sets = markPRs(base, exercise.type);
         set((s) => ({
           workouts: [
