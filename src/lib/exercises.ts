@@ -61,9 +61,9 @@ const SEEDS: Seed[] = [
   { id: 'squat', en: 'Barbell Squat', ar: 'سكوات بار', category: 'legs', aliases: ['squat', 'back squat', 'سكوات', 'قرفصاء'] },
   { id: 'leg-press', en: 'Leg Press', ar: 'جهاز دفع الأرجل', category: 'legs', aliases: ['leg press', 'جهاز أرجل', 'دفع أرجل', 'ليج برس'] },
   { id: 'leg-extension', en: 'Leg Extension', ar: 'تمديد الأرجل', category: 'legs', aliases: ['leg extension', 'quad extension', 'تمديد أرجل', 'مقدمة فخذ'] },
-  { id: 'leg-curl', en: 'Leg Curl', ar: 'ثني الأرجل', category: 'legs', aliases: ['leg curl', 'hamstring curl', 'ثني أرجل', 'خلفية فخذ'] },
+  { id: 'leg-curl', en: 'Lying Leg Curl', ar: 'ثني الأرجل مستلقياً', category: 'legs', aliases: ['leg curl', 'lying leg curl', 'hamstring curl', 'ثني أرجل', 'خلفية فخذ'] },
   { id: 'lunge', en: 'Lunge', ar: 'الطعنات', category: 'legs', aliases: ['lunge', 'walking lunge', 'طعنات'] },
-  { id: 'calf-raise', en: 'Calf Raise', ar: 'رفع السمانة', category: 'legs', aliases: ['calf raise', 'سمانة', 'رفع سمانة'] },
+  { id: 'calf-raise', en: 'Standing Calf Raise', ar: 'رفع السمانة واقفاً', category: 'legs', aliases: ['calf raise', 'standing calf raise', 'سمانة', 'رفع سمانة'] },
   { id: 'romanian-deadlift', en: 'Romanian Deadlift', ar: 'الرفعة الرومانية', category: 'legs', aliases: ['romanian deadlift', 'rdl', 'رفعة رومانية'] },
 
   // ── Glutes ─────────────────────────────────────────────
@@ -130,6 +130,23 @@ const SEEDS: Seed[] = [
   { id: 'calf-press-leg-press', en: 'Calf Press on Leg Press', ar: 'ضغط السمانة على جهاز الأرجل', category: 'legs', aliases: ['calf press on leg press', 'calf press', 'leg press calf raise', 'ضغط سمانة'] },
   { id: 'hanging-knee-raise', en: 'Hanging Knee Raise', ar: 'رفع الركبتين معلقاً', category: 'core', type: 'bodyweight_reps', aliases: ['hanging knee raise', 'knee raise', 'رفع ركبتين'] },
   { id: 'reverse-crunch', en: 'Reverse Crunch', ar: 'الكرنش العكسي', category: 'core', type: 'bodyweight_reps', aliases: ['reverse crunch', 'كرنش عكسي'] },
+
+  // ── Machine ⇄ free-weight & seated ⇄ standing counterparts ─────────
+  // Chest
+  { id: 'dumbbell-chest-fly', en: 'Dumbbell Chest Fly', ar: 'تفتيح الصدر بالدمبل', category: 'chest', aliases: ['dumbbell chest fly', 'dumbbell fly', 'تفتيح دمبل'] },
+  { id: 'incline-chest-press-machine', en: 'Incline Chest Press Machine', ar: 'جهاز ضغط الصدر المائل', category: 'chest', aliases: ['incline chest press machine', 'machine incline press', 'جهاز صدر مائل'] },
+  { id: 'decline-bench-press', en: 'Decline Bench Press', ar: 'ضغط بار منحدر', category: 'chest', aliases: ['decline bench press', 'decline barbell press', 'بنش منحدر'] },
+  // Shoulders
+  { id: 'shoulder-press-machine', en: 'Machine Shoulder Press', ar: 'ضغط الكتف بالجهاز', category: 'shoulders', aliases: ['machine shoulder press', 'shoulder press machine', 'ضغط كتف جهاز'] },
+  { id: 'shrug-machine', en: 'Machine Shrug', ar: 'هز الأكتاف بالجهاز', category: 'shoulders', aliases: ['machine shrug', 'shrug machine', 'هز أكتاف جهاز'] },
+  { id: 'lateral-raise-machine', en: 'Machine Lateral Raise', ar: 'الرفرفة الجانبية بالجهاز', category: 'shoulders', aliases: ['machine lateral raise', 'lateral raise machine', 'رفرفة جهاز'] },
+  // Biceps
+  { id: 'preacher-curl-machine', en: 'Machine Preacher Curl', ar: 'مرجحة كرسي القسيس بالجهاز', category: 'biceps', aliases: ['machine preacher curl', 'preacher curl machine', 'بريتشر جهاز'] },
+  // Triceps
+  { id: 'tricep-extension-machine', en: 'Triceps Extension Machine', ar: 'جهاز تمديد الترايسبس', category: 'triceps', aliases: ['triceps extension machine', 'tricep machine', 'جهاز ترايسبس'] },
+  // Legs
+  { id: 'seated-leg-curl', en: 'Seated Leg Curl', ar: 'ثني الأرجل جالساً', category: 'legs', aliases: ['seated leg curl', 'ثني أرجل جالس'] },
+  { id: 'hip-adductor', en: 'Hip Adductor Machine', ar: 'جهاز تقريب الأرجل', category: 'legs', aliases: ['adductor', 'hip adduction', 'inner thigh machine', 'تقريب'] },
 ];
 
 export const BUILTIN_EXERCISES: Exercise[] = SEEDS.map((s) => ({
