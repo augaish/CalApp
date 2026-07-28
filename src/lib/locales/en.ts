@@ -305,6 +305,7 @@ export const en = {
   },
   describe: {
     title: 'Describe your meal',
+    tip: 'Add amounts and how it was cooked for a better estimate — e.g. "1 plate chicken bukhari, ~1.5 cups rice cooked in ghee".',
     placeholder: 'e.g. 2 boiled eggs and toast with honey',
     analyze: 'Analyze',
   },

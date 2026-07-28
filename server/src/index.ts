@@ -21,6 +21,9 @@ import {
 } from './prompts.js';
 
 const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001';
+// Meal calorie analysis can use a stronger model for accuracy without paying
+// for it on the cheaper endpoints (coach, equipment). Falls back to MODEL.
+const MEAL_MODEL = process.env.MEAL_MODEL ?? MODEL;
 const PORT = Number(process.env.PORT ?? 3000);
 
 const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
@@ -92,9 +95,9 @@ function parseBody(body: AnalyzeBody): { image: string; language: Language } | n
   return { image, language };
 }
 
-async function analyze(image: string, prompt: string): Promise<unknown> {
+async function analyze(image: string, prompt: string, model: string = MODEL): Promise<unknown> {
   const response = await anthropic.messages.create({
-    model: MODEL,
+    model,
     max_tokens: 1500,
     messages: [
       {
@@ -132,7 +135,7 @@ app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
   try {
-    const result = await analyze(parsed.image, mealPrompt(parsed.language));
+    const result = await analyze(parsed.image, mealPrompt(parsed.language), MEAL_MODEL);
     return c.json(result);
   } catch (err) {
     console.error('analyze-meal failed:', err);
@@ -187,7 +190,7 @@ app.post('/api/analyze-text', async (c) => {
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
   try {
     const response = await anthropic.messages.create({
-      model: MODEL,
+      model: MEAL_MODEL,
       max_tokens: 1000,
       messages: [{ role: 'user', content: textMealPrompt(language, text) }],
     });

@@ -5,6 +5,22 @@ const LANGUAGE_NAME: Record<Language, string> = {
   ar: 'Arabic',
 };
 
+/**
+ * Calibration guidance shared by the photo + text meal prompts. The single most
+ * common error is UNDER-counting (estimates come out ~half of reality), because
+ * models pick small "diet" portions and ignore cooking fat. This pushes toward
+ * realistic full servings and counting all hidden fats.
+ */
+function REALISM_BLOCK(_language: Language): string {
+  return `CALIBRATE FOR REALISM — the most common mistake is UNDER-counting calories:
+- Assume full real-world portions as actually served in a restaurant or home, NOT minimal "standard" diet servings, unless the user clearly states a small amount.
+- Count ALL cooking fat and add-ons: oil, ghee/samn, butter, cream, sauces, dressing, mayonnaise, nuts, raisins, cheese. These are frequently 20-40% of the calories and are the #1 reason estimates come out too low.
+- Gulf rice-and-meat dishes (kabsa, bukhari, mandi, machboos, biryani, maqluba) are cooked with generous ghee/oil and often topped with fried onions, nuts and raisins: ONE restaurant plate WITH chicken is typically 800-1200 kcal — never return half of that.
+- Grilled or fried meats include the oil/marinade/butter they are cooked in.
+- Bread, rice and sauces served alongside a dish must each be counted.
+- When uncertain between a smaller and a larger portion, choose the higher realistic one — for a calorie tracker, under-counting is worse than a slight over-count.`;
+}
+
 export function mealPrompt(language: Language): string {
   return `You are a meticulous nutrition analyst with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes (kabsa, mandi, machboos, foul, molokhia, shawarma, etc.).
 
@@ -15,6 +31,8 @@ IDENTIFY CAREFULLY before answering:
 - Watch out for easily-confused foods: watermelon vs tomato vs strawberry vs bell pepper; sweet potato vs potato vs pumpkin; lime vs lemon; zucchini vs cucumber; dates vs olives; labneh vs yogurt vs hummus. A red/pink round item with black seeds and a green rind is watermelon, not tomato.
 - If two foods are genuinely hard to tell apart, pick the more likely one, lower the confidence, and say so in "notes".
 
+${REALISM_BLOCK(language)}
+
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 {
   "items": [
@@ -26,18 +44,21 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 
 Rules:
 - "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
+- "portion" MUST include an approximate weight in grams, e.g. "1 plate (~500 g)".
 - "confidence" is 0-1 for the overall analysis; use lower values when identification is uncertain.
-- Use "notes" for a single short caveat in ${LANGUAGE_NAME[language]} (or "" if none).
+- "notes" (in ${LANGUAGE_NAME[language]}) should state the portion size you assumed (or "" if none).
 - If the image contains no food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.
-- Be realistic about portions: estimate from what is visible, not standard servings.`;
+- Estimate the portion from what is visible, but size it realistically (a full plate, not a token serving).`;
 }
 
 export function textMealPrompt(language: Language, text: string): string {
-  return `You are a nutrition analysis expert with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes.
+  return `You are a meticulous nutrition analyst with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes.
 
 The user described a meal in text: "${text.replace(/"/g, "'")}"
 
-Estimate the foods, portions, calories and macros.
+Estimate the foods, realistic portions, calories and macros AS ACTUALLY SERVED.
+
+${REALISM_BLOCK(language)}
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 {
@@ -50,7 +71,9 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 
 Rules:
 - "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
-- "confidence" is 0-1. Use "notes" for one short caveat in ${LANGUAGE_NAME[language]} (or "").
+- "portion" MUST include an approximate weight in grams, e.g. "1 plate (~500 g)".
+- "notes" (in ${LANGUAGE_NAME[language]}) MUST state the portion size and key assumptions you used so the user can verify them, e.g. "Assumed ~1.5 cups rice cooked in ghee + 250 g chicken".
+- "confidence" is 0-1.
 - If the text is not about food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.`;
 }
 

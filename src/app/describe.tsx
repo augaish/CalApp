@@ -58,6 +58,7 @@ export default function Describe() {
         }
       >
         <Title>{t('describe.title')}</Title>
+        <Subtitle>{t('describe.tip')}</Subtitle>
         {isMockMode && <Subtitle>{t('scan.mockBadge')}</Subtitle>}
         <TextInput
           value={text}
