@@ -13,6 +13,14 @@ import { successHaptic } from '@/lib/feedback';
 import { useAppStore } from '@/lib/store';
 import type { FoodItem, MealType } from '@/lib/types';
 
+const PORTIONS: { m: number; label: string }[] = [
+  { m: 0.25, label: '¼' },
+  { m: 0.5, label: '½' },
+  { m: 1, label: '1' },
+  { m: 1.5, label: '1½' },
+  { m: 2, label: '2' },
+];
+
 function sameDay(a: Date, b: Date): boolean {
   return (
     a.getFullYear() === b.getFullYear() &&
@@ -44,6 +52,17 @@ export default function MealEdit() {
   const [items, setItems] = useState<FoodItem[]>(() => (meal ? meal.items.map((i) => ({ ...i })) : []));
   const [mealType, setMealType] = useState<MealType>(meal?.mealType ?? 'snack');
   const [day, setDay] = useState<Date>(() => (meal ? new Date(meal.at) : new Date()));
+  // Baseline macros captured at open (treated as the ×1 portion), so portion
+  // scaling works on any saved record — not just freshly-scanned ones.
+  const [baseSnap] = useState(() =>
+    (meal ? meal.items : []).map((i) => ({
+      calories: i.calories,
+      proteinG: i.proteinG,
+      carbsG: i.carbsG,
+      fatG: i.fatG,
+    })),
+  );
+  const [mults, setMults] = useState<number[]>(() => (meal ? meal.items.map(() => 1) : []));
 
   if (!meal) {
     return (
@@ -65,6 +84,45 @@ export default function MealEdit() {
           delete next.basePer100;
         }
         return next;
+      }),
+    );
+  };
+
+  // Portion multiplier for AI/manual items — scales from the opened baseline.
+  const setPortion = (index: number, m: number) => {
+    const b = baseSnap[index];
+    if (!b) return;
+    setMults((prev) => prev.map((v, i) => (i === index ? m : v)));
+    setItems((prev) =>
+      prev.map((item, i) =>
+        i === index
+          ? {
+              ...item,
+              calories: Math.round(b.calories * m),
+              proteinG: Math.round(b.proteinG * m),
+              carbsG: Math.round(b.carbsG * m),
+              fatG: Math.round(b.fatG * m),
+            }
+          : item,
+      ),
+    );
+  };
+
+  // Grams-based scaling for barcode / packaged records.
+  const setGrams = (index: number, grams: number) => {
+    setItems((prev) =>
+      prev.map((item, i) => {
+        if (i !== index || !item.basePer100) return item;
+        const f = grams / 100;
+        return {
+          ...item,
+          gramsEaten: grams,
+          portion: `${Math.round(grams)} g`,
+          calories: Math.round(item.basePer100.calories * f),
+          proteinG: Math.round(item.basePer100.proteinG * f),
+          carbsG: Math.round(item.basePer100.carbsG * f),
+          fatG: Math.round(item.basePer100.fatG * f),
+        };
       }),
     );
   };
@@ -182,11 +240,51 @@ export default function MealEdit() {
             />
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
           </View>
+
+          {item.basePer100 ? (
+            <View style={[styles.gramsRow, { backgroundColor: theme.cardSubtle }]}>
+              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
+                {t('mealResult.amountEaten')}
+              </Text>
+              <TextInput
+                defaultValue={String(Math.round(item.gramsEaten ?? 100))}
+                keyboardType="number-pad"
+                maxLength={4}
+                onChangeText={(text) => setGrams(index, parseInt(text, 10) || 0)}
+                style={[styles.gramsInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
+              />
+              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{t('common.grams')}</Text>
+            </View>
+          ) : (
+            <View style={styles.portionRow}>
+              <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600', marginEnd: 4 }}>
+                {t('mealResult.portion')}
+              </Text>
+              {PORTIONS.map(({ m, label }) => {
+                const active = Math.abs((mults[index] ?? 1) - m) < 0.001;
+                return (
+                  <Pressable
+                    key={m}
+                    onPress={() => setPortion(index, m)}
+                    style={[
+                      styles.portionChip,
+                      { borderColor: active ? theme.primary : theme.border, backgroundColor: active ? theme.primary : 'transparent' },
+                    ]}
+                  >
+                    <Text style={{ color: active ? '#fff' : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
+                      {label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+
           <View style={styles.numRow}>
-            <NumBox label={t('common.kcal')} value={item.calories} onChange={(v) => updateItem(index, { calories: v })} />
-            <NumBox label={t('home.protein')} value={item.proteinG} onChange={(v) => updateItem(index, { proteinG: v })} />
-            <NumBox label={t('home.carbs')} value={item.carbsG} onChange={(v) => updateItem(index, { carbsG: v })} />
-            <NumBox label={t('home.fat')} value={item.fatG} onChange={(v) => updateItem(index, { fatG: v })} />
+            <NumBox key={`c${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('common.kcal')} value={item.calories} onChange={(v) => updateItem(index, { calories: v })} />
+            <NumBox key={`p${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('home.protein')} value={item.proteinG} onChange={(v) => updateItem(index, { proteinG: v })} />
+            <NumBox key={`ca${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('home.carbs')} value={item.carbsG} onChange={(v) => updateItem(index, { carbsG: v })} />
+            <NumBox key={`f${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('home.fat')} value={item.fatG} onChange={(v) => updateItem(index, { fatG: v })} />
           </View>
         </Card>
       ))}
@@ -249,6 +347,40 @@ const styles = StyleSheet.create({
     flex: 1,
     borderBottomWidth: 1,
     paddingVertical: 4,
+  },
+  portionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginBottom: Spacing.sm,
+  },
+  portionChip: {
+    minWidth: 40,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  gramsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    marginBottom: Spacing.sm,
+  },
+  gramsInput: {
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    minWidth: 72,
   },
   numRow: { flexDirection: 'row', gap: Spacing.sm },
   numBox: { flex: 1 },
