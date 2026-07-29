@@ -92,6 +92,24 @@ export interface Entitlement {
   } | null;
 }
 
+/**
+ * Hand this install's usage and plan to the account that just signed in, so
+ * the month's allowance carries over instead of restarting. Call after
+ * `setInstallId` has been pointed at the account id.
+ */
+export async function linkInstall(installId: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ from: installId }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Current plan + remaining AI actions (and the sponsor slot, if any). */
 export async function fetchEntitlement(): Promise<Entitlement | null> {
   try {

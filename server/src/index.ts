@@ -16,7 +16,9 @@ import {
   getSetting,
   getUsageKind,
   initDb,
+  linkRefs,
   listUsers,
+  resolveRef,
   setCachedEquipment,
   setSetting,
   setUserPlan,
@@ -44,14 +46,23 @@ const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
 const app = new Hono();
 app.use('*', cors());
 
+/** Ids are opaque to us; only the shape is checked. */
+function validRef(raw: string): string | null {
+  const ref = raw.trim();
+  if (!ref || ref.length > 100) return null;
+  return /^[A-Za-z0-9._:-]+$/.test(ref) ? ref : null;
+}
+
 /**
- * Who is calling. Today the app sends a stable per-install id; once real
- * sign-in ships this becomes the auth user id and nothing else changes.
+ * Who is calling. A guest sends their per-install id and a signed-in user
+ * sends their account id; an install that has since been claimed by an account
+ * resolves to that account, so usage and plan stay with the person.
  */
-function callerRef(c: { req: { header: (n: string) => string | undefined } }): string | null {
-  const raw = (c.req.header('x-calgym-user') ?? '').trim();
-  if (!raw || raw.length > 100) return null;
-  return /^[A-Za-z0-9._:-]+$/.test(raw) ? raw : null;
+async function callerRef(c: {
+  req: { header: (n: string) => string | undefined };
+}): Promise<string | null> {
+  const ref = validRef(c.req.header('x-calgym-user') ?? '');
+  return ref ? await resolveRef(ref) : null;
 }
 
 app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled }));
@@ -157,7 +168,7 @@ function parseJson(text: string): unknown {
 app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
-  const ref = callerRef(c);
+  const ref = await callerRef(c);
   const access = await checkAccess(ref, 'meal');
   if (!access.withinQuota) return c.json(quotaError(access), 402);
   try {
@@ -174,7 +185,7 @@ app.post('/api/analyze-meal', async (c) => {
 app.post('/api/analyze-equipment', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
-  const ref = callerRef(c);
+  const ref = await callerRef(c);
   const access = await checkAccess(ref, 'equipment');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   if (!access.withinQuota) return c.json(quotaError(access), 402);
@@ -222,7 +233,7 @@ app.post('/api/analyze-text', async (c) => {
   const text = (body.text ?? '').trim().slice(0, 500);
   if (text.length < 3) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
-  const ref = callerRef(c);
+  const ref = await callerRef(c);
   const access = await checkAccess(ref, 'describe');
   if (!access.withinQuota) return c.json(quotaError(access), 402);
   try {
@@ -245,7 +256,7 @@ app.post('/api/analyze-exercise', async (c) => {
   const name = (body.name ?? '').trim().slice(0, 120);
   if (name.length < 2) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
-  const ref = callerRef(c);
+  const ref = await callerRef(c);
   const access = await checkAccess(ref, 'equipment');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   if (!access.withinQuota) return c.json(quotaError(access), 402);
@@ -291,7 +302,7 @@ app.post('/api/coach', async (c) => {
   if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
     return c.json({ error: 'invalid_request' }, 400);
   }
-  const ref = callerRef(c);
+  const ref = await callerRef(c);
   const access = await checkAccess(ref, 'coach');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   if (!access.withinQuota) return c.json(quotaError(access), 402);
@@ -316,7 +327,7 @@ app.post('/api/coach', async (c) => {
  * sponsor slot to display. Safe to call often; cheap.
  */
 app.get('/api/me', async (c) => {
-  const ref = callerRef(c);
+  const ref = await callerRef(c);
   const access = await checkAccess(ref, 'meal');
   const sponsor = await getSetting<Record<string, unknown> | null>('sponsor', null);
   const coachUsed =
@@ -341,9 +352,31 @@ app.get('/api/me', async (c) => {
   });
 });
 
+/**
+ * Claim a guest install for a signed-in account. The app calls this once, right
+ * after sign-in, so the month's usage and any granted plan follow the person
+ * instead of starting over. Install ids are unguessable and each one can only
+ * ever be claimed once, so this is not a route to another user's plan.
+ */
+app.post('/api/link', async (c) => {
+  const to = await callerRef(c);
+  const body = await c.req.json<{ from?: string }>().catch(() => ({}) as { from?: string });
+  const from = validRef(body.from ?? '');
+  if (!to || !from) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    // 'taken' is settled, not an error: that id already belongs to an account
+    // and retrying will never change it, so the app should stop asking.
+    const result = await linkRefs(from, to);
+    return c.json({ ok: true, result });
+  } catch (err) {
+    console.error('link failed:', err);
+    return c.json({ error: 'link_failed' }, 500);
+  }
+});
+
 /** Account deletion — required by both app stores. Irreversible. */
 app.delete('/api/me', async (c) => {
-  const ref = callerRef(c);
+  const ref = await callerRef(c);
   if (!ref) return c.json({ error: 'invalid_request' }, 400);
   try {
     await deleteUser(ref);

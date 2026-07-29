@@ -1,4 +1,4 @@
-import { setInstallId } from './api';
+import { linkInstall, setInstallId } from './api';
 import type { Account } from './store';
 import { useAppStore } from './store';
 import { supabase } from './supabase';
@@ -43,7 +43,18 @@ export async function syncAuthIdentity(): Promise<void> {
   const { data } = await supabase.auth.getSession();
   const uid = data.session?.user.id;
   const store = useAppStore.getState();
-  setInstallId(uid ?? store.ensureInstallId());
+  const deviceId = store.ensureInstallId();
+  if (!uid) {
+    setInstallId(deviceId);
+    return;
+  }
+  setInstallId(uid);
+  // The first time this account is seen here, give it what the install already
+  // used and owns — otherwise signing in would silently refill the month's
+  // allowance. Retried on the next launch if the call does not get through.
+  if (store.linkedRef !== uid && (await linkInstall(deviceId))) {
+    useAppStore.getState().setLinkedRef(uid);
+  }
 }
 
 export async function signOutAuth(): Promise<void> {

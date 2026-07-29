@@ -63,6 +63,14 @@ export async function initDb(): Promise<void> {
       value JSONB NOT NULL
     );
   `);
+  // Old id → account id, written when a guest signs in. See resolveRef below.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ref_links (
+      from_ref   TEXT PRIMARY KEY,
+      to_ref     TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
 }
 
 // ── Accounts & entitlement ────────────────────────────────────────────────
@@ -182,13 +190,114 @@ export async function recordUsage(ref: string, kind: string): Promise<number> {
 }
 
 /**
- * Erase everything we hold for a caller: their account row and every usage
- * counter. Required by the app stores' account-deletion rules.
+ * Erase everything we hold for a caller: their account row, every usage
+ * counter, and any id aliases pointing at them. Required by the app stores'
+ * account-deletion rules.
  */
 export async function deleteUser(ref: string): Promise<void> {
   if (!pool) return;
   await pool.query('DELETE FROM usage_counters WHERE ref = $1', [ref]);
   await pool.query('DELETE FROM app_users WHERE ref = $1', [ref]);
+  await pool.query('DELETE FROM ref_links WHERE from_ref = $1 OR to_ref = $1', [ref]);
+  aliasCache.clear();
+}
+
+// ── Identity links ────────────────────────────────────────────────────────
+
+/**
+ * When a guest signs in, the id the app sends changes from the anonymous
+ * install id to the account id. Left alone that would reset the month's usage
+ * to zero — free credits on demand — and strand any plan on the old id.
+ * `ref_links` maps the old id onto the account permanently, so the install
+ * keeps resolving to the same person even after a later sign-out.
+ */
+const aliasCache = new Map<string, string>();
+
+/** Follow an id to the account that claimed it (or return it unchanged). */
+export async function resolveRef(ref: string): Promise<string> {
+  if (!pool) return ref;
+  const hit = aliasCache.get(ref);
+  if (hit) return hit;
+  try {
+    const res = await pool.query('SELECT to_ref FROM ref_links WHERE from_ref = $1', [ref]);
+    const to = res.rows[0]?.to_ref as string | undefined;
+    if (!to) return ref;
+    // Purely an optimisation, so dropping the whole thing when it grows is fine.
+    if (aliasCache.size > 5000) aliasCache.clear();
+    aliasCache.set(ref, to);
+    return to;
+  } catch (err) {
+    console.error('resolveRef failed:', err);
+    return ref;
+  }
+}
+
+/** 'taken' means the id was already claimed by a different account. */
+export type LinkResult = 'linked' | 'noop' | 'taken';
+
+/**
+ * Hand everything the anonymous id accumulated to the signed-in account.
+ * Claiming is one-shot: once an id points at an account it can never be
+ * re-pointed, so a leaked id cannot be replayed onto a second account.
+ */
+export async function linkRefs(fromRef: string, toRef: string): Promise<LinkResult> {
+  if (!pool || fromRef === toRef) return 'noop';
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const prior = await client.query('SELECT to_ref FROM ref_links WHERE from_ref = $1', [fromRef]);
+    const priorTo = prior.rows[0]?.to_ref as string | undefined;
+    if (priorTo) {
+      await client.query('ROLLBACK');
+      return priorTo === toRef ? 'noop' : 'taken';
+    }
+
+    await client.query('INSERT INTO app_users (ref) VALUES ($1) ON CONFLICT (ref) DO NOTHING', [
+      toRef,
+    ]);
+
+    // Usage moves with the person, so signing in never refills the allowance.
+    await client.query(
+      `INSERT INTO usage_counters (ref, period, kind, count)
+       SELECT $2, period, kind, count FROM usage_counters WHERE ref = $1
+       ON CONFLICT (ref, period, kind)
+         DO UPDATE SET count = usage_counters.count + EXCLUDED.count`,
+      [fromRef, toRef],
+    );
+    await client.query('DELETE FROM usage_counters WHERE ref = $1', [fromRef]);
+
+    // A plan granted before signing in belongs to the person too — but never
+    // let the old id downgrade a plan the account already has.
+    await client.query(
+      `UPDATE app_users t
+          SET plan = f.plan,
+              plan_source = f.plan_source,
+              plan_until = f.plan_until,
+              note = COALESCE(t.note, f.note)
+         FROM app_users f
+        WHERE t.ref = $2 AND f.ref = $1
+          AND f.plan <> 'free'
+          AND (f.plan_until IS NULL OR f.plan_until > now())
+          AND (t.plan = 'free' OR (t.plan_until IS NOT NULL AND t.plan_until <= now()))`,
+      [fromRef, toRef],
+    );
+
+    await client.query('DELETE FROM app_users WHERE ref = $1', [fromRef]);
+    await client.query('INSERT INTO ref_links (from_ref, to_ref) VALUES ($1, $2)', [
+      fromRef,
+      toRef,
+    ]);
+    // Flatten any chain (a → b, then b → c) so resolution stays one hop.
+    await client.query('UPDATE ref_links SET to_ref = $2 WHERE to_ref = $1', [fromRef, toRef]);
+    await client.query('COMMIT');
+    aliasCache.clear();
+    return 'linked';
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────

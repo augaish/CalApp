@@ -52,6 +52,11 @@ interface AppState {
    * server. Generated on first launch; superseded by the auth user id later.
    */
   installId: string | null;
+  /**
+   * Account id this install has already been handed over to. Set once the
+   * server accepts the claim, so it is not re-attempted on every launch.
+   */
+  linkedRef: string | null;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -146,6 +151,8 @@ interface AppState {
   setHydrated: () => void;
   /** Create the install id on first launch; returns the existing one after. */
   ensureInstallId: () => string;
+  /** Remember that this install has been claimed by the given account id. */
+  setLinkedRef: (ref: string) => void;
   /** Wipes all local data and returns to the login/onboarding flow. */
   resetAll: () => void;
 }
@@ -175,6 +182,7 @@ export const useAppStore = create<AppState>()(
       schedule: {},
       skips: {},
       installId: null,
+      linkedRef: null,
       workouts: [],
       water: [],
       weights: [],
@@ -491,9 +499,13 @@ export const useAppStore = create<AppState>()(
         set({ installId: fresh });
         return fresh;
       },
+      setLinkedRef: (ref) => set({ linkedRef: ref }),
       resetAll: () =>
         set({
           account: null,
+          // The server drops its side of the link on delete, so let a future
+          // sign-in claim this install again.
+          linkedRef: null,
           language: null,
           profile: null,
           targets: null,
@@ -528,6 +540,7 @@ export const useAppStore = create<AppState>()(
         schedule,
         skips,
         installId,
+        linkedRef,
         workouts,
         water,
         weights,
@@ -548,6 +561,7 @@ export const useAppStore = create<AppState>()(
         schedule,
         skips,
         installId,
+        linkedRef,
         workouts,
         water,
         weights,
