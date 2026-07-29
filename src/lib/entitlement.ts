@@ -10,7 +10,7 @@ interface EntitlementState extends Partial<Entitlement> {
   loaded: boolean;
   refresh: () => Promise<void>;
   /** Locally decrement after a successful AI action for instant feedback. */
-  spend: () => void;
+  spend: (kind?: 'coach') => void;
 }
 
 export const useEntitlement = create<EntitlementState>((set, get) => ({
@@ -20,11 +20,18 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
     if (data) set({ ...data, loaded: true });
     else set({ loaded: true });
   },
-  spend: () => {
-    const { used, limit } = get();
+  spend: (kind) => {
+    const { used, limit, features } = get();
     if (typeof used !== 'number' || typeof limit !== 'number') return;
     const next = used + 1;
-    set({ used: next, remaining: Math.max(0, limit - next) });
+    set({
+      used: next,
+      remaining: Math.max(0, limit - next),
+      // Keep the coach sub-counter in step so the "messages left" line is live.
+      ...(kind === 'coach' && features
+        ? { features: { ...features, coachUsed: (features.coachUsed ?? 0) + 1 } }
+        : {}),
+    });
   },
 }));
 

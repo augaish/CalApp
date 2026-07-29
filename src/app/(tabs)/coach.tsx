@@ -30,8 +30,11 @@ export default function Coach() {
   const insets = useSafeAreaInsets();
   const language = useAppStore((s) => s.language) ?? 'en';
 
-  // Coach is a paid feature: free users see a lock card instead of the input.
+  // Free plans can use the coach, but only a few messages a month.
   const coachUnlocked = useEntitlement((s) => s.features?.coach !== false);
+  const coachCap = useEntitlement((s) => s.features?.coachCap);
+  const coachUsed = useEntitlement((s) => s.features?.coachUsed ?? 0);
+  const coachLeft = typeof coachCap === 'number' ? Math.max(0, coachCap - coachUsed) : null;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -51,7 +54,7 @@ export default function Coach() {
     setBusy(true);
     try {
       const reply = await coachChat(next, language, buildCoachContext(language));
-      useEntitlement.getState().spend();
+      useEntitlement.getState().spend('coach');
       setMessages([
         ...next,
         { role: 'assistant', content: isMockMode ? t('coach.mockReply') : reply },
@@ -88,6 +91,14 @@ export default function Coach() {
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
           <Bubble role="assistant" text={t('coach.intro')} />
+          {coachUnlocked && coachLeft !== null && (
+            <Pressable onPress={() => router.push('/upgrade')} style={styles.creditsRow}>
+              <Ionicons name="sparkles-outline" size={13} color={theme.textTertiary} />
+              <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                {t('coach.messagesLeft', { count: coachLeft })}
+              </Text>
+            </Pressable>
+          )}
           {!coachUnlocked && (
             <Pressable
               onPress={() => router.push('/upgrade?reason=coach')}
@@ -170,6 +181,7 @@ function Bubble({ role, text }: { role: 'user' | 'assistant'; text: string }) {
 }
 
 const styles = StyleSheet.create({
+  creditsRow: { flexDirection: 'row', alignItems: 'center', gap: 5, justifyContent: 'center' },
   lockCard: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,4 +1,11 @@
-import { currentPeriod, getOrCreateUser, getSetting, getUsage, recordUsage } from './db.js';
+import {
+  currentPeriod,
+  getOrCreateUser,
+  getSetting,
+  getUsage,
+  getUsageKind,
+  recordUsage,
+} from './db.js';
 
 export type Plan = 'free' | 'pro' | 'proPlus';
 
@@ -6,22 +13,28 @@ export type Plan = 'free' | 'pro' | 'proPlus';
 export interface PlanSpec {
   /** Monthly AI actions (meal scan, describe, equipment, coach message). */
   limit: number;
-  /** AI coach chat. The most token-hungry feature, so it is Pro and above. */
+  /** AI coach chat. */
   coach: boolean;
   /** Gym-equipment photo analysis. */
   equipment: boolean;
   /** Use the stronger (more accurate, pricier) model for meal analysis. */
   highAccuracy: boolean;
+  /**
+   * Optional cap on coach messages inside the shared allowance. Without it a
+   * free user could spend the whole month's credits on chat and never try the
+   * meal scan — the feature that actually sells the app.
+   */
+  coachCap?: number;
 }
 
 /**
- * Free deliberately keeps a small AI allowance rather than zero: users need to
- * feel the scan work before they will pay for it. Everything that costs real
- * money at volume — the coach, high-accuracy analysis, big allowances — sits
- * behind Pro. Limits are editable from the admin page without a redeploy.
+ * Free can try EVERY feature, just a little of it: experiencing the coach and
+ * the equipment scan is what converts, and the monthly action cap already
+ * bounds the cost. Paid tiers buy volume (and higher accuracy), not access.
+ * Limits are editable from the admin page without a redeploy.
  */
 export const PLANS: Record<Plan, PlanSpec> = {
-  free: { limit: 10, coach: false, equipment: false, highAccuracy: false },
+  free: { limit: 15, coach: true, equipment: true, highAccuracy: false, coachCap: 5 },
   pro: { limit: 150, coach: true, equipment: true, highAccuracy: false },
   proPlus: { limit: 500, coach: true, equipment: true, highAccuracy: true },
 };
@@ -59,8 +72,13 @@ export async function checkAccess(ref: string | null, feature: Feature): Promise
   const spec = PLANS[plan] ?? PLANS.free;
   const limit = limits[plan] ?? spec.limit;
   const used = ref ? await getUsage(ref, period) : 0;
-  const featureAllowed =
+  let featureAllowed =
     feature === 'coach' ? spec.coach : feature === 'equipment' ? spec.equipment : true;
+  // A plan may allow the coach but ration it inside the shared allowance.
+  if (featureAllowed && feature === 'coach' && ref && typeof spec.coachCap === 'number') {
+    const coachUsed = await getUsageKind(ref, 'coach', period);
+    if (coachUsed >= spec.coachCap) featureAllowed = false;
+  }
   return {
     plan,
     spec,

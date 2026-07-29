@@ -12,6 +12,7 @@ import {
   getCachedEquipment,
   getOrCreateUser,
   getSetting,
+  getUsageKind,
   initDb,
   listUsers,
   setCachedEquipment,
@@ -316,6 +317,10 @@ app.get('/api/me', async (c) => {
   const ref = callerRef(c);
   const access = await checkAccess(ref, 'meal');
   const sponsor = await getSetting<Record<string, unknown> | null>('sponsor', null);
+  const coachUsed =
+    ref && typeof access.spec.coachCap === 'number'
+      ? await getUsageKind(ref, 'coach', access.period)
+      : 0;
   return c.json({
     plan: access.plan,
     used: access.used,
@@ -327,6 +332,8 @@ app.get('/api/me', async (c) => {
       coach: access.spec.coach,
       equipment: access.spec.equipment,
       highAccuracy: access.spec.highAccuracy,
+      coachCap: access.spec.coachCap ?? null,
+      coachUsed,
     },
     sponsor,
   });

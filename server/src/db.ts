@@ -146,6 +146,25 @@ export async function getUsage(ref: string, period = currentPeriod()): Promise<n
   }
 }
 
+/** Usage of a single action kind this period (e.g. how many coach messages). */
+export async function getUsageKind(
+  ref: string,
+  kind: string,
+  period = currentPeriod(),
+): Promise<number> {
+  if (!pool) return 0;
+  try {
+    const res = await pool.query(
+      'SELECT COALESCE(count, 0)::int AS n FROM usage_counters WHERE ref = $1 AND period = $2 AND kind = $3',
+      [ref, period, kind],
+    );
+    return res.rows[0]?.n ?? 0;
+  } catch (err) {
+    console.error('getUsageKind failed:', err);
+    return 0;
+  }
+}
+
 /** Record one AI action. Returns the new period total. */
 export async function recordUsage(ref: string, kind: string): Promise<number> {
   if (!pool) return 0;

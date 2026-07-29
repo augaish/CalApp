@@ -75,7 +75,14 @@ export interface Entitlement {
   limit: number;
   remaining: number;
   period: string;
-  features?: { coach?: boolean; equipment?: boolean; highAccuracy?: boolean };
+  features?: {
+    coach?: boolean;
+    equipment?: boolean;
+    highAccuracy?: boolean;
+    /** Cap on coach messages inside the allowance (null = no sub-cap). */
+    coachCap?: number | null;
+    coachUsed?: number;
+  };
   sponsor?: {
     enabled?: boolean;
     title?: string;
