@@ -74,8 +74,9 @@ export const ADMIN_HTML = `<!doctype html>
     <div class="card">
       <b>Monthly AI allowance</b>
       <div class="row">
-        <div><label>Free plan</label><input id="lim_free" type="number" min="0" /></div>
-        <div><label>Pro plan</label><input id="lim_pro" type="number" min="0" /></div>
+        <div><label>Free</label><input id="lim_free" type="number" min="0" /></div>
+        <div><label>Pro</label><input id="lim_pro" type="number" min="0" /></div>
+        <div><label>Pro+</label><input id="lim_proplus" type="number" min="0" /></div>
         <button onclick="saveLimits()">Save</button>
       </div>
       <div class="sub" style="margin:10px 0 0">Every AI action counts: meal photo, describe, equipment and each coach message.</div>
@@ -90,6 +91,7 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
       <div class="row" style="margin-top:10px">
         <button onclick="setPlan('pro')">Grant Pro</button>
+        <button onclick="setPlan('proPlus')">Grant Pro+</button>
         <button class="ghost" onclick="setPlan('free')">Revoke</button>
       </div>
     </div>
@@ -156,6 +158,7 @@ export const ADMIN_HTML = `<!doctype html>
       Math.round(s.actionsThisMonth * COST_PER_ACTION_SAR);
     document.getElementById('lim_free').value = data.limits.free;
     document.getElementById('lim_pro').value = data.limits.pro;
+    document.getElementById('lim_proplus').value = data.limits.proPlus;
     var sp = data.sponsor || {};
     document.getElementById('sp_title').value = sp.title || '';
     document.getElementById('sp_sub').value = sp.subtitle || '';
@@ -165,7 +168,7 @@ export const ADMIN_HTML = `<!doctype html>
 
     var html = '';
     data.users.forEach(function (u) {
-      var isPro = u.plan === 'pro';
+      var isPro = u.plan === 'pro' || u.plan === 'proPlus';
       html += '<tr>' +
         '<td style="font-family:monospace">' + esc(u.ref) + '</td>' +
         '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + u.plan + '</span></td>' +
@@ -194,6 +197,7 @@ export const ADMIN_HTML = `<!doctype html>
     api('/admin/api/limits', {
       free: parseInt(document.getElementById('lim_free').value, 10),
       pro: parseInt(document.getElementById('lim_pro').value, 10),
+      proPlus: parseInt(document.getElementById('lim_proplus').value, 10),
     }).then(load);
   }
   function saveSponsor() {

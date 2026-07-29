@@ -40,18 +40,27 @@ export class QuotaError extends Error {
   }
 }
 
+/** Raised when the caller's plan does not include the feature at all. */
+export class FeatureLockedError extends Error {
+  constructor(public plan: string) {
+    super('feature_locked');
+    this.name = 'FeatureLockedError';
+  }
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
-  if (res.status === 402) {
+  if (res.status === 402 || res.status === 403) {
     const q = (await res.json().catch(() => ({}))) as {
       plan?: string;
       used?: number;
       limit?: number;
     };
+    if (res.status === 403) throw new FeatureLockedError(q.plan ?? 'free');
     throw new QuotaError(q.plan ?? 'free', q.used ?? 0, q.limit ?? 0);
   }
   if (!res.ok) {
@@ -61,11 +70,12 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export interface Entitlement {
-  plan: 'free' | 'pro';
+  plan: 'free' | 'pro' | 'proPlus';
   used: number;
   limit: number;
   remaining: number;
   period: string;
+  features?: { coach?: boolean; equipment?: boolean; highAccuracy?: boolean };
   sponsor?: {
     enabled?: boolean;
     title?: string;

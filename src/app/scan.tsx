@@ -20,7 +20,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeEquipment, analyzeMeal, isMockMode, lookupBarcode, QuotaError } from '@/lib/api';
+import {
+  analyzeEquipment,
+  analyzeMeal,
+  FeatureLockedError,
+  isMockMode,
+  lookupBarcode,
+  QuotaError,
+} from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
@@ -124,10 +131,10 @@ export default function Scan() {
     }
   };
 
-  /** Out of monthly AI actions — send the user to the upgrade screen. */
-  const onQuota = () => {
+  /** Out of allowance, or the plan doesn't include this — go to upgrade. */
+  const onLocked = (reason: 'quota' | 'equipment') => {
     useEntitlement.getState().refresh();
-    router.replace('/upgrade?reason=quota');
+    router.replace(`/upgrade?reason=${reason}`);
   };
 
   const capture = async () => {
@@ -137,7 +144,8 @@ export default function Scan() {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       await processImage(photo.uri);
     } catch (err) {
-      if (err instanceof QuotaError) return onQuota();
+      if (err instanceof QuotaError) return onLocked('quota');
+      if (err instanceof FeatureLockedError) return onLocked('equipment');
       Alert.alert(t('common.error'));
       setAnalyzing(false);
     }
@@ -158,7 +166,8 @@ export default function Scan() {
       setAnalyzing(true);
       await processImage(asset.uri);
     } catch (err) {
-      if (err instanceof QuotaError) return onQuota();
+      if (err instanceof QuotaError) return onLocked('quota');
+      if (err instanceof FeatureLockedError) return onLocked('equipment');
       Alert.alert(t('common.error'));
       setAnalyzing(false);
     }

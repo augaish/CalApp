@@ -9,6 +9,18 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useEntitlement } from '@/lib/entitlement';
 
+const TIERS: {
+  id: 'free' | 'pro' | 'proPlus';
+  nameKey: string;
+  descKey: string;
+  price: number;
+  highlight?: boolean;
+}[] = [
+  { id: 'free', nameKey: 'upgrade.tierFree', descKey: 'upgrade.tierFreeDesc', price: 0 },
+  { id: 'pro', nameKey: 'upgrade.tierPro', descKey: 'upgrade.tierProDesc', price: 13, highlight: true },
+  { id: 'proPlus', nameKey: 'upgrade.tierProPlus', descKey: 'upgrade.tierProPlusDesc', price: 25 },
+];
+
 const FEATURES: { icon: keyof typeof Ionicons.glyphMap; key: string }[] = [
   { icon: 'camera', key: 'scan' },
   { icon: 'sparkles', key: 'describe' },
@@ -26,7 +38,7 @@ export default function Upgrade() {
   const plan = useEntitlement((s) => s.plan);
   const used = useEntitlement((s) => s.used);
   const limit = useEntitlement((s) => s.limit);
-  const pro = plan === 'pro';
+  const pro = plan === 'pro' || plan === 'proPlus';
 
   return (
     <Screen
@@ -63,13 +75,17 @@ export default function Upgrade() {
         <Text style={styles.heroSub}>{t('upgrade.subtitle')}</Text>
       </LinearGradient>
 
-      {reason === 'quota' && (
+      {reason ? (
         <Card style={{ borderColor: theme.warning, borderWidth: 1 }}>
           <Text style={{ color: theme.warning, fontWeight: '600' }}>
-            {t('upgrade.quotaHit', { used: used ?? 0, limit: limit ?? 0 })}
+            {reason === 'coach'
+              ? t('upgrade.coachLocked')
+              : reason === 'equipment'
+                ? t('upgrade.equipmentLocked')
+                : t('upgrade.quotaHit', { used: used ?? 0, limit: limit ?? 0 })}
           </Text>
         </Card>
-      )}
+      ) : null}
 
       {pro && (
         <Card style={{ borderColor: theme.primary, borderWidth: 1 }}>
@@ -106,31 +122,48 @@ export default function Upgrade() {
         ))}
       </Card>
 
-      <Card>
-        <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
-          {t('upgrade.pricing')}
-        </Text>
-        <View style={styles.priceRow}>
-          <View style={[styles.priceBox, { borderColor: theme.border }]}>
-            <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800' }}>13</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-              {t('upgrade.perMonth')}
-            </Text>
-          </View>
-          <View style={[styles.priceBox, { borderColor: theme.primary, borderWidth: 2 }]}>
-            <View style={[styles.saveBadge, { backgroundColor: theme.primary }]}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>
-                {t('upgrade.save')}
+      <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
+        {t('upgrade.pricing')}
+      </Text>
+      {TIERS.map((tier) => {
+        const current = plan === tier.id;
+        return (
+          <Card
+            key={tier.id}
+            style={tier.highlight ? { borderColor: theme.primary, borderWidth: 2 } : undefined}
+          >
+            <View style={styles.tierHead}>
+              <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800', flex: 1 }}>
+                {t(tier.nameKey)}
+              </Text>
+              {current && (
+                <View style={[styles.currentBadge, { backgroundColor: theme.cardSubtle }]}>
+                  <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800' }}>
+                    {t('upgrade.current')}
+                  </Text>
+                </View>
+              )}
+              <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }}>
+                {tier.price}
+              </Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                {tier.price === 0 ? '' : t('upgrade.perMonthShort')}
               </Text>
             </View>
-            <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800' }}>129</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('upgrade.perYear')}</Text>
-          </View>
-        </View>
-        <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: Spacing.sm }}>
-          {t('upgrade.freeNote')}
-        </Text>
-      </Card>
+            <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
+              {t(tier.descKey)}
+            </Text>
+            {tier.id === 'pro' && (
+              <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700', marginTop: 6 }}>
+                {t('upgrade.yearly')}
+              </Text>
+            )}
+          </Card>
+        );
+      })}
+      <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: Spacing.xs }}>
+        {t('upgrade.freeNote')}
+      </Text>
     </Screen>
   );
 }
@@ -160,20 +193,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  priceRow: { flexDirection: 'row', gap: Spacing.sm },
-  priceBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingVertical: Spacing.md,
-    alignItems: 'center',
-    gap: 2,
-  },
-  saveBadge: {
-    position: 'absolute',
-    top: -9,
-    borderRadius: 99,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
+  tierHead: { flexDirection: 'row', alignItems: 'baseline', gap: 6 },
+  currentBadge: { borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3 },
 });

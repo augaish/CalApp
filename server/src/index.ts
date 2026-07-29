@@ -4,7 +4,7 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
-import { checkQuota, consume, planLimits, quotaError } from './billing.js';
+import { checkAccess, consume, featureLocked, PLANS, planLimits, quotaError } from './billing.js';
 import {
   adminStats,
   canonicalKey,
@@ -32,6 +32,8 @@ const MODEL = process.env.ANTHROPIC_MODEL ?? 'claude-haiku-4-5-20251001';
 // Meal calorie analysis can use a stronger model for accuracy without paying
 // for it on the cheaper endpoints (coach, equipment). Falls back to MODEL.
 const MEAL_MODEL = process.env.MEAL_MODEL ?? MODEL;
+/** Highest-accuracy model, used for meal analysis on the top tier. */
+const PREMIUM_MODEL = process.env.PREMIUM_MODEL ?? MEAL_MODEL;
 const PORT = Number(process.env.PORT ?? 3000);
 
 const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
@@ -153,10 +155,11 @@ app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
   const ref = callerRef(c);
-  const quota = await checkQuota(ref);
-  if (!quota.allowed) return c.json(quotaError(quota), 402);
+  const access = await checkAccess(ref, 'meal');
+  if (!access.withinQuota) return c.json(quotaError(access), 402);
   try {
-    const result = await analyze(parsed.image, mealPrompt(parsed.language), MEAL_MODEL);
+    const model = access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL;
+    const result = await analyze(parsed.image, mealPrompt(parsed.language), model);
     await consume(ref, 'meal');
     return c.json(result);
   } catch (err) {
@@ -169,8 +172,9 @@ app.post('/api/analyze-equipment', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
   const ref = callerRef(c);
-  const quota = await checkQuota(ref);
-  if (!quota.allowed) return c.json(quotaError(quota), 402);
+  const access = await checkAccess(ref, 'equipment');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
+  if (!access.withinQuota) return c.json(quotaError(access), 402);
   try {
     // Step 1: cheap vision call to identify the machine.
     const id = (await analyze(parsed.image, identifyEquipmentPrompt(parsed.language))) as {
@@ -216,11 +220,11 @@ app.post('/api/analyze-text', async (c) => {
   if (text.length < 3) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
   const ref = callerRef(c);
-  const quota = await checkQuota(ref);
-  if (!quota.allowed) return c.json(quotaError(quota), 402);
+  const access = await checkAccess(ref, 'describe');
+  if (!access.withinQuota) return c.json(quotaError(access), 402);
   try {
     const response = await anthropic.messages.create({
-      model: MEAL_MODEL,
+      model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
       max_tokens: 1000,
       messages: [{ role: 'user', content: textMealPrompt(language, text) }],
     });
@@ -239,8 +243,9 @@ app.post('/api/analyze-exercise', async (c) => {
   if (name.length < 2) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
   const ref = callerRef(c);
-  const quota = await checkQuota(ref);
-  if (!quota.allowed) return c.json(quotaError(quota), 402);
+  const access = await checkAccess(ref, 'equipment');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
+  if (!access.withinQuota) return c.json(quotaError(access), 402);
   try {
     const result = await textCall(exerciseInfoPrompt(language, name), 600);
     await consume(ref, 'exercise');
@@ -284,8 +289,9 @@ app.post('/api/coach', async (c) => {
     return c.json({ error: 'invalid_request' }, 400);
   }
   const ref = callerRef(c);
-  const quota = await checkQuota(ref);
-  if (!quota.allowed) return c.json(quotaError(quota), 402);
+  const access = await checkAccess(ref, 'coach');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
+  if (!access.withinQuota) return c.json(quotaError(access), 402);
   try {
     const response = await anthropic.messages.create({
       model: MODEL,
@@ -308,14 +314,20 @@ app.post('/api/coach', async (c) => {
  */
 app.get('/api/me', async (c) => {
   const ref = callerRef(c);
-  const quota = await checkQuota(ref);
+  const access = await checkAccess(ref, 'meal');
   const sponsor = await getSetting<Record<string, unknown> | null>('sponsor', null);
   return c.json({
-    plan: quota.plan,
-    used: quota.used,
-    limit: quota.limit,
-    remaining: Math.max(0, quota.limit - quota.used),
-    period: quota.period,
+    plan: access.plan,
+    used: access.used,
+    limit: access.limit,
+    remaining: Math.max(0, access.limit - access.used),
+    period: access.period,
+    // What this plan unlocks, so the app can gate its UI consistently.
+    features: {
+      coach: access.spec.coach,
+      equipment: access.spec.equipment,
+      highAccuracy: access.spec.highAccuracy,
+    },
     sponsor,
   });
 });
@@ -338,7 +350,7 @@ app.get('/admin/api/data', async (c) => {
     planLimits(),
     getSetting<Record<string, unknown> | null>('sponsor', null),
   ]);
-  return c.json({ stats, users, limits, sponsor, cache: cacheEnabled });
+  return c.json({ stats, users, limits, sponsor, plans: PLANS, cache: cacheEnabled });
 });
 
 app.post('/admin/api/plan', async (c) => {
@@ -346,9 +358,9 @@ app.post('/admin/api/plan', async (c) => {
   const body = await c.req.json<{ ref?: string; plan?: string; days?: number; note?: string }>().catch(() => ({}) as never);
   const ref = (body.ref ?? '').trim();
   if (!ref) return c.json({ error: 'invalid_request' }, 400);
-  const plan = body.plan === 'pro' ? 'pro' : 'free';
+  const plan = body.plan === 'pro' || body.plan === 'proPlus' ? body.plan : 'free';
   const until =
-    plan === 'pro' && body.days && body.days > 0
+    plan !== 'free' && body.days && body.days > 0
       ? new Date(Date.now() + body.days * 86400000).toISOString()
       : null;
   await setUserPlan(ref, plan, 'admin', until, body.note);
@@ -357,11 +369,16 @@ app.post('/admin/api/plan', async (c) => {
 
 app.post('/admin/api/limits', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json<{ free?: number; pro?: number }>().catch(() => ({}) as never);
+  const body = await c.req
+    .json<{ free?: number; pro?: number; proPlus?: number }>()
+    .catch(() => ({}) as never);
   const cur = await planLimits();
+  const pick = (v: unknown, fallback: number) =>
+    Number.isFinite(v) ? Math.max(0, Number(v)) : fallback;
   await setSetting('plan_limits', {
-    free: Number.isFinite(body.free) ? Math.max(0, Number(body.free)) : cur.free,
-    pro: Number.isFinite(body.pro) ? Math.max(0, Number(body.pro)) : cur.pro,
+    free: pick(body.free, cur.free),
+    pro: pick(body.pro, cur.pro),
+    proPlus: pick(body.proPlus, cur.proPlus),
   });
   return c.json({ ok: true, limits: await planLimits() });
 });

@@ -67,7 +67,7 @@ export async function initDb(): Promise<void> {
 
 // ── Accounts & entitlement ────────────────────────────────────────────────
 
-export type Plan = 'free' | 'pro';
+export type Plan = 'free' | 'pro' | 'proPlus';
 
 export interface AppUser {
   ref: string;

@@ -1,77 +1,89 @@
-import {
-  currentPeriod,
-  getOrCreateUser,
-  getSetting,
-  getUsage,
-  recordUsage,
-  type Plan,
-} from './db.js';
+import { currentPeriod, getOrCreateUser, getSetting, getUsage, recordUsage } from './db.js';
 
-/**
- * Monthly AI-action allowances per plan. Every AI call (meal photo, describe,
- * equipment, coach message) counts as one action, so a chatty user can't run up
- * an unbounded bill. Editable from the admin page without a redeploy.
- */
-export interface PlanLimits {
-  free: number;
-  pro: number;
+export type Plan = 'free' | 'pro' | 'proPlus';
+
+/** Capabilities and monthly AI allowance for each tier. */
+export interface PlanSpec {
+  /** Monthly AI actions (meal scan, describe, equipment, coach message). */
+  limit: number;
+  /** AI coach chat. The most token-hungry feature, so it is Pro and above. */
+  coach: boolean;
+  /** Gym-equipment photo analysis. */
+  equipment: boolean;
+  /** Use the stronger (more accurate, pricier) model for meal analysis. */
+  highAccuracy: boolean;
 }
 
 /**
- * Pre-launch defaults are deliberately generous: until the paywall ships there
- * is no way for anyone to upgrade, so a tight free cap would just lock testers
- * out. Tighten these from the admin page (Monthly AI allowance) on the day
- * paid plans go live — no redeploy needed.
+ * Free deliberately keeps a small AI allowance rather than zero: users need to
+ * feel the scan work before they will pay for it. Everything that costs real
+ * money at volume — the coach, high-accuracy analysis, big allowances — sits
+ * behind Pro. Limits are editable from the admin page without a redeploy.
  */
-export const DEFAULT_LIMITS: PlanLimits = { free: 1000, pro: 3000 };
+export const PLANS: Record<Plan, PlanSpec> = {
+  free: { limit: 10, coach: false, equipment: false, highAccuracy: false },
+  pro: { limit: 150, coach: true, equipment: true, highAccuracy: false },
+  proPlus: { limit: 500, coach: true, equipment: true, highAccuracy: true },
+};
 
-export async function planLimits(): Promise<PlanLimits> {
-  const stored = await getSetting<Partial<PlanLimits>>('plan_limits', {});
+export type Feature = 'meal' | 'describe' | 'equipment' | 'coach';
+
+/** Admin-overridable per-plan limits. */
+export async function planLimits(): Promise<Record<Plan, number>> {
+  const stored = await getSetting<Partial<Record<Plan, number>>>('plan_limits', {});
   return {
-    free: typeof stored.free === 'number' ? stored.free : DEFAULT_LIMITS.free,
-    pro: typeof stored.pro === 'number' ? stored.pro : DEFAULT_LIMITS.pro,
+    free: typeof stored.free === 'number' ? stored.free : PLANS.free.limit,
+    pro: typeof stored.pro === 'number' ? stored.pro : PLANS.pro.limit,
+    proPlus: typeof stored.proPlus === 'number' ? stored.proPlus : PLANS.proPlus.limit,
   };
 }
 
-export interface QuotaCheck {
-  allowed: boolean;
+export interface Access {
   plan: Plan;
+  spec: PlanSpec;
   used: number;
   limit: number;
   period: string;
+  /** false when the plan does not include the requested feature at all. */
+  featureAllowed: boolean;
+  /** false when the monthly allowance is spent. */
+  withinQuota: boolean;
 }
 
-/**
- * Decide whether `ref` may perform one more AI action. When the database is not
- * configured (local dev) everything is allowed so the server still runs.
- */
-export async function checkQuota(ref: string | null): Promise<QuotaCheck> {
+/** Resolve the caller's plan, feature access and remaining allowance. */
+export async function checkAccess(ref: string | null, feature: Feature): Promise<Access> {
   const period = currentPeriod();
   const limits = await planLimits();
-  if (!ref) {
-    // No caller identity (older app build): allow, but treat as free-tier.
-    return { allowed: true, plan: 'free', used: 0, limit: limits.free, period };
-  }
-  const user = await getOrCreateUser(ref);
-  const plan: Plan = user?.plan ?? 'free';
-  const limit = plan === 'pro' ? limits.pro : limits.free;
-  const used = await getUsage(ref, period);
-  return { allowed: used < limit, plan, used, limit, period };
+  const user = ref ? await getOrCreateUser(ref) : null;
+  const plan: Plan = (user?.plan as Plan) ?? 'free';
+  const spec = PLANS[plan] ?? PLANS.free;
+  const limit = limits[plan] ?? spec.limit;
+  const used = ref ? await getUsage(ref, period) : 0;
+  const featureAllowed =
+    feature === 'coach' ? spec.coach : feature === 'equipment' ? spec.equipment : true;
+  return {
+    plan,
+    spec,
+    used,
+    limit,
+    period,
+    featureAllowed,
+    // Without an identified caller we cannot meter, so do not block.
+    withinQuota: !ref || used < limit,
+  };
 }
 
-/** Count one action against the caller's allowance. */
 export async function consume(ref: string | null, kind: string): Promise<void> {
   if (!ref) return;
   await recordUsage(ref, kind);
 }
 
-/** Payload returned to the app when the monthly allowance is exhausted. */
-export function quotaError(q: QuotaCheck) {
-  return {
-    error: 'quota_exceeded',
-    plan: q.plan,
-    used: q.used,
-    limit: q.limit,
-    period: q.period,
-  };
+/** 403 body: the plan does not include this feature. */
+export function featureLocked(a: Access) {
+  return { error: 'feature_locked', feature: true, plan: a.plan, used: a.used, limit: a.limit };
+}
+
+/** 402 body: allowance for the month is spent. */
+export function quotaError(a: Access) {
+  return { error: 'quota_exceeded', plan: a.plan, used: a.used, limit: a.limit, period: a.period };
 }

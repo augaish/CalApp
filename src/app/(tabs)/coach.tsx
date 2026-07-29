@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { coachChat, isMockMode, QuotaError } from '@/lib/api';
+import { coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
 import { buildCoachContext } from '@/lib/coach-context';
 import { useEntitlement } from '@/lib/entitlement';
 import { useAppStore } from '@/lib/store';
@@ -30,6 +30,9 @@ export default function Coach() {
   const insets = useSafeAreaInsets();
   const language = useAppStore((s) => s.language) ?? 'en';
 
+  // Coach is a paid feature: free users see a lock card instead of the input.
+  const coachUnlocked = useEntitlement((s) => s.features?.coach !== false);
+
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -38,6 +41,10 @@ export default function Coach() {
   const send = async () => {
     const content = input.trim();
     if (!content || busy) return;
+    if (!coachUnlocked) {
+      router.push('/upgrade?reason=coach');
+      return;
+    }
     const next: ChatMessage[] = [...messages, { role: 'user', content }];
     setMessages(next);
     setInput('');
@@ -50,10 +57,10 @@ export default function Coach() {
         { role: 'assistant', content: isMockMode ? t('coach.mockReply') : reply },
       ]);
     } catch (err) {
-      if (err instanceof QuotaError) {
+      if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         setMessages(next);
-        router.push('/upgrade?reason=quota');
+        router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
         return;
       }
       setMessages([...next, { role: 'assistant', content: t('common.error') }]);
@@ -81,6 +88,23 @@ export default function Coach() {
           onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         >
           <Bubble role="assistant" text={t('coach.intro')} />
+          {!coachUnlocked && (
+            <Pressable
+              onPress={() => router.push('/upgrade?reason=coach')}
+              style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}
+            >
+              <Ionicons name="lock-closed" size={22} color={theme.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
+                  {t('coach.lockedTitle')}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                  {t('coach.lockedBody')}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+            </Pressable>
+          )}
           {messages.map((m, i) => (
             <Bubble key={i} role={m.role} text={m.content} />
           ))}
@@ -146,6 +170,14 @@ function Bubble({ role, text }: { role: 'user' | 'assistant'; text: string }) {
 }
 
 const styles = StyleSheet.create({
+  lockCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1.5,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',

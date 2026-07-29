@@ -113,14 +113,18 @@ export default function Profile() {
           <View style={styles.planRow}>
             <View style={[styles.planIcon, { backgroundColor: theme.cardSubtle }]}>
               <Ionicons
-                name={plan === 'pro' ? 'sparkles' : 'sparkles-outline'}
+                name={plan && plan !== 'free' ? 'sparkles' : 'sparkles-outline'}
                 size={18}
                 color={theme.primary}
               />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>
-                {plan === 'pro' ? t('upgrade.planPro') : t('upgrade.planFree')}
+                {plan === 'proPlus'
+                  ? t('upgrade.planProPlus')
+                  : plan === 'pro'
+                    ? t('upgrade.planPro')
+                    : t('upgrade.planFree')}
               </Text>
               {typeof remaining === 'number' && typeof limit === 'number' ? (
                 <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
