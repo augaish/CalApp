@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { coachChat, isMockMode, QuotaError } from '@/lib/api';
+import { buildCoachContext } from '@/lib/coach-context';
 import { useEntitlement } from '@/lib/entitlement';
 import { useAppStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/types';
@@ -42,7 +43,7 @@ export default function Coach() {
     setInput('');
     setBusy(true);
     try {
-      const reply = await coachChat(next, language);
+      const reply = await coachChat(next, language, buildCoachContext(language));
       useEntitlement.getState().spend();
       setMessages([
         ...next,

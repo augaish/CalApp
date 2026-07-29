@@ -254,6 +254,23 @@ app.post('/api/analyze-exercise', async (c) => {
 interface CoachBody {
   messages?: { role?: string; content?: string }[];
   language?: string;
+  /** Compact snapshot of the caller's own logs (profile, targets, recent days). */
+  context?: unknown;
+}
+
+/**
+ * Serialize the app-supplied context for the system prompt. Capped so a
+ * malformed or oversized payload can never blow up the token bill.
+ */
+function contextText(raw: unknown): string | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  try {
+    const json = JSON.stringify(raw);
+    if (json.length > 6000) return undefined;
+    return json;
+  } catch {
+    return undefined;
+  }
 }
 
 app.post('/api/coach', async (c) => {
@@ -273,7 +290,7 @@ app.post('/api/coach', async (c) => {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 500,
-      system: coachSystemPrompt(language),
+      system: coachSystemPrompt(language, contextText(body.context)),
       messages,
     });
     const reply = response.content.find((b) => b.type === 'text')?.text ?? '';

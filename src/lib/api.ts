@@ -150,12 +150,17 @@ export async function analyzeText(text: string, language: Language): Promise<Mea
   return post<MealAnalysis>('/api/analyze-text', { text, language });
 }
 
-export async function coachChat(messages: ChatMessage[], language: Language): Promise<string> {
+export async function coachChat(
+  messages: ChatMessage[],
+  language: Language,
+  /** Compact snapshot of the user's own logs, so answers are personalized. */
+  context?: unknown,
+): Promise<string> {
   if (isMockMode) {
     await delay(900);
     return ''; // caller substitutes the localized mock reply
   }
-  const res = await post<{ reply: string }>('/api/coach', { messages, language });
+  const res = await post<{ reply: string }>('/api/coach', { messages, language, context });
   return res.reply;
 }
 
