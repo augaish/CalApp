@@ -44,6 +44,9 @@ interface AppState {
     number,
     { title?: string; exerciseIds: string[]; plans?: Record<string, PlannedSet[]> }
   >;
+  /** Plan exercises skipped on a specific date (dateKey → exerciseIds). The
+   * weekly schedule is untouched, so a skipped exercise returns next week. */
+  skips: Record<string, string[]>;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -101,6 +104,10 @@ interface AppState {
   setScheduleTitle: (weekday: number, title: string) => void;
   /** Set (or clear, with []) the planned target sets for a scheduled exercise. */
   setPlannedSets: (weekday: number, exerciseId: string, sets: PlannedSet[]) => void;
+  /** Hide a plan exercise for one day only (kept in the weekly schedule). */
+  skipPlanToday: (day: Date, exerciseId: string) => void;
+  /** Undo a same-day skip. */
+  restorePlanToday: (day: Date, exerciseId: string) => void;
   /** Replace the weekly plan with a shared one, recreating custom exercises. */
   importSchedule: (payload: {
     schedule: Record<
@@ -159,6 +166,7 @@ export const useAppStore = create<AppState>()(
       meals: [],
       exercises: [],
       schedule: {},
+      skips: {},
       workouts: [],
       water: [],
       weights: [],
@@ -374,6 +382,24 @@ export const useAppStore = create<AppState>()(
           else plans[exerciseId] = sets;
           return { schedule: { ...s.schedule, [weekday]: { ...cur, plans } } };
         }),
+      skipPlanToday: (day, exerciseId) =>
+        set((s) => {
+          const key = dateKey(day);
+          const cur = s.skips[key] ?? [];
+          if (cur.includes(exerciseId)) return {};
+          return { skips: { ...s.skips, [key]: [...cur, exerciseId] } };
+        }),
+      restorePlanToday: (day, exerciseId) =>
+        set((s) => {
+          const key = dateKey(day);
+          const cur = s.skips[key];
+          if (!cur) return {};
+          const next = cur.filter((x) => x !== exerciseId);
+          const skips = { ...s.skips };
+          if (next.length === 0) delete skips[key];
+          else skips[key] = next;
+          return { skips };
+        }),
       setScheduleTitle: (weekday, title) =>
         set((s) => {
           const cur = s.schedule[weekday] ?? { exerciseIds: [] };
@@ -459,6 +485,7 @@ export const useAppStore = create<AppState>()(
           meals: [],
           exercises: [],
           schedule: {},
+          skips: {},
           workouts: [],
           water: [],
           weights: [],
@@ -484,6 +511,7 @@ export const useAppStore = create<AppState>()(
         meals,
         exercises,
         schedule,
+        skips,
         workouts,
         water,
         weights,
@@ -502,6 +530,7 @@ export const useAppStore = create<AppState>()(
         meals,
         exercises,
         schedule,
+        skips,
         workouts,
         water,
         weights,
@@ -631,6 +660,11 @@ export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
     (sum, w) => (isSameDay(w.at, day) ? sum + (w.caloriesBurned ?? 0) : sum),
     0,
   );
+}
+
+/** Stable per-day key (local date) for the same-day skip list. */
+export function dateKey(day: Date): string {
+  return `${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`;
 }
 
 function startOfDay(day: Date): Date {

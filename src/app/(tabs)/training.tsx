@@ -10,7 +10,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
-import { burnedForDay, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
+import { burnedForDay, dateKey, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
 import type { Exercise, ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
 /** Short label of the best (heaviest) set in a session, for the plan preview. */
@@ -103,10 +103,16 @@ export default function Training() {
   const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const removeWorkout = useAppStore((s) => s.removeWorkout);
   const setWorkoutTrained = useAppStore((s) => s.setWorkoutTrained);
+  const skips = useAppStore((s) => s.skips);
+  const skipPlanToday = useAppStore((s) => s.skipPlanToday);
+  const restorePlanToday = useAppStore((s) => s.restorePlanToday);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
   const plan = schedule[selected.getDay()];
+  const skippedIds = skips[dateKey(selected)] ?? [];
+  const visiblePlanIds = plan ? plan.exerciseIds.filter((id) => !skippedIds.includes(id)) : [];
+  const skippedPlanIds = plan ? plan.exerciseIds.filter((id) => skippedIds.includes(id)) : [];
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = burnedForDay(workouts, selected);
@@ -235,18 +241,18 @@ export default function Training() {
             </Pressable>
           </View>
           <View style={{ marginTop: Spacing.sm }}>
-            {plan.exerciseIds.map((exId) => {
+            {visiblePlanIds.map((exId) => {
               const ex = findExercise(exId, custom);
               const wToday = workoutFor(workouts, exId, selected);
               const doneToday = !!wToday && wToday.sets.some((s) => s.done);
               const planned = plan.plans?.[exId] ?? [];
-              // Highest previous session — the record to beat.
-              const best = historyFor(workouts, exId)
-                .filter((w) => !isSameDay(w.at, selected))
-                .reduce<LoggedWorkout | undefined>(
-                  (b, w) => (!b || sessionTopScore(w) > sessionTopScore(b) ? w : b),
-                  undefined,
-                );
+              // Your highest-ever session for this exercise (including today) —
+              // the "Max" record. Falls back to the plan target only when it
+              // has never been logged.
+              const best = historyFor(workouts, exId).reduce<LoggedWorkout | undefined>(
+                (b, w) => (!b || sessionTopScore(w) > sessionTopScore(b) ? w : b),
+                undefined,
+              );
               const preview = best ? bestSetLabel(best, best.type, kg) : '';
               return (
                 <View key={exId} style={styles.planRow}>
@@ -272,7 +278,7 @@ export default function Training() {
                       </Text>
                       {preview ? (
                         <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                          {t('training.best')}: {preview}
+                          {t('training.max')}: {preview}
                         </Text>
                       ) : planned.length > 0 ? (
                         <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600' }}>
@@ -289,10 +295,41 @@ export default function Training() {
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
                   </Pressable>
+                  <Pressable onPress={() => skipPlanToday(selected, exId)} hitSlop={8} style={styles.skipBtn}>
+                    <Ionicons name="close" size={18} color={theme.textTertiary} />
+                  </Pressable>
                 </View>
               );
             })}
           </View>
+          {skippedPlanIds.length > 0 && (
+            <View style={[styles.skippedWrap, { borderTopColor: theme.border }]}>
+              <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: 6 }}>
+                {t('training.skippedToday')}
+              </Text>
+              <View style={styles.chipWrap}>
+                {skippedPlanIds.map((exId) => {
+                  const ex = findExercise(exId, custom);
+                  return (
+                    <Pressable
+                      key={exId}
+                      onPress={() => restorePlanToday(selected, exId)}
+                      style={({ pressed }) => [
+                        styles.chip,
+                        { backgroundColor: theme.cardSubtle },
+                        pressed && { transform: [{ scale: 0.95 }] },
+                      ]}
+                    >
+                      <Ionicons name="arrow-undo" size={13} color={theme.primary} />
+                      <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
+                        {ex ? exerciseName(ex, lang) : exId}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+          )}
         </Card>
       ) : (
         <Pressable onPress={() => router.push('/schedule')}>
@@ -446,6 +483,12 @@ const styles = StyleSheet.create({
   repeatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.sm },
   planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 8 },
   planTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  skipBtn: { padding: 4 },
+  skippedWrap: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
   checkBox: {
     width: 26,
     height: 26,

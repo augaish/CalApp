@@ -168,6 +168,8 @@ export const en = {
     buildSchedule: 'Build a weekly schedule',
     last: 'Last',
     best: 'Best',
+    max: 'Max',
+    skippedToday: 'Skipped today — tap to restore',
     planTarget: 'Target: {{count}} × {{detail}}',
     deleteWorkoutConfirm: 'Delete this exercise entry? This cannot be undone.',
   },
