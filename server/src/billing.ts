@@ -86,8 +86,10 @@ export async function checkAccess(ref: string | null, feature: Feature): Promise
     limit,
     period,
     featureAllowed,
-    // Without an identified caller we cannot meter, so do not block.
-    withinQuota: !ref || used < limit,
+    // No id means nothing to meter against. The metered routes reject those
+    // callers outright; failing closed here too keeps a route that forgets the
+    // check from handing out unlimited AI.
+    withinQuota: !!ref && used < limit,
   };
 }
 

@@ -1,3 +1,4 @@
+import { useAppStore } from './store';
 import type { ChatMessage, EquipmentAnalysis, FoodItem, Language, MealAnalysis } from './types';
 
 /**
@@ -25,7 +26,10 @@ export function setInstallId(id: string | null) {
 }
 
 function authHeaders(): Record<string, string> {
-  return installId ? { 'x-calgym-user': installId } : {};
+  // The server refuses unmetered calls, so never send one without an id: if
+  // launch has not set it yet, mint it from the store on the spot.
+  const id = installId ?? useAppStore.getState().ensureInstallId();
+  return { 'x-calgym-user': id };
 }
 
 /** Raised when the caller has used up the month's AI allowance. */

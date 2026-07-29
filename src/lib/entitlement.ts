@@ -35,6 +35,8 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
   },
 }));
 
+/** True on any paying tier — Pro+ is still Pro. */
 export function isPro(): boolean {
-  return useEntitlement.getState().plan === 'pro';
+  const plan = useEntitlement.getState().plan;
+  return plan === 'pro' || plan === 'proPlus';
 }

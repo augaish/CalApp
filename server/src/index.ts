@@ -65,6 +65,28 @@ async function callerRef(c: {
   return ref ? await resolveRef(ref) : null;
 }
 
+/**
+ * Every endpoint that spends model tokens. Without an id there is nothing to
+ * meter against, so an unidentified caller would get unlimited AI on our bill
+ * simply by omitting the header — these routes require one.
+ */
+const METERED_ROUTES = [
+  '/api/analyze-meal',
+  '/api/analyze-equipment',
+  '/api/analyze-text',
+  '/api/analyze-exercise',
+  '/api/coach',
+];
+
+for (const path of METERED_ROUTES) {
+  app.use(path, async (c, next) => {
+    if (!validRef(c.req.header('x-calgym-user') ?? '')) {
+      return c.json({ error: 'identify_required' }, 401);
+    }
+    await next();
+  });
+}
+
 app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled }));
 
 /**
