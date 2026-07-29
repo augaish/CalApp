@@ -22,6 +22,12 @@ import { useAppStore } from '@/lib/store';
 
 type Step = 'choose' | 'email' | 'code';
 
+/** The auth service's own wording, when it gave one. */
+function reason(err: unknown): string | undefined {
+  const msg = err instanceof Error ? err.message.trim() : '';
+  return msg || undefined;
+}
+
 export default function Login() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -42,8 +48,10 @@ export default function Login() {
     try {
       await sendEmailCode(email);
       setStep('code');
-    } catch {
-      Alert.alert(t('auth.signInFailed'));
+    } catch (err) {
+      // Show what the mail service actually said (rate limited, address not
+      // allowed, …) — "sign-in failed" on its own leaves nothing to act on.
+      Alert.alert(t('auth.signInFailed'), reason(err));
     } finally {
       setBusy(false);
     }
@@ -60,8 +68,8 @@ export default function Login() {
       // Metering follows the person from here on, not the install.
       await syncAuthIdentity();
       setAccount(account);
-    } catch {
-      Alert.alert(t('auth.invalidCode'));
+    } catch (err) {
+      Alert.alert(t('auth.invalidCode'), reason(err));
       setBusy(false);
     }
   };
