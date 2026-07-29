@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -16,13 +17,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { coachChat, isMockMode } from '@/lib/api';
+import { coachChat, isMockMode, QuotaError } from '@/lib/api';
+import { useEntitlement } from '@/lib/entitlement';
 import { useAppStore } from '@/lib/store';
 import type { ChatMessage } from '@/lib/types';
 
 export default function Coach() {
   const { t } = useTranslation();
   const theme = useTheme();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const language = useAppStore((s) => s.language) ?? 'en';
 
@@ -40,11 +43,18 @@ export default function Coach() {
     setBusy(true);
     try {
       const reply = await coachChat(next, language);
+      useEntitlement.getState().spend();
       setMessages([
         ...next,
         { role: 'assistant', content: isMockMode ? t('coach.mockReply') : reply },
       ]);
-    } catch {
+    } catch (err) {
+      if (err instanceof QuotaError) {
+        useEntitlement.getState().refresh();
+        setMessages(next);
+        router.push('/upgrade?reason=quota');
+        return;
+      }
       setMessages([...next, { role: 'assistant', content: t('common.error') }]);
     } finally {
       setBusy(false);

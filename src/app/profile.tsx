@@ -8,6 +8,7 @@ import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useEntitlement } from '@/lib/entitlement';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { syncReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
@@ -28,6 +29,9 @@ export default function Profile() {
   const remindMeals = useAppStore((s) => s.remindMeals);
   const remindWater = useAppStore((s) => s.remindWater);
   const remindWorkouts = useAppStore((s) => s.remindWorkouts);
+  const plan = useEntitlement((s) => s.plan);
+  const remaining = useEntitlement((s) => s.remaining);
+  const limit = useEntitlement((s) => s.limit);
   const setRemindMeals = useAppStore((s) => s.setRemindMeals);
   const setRemindWater = useAppStore((s) => s.setRemindWater);
   const setRemindWorkouts = useAppStore((s) => s.setRemindWorkouts);
@@ -101,6 +105,33 @@ export default function Profile() {
           <Text style={{ color: theme.danger, fontWeight: '600' }}>{t('profile.signOut')}</Text>
         </Pressable>
       </Card>
+
+      {/* Plan + remaining AI actions */}
+      <Text style={[styles.section, { color: theme.textSecondary }]}>{t('upgrade.planSection')}</Text>
+      <Pressable onPress={() => router.push('/upgrade')}>
+        <Card>
+          <View style={styles.planRow}>
+            <View style={[styles.planIcon, { backgroundColor: theme.cardSubtle }]}>
+              <Ionicons
+                name={plan === 'pro' ? 'sparkles' : 'sparkles-outline'}
+                size={18}
+                color={theme.primary}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>
+                {plan === 'pro' ? t('upgrade.planPro') : t('upgrade.planFree')}
+              </Text>
+              {typeof remaining === 'number' && typeof limit === 'number' ? (
+                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                  {t('upgrade.remaining', { remaining, limit })}
+                </Text>
+              ) : null}
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+          </View>
+        </Card>
+      </Pressable>
 
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.language')}</Text>
       <View style={styles.row}>
@@ -265,6 +296,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 6,
+  },
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  planIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   accountCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   avatar: {

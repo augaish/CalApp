@@ -20,7 +20,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeEquipment, analyzeMeal, isMockMode, lookupBarcode } from '@/lib/api';
+import { analyzeEquipment, analyzeMeal, isMockMode, lookupBarcode, QuotaError } from '@/lib/api';
+import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
 
@@ -112,13 +113,21 @@ export default function Scan() {
       router.back();
     } else if (isGym) {
       const analysis = await analyzeEquipment(base64, language);
+      useEntitlement.getState().spend();
       setEquipment(analysis, saved.uri);
       router.replace('/gym-result');
     } else {
       const analysis = await analyzeMeal(base64, language);
+      useEntitlement.getState().spend();
       setMeal(analysis, saved.uri);
       router.replace('/meal-result');
     }
+  };
+
+  /** Out of monthly AI actions — send the user to the upgrade screen. */
+  const onQuota = () => {
+    useEntitlement.getState().refresh();
+    router.replace('/upgrade?reason=quota');
   };
 
   const capture = async () => {
@@ -127,7 +136,8 @@ export default function Scan() {
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
       await processImage(photo.uri);
-    } catch {
+    } catch (err) {
+      if (err instanceof QuotaError) return onQuota();
       Alert.alert(t('common.error'));
       setAnalyzing(false);
     }
@@ -147,7 +157,8 @@ export default function Scan() {
       if (!asset) return;
       setAnalyzing(true);
       await processImage(asset.uri);
-    } catch {
+    } catch (err) {
+      if (err instanceof QuotaError) return onQuota();
       Alert.alert(t('common.error'));
       setAnalyzing(false);
     }

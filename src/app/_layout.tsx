@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Celebration } from '@/components/celebration';
 import { setInstallId } from '@/lib/api';
+import { useEntitlement } from '@/lib/entitlement';
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 
@@ -24,8 +25,10 @@ export default function RootLayout() {
     if (!hydrated) return;
     setI18nLanguage(lang);
     applyRTL(lang);
-    // Identify this install to the server so AI usage is metered per user.
+    // Identify this install to the server so AI usage is metered per user,
+    // then pull the current plan / remaining allowance.
     setInstallId(useAppStore.getState().ensureInstallId());
+    useEntitlement.getState().refresh();
     SplashScreen.hideAsync();
   }, [hydrated, lang]);
 
@@ -60,6 +63,7 @@ export default function RootLayout() {
           <Stack.Screen name="edit-profile" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-targets" options={{ presentation: 'modal' }} />
           <Stack.Screen name="profile" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="upgrade" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-library" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-edit" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-detail" options={{ presentation: 'modal' }} />

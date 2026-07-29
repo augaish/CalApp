@@ -6,7 +6,8 @@ import { Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } fr
 import { Button, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeText, isMockMode } from '@/lib/api';
+import { analyzeText, isMockMode, QuotaError } from '@/lib/api';
+import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
 
@@ -24,9 +25,15 @@ export default function Describe() {
     setBusy(true);
     try {
       const analysis = await analyzeText(text.trim(), language);
+      useEntitlement.getState().spend();
       setMeal(analysis, null);
       router.replace('/meal-result');
-    } catch {
+    } catch (err) {
+      if (err instanceof QuotaError) {
+        useEntitlement.getState().refresh();
+        router.replace('/upgrade?reason=quota');
+        return;
+      }
       Alert.alert(t('common.error'));
       setBusy(false);
     }
