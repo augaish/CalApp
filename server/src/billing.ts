@@ -17,7 +17,13 @@ export interface PlanLimits {
   pro: number;
 }
 
-export const DEFAULT_LIMITS: PlanLimits = { free: 15, pro: 300 };
+/**
+ * Pre-launch defaults are deliberately generous: until the paywall ships there
+ * is no way for anyone to upgrade, so a tight free cap would just lock testers
+ * out. Tighten these from the admin page (Monthly AI allowance) on the day
+ * paid plans go live — no redeploy needed.
+ */
+export const DEFAULT_LIMITS: PlanLimits = { free: 1000, pro: 3000 };
 
 export async function planLimits(): Promise<PlanLimits> {
   const stored = await getSetting<Partial<PlanLimits>>('plan_limits', {});
