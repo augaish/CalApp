@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TrendLine, WeekBars } from '@/components/charts';
 import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
 import { Ring } from '@/components/ring';
+import { SponsorCard } from '@/components/sponsor-card';
 import { Button, Field } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -440,6 +441,8 @@ export default function Overview() {
             <Button label="+" onPress={submitWeight} style={styles.weightBtn} />
           </View>
         </View>
+
+        <SponsorCard />
       </ScrollView>
 
       {tourSteps && (

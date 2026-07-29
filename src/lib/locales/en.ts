@@ -334,7 +334,10 @@ export const en = {
     soon: 'Subscriptions coming soon',
     features: {
       scan: { title: 'Snap your meal', body: 'Photo scan with calories and macros' },
-      describe: { title: 'Describe it in words', body: 'Type any dish and get an estimate' },
+      sponsor: {
+    label: 'SPONSORED',
+  },
+  describe: { title: 'Describe it in words', body: 'Type any dish and get an estimate' },
       equipment: { title: 'Scan gym equipment', body: 'Identify machines and how to use them' },
       coach: { title: 'AI coach', body: 'Ask about nutrition and training' },
       limits: { title: 'Higher monthly limits', body: 'Far more AI actions every month' },
