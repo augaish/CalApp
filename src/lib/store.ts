@@ -47,6 +47,11 @@ interface AppState {
   /** Plan exercises skipped on a specific date (dateKey → exerciseIds). The
    * weekly schedule is untouched, so a skipped exercise returns next week. */
   skips: Record<string, string[]>;
+  /**
+   * Stable per-install id used to meter AI usage and resolve the plan on the
+   * server. Generated on first launch; superseded by the auth user id later.
+   */
+  installId: string | null;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -139,6 +144,8 @@ interface AppState {
   /** Re-arm the coach-mark tour (from Profile → Replay tour). */
   replayTour: () => void;
   setHydrated: () => void;
+  /** Create the install id on first launch; returns the existing one after. */
+  ensureInstallId: () => string;
   /** Wipes all local data and returns to the login/onboarding flow. */
   resetAll: () => void;
 }
@@ -167,6 +174,7 @@ export const useAppStore = create<AppState>()(
       exercises: [],
       schedule: {},
       skips: {},
+      installId: null,
       workouts: [],
       water: [],
       weights: [],
@@ -476,6 +484,13 @@ export const useAppStore = create<AppState>()(
       setTourSeen: () => set({ tourSeen: true }),
       replayTour: () => set({ tourSeen: false }),
       setHydrated: () => set({ hydrated: true }),
+      ensureInstallId: () => {
+        const existing = get().installId;
+        if (existing) return existing;
+        const fresh = `u_${id()}`;
+        set({ installId: fresh });
+        return fresh;
+      },
       resetAll: () =>
         set({
           account: null,
@@ -512,6 +527,7 @@ export const useAppStore = create<AppState>()(
         exercises,
         schedule,
         skips,
+        installId,
         workouts,
         water,
         weights,
@@ -531,6 +547,7 @@ export const useAppStore = create<AppState>()(
         exercises,
         schedule,
         skips,
+        installId,
         workouts,
         water,
         weights,

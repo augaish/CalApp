@@ -15,16 +15,75 @@ export const SERVER_URL = API_URL || DEFAULT_API_URL;
 
 export const isMockMode = !API_URL;
 
+/**
+ * Stable per-install id, sent with every AI call so the server can meter usage
+ * and resolve the plan. Replaced by the real auth user id when sign-in ships.
+ */
+let installId: string | null = null;
+export function setInstallId(id: string | null) {
+  installId = id;
+}
+
+function authHeaders(): Record<string, string> {
+  return installId ? { 'x-calgym-user': installId } : {};
+}
+
+/** Raised when the caller has used up the month's AI allowance. */
+export class QuotaError extends Error {
+  constructor(
+    public plan: string,
+    public used: number,
+    public limit: number,
+  ) {
+    super('quota_exceeded');
+    this.name = 'QuotaError';
+  }
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify(body),
   });
+  if (res.status === 402) {
+    const q = (await res.json().catch(() => ({}))) as {
+      plan?: string;
+      used?: number;
+      limit?: number;
+    };
+    throw new QuotaError(q.plan ?? 'free', q.used ?? 0, q.limit ?? 0);
+  }
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status}`);
   }
   return (await res.json()) as T;
+}
+
+export interface Entitlement {
+  plan: 'free' | 'pro';
+  used: number;
+  limit: number;
+  remaining: number;
+  period: string;
+  sponsor?: {
+    enabled?: boolean;
+    title?: string;
+    subtitle?: string;
+    imageUrl?: string;
+    linkUrl?: string;
+  } | null;
+}
+
+/** Current plan + remaining AI actions (and the sponsor slot, if any). */
+export async function fetchEntitlement(): Promise<Entitlement | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/me`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    return (await res.json()) as Entitlement;
+  } catch {
+    return null;
+  }
 }
 
 export async function analyzeMeal(

@@ -3,12 +3,20 @@ import { serve } from '@hono/node-server';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
+import { ADMIN_HTML } from './admin-html.js';
+import { checkQuota, consume, planLimits, quotaError } from './billing.js';
 import {
+  adminStats,
   canonicalKey,
   cacheEnabled,
   getCachedEquipment,
+  getOrCreateUser,
+  getSetting,
   initDb,
+  listUsers,
   setCachedEquipment,
+  setSetting,
+  setUserPlan,
 } from './db.js';
 import {
   coachSystemPrompt,
@@ -30,6 +38,16 @@ const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
 
 const app = new Hono();
 app.use('*', cors());
+
+/**
+ * Who is calling. Today the app sends a stable per-install id; once real
+ * sign-in ships this becomes the auth user id and nothing else changes.
+ */
+function callerRef(c: { req: { header: (n: string) => string | undefined } }): string | null {
+  const raw = (c.req.header('x-calgym-user') ?? '').trim();
+  if (!raw || raw.length > 100) return null;
+  return /^[A-Za-z0-9._:-]+$/.test(raw) ? raw : null;
+}
 
 app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled }));
 
@@ -134,8 +152,12 @@ function parseJson(text: string): unknown {
 app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
+  const ref = callerRef(c);
+  const quota = await checkQuota(ref);
+  if (!quota.allowed) return c.json(quotaError(quota), 402);
   try {
     const result = await analyze(parsed.image, mealPrompt(parsed.language), MEAL_MODEL);
+    await consume(ref, 'meal');
     return c.json(result);
   } catch (err) {
     console.error('analyze-meal failed:', err);
@@ -146,6 +168,9 @@ app.post('/api/analyze-meal', async (c) => {
 app.post('/api/analyze-equipment', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
+  const ref = callerRef(c);
+  const quota = await checkQuota(ref);
+  if (!quota.allowed) return c.json(quotaError(quota), 402);
   try {
     // Step 1: cheap vision call to identify the machine.
     const id = (await analyze(parsed.image, identifyEquipmentPrompt(parsed.language))) as {
@@ -170,12 +195,14 @@ app.post('/api/analyze-equipment', async (c) => {
     const key = canonicalKey(name);
     const cached = await getCachedEquipment(key, parsed.language);
     if (cached) {
+      await consume(ref, 'equipment');
       return c.json(cached);
     }
 
     // Step 3: cache miss — generate details (text only, no image) and store.
     const details = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500);
     await setCachedEquipment(key, parsed.language, details);
+    await consume(ref, 'equipment');
     return c.json(details);
   } catch (err) {
     console.error('analyze-equipment failed:', err);
@@ -188,6 +215,9 @@ app.post('/api/analyze-text', async (c) => {
   const text = (body.text ?? '').trim().slice(0, 500);
   if (text.length < 3) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const ref = callerRef(c);
+  const quota = await checkQuota(ref);
+  if (!quota.allowed) return c.json(quotaError(quota), 402);
   try {
     const response = await anthropic.messages.create({
       model: MEAL_MODEL,
@@ -195,6 +225,7 @@ app.post('/api/analyze-text', async (c) => {
       messages: [{ role: 'user', content: textMealPrompt(language, text) }],
     });
     const raw = response.content.find((b) => b.type === 'text')?.text ?? '';
+    await consume(ref, 'describe');
     return c.json(JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')));
   } catch (err) {
     console.error('analyze-text failed:', err);
@@ -207,8 +238,12 @@ app.post('/api/analyze-exercise', async (c) => {
   const name = (body.name ?? '').trim().slice(0, 120);
   if (name.length < 2) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const ref = callerRef(c);
+  const quota = await checkQuota(ref);
+  if (!quota.allowed) return c.json(quotaError(quota), 402);
   try {
     const result = await textCall(exerciseInfoPrompt(language, name), 600);
+    await consume(ref, 'exercise');
     return c.json(result);
   } catch (err) {
     console.error('analyze-exercise failed:', err);
@@ -231,6 +266,9 @@ app.post('/api/coach', async (c) => {
   if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
     return c.json({ error: 'invalid_request' }, 400);
   }
+  const ref = callerRef(c);
+  const quota = await checkQuota(ref);
+  if (!quota.allowed) return c.json(quotaError(quota), 402);
   try {
     const response = await anthropic.messages.create({
       model: MODEL,
@@ -239,12 +277,99 @@ app.post('/api/coach', async (c) => {
       messages,
     });
     const reply = response.content.find((b) => b.type === 'text')?.text ?? '';
+    await consume(ref, 'coach');
     return c.json({ reply });
   } catch (err) {
     console.error('coach failed:', err);
     return c.json({ error: 'coach_failed' }, 502);
   }
 });
+
+/**
+ * The app's entitlement check: current plan, remaining AI actions, and the
+ * sponsor slot to display. Safe to call often; cheap.
+ */
+app.get('/api/me', async (c) => {
+  const ref = callerRef(c);
+  const quota = await checkQuota(ref);
+  const sponsor = await getSetting<Record<string, unknown> | null>('sponsor', null);
+  return c.json({
+    plan: quota.plan,
+    used: quota.used,
+    limit: quota.limit,
+    remaining: Math.max(0, quota.limit - quota.used),
+    period: quota.period,
+    sponsor,
+  });
+});
+
+// ── Admin ─────────────────────────────────────────────────────────────────
+
+/** Shared-secret gate. Set ADMIN_TOKEN in the server environment. */
+function adminOk(c: { req: { header: (n: string) => string | undefined; query: (n: string) => string | undefined } }): boolean {
+  const token = process.env.ADMIN_TOKEN;
+  if (!token) return false;
+  const given = c.req.header('x-admin-token') ?? c.req.query('token') ?? '';
+  return given === token;
+}
+
+app.get('/admin/api/data', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const [stats, users, limits, sponsor] = await Promise.all([
+    adminStats(),
+    listUsers(200),
+    planLimits(),
+    getSetting<Record<string, unknown> | null>('sponsor', null),
+  ]);
+  return c.json({ stats, users, limits, sponsor, cache: cacheEnabled });
+});
+
+app.post('/admin/api/plan', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ ref?: string; plan?: string; days?: number; note?: string }>().catch(() => ({}) as never);
+  const ref = (body.ref ?? '').trim();
+  if (!ref) return c.json({ error: 'invalid_request' }, 400);
+  const plan = body.plan === 'pro' ? 'pro' : 'free';
+  const until =
+    plan === 'pro' && body.days && body.days > 0
+      ? new Date(Date.now() + body.days * 86400000).toISOString()
+      : null;
+  await setUserPlan(ref, plan, 'admin', until, body.note);
+  return c.json({ ok: true, ...(await getOrCreateUser(ref)) });
+});
+
+app.post('/admin/api/limits', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ free?: number; pro?: number }>().catch(() => ({}) as never);
+  const cur = await planLimits();
+  await setSetting('plan_limits', {
+    free: Number.isFinite(body.free) ? Math.max(0, Number(body.free)) : cur.free,
+    pro: Number.isFinite(body.pro) ? Math.max(0, Number(body.pro)) : cur.pro,
+  });
+  return c.json({ ok: true, limits: await planLimits() });
+});
+
+/** The rented sponsor slot (a real advertiser you sell the spot to). */
+app.post('/admin/api/sponsor', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req
+    .json<{ enabled?: boolean; title?: string; subtitle?: string; imageUrl?: string; linkUrl?: string }>()
+    .catch(() => ({}) as never);
+  const clean = (v: unknown, max: number) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const url = clean(body.linkUrl, 500);
+  const img = clean(body.imageUrl, 500);
+  await setSetting('sponsor', {
+    enabled: !!body.enabled,
+    title: clean(body.title, 80),
+    subtitle: clean(body.subtitle, 140),
+    // Only allow https links so the app never opens something unexpected.
+    imageUrl: /^https:\/\//.test(img) ? img : '',
+    linkUrl: /^https:\/\//.test(url) ? url : '',
+  });
+  return c.json({ ok: true, sponsor: await getSetting('sponsor', null) });
+});
+
+app.get('/admin', (c) => c.html(ADMIN_HTML));
 
 initDb()
   .then(() => {

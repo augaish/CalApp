@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Celebration } from '@/components/celebration';
+import { setInstallId } from '@/lib/api';
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
 
@@ -23,6 +24,8 @@ export default function RootLayout() {
     if (!hydrated) return;
     setI18nLanguage(lang);
     applyRTL(lang);
+    // Identify this install to the server so AI usage is metered per user.
+    setInstallId(useAppStore.getState().ensureInstallId());
     SplashScreen.hideAsync();
   }, [hydrated, lang]);
 
