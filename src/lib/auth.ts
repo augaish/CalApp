@@ -1,7 +1,7 @@
 import { linkInstall, setInstallId } from './api';
 import type { Account } from './store';
 import { useAppStore } from './store';
-import { supabase } from './supabase';
+import { getSupabase } from './supabase';
 
 export { authConfigured } from './supabase';
 
@@ -11,7 +11,7 @@ export { authConfigured } from './supabase';
  * from every mail client.
  */
 export async function sendEmailCode(email: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithOtp({
+  const { error } = await getSupabase().auth.signInWithOtp({
     email: email.trim().toLowerCase(),
     options: { shouldCreateUser: true },
   });
@@ -20,7 +20,7 @@ export async function sendEmailCode(email: string): Promise<void> {
 
 /** Verify the emailed code and return the signed-in account. */
 export async function verifyEmailCode(email: string, code: string): Promise<Account> {
-  const { data, error } = await supabase.auth.verifyOtp({
+  const { data, error } = await getSupabase().auth.verifyOtp({
     email: email.trim().toLowerCase(),
     token: code.trim(),
     type: 'email',
@@ -40,7 +40,7 @@ export async function verifyEmailCode(email: string, code: string): Promise<Acco
  * across devices instead of the install. Called after sign-in and on launch.
  */
 export async function syncAuthIdentity(): Promise<void> {
-  const { data } = await supabase.auth.getSession();
+  const { data } = await getSupabase().auth.getSession();
   const uid = data.session?.user.id;
   const store = useAppStore.getState();
   const deviceId = store.ensureInstallId();
@@ -59,7 +59,7 @@ export async function syncAuthIdentity(): Promise<void> {
 
 export async function signOutAuth(): Promise<void> {
   try {
-    await supabase.auth.signOut();
+    await getSupabase().auth.signOut();
   } catch {
     // Already signed out or offline — the local account is cleared regardless.
   }
