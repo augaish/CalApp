@@ -25,7 +25,7 @@ export interface WaterEntry {
 export interface Account {
   name: string;
   email?: string;
-  provider: 'google' | 'guest';
+  provider: 'google' | 'apple' | 'email' | 'guest';
 }
 
 interface AppState {

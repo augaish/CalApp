@@ -10,6 +10,7 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { buildExport, deleteAccount } from '@/lib/account';
 import { SERVER_URL } from '@/lib/api';
+import { signOutAuth } from '@/lib/auth';
 import { useEntitlement } from '@/lib/entitlement';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { syncReminders } from '@/lib/reminders';
@@ -74,7 +75,14 @@ export default function Profile() {
   const confirmSignOut = () => {
     Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
-      { text: t('profile.signOut'), style: 'destructive', onPress: () => signOut() },
+      {
+        text: t('profile.signOut'),
+        style: 'destructive',
+        onPress: async () => {
+          await signOutAuth();
+          signOut();
+        },
+      },
     ]);
   };
 

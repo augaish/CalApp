@@ -1,24 +1,57 @@
+import { setInstallId } from './api';
 import type { Account } from './store';
+import { useAppStore } from './store';
+import { supabase } from './supabase';
+
+export { authConfigured } from './supabase';
 
 /**
- * Google sign-in.
- *
- * When Google OAuth client IDs are configured (EXPO_PUBLIC_GOOGLE_*), this
- * runs the real flow. Until then it resolves a local account so the rest of
- * the app — persistent login, logout, per-account data — works end to end.
- * Wiring the real OAuth is a config step (Google Cloud client IDs), done
- * alongside the server deploy.
+ * Email sign-in via a 6-digit one-time code. Chosen over magic links because a
+ * code can be typed back into the app without depending on deep links working
+ * from every mail client.
  */
-const GOOGLE_CONFIGURED = !!process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+export async function sendEmailCode(email: string): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({
+    email: email.trim().toLowerCase(),
+    options: { shouldCreateUser: true },
+  });
+  if (error) throw error;
+}
 
-export const isGoogleConfigured = GOOGLE_CONFIGURED;
+/** Verify the emailed code and return the signed-in account. */
+export async function verifyEmailCode(email: string, code: string): Promise<Account> {
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email.trim().toLowerCase(),
+    token: code.trim(),
+    type: 'email',
+  });
+  if (error) throw error;
+  const user = data.user;
+  if (!user) throw new Error('no_user');
+  return {
+    name: (user.user_metadata?.name as string) ?? email.split('@')[0],
+    email: user.email ?? email,
+    provider: 'email',
+  };
+}
 
-export async function signInWithGoogle(): Promise<Account> {
-  if (!GOOGLE_CONFIGURED) {
-    await new Promise((r) => setTimeout(r, 500));
-    return { name: 'Athlete', provider: 'guest' };
+/**
+ * Point usage metering at the signed-in user so the plan follows the person
+ * across devices instead of the install. Called after sign-in and on launch.
+ */
+export async function syncAuthIdentity(): Promise<void> {
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user.id;
+  const store = useAppStore.getState();
+  setInstallId(uid ?? store.ensureInstallId());
+}
+
+export async function signOutAuth(): Promise<void> {
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // Already signed out or offline — the local account is cleared regardless.
   }
-  // Real Google OAuth is wired here once client IDs exist (expo-auth-session).
-  // Placeholder keeps the type contract until then.
-  return { name: 'Athlete', provider: 'guest' };
+  // Fall back to the anonymous install id so the app keeps working as a guest.
+  setInstallId(useAppStore.getState().ensureInstallId());
 }

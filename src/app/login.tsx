@@ -1,76 +1,166 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { signInWithGoogle } from '@/lib/auth';
+import { sendEmailCode, syncAuthIdentity, verifyEmailCode } from '@/lib/auth';
 import { useAppStore } from '@/lib/store';
+
+type Step = 'choose' | 'email' | 'code';
 
 export default function Login() {
   const { t } = useTranslation();
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const setAccount = useAppStore((s) => s.setAccount);
+
+  const [step, setStep] = useState<Step>('choose');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const google = async () => {
+  const requestCode = async () => {
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
+      Alert.alert(t('auth.invalidEmail'));
+      return;
+    }
     setBusy(true);
     try {
-      setAccount(await signInWithGoogle());
+      await sendEmailCode(email);
+      setStep('code');
     } catch {
       Alert.alert(t('auth.signInFailed'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmCode = async () => {
+    if (code.trim().length < 6) {
+      Alert.alert(t('auth.invalidCode'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const account = await verifyEmailCode(email, code);
+      // Metering follows the person from here on, not the install.
+      await syncAuthIdentity();
+      setAccount(account);
+    } catch {
+      Alert.alert(t('auth.invalidCode'));
       setBusy(false);
     }
   };
 
   return (
-    <LinearGradient
-      colors={[theme.gradientStart, theme.gradientEnd]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + Spacing.lg }]}
-    >
-      <View style={styles.hero}>
-        <Image
-          source={require('../../assets/images/logo-tile.png')}
-          style={styles.logoImg}
-          contentFit="contain"
-        />
-        <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
-      </View>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <LinearGradient
+        colors={[theme.gradientStart, theme.gradientEnd]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.root, { paddingTop: insets.top, paddingBottom: insets.bottom + Spacing.lg }]}
+      >
+        <View style={styles.hero}>
+          <Image
+            source={require('../../assets/images/logo-tile.png')}
+            style={styles.logoImg}
+            contentFit="contain"
+          />
+          <Text style={styles.subtitle}>{t('auth.welcomeSubtitle')}</Text>
+        </View>
 
-      <View style={styles.actions}>
-        <Pressable
-          onPress={google}
-          disabled={busy}
-          style={({ pressed }) => [
-            styles.googleBtn,
-            pressed && { transform: [{ scale: 0.98 }], opacity: 0.9 },
-            busy && { opacity: 0.6 },
-          ]}
-        >
-          <Ionicons name="logo-google" size={20} color="#1F1F1F" />
-          <Text style={styles.googleLabel}>
-            {busy ? t('auth.signingIn') : t('auth.continueGoogle')}
-          </Text>
-        </Pressable>
+        <View style={styles.actions}>
+          {step === 'choose' && (
+            <>
+              <Pressable
+                onPress={() => setStep('email')}
+                style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}
+              >
+                <Text style={styles.primaryLabel}>{t('auth.continueEmail')}</Text>
+              </Pressable>
+              <Button
+                label={t('auth.continueGuest')}
+                variant="ghost"
+                onPress={() => setAccount({ name: 'Athlete', provider: 'guest' })}
+                style={styles.guestBtn}
+              />
+              <Text style={styles.note}>{t('auth.guestNote')}</Text>
+            </>
+          )}
 
-        <Button
-          label={t('auth.continueGuest')}
-          variant="ghost"
-          onPress={() => setAccount({ name: 'Athlete', provider: 'guest' })}
-          style={styles.guestBtn}
-        />
+          {step === 'email' && (
+            <>
+              <TextInput
+                value={email}
+                onChangeText={setEmail}
+                placeholder={t('auth.emailPlaceholder')}
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoFocus
+                style={styles.input}
+              />
+              <Button
+                label={busy ? t('auth.sending') : t('auth.sendCode')}
+                onPress={requestCode}
+                disabled={busy}
+              />
+              <Button
+                label={t('common.back')}
+                variant="ghost"
+                onPress={() => setStep('choose')}
+                style={styles.guestBtn}
+              />
+            </>
+          )}
 
-        <Text style={styles.note}>{t('auth.staysSignedIn')}</Text>
-      </View>
-    </LinearGradient>
+          {step === 'code' && (
+            <>
+              <Text style={styles.note}>{t('auth.codeSent', { email })}</Text>
+              <TextInput
+                value={code}
+                onChangeText={setCode}
+                placeholder="123456"
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                keyboardType="number-pad"
+                maxLength={6}
+                autoFocus
+                style={[styles.input, styles.codeInput]}
+              />
+              <Button
+                label={busy ? t('auth.signingIn') : t('auth.verify')}
+                onPress={confirmCode}
+                disabled={busy}
+              />
+              <Button
+                label={t('auth.useAnotherEmail')}
+                variant="ghost"
+                onPress={() => {
+                  setCode('');
+                  setStep('email');
+                }}
+                style={styles.guestBtn}
+              />
+            </>
+          )}
+        </View>
+      </LinearGradient>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -87,17 +177,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   actions: { gap: Spacing.sm },
-  googleBtn: {
-    flexDirection: 'row',
+  primaryBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    gap: Spacing.sm,
     backgroundColor: '#FFFFFF',
     borderRadius: Radius.full,
     paddingVertical: 16,
     minHeight: 54,
   },
-  googleLabel: { color: '#1F1F1F', fontSize: 17, fontWeight: '700' },
+  primaryLabel: { color: '#1F1F1F', fontSize: 17, fontWeight: '700' },
+  input: {
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 15,
+    color: '#fff',
+    fontSize: 16,
+  },
+  codeInput: { textAlign: 'center', fontSize: 24, fontWeight: '800', letterSpacing: 6 },
   guestBtn: { minHeight: 48 },
   note: { color: 'rgba(255,255,255,0.85)', fontSize: 13, textAlign: 'center' },
 });
