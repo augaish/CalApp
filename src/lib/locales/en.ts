@@ -334,7 +334,19 @@ export const en = {
     soon: 'Subscriptions coming soon',
     features: {
       scan: { title: 'Snap your meal', body: 'Photo scan with calories and macros' },
-      sponsor: {
+      legal: {
+    section: 'Legal & data',
+    privacy: 'Privacy policy',
+    terms: 'Terms of use',
+    exportData: 'Export my data',
+    deleteAccount: 'Delete my account',
+    deleteConfirm:
+      'This permanently deletes your data on this device and your records on our server. This cannot be undone.',
+    deleteConfirmCta: 'Delete everything',
+    deletePartial:
+      'Your device data was erased, but we could not reach the server. Please try again while online.',
+  },
+  sponsor: {
     label: 'SPONSORED',
   },
   describe: { title: 'Describe it in words', body: 'Type any dish and get an estimate' },

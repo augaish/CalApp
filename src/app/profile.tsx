@@ -3,11 +3,13 @@ import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { buildExport, deleteAccount } from '@/lib/account';
+import { SERVER_URL } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { syncReminders } from '@/lib/reminders';
@@ -73,6 +75,28 @@ export default function Profile() {
     Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('profile.signOut'), style: 'destructive', onPress: () => signOut() },
+    ]);
+  };
+
+  const exportData = async () => {
+    try {
+      await Share.share({ message: buildExport() });
+    } catch {
+      // share sheet dismissed — nothing to do
+    }
+  };
+
+  const confirmDeleteAccount = () => {
+    Alert.alert(t('legal.deleteAccount'), t('legal.deleteConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('legal.deleteConfirmCta'),
+        style: 'destructive',
+        onPress: async () => {
+          const ok = await deleteAccount();
+          if (!ok) Alert.alert(t('legal.deletePartial'));
+        },
+      },
     ]);
   };
 
@@ -239,11 +263,49 @@ export default function Profile() {
         <Row label={t('settings.version')} value={Constants.expoConfig?.version ?? '1.0.0'} />
       </Card>
 
+      <Text style={[styles.section, { color: theme.textSecondary }]}>{t('legal.section')}</Text>
+      <Pressable onPress={() => Linking.openURL(`${SERVER_URL}/privacy`)}>
+        <Card style={styles.linkRow}>
+          <Ionicons name="shield-checkmark-outline" size={18} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('legal.privacy')}
+          </Text>
+          <Ionicons name="open-outline" size={16} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
+      <Pressable onPress={() => Linking.openURL(`${SERVER_URL}/terms`)}>
+        <Card style={styles.linkRow}>
+          <Ionicons name="document-text-outline" size={18} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('legal.terms')}
+          </Text>
+          <Ionicons name="open-outline" size={16} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
+      <Pressable onPress={exportData}>
+        <Card style={styles.linkRow}>
+          <Ionicons name="download-outline" size={18} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('legal.exportData')}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
+
       <Pressable onPress={confirmReset}>
         <Card style={[styles.linkRow, { borderColor: theme.danger, borderWidth: 1 }]}>
           <Ionicons name="trash-outline" size={18} color={theme.danger} />
           <Text style={{ color: theme.danger, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
             {t('settings.resetData')}
+          </Text>
+        </Card>
+      </Pressable>
+
+      <Pressable onPress={confirmDeleteAccount}>
+        <Card style={[styles.linkRow, { borderColor: theme.danger, borderWidth: 1 }]}>
+          <Ionicons name="person-remove-outline" size={18} color={theme.danger} />
+          <Text style={{ color: theme.danger, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('legal.deleteAccount')}
           </Text>
         </Card>
       </Pressable>

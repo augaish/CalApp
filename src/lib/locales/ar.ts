@@ -336,7 +336,17 @@ export const ar: TranslationSchema = {
     soon: 'الاشتراكات قريباً',
     features: {
       scan: { title: 'صوّر وجبتك', body: 'مسح بالصورة مع السعرات والماكروز' },
-      sponsor: {
+      legal: {
+    section: 'القانونية والبيانات',
+    privacy: 'سياسة الخصوصية',
+    terms: 'شروط الاستخدام',
+    exportData: 'تصدير بياناتي',
+    deleteAccount: 'حذف حسابي',
+    deleteConfirm: 'سيؤدي هذا إلى حذف بياناتك على هذا الجهاز وسجلاتك لدينا نهائياً. لا يمكن التراجع.',
+    deleteConfirmCta: 'حذف كل شيء',
+    deletePartial: 'تم مسح بيانات جهازك، لكن تعذّر الوصول إلى الخادم. حاول مرة أخرى وأنت متصل بالإنترنت.',
+  },
+  sponsor: {
     label: 'إعلان',
   },
   describe: { title: 'اكتبها بالكلمات', body: 'اكتب أي طبق واحصل على تقدير' },

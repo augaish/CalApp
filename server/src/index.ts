@@ -4,11 +4,13 @@ import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
+import { PRIVACY_HTML, TERMS_HTML } from './legal-html.js';
 import { checkAccess, consume, featureLocked, PLANS, planLimits, quotaError } from './billing.js';
 import {
   adminStats,
   canonicalKey,
   cacheEnabled,
+  deleteUser,
   getCachedEquipment,
   getOrCreateUser,
   getSetting,
@@ -338,6 +340,22 @@ app.get('/api/me', async (c) => {
     sponsor,
   });
 });
+
+/** Account deletion — required by both app stores. Irreversible. */
+app.delete('/api/me', async (c) => {
+  const ref = callerRef(c);
+  if (!ref) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    await deleteUser(ref);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('delete account failed:', err);
+    return c.json({ error: 'delete_failed' }, 500);
+  }
+});
+
+app.get('/privacy', (c) => c.html(PRIVACY_HTML));
+app.get('/terms', (c) => c.html(TERMS_HTML));
 
 // ── Admin ─────────────────────────────────────────────────────────────────
 

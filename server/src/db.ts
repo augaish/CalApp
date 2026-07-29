@@ -181,6 +181,16 @@ export async function recordUsage(ref: string, kind: string): Promise<number> {
   }
 }
 
+/**
+ * Erase everything we hold for a caller: their account row and every usage
+ * counter. Required by the app stores' account-deletion rules.
+ */
+export async function deleteUser(ref: string): Promise<void> {
+  if (!pool) return;
+  await pool.query('DELETE FROM usage_counters WHERE ref = $1', [ref]);
+  await pool.query('DELETE FROM app_users WHERE ref = $1', [ref]);
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────
 
 export async function getSetting<T>(key: string, fallback: T): Promise<T> {
