@@ -57,6 +57,8 @@ interface AppState {
    * server accepts the claim, so it is not re-attempted on every launch.
    */
   linkedRef: string | null;
+  /** When this device last agreed with the account's stored copy. */
+  syncedAt: string | null;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -153,6 +155,19 @@ interface AppState {
   ensureInstallId: () => string;
   /** Remember that this install has been claimed by the given account id. */
   setLinkedRef: (ref: string) => void;
+  setSyncedAt: (iso: string | null) => void;
+  /** Replace every synced log with the account's copy (cloud restore). */
+  applySnapshot: (snap: {
+    profile: Profile | null;
+    targets: DailyTargets | null;
+    meals: LoggedMeal[];
+    exercises: Exercise[];
+    schedule: AppState['schedule'];
+    skips: Record<string, string[]>;
+    workouts: LoggedWorkout[];
+    water: WaterEntry[];
+    weights: WeightEntry[];
+  }) => void;
   /** Wipes all local data and returns to the login/onboarding flow. */
   resetAll: () => void;
 }
@@ -183,6 +198,7 @@ export const useAppStore = create<AppState>()(
       skips: {},
       installId: null,
       linkedRef: null,
+      syncedAt: null,
       workouts: [],
       water: [],
       weights: [],
@@ -500,12 +516,26 @@ export const useAppStore = create<AppState>()(
         return fresh;
       },
       setLinkedRef: (ref) => set({ linkedRef: ref }),
+      setSyncedAt: (iso) => set({ syncedAt: iso }),
+      applySnapshot: (snap) =>
+        set({
+          profile: snap.profile,
+          targets: snap.targets,
+          meals: snap.meals,
+          exercises: snap.exercises,
+          schedule: snap.schedule,
+          skips: snap.skips,
+          workouts: snap.workouts,
+          water: snap.water,
+          weights: snap.weights,
+        }),
       resetAll: () =>
         set({
           account: null,
           // The server drops its side of the link on delete, so let a future
           // sign-in claim this install again.
           linkedRef: null,
+          syncedAt: null,
           language: null,
           profile: null,
           targets: null,
@@ -541,6 +571,7 @@ export const useAppStore = create<AppState>()(
         skips,
         installId,
         linkedRef,
+        syncedAt,
         workouts,
         water,
         weights,
@@ -562,6 +593,7 @@ export const useAppStore = create<AppState>()(
         skips,
         installId,
         linkedRef,
+        syncedAt,
         workouts,
         water,
         weights,

@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -18,6 +19,7 @@ import { Button } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { sendEmailCode, syncAuthIdentity, verifyEmailCode } from '@/lib/auth';
+import { appleSignInAvailable, signInWithApple } from '@/lib/auth-apple';
 import { useAppStore } from '@/lib/store';
 
 type Step = 'choose' | 'email' | 'code';
@@ -38,6 +40,36 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
+  // Absent until a build ships the native module, so the button appears on its
+  // own after the next native release rather than needing another JS change.
+  const [appleReady, setAppleReady] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    appleSignInAvailable().then((ok) => {
+      if (alive) setAppleReady(ok);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const withApple = async () => {
+    setBusy(true);
+    try {
+      const account = await signInWithApple();
+      const outcome = await syncAuthIdentity();
+      setAccount(account);
+      if (outcome === 'restored') Alert.alert(t('auth.restored'));
+    } catch (err) {
+      // Backing out of the Apple sheet is a cancel, not a failure to report.
+      const msg = err instanceof Error ? err.message : '';
+      if (!/canceled|cancelled|ERR_REQUEST_CANCELED/i.test(msg)) {
+        Alert.alert(t('auth.signInFailed'), reason(err));
+      }
+      setBusy(false);
+    }
+  };
 
   const requestCode = async () => {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
@@ -65,9 +97,11 @@ export default function Login() {
     setBusy(true);
     try {
       const account = await verifyEmailCode(email, code);
-      // Metering follows the person from here on, not the install.
-      await syncAuthIdentity();
+      // Metering and logs both follow the person from here on, not the install.
+      const outcome = await syncAuthIdentity();
       setAccount(account);
+      // Restoring someone's history onto a new phone is worth saying out loud.
+      if (outcome === 'restored') Alert.alert(t('auth.restored'));
     } catch (err) {
       Alert.alert(t('auth.invalidCode'), reason(err));
       setBusy(false);
@@ -94,6 +128,16 @@ export default function Login() {
         <View style={styles.actions}>
           {step === 'choose' && (
             <>
+              {appleReady && (
+                <Pressable
+                  onPress={withApple}
+                  disabled={busy}
+                  style={({ pressed }) => [styles.appleBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <Ionicons name="logo-apple" size={19} color="#fff" />
+                  <Text style={styles.appleLabel}>{t('auth.continueApple')}</Text>
+                </Pressable>
+              )}
               <Pressable
                 onPress={() => setStep('email')}
                 style={({ pressed }) => [styles.primaryBtn, pressed && { opacity: 0.9 }]}
@@ -194,6 +238,17 @@ const styles = StyleSheet.create({
     minHeight: 54,
   },
   primaryLabel: { color: '#1F1F1F', fontSize: 17, fontWeight: '700' },
+  appleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    backgroundColor: '#000000',
+    borderRadius: Radius.full,
+    paddingVertical: 16,
+    minHeight: 54,
+  },
+  appleLabel: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
   input: {
     backgroundColor: 'rgba(255,255,255,0.18)',
     borderRadius: Radius.md,

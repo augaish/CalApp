@@ -283,6 +283,7 @@ export const ar: TranslationSchema = {
   },
   auth: {
     continueEmail: 'المتابعة بالبريد الإلكتروني',
+    continueApple: 'المتابعة عبر Apple',
     emailPlaceholder: 'you@example.com',
     sendCode: 'أرسل لي رمزاً',
     sending: 'جارٍ الإرسال…',
@@ -292,6 +293,7 @@ export const ar: TranslationSchema = {
     invalidEmail: 'يرجى إدخال بريد إلكتروني صحيح.',
     invalidCode: 'الرمز غير صحيح. تحقق وحاول مرة أخرى.',
     guestNote: 'يمكنك إنشاء حساب لاحقاً — بياناتك تبقى على هذا الجهاز.',
+    restored: 'مرحباً بعودتك — تم استرجاع سجلك من حسابك.',
     welcomeTitle: 'كالجيم',
     welcomeSubtitle: 'مدربك الذكي للطعام والنادي. صوّر، امسح، وحقق أهدافك.',
     continueGoogle: 'المتابعة عبر Google',

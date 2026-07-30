@@ -2,6 +2,7 @@ import { linkInstall, setInstallId } from './api';
 import type { Account } from './store';
 import { useAppStore } from './store';
 import { getSupabase } from './supabase';
+import { reconcileOnSignIn, startBackupWatcher, syncOnLaunch } from './sync';
 
 export { authConfigured } from './supabase';
 
@@ -39,22 +40,29 @@ export async function verifyEmailCode(email: string, code: string): Promise<Acco
  * Point usage metering at the signed-in user so the plan follows the person
  * across devices instead of the install. Called after sign-in and on launch.
  */
-export async function syncAuthIdentity(): Promise<void> {
+export async function syncAuthIdentity(): Promise<'restored' | 'uploaded' | 'none'> {
   const { data } = await getSupabase().auth.getSession();
   const uid = data.session?.user.id;
   const store = useAppStore.getState();
   const deviceId = store.ensureInstallId();
   if (!uid) {
     setInstallId(deviceId);
-    return;
+    return 'none';
   }
   setInstallId(uid);
   // The first time this account is seen here, give it what the install already
   // used and owns — otherwise signing in would silently refill the month's
   // allowance. Retried on the next launch if the call does not get through.
-  if (store.linkedRef !== uid && (await linkInstall(deviceId))) {
+  const firstTimeHere = store.linkedRef !== uid;
+  if (firstTimeHere && (await linkInstall(deviceId))) {
     useAppStore.getState().setLinkedRef(uid);
   }
+  // Logs follow the person too: restore the account's history onto a new phone,
+  // or adopt this phone's guest history into an empty account.
+  const outcome = firstTimeHere ? await reconcileOnSignIn() : 'none';
+  if (!firstTimeHere) await syncOnLaunch();
+  startBackupWatcher();
+  return outcome;
 }
 
 export async function signOutAuth(): Promise<void> {
