@@ -5,7 +5,12 @@ import {
   getUsage,
   getUsageKind,
   recordUsage,
+  refundUsage,
+  reserveUsage,
+  type Reservation,
 } from './db.js';
+
+export type { Reservation };
 
 export type Plan = 'free' | 'pro' | 'proPlus';
 
@@ -96,6 +101,20 @@ export async function checkAccess(ref: string | null, feature: Feature): Promise
 export async function consume(ref: string | null, kind: string): Promise<void> {
   if (!ref) return;
   await recordUsage(ref, kind);
+}
+
+/**
+ * Take the action out of the allowance before spending money on it, so
+ * concurrent requests cannot overshoot the cap. Refund with `release` if the
+ * model call then fails — the user should not pay for our error.
+ */
+export async function reserve(ref: string, access: Access, kind: string): Promise<Reservation> {
+  const cap = kind === 'coach' ? access.spec.coachCap : undefined;
+  return reserveUsage(ref, kind, access.limit, cap);
+}
+
+export async function release(ref: string, kind: string): Promise<void> {
+  await refundUsage(ref, kind);
 }
 
 /** 403 body: the plan does not include this feature. */

@@ -173,6 +173,81 @@ export async function getUsageKind(
   }
 }
 
+export type Reservation =
+  | { ok: true; used: number; kindUsed: number }
+  | { ok: false; reason: 'quota' | 'cap'; used: number; kindUsed: number };
+
+/**
+ * Claim one action against the allowance, checking and incrementing under a
+ * lock on the account row. Reading the total and then writing it as two steps
+ * let a burst of parallel requests all see "14 of 15 used" and every one of
+ * them proceed; holding the row makes that impossible. The lock is per account,
+ * so one user's burst never slows anyone else down.
+ */
+export async function reserveUsage(
+  ref: string,
+  kind: string,
+  limit: number,
+  kindCap?: number,
+): Promise<Reservation> {
+  if (!pool) return { ok: true, used: 0, kindUsed: 0 };
+  const period = currentPeriod();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('INSERT INTO app_users (ref) VALUES ($1) ON CONFLICT (ref) DO NOTHING', [
+      ref,
+    ]);
+    await client.query('SELECT 1 FROM app_users WHERE ref = $1 FOR UPDATE', [ref]);
+    const res = await client.query(
+      `SELECT COALESCE(SUM(count), 0)::int AS n,
+              COALESCE(SUM(count) FILTER (WHERE kind = $3), 0)::int AS k
+         FROM usage_counters WHERE ref = $1 AND period = $2`,
+      [ref, period, kind],
+    );
+    const used = res.rows[0].n as number;
+    const kindUsed = res.rows[0].k as number;
+    // The shared allowance is the hard stop; a per-kind cap only rations that
+    // one feature, so the two are reported apart for the right error.
+    if (used >= limit) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'quota', used, kindUsed };
+    }
+    if (typeof kindCap === 'number' && kindUsed >= kindCap) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'cap', used, kindUsed };
+    }
+    await client.query(
+      `INSERT INTO usage_counters (ref, period, kind, count) VALUES ($1, $2, $3, 1)
+       ON CONFLICT (ref, period, kind) DO UPDATE SET count = usage_counters.count + 1`,
+      [ref, period, kind],
+    );
+    await client.query('COMMIT');
+    return { ok: true, used: used + 1, kindUsed: kindUsed + 1 };
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/** Hand a reserved action back when the model call itself failed. */
+export async function refundUsage(ref: string, kind: string): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `UPDATE usage_counters SET count = GREATEST(0, count - 1)
+        WHERE ref = $1 AND period = $2 AND kind = $3`,
+      [ref, currentPeriod(), kind],
+    );
+  } catch (err) {
+    // A lost refund only ever costs the user one action; never fail their
+    // request over it.
+    console.error('refundUsage failed:', err);
+  }
+}
+
 /** Record one AI action. Returns the new period total. */
 export async function recordUsage(ref: string, kind: string): Promise<number> {
   if (!pool) return 0;

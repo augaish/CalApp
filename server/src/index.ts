@@ -5,7 +5,7 @@ import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
 import { PRIVACY_HTML, TERMS_HTML } from './legal-html.js';
-import { checkAccess, consume, featureLocked, PLANS, planLimits, quotaError } from './billing.js';
+import { checkAccess, featureLocked, PLANS, planLimits, quotaError, release, reserve } from './billing.js';
 import {
   adminStats,
   canonicalKey,
@@ -87,7 +87,17 @@ for (const path of METERED_ROUTES) {
   });
 }
 
-app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled }));
+/**
+ * Which build is actually running. Railway injects the deployed commit, so
+ * "is my change live?" is one request instead of guesswork.
+ */
+const COMMIT = (
+  process.env.RAILWAY_GIT_COMMIT_SHA ??
+  process.env.COMMIT_SHA ??
+  'dev'
+).slice(0, 7);
+
+app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled, commit: COMMIT }));
 
 /**
  * Shareable workout-plan link. Someone taps `/s?d=<base64url>` (sent over
@@ -190,16 +200,17 @@ function parseJson(text: string): unknown {
 app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
-  const ref = await callerRef(c);
+  const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'meal');
-  if (!access.withinQuota) return c.json(quotaError(access), 402);
+  const claim = await reserve(ref, access, 'meal');
+  if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const model = access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL;
     const result = await analyze(parsed.image, mealPrompt(parsed.language), model);
-    await consume(ref, 'meal');
     return c.json(result);
   } catch (err) {
     console.error('analyze-meal failed:', err);
+    await release(ref, 'meal');
     return c.json({ error: 'analysis_failed' }, 502);
   }
 });
@@ -207,10 +218,11 @@ app.post('/api/analyze-meal', async (c) => {
 app.post('/api/analyze-equipment', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
-  const ref = await callerRef(c);
+  const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'equipment');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
-  if (!access.withinQuota) return c.json(quotaError(access), 402);
+  const claim = await reserve(ref, access, 'equipment');
+  if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     // Step 1: cheap vision call to identify the machine.
     const id = (await analyze(parsed.image, identifyEquipmentPrompt(parsed.language))) as {
@@ -219,6 +231,8 @@ app.post('/api/analyze-equipment', async (c) => {
     };
     const name = (id.name ?? '').trim();
     if (!name) {
+      // Nothing recognised is not a result worth charging for.
+      await release(ref, 'equipment');
       return c.json({
         name: parsed.language === 'ar' ? 'لا يوجد جهاز واضح' : 'No equipment detected',
         primaryMuscles: [],
@@ -235,17 +249,16 @@ app.post('/api/analyze-equipment', async (c) => {
     const key = canonicalKey(name);
     const cached = await getCachedEquipment(key, parsed.language);
     if (cached) {
-      await consume(ref, 'equipment');
       return c.json(cached);
     }
 
     // Step 3: cache miss — generate details (text only, no image) and store.
     const details = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500);
     await setCachedEquipment(key, parsed.language, details);
-    await consume(ref, 'equipment');
     return c.json(details);
   } catch (err) {
     console.error('analyze-equipment failed:', err);
+    await release(ref, 'equipment');
     return c.json({ error: 'analysis_failed' }, 502);
   }
 });
@@ -255,9 +268,10 @@ app.post('/api/analyze-text', async (c) => {
   const text = (body.text ?? '').trim().slice(0, 500);
   if (text.length < 3) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
-  const ref = await callerRef(c);
+  const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'describe');
-  if (!access.withinQuota) return c.json(quotaError(access), 402);
+  const claim = await reserve(ref, access, 'describe');
+  if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const response = await anthropic.messages.create({
       model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
@@ -265,10 +279,10 @@ app.post('/api/analyze-text', async (c) => {
       messages: [{ role: 'user', content: textMealPrompt(language, text) }],
     });
     const raw = response.content.find((b) => b.type === 'text')?.text ?? '';
-    await consume(ref, 'describe');
     return c.json(JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')));
   } catch (err) {
     console.error('analyze-text failed:', err);
+    await release(ref, 'describe');
     return c.json({ error: 'analysis_failed' }, 502);
   }
 });
@@ -278,16 +292,17 @@ app.post('/api/analyze-exercise', async (c) => {
   const name = (body.name ?? '').trim().slice(0, 120);
   if (name.length < 2) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
-  const ref = await callerRef(c);
+  const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'equipment');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
-  if (!access.withinQuota) return c.json(quotaError(access), 402);
+  const claim = await reserve(ref, access, 'exercise');
+  if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const result = await textCall(exerciseInfoPrompt(language, name), 600);
-    await consume(ref, 'exercise');
     return c.json(result);
   } catch (err) {
     console.error('analyze-exercise failed:', err);
+    await release(ref, 'exercise');
     return c.json({ error: 'analysis_failed' }, 502);
   }
 });
@@ -324,10 +339,17 @@ app.post('/api/coach', async (c) => {
   if (messages.length === 0 || messages[messages.length - 1].role !== 'user') {
     return c.json({ error: 'invalid_request' }, 400);
   }
-  const ref = await callerRef(c);
+  const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'coach');
-  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
-  if (!access.withinQuota) return c.json(quotaError(access), 402);
+  if (!access.spec.coach) return c.json(featureLocked(access), 403);
+  const claim = await reserve(ref, access, 'coach');
+  // 'cap' means the coach ration is spent while the plan still has actions
+  // left, which the app shows as a coach-specific upsell rather than a wall.
+  if (!claim.ok) {
+    return claim.reason === 'cap'
+      ? c.json(featureLocked(access), 403)
+      : c.json(quotaError(access), 402);
+  }
   try {
     const response = await anthropic.messages.create({
       model: MODEL,
@@ -336,10 +358,10 @@ app.post('/api/coach', async (c) => {
       messages,
     });
     const reply = response.content.find((b) => b.type === 'text')?.text ?? '';
-    await consume(ref, 'coach');
     return c.json({ reply });
   } catch (err) {
     console.error('coach failed:', err);
+    await release(ref, 'coach');
     return c.json({ error: 'coach_failed' }, 502);
   }
 });
