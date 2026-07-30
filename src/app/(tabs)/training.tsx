@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -8,10 +9,30 @@ import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
-import { exerciseName, findExercise } from '@/lib/exercises';
+import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
 import { burnedForDay, dateKey, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
 import type { Exercise, ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
+
+/** Whole minutes, for cardio durations stored as seconds. */
+function toMin(seconds: number | undefined): number {
+  return Math.round((seconds ?? 0) / 60);
+}
+
+/**
+ * One set as it reads on the day's card: the number you are about to lift.
+ * Weight first because that is what you set on the machine.
+ */
+function setChipLabel(s: WorkoutSet, type: ExerciseType, kg: string, min: string): string {
+  if (type === 'weight_reps') {
+    return s.weightKg ? `${s.weightKg}${kg} × ${s.reps ?? 0}` : `× ${s.reps ?? 0}`;
+  }
+  if (type === 'bodyweight_reps') return `× ${s.reps ?? 0}`;
+  if (type === 'time') return `${s.seconds ?? 0}s`;
+  const parts = [`${toMin(s.seconds)} ${min}`];
+  if (s.distanceM) parts.push(`${(s.distanceM / 1000).toFixed(1)} km`);
+  return parts.join(' · ');
+}
 
 /** Short label of the best (heaviest) set in a session, for the plan preview. */
 function bestSetLabel(w: LoggedWorkout, type: ExerciseType, kg: string): string {
@@ -26,7 +47,7 @@ function bestSetLabel(w: LoggedWorkout, type: ExerciseType, kg: string): string 
   if (type === 'weight_reps') return `${best.weightKg ?? 0} ${kg} × ${best.reps ?? 0}`;
   if (type === 'bodyweight_reps') return `× ${best.reps ?? 0}`;
   if (type === 'time') return `${best.seconds ?? 0}s`;
-  return `${best.distanceM ?? 0} m`;
+  return `${((best.distanceM ?? 0) / 1000).toFixed(1)} km`;
 }
 
 /** Numeric "best set" score of a session, for picking the highest prior. */
@@ -60,10 +81,18 @@ function routineFor(workouts: LoggedWorkout[], day: Date): { id: string; name: s
     .map(([id, v]) => ({ id, name: v.name }));
 }
 
-/** Group workouts into date buckets, newest first. */
-function groupByDay(workouts: LoggedWorkout[]): { key: string; date: Date; items: LoggedWorkout[] }[] {
+/**
+ * Group workouts into date buckets, newest first. The day being viewed is left
+ * out: it is already laid out in full above, so repeating it here would just be
+ * the same sets twice.
+ */
+function groupByDay(
+  workouts: LoggedWorkout[],
+  exclude: Date,
+): { key: string; date: Date; items: LoggedWorkout[] }[] {
   const groups: { key: string; date: Date; items: LoggedWorkout[] }[] = [];
   for (const w of workouts) {
+    if (isSameDay(w.at, exclude)) continue;
     const d = new Date(w.at);
     const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
     let g = groups.find((x) => x.key === key);
@@ -117,9 +146,15 @@ export default function Training() {
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = burnedForDay(workouts, selected);
   const routine = routineFor(workouts, selected);
-  const groups = groupByDay(workouts);
+  const groups = groupByDay(workouts, selected);
   const weekday = selected.toLocaleDateString(locale, { weekday: 'long' });
   const kg = t('progress.kg');
+  const min = t('track.min');
+
+  // Past days start collapsed — history is for looking something up, not for
+  // scrolling past on the way to today.
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
+  const toggleDay = (key: string) => setOpenDays((o) => ({ ...o, [key]: !o[key] }));
 
   // Resolve a logged exercise's display name live (localized) when it still
   // exists in the library; fall back to the snapshot taken at log time.
@@ -246,58 +281,87 @@ export default function Training() {
               const wToday = workoutFor(workouts, exId, selected);
               const doneToday = !!wToday && wToday.sets.some((s) => s.done);
               const planned = plan.plans?.[exId] ?? [];
-              // Your highest-ever session for this exercise (including today) —
-              // the "Max" record. Falls back to the plan target only when it
-              // has never been logged.
+              const type = ex?.type ?? 'weight_reps';
+              const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
+              // Every set for this day, right on the card — what is already
+              // logged if you have started, otherwise the plan's targets. No
+              // tapping through to find out what you are meant to lift.
+              const rows: WorkoutSet[] = wToday?.sets.length
+                ? wToday.sets
+                : planned.map((p) => ({ ...p, done: false }));
+              // Your highest-ever session, kept as the reference to beat.
               const best = historyFor(workouts, exId).reduce<LoggedWorkout | undefined>(
                 (b, w) => (!b || sessionTopScore(w) > sessionTopScore(b) ? w : b),
                 undefined,
               );
-              const preview = best ? bestSetLabel(best, best.type, kg) : '';
+              const maxLabel = best ? bestSetLabel(best, best.type, kg) : '';
               return (
-                <View key={exId} style={styles.planRow}>
-                  <Pressable onPress={() => checkOff(exId)} hitSlop={8}>
-                    <View
-                      style={[
-                        styles.checkBox,
-                        doneToday
-                          ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                          : { borderColor: theme.border },
-                      ]}
+                <View key={exId} style={styles.planItem}>
+                  <View style={styles.planRow}>
+                    <Pressable onPress={() => checkOff(exId)} hitSlop={8}>
+                      <View
+                        style={[
+                          styles.checkBox,
+                          doneToday
+                            ? { backgroundColor: theme.primary, borderColor: theme.primary }
+                            : { borderColor: theme.border },
+                        ]}
+                      >
+                        {doneToday && <Ionicons name="checkmark" size={15} color={theme.onPrimary} />}
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      style={({ pressed }) => [styles.planTap, pressed && { opacity: 0.6 }]}
+                      onPress={() => openExercise(exId)}
                     >
-                      {doneToday && <Ionicons name="checkmark" size={15} color={theme.onPrimary} />}
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    style={({ pressed }) => [styles.planTap, pressed && { opacity: 0.6 }]}
-                    onPress={() => openExercise(exId)}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
-                        {ex ? exerciseName(ex, lang) : exId}
-                      </Text>
-                      {preview ? (
-                        <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                          {t('training.max')}: {preview}
+                      <View style={[styles.rowIcon, { backgroundColor: accent + '22' }]}>
+                        <Ionicons
+                          name={ex ? exerciseIcon(ex) : 'barbell-outline'}
+                          size={15}
+                          color={accent}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                          {ex ? exerciseName(ex, lang) : exId}
                         </Text>
-                      ) : planned.length > 0 ? (
-                        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600' }}>
-                          {t('training.planTarget', {
-                            count: planned.length,
-                            detail: bestSetLabel(
-                              { sets: planned.map((p) => ({ ...p, done: false })) } as LoggedWorkout,
-                              ex?.type ?? 'weight_reps',
-                              kg,
-                            ),
-                          })}
-                        </Text>
-                      ) : null}
+                        {maxLabel ? (
+                          <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                            {t('training.max')}: {maxLabel}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                    </Pressable>
+                    <Pressable onPress={() => skipPlanToday(selected, exId)} hitSlop={8} style={styles.skipBtn}>
+                      <Ionicons name="close" size={18} color={theme.textTertiary} />
+                    </Pressable>
+                  </View>
+                  {rows.length > 0 && (
+                    <View style={styles.setStrip}>
+                      {rows.map((s, i) => (
+                        <View
+                          key={i}
+                          style={[
+                            styles.setChip,
+                            s.done
+                              ? { backgroundColor: accent + '22', borderColor: accent + '55' }
+                              : { backgroundColor: theme.cardSubtle, borderColor: theme.border },
+                          ]}
+                        >
+                          <Text
+                            style={{
+                              color: s.done ? accent : theme.textSecondary,
+                              fontSize: 12,
+                              fontWeight: '700',
+                            }}
+                          >
+                            {setChipLabel(s, type, kg, min)}
+                          </Text>
+                        </View>
+                      ))}
                     </View>
-                    <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-                  </Pressable>
-                  <Pressable onPress={() => skipPlanToday(selected, exId)} hitSlop={8} style={styles.skipBtn}>
-                    <Ionicons name="close" size={18} color={theme.textTertiary} />
-                  </Pressable>
+                  )}
                 </View>
               );
             })}
@@ -400,49 +464,68 @@ export default function Training() {
       ) : (
         groups.map((g) => {
           const dayBurn = g.items.reduce((s, w) => s + (w.caloriesBurned ?? 0), 0);
+          const open = !!openDays[g.key];
           return (
             <Card key={g.key}>
-              <View style={styles.groupHead}>
+              <Pressable
+                onPress={() => toggleDay(g.key)}
+                style={({ pressed }) => [styles.groupHead, pressed && { opacity: 0.6 }]}
+              >
+                <Ionicons
+                  name={open ? 'chevron-down' : 'chevron-forward'}
+                  size={18}
+                  color={theme.textSecondary}
+                />
                 <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flex: 1 }}>
-                  {isSameDay(g.date.toISOString(), new Date())
-                    ? t('home.today')
-                    : g.date.toLocaleDateString(locale, {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'short',
-                      })}
+                  {g.date.toLocaleDateString(locale, {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'short',
+                  })}
+                </Text>
+                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                  {t('training.exerciseCount', { count: g.items.length })}
                 </Text>
                 <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
                   {dayBurn} {t('common.kcal')}
                 </Text>
-              </View>
-              {g.items.map((w) => (
-                <View key={w.id} style={styles.workoutRow}>
-                  <Pressable
-                    onPress={() => openExercise(w.exerciseId)}
-                    style={({ pressed }) => [styles.workoutTap, pressed && { opacity: 0.6 }]}
-                  >
-                    <View style={[styles.workoutIcon, { backgroundColor: theme.cardSubtle }]}>
-                      <Ionicons name="barbell" size={16} color={theme.primary} />
+              </Pressable>
+              {open &&
+                g.items.map((w) => {
+                  const ex = findExercise(w.exerciseId, custom);
+                  const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
+                  return (
+                    <View key={w.id} style={styles.workoutRow}>
+                      <Pressable
+                        onPress={() => openExercise(w.exerciseId)}
+                        style={({ pressed }) => [styles.workoutTap, pressed && { opacity: 0.6 }]}
+                      >
+                        <View style={[styles.workoutIcon, { backgroundColor: accent + '22' }]}>
+                          <Ionicons
+                            name={ex ? exerciseIcon(ex) : 'barbell-outline'}
+                            size={16}
+                            color={accent}
+                          />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                            {nameOf(w)}
+                          </Text>
+                          <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                            {summarize(w, t('training.sets'), t('training.top'), kg)}
+                          </Text>
+                        </View>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => confirmDeleteWorkout(w.id)}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
+                      >
+                        <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                      </Pressable>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
-                        {nameOf(w)}
-                      </Text>
-                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                        {summarize(w, t('training.sets'), t('training.top'), kg)}
-                      </Text>
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => confirmDeleteWorkout(w.id)}
-                    hitSlop={8}
-                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
-                  >
-                    <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
-                  </Pressable>
-                </View>
-              ))}
+                  );
+                })}
             </Card>
           );
         })
@@ -481,8 +564,24 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
   routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   repeatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.sm },
-  planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 8 },
+  planItem: { paddingVertical: 4 },
+  planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 6 },
   planTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  // Indented to sit under the exercise name, clear of the checkbox column.
+  setStrip: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginStart: 34 + Spacing.sm,
+    marginBottom: 4,
+  },
+  setChip: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   skipBtn: { padding: 4 },
   skippedWrap: {
     marginTop: Spacing.sm,

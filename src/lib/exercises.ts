@@ -190,6 +190,24 @@ export const MUSCLE_COLORS: Record<MuscleGroup, string> = {
   fullBody: '#8C7BC7', // lavender
 };
 
+/**
+ * Icon for an exercise row. Cardio reads as movement rather than iron — a
+ * barbell on a treadmill entry is just wrong — and anything the user made
+ * themselves keeps its origin marker. Shared by every screen that lists
+ * exercises so the same entry never changes appearance between them.
+ */
+export function exerciseIcon(ex: Exercise): 'walk' | 'camera-outline' | 'create-outline' | 'barbell-outline' {
+  if (ex.category === 'cardio') return 'walk';
+  if (ex.source === 'scan') return 'camera-outline';
+  if (ex.source === 'custom') return 'create-outline';
+  return 'barbell-outline';
+}
+
+/** Accent for an exercise, or a neutral fallback when it left the library. */
+export function exerciseColor(ex: Exercise | undefined, fallback: string): string {
+  return ex ? MUSCLE_COLORS[ex.category] : fallback;
+}
+
 /** Localized display name for an exercise. */
 export function exerciseName(ex: Exercise, lang: Language): string {
   if (lang === 'ar') return ex.nameAr ?? ex.name;

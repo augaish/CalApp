@@ -171,6 +171,7 @@ export const en = {
     max: 'Max',
     skippedToday: 'Skipped today — tap to restore',
     planTarget: 'Target: {{count}} × {{detail}}',
+    exerciseCount: '{{count}} exercises',
     deleteWorkoutConfirm: 'Delete this exercise entry? This cannot be undone.',
   },
   schedule: {
@@ -259,6 +260,8 @@ export const en = {
     weight: 'Weight',
     reps: 'Reps',
     seconds: 'Seconds',
+    minutes: 'Minutes',
+    min: 'min',
     distance: 'Distance (m)',
     addSet: 'Add set',
     saveSet: 'Save set',

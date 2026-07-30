@@ -8,7 +8,7 @@ import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
-import { allExercises, exerciseName, MUSCLE_COLORS, MUSCLE_GROUPS } from '@/lib/exercises';
+import { allExercises, exerciseIcon, exerciseName, MUSCLE_COLORS, MUSCLE_GROUPS } from '@/lib/exercises';
 import { useAppStore } from '@/lib/store';
 import type { Exercise, MuscleGroup } from '@/lib/types';
 
@@ -172,11 +172,7 @@ export default function ExerciseLibrary() {
                   ]}
                 >
                   <View style={[styles.rowIcon, { backgroundColor: MUSCLE_COLORS[ex.category] + '22' }]}>
-                    <Ionicons
-                      name={ex.source === 'builtin' ? 'barbell-outline' : ex.source === 'scan' ? 'camera-outline' : 'create-outline'}
-                      size={16}
-                      color={MUSCLE_COLORS[ex.category]}
-                    />
+                    <Ionicons name={exerciseIcon(ex)} size={16} color={MUSCLE_COLORS[ex.category]} />
                   </View>
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
                     {exerciseName(ex, lang)}

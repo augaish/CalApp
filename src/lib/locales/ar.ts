@@ -173,6 +173,7 @@ export const ar: TranslationSchema = {
     max: 'الأقصى',
     skippedToday: 'مُتخطّى اليوم — اضغط للاستعادة',
     planTarget: 'الهدف: {{count}} × {{detail}}',
+    exerciseCount: '{{count}} تمارين',
     deleteWorkoutConfirm: 'حذف هذا التمرين المسجّل؟ لا يمكن التراجع.',
   },
   schedule: {
@@ -261,6 +262,8 @@ export const ar: TranslationSchema = {
     weight: 'الوزن',
     reps: 'التكرارات',
     seconds: 'الثواني',
+    minutes: 'الدقائق',
+    min: 'د',
     distance: 'المسافة (م)',
     addSet: 'إضافة مجموعة',
     saveSet: 'حفظ المجموعة',

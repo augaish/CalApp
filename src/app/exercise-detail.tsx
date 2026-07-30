@@ -292,11 +292,13 @@ export default function ExerciseDetail() {
 }
 
 /** Human-readable value(s) of a single set. */
-function setLabel(s: WorkoutSet, type: ExerciseType, kg: string): string {
+function setLabel(s: WorkoutSet, type: ExerciseType, kg: string, min = 'min'): string {
   if (type === 'weight_reps') return `${s.weightKg ?? 0} ${kg} × ${s.reps ?? 0}`;
   if (type === 'bodyweight_reps') return `× ${s.reps ?? 0}`;
   if (type === 'time') return `${s.seconds ?? 0}s`;
-  return `${s.distanceM ?? 0} m · ${s.seconds ?? 0}s`;
+  const parts = [`${Math.round((s.seconds ?? 0) / 60)} ${min}`];
+  if (s.distanceM) parts.push(`${(s.distanceM / 1000).toFixed(1)} km`);
+  return parts.join(' · ');
 }
 
 function TrackTab({
@@ -364,7 +366,14 @@ function TrackTab({
           {type === 'distance_time' && (
             <>
               <Stepper label={t('track.distance')} value={distance} onChange={setDistance} step={100} />
-              <Stepper label={t('track.seconds')} value={seconds} onChange={setSeconds} step={10} />
+              {/* Cardio is counted in minutes — nobody logs a 20 minute run by
+                  tapping seconds. Stored as seconds underneath, unchanged. */}
+              <Stepper
+                label={t('track.minutes')}
+                value={Math.round(seconds / 60)}
+                onChange={(m) => setSeconds(Math.round(m) * 60)}
+                step={1}
+              />
             </>
           )}
         </View>
@@ -409,7 +418,7 @@ function TrackTab({
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
-                      {setLabel(s, type, kg)}
+                      {setLabel(s, type, kg, t('track.min'))}
                     </Text>
                     {isBest && <Ionicons name="trophy" size={14} color={theme.carbs} />}
                   </View>
@@ -461,7 +470,7 @@ function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; typ
             <View key={i} style={styles.histSet}>
               <Text style={{ color: theme.textSecondary, fontSize: 13, width: 22 }}>{i + 1}.</Text>
               <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
-                {setLabel(s, type, kg)}
+                {setLabel(s, type, kg, t('track.min'))}
               </Text>
               {i === bestSetIndex(w.sets, w.type) && <Ionicons name="trophy" size={13} color={theme.carbs} />}
               {type === 'weight_reps' && (s.weightKg ?? 0) > 0 && (s.reps ?? 0) > 0 ? (
