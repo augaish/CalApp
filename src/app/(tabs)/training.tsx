@@ -23,6 +23,11 @@ import {
 } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
+/** Weekday name in the active locale (Jan 7 2024 was a Sunday). */
+function weekdayLabel(i: number, locale: string): string {
+  return new Date(2024, 0, 7 + i).toLocaleDateString(locale, { weekday: 'long' });
+}
+
 /** Whole minutes, for cardio durations stored as seconds. */
 function toMin(seconds: number | undefined): number {
   return Math.round((seconds ?? 0) / 60);
@@ -123,6 +128,7 @@ export default function Training() {
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const copyDayTo = useAppStore((s) => s.copyDayTo);
+  const saveDayToSchedule = useAppStore((s) => s.saveDayToSchedule);
   const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const removeWorkout = useAppStore((s) => s.removeWorkout);
   const setWorkoutTrained = useAppStore((s) => s.setWorkoutTrained);
@@ -141,6 +147,7 @@ export default function Training() {
   // duplicated from another day, scanned in, or picked from the library. The
   // card has to show what was actually done, not only what was planned, or
   // those exercises exist in the data with nowhere to appear.
+  const loggedTodayCount = workouts.filter((w) => isSameDay(w.at, selected)).length;
   const unplannedIds = [
     ...new Set(
       workouts.filter((w) => isSameDay(w.at, selected)).map((w) => w.exerciseId),
@@ -158,6 +165,7 @@ export default function Training() {
   // scrolling past on the way to today.
   const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
   const toggleDay = (key: string) => setOpenDays((o) => ({ ...o, [key]: !o[key] }));
+  const [pickingWeekday, setPickingWeekday] = useState(false);
 
   // Resolve a logged exercise's display name live (localized) when it still
   // exists in the library; fall back to the snapshot taken at log time.
@@ -195,6 +203,32 @@ export default function Training() {
           Alert.alert(t('training.repeated', { count: n }));
         },
       },
+    ]);
+  };
+
+  /**
+   * Turn what was trained today into a weekday of the weekly schedule. A
+   * weekday that already has exercises asks first, because replacing a plan
+   * and adding to it are both things people genuinely mean.
+   */
+  const saveToWeekday = (weekday: number) => {
+    setPickingWeekday(false);
+    const label = weekdayLabel(weekday, locale);
+    const existing = schedule[weekday]?.exerciseIds ?? [];
+    const commit = (mode: 'replace' | 'merge') => {
+      const n = saveDayToSchedule(selected, weekday, mode);
+      if (n === 0) return;
+      successHaptic();
+      Alert.alert(t('training.savedToSchedule', { count: n, day: label }));
+    };
+    if (existing.length === 0) {
+      commit('replace');
+      return;
+    }
+    Alert.alert(t('training.scheduleExists', { day: label }), t('training.scheduleExistsBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('training.scheduleMerge'), onPress: () => commit('merge') },
+      { text: t('training.scheduleReplace'), style: 'destructive', onPress: () => commit('replace') },
     ]);
   };
 
@@ -279,6 +313,29 @@ export default function Training() {
           </Text>
         </View>
       </Card>
+
+      {/* One fixed way into the planning model, whether or not today has a
+          plan — previously this lived inside the day card and so came and went
+          with it. */}
+      <Pressable
+        onPress={() => router.push('/schedule')}
+        style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+      >
+        <Card style={styles.scheduleRow}>
+          <View style={[styles.scheduleIcon, { backgroundColor: theme.cardSubtle }]}>
+            <Ionicons name="calendar" size={19} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
+              {t('training.weeklySchedule')}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+              {t('training.weeklyScheduleHint')}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
 
       {/* The day itself: the weekly plan plus anything else logged today. */}
       {visiblePlanIds.length > 0 ? (
@@ -447,6 +504,59 @@ export default function Training() {
                   );
                 })}
               </View>
+            </View>
+          )}
+
+          {/* Make today repeatable: the session just trained becomes a weekday
+              of the schedule, targets and all. Only offered once something is
+              actually logged — an untouched plan is already the schedule. */}
+          {loggedTodayCount > 0 && (
+            <View style={[styles.saveWrap, { borderTopColor: theme.border }]}>
+              <Pressable
+                onPress={() => setPickingWeekday((v) => !v)}
+                style={({ pressed }) => [styles.saveDayBtn, pressed && { opacity: 0.6 }]}
+              >
+                <Ionicons
+                  name={pickingWeekday ? 'chevron-down' : 'calendar-outline'}
+                  size={16}
+                  color={theme.primary}
+                />
+                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>
+                  {t('training.saveAsScheduleDay')}
+                </Text>
+              </Pressable>
+              {pickingWeekday && (
+                <>
+                  <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 6 }}>
+                    {t('training.pickWeekday')}
+                  </Text>
+                  <View style={styles.chipWrap}>
+                    {[0, 1, 2, 3, 4, 5, 6].map((wd) => {
+                      const has = (schedule[wd]?.exerciseIds.length ?? 0) > 0;
+                      return (
+                        <Pressable
+                          key={wd}
+                          onPress={() => saveToWeekday(wd)}
+                          style={({ pressed }) => [
+                            styles.chip,
+                            { backgroundColor: theme.cardSubtle },
+                            pressed && { transform: [{ scale: 0.95 }] },
+                          ]}
+                        >
+                          {/* A dot marks a weekday that already has a plan, so
+                              the "replace or add?" question is not a surprise. */}
+                          {has && <View style={[styles.chipDot, { backgroundColor: theme.primary }]} />}
+                          <Text
+                            style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}
+                          >
+                            {weekdayLabel(wd, locale)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
             </View>
           )}
         </Card>
@@ -638,6 +748,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   buildScheduleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  scheduleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  scheduleIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveWrap: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  saveDayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  chipDot: { width: 7, height: 7, borderRadius: 3.5 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   chip: {
     flexDirection: 'row',

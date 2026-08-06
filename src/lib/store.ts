@@ -114,6 +114,13 @@ interface AppState {
    * already logged there. Returns how many were added.
    */
   copyDayTo: (sourceDay: Date, targetDay: Date) => number;
+  /**
+   * Turn a day that was actually trained into a weekday of the weekly
+   * schedule, carrying its sets across as the targets. 'replace' makes the
+   * weekday exactly this day; 'merge' keeps what is already there but lets
+   * today's numbers win for any exercise in both. Returns how many were saved.
+   */
+  saveDayToSchedule: (day: Date, weekday: number, mode: 'replace' | 'merge') => number;
   addToSchedule: (weekday: number, exerciseId: string) => void;
   removeFromSchedule: (weekday: number, exerciseId: string) => void;
   setScheduleTitle: (weekday: number, title: string) => void;
@@ -386,6 +393,39 @@ export const useAppStore = create<AppState>()(
         if (cloned.length === 0) return 0;
         set((s) => ({ workouts: [...cloned, ...s.workouts] }));
         return cloned.length;
+      },
+      saveDayToSchedule: (day, weekday, mode) => {
+        const state = get();
+        const dk = dayKey(day);
+        const logged = state.workouts.filter((w) => dayKey(new Date(w.at)) === dk);
+        if (logged.length === 0) return 0;
+
+        const current = state.schedule[weekday];
+        const ids = mode === 'replace' ? [] : [...(current?.exerciseIds ?? [])];
+        const plans: Record<string, PlannedSet[]> =
+          mode === 'replace' ? {} : { ...(current?.plans ?? {}) };
+
+        for (const w of logged) {
+          if (!ids.includes(w.exerciseId)) ids.push(w.exerciseId);
+          // What was just trained is the better target, so it overwrites any
+          // existing plan for that exercise even when merging.
+          plans[w.exerciseId] = w.sets.map((s) => ({
+            weightKg: s.weightKg,
+            reps: s.reps,
+            seconds: s.seconds,
+            distanceM: s.distanceM,
+          }));
+        }
+
+        set((s) => ({
+          schedule: {
+            ...s.schedule,
+            // The day's name belongs to the weekday, not to the workout, so it
+            // survives a replace.
+            [weekday]: { title: current?.title, exerciseIds: ids, plans },
+          },
+        }));
+        return logged.length;
       },
       addToSchedule: (weekday, exerciseId) =>
         set((s) => {
