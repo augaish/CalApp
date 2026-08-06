@@ -11,7 +11,15 @@ import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
-import { burnedForDay, dateKey, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
+import {
+  bestSetIndex,
+  burnedForDay,
+  dateKey,
+  historyFor,
+  isSameDay,
+  useAppStore,
+  workoutFor,
+} from '@/lib/store';
 import type { Exercise, ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
 /** Whole minutes, for cardio durations stored as seconds. */
@@ -339,27 +347,35 @@ export default function Training() {
                   </View>
                   {rows.length > 0 && (
                     <View style={styles.setStrip}>
-                      {rows.map((s, i) => (
-                        <View
-                          key={i}
-                          style={[
-                            styles.setChip,
-                            s.done
-                              ? { backgroundColor: accent + '22', borderColor: accent + '55' }
-                              : { backgroundColor: theme.cardSubtle, borderColor: theme.border },
-                          ]}
-                        >
-                          <Text
-                            style={{
-                              color: s.done ? accent : theme.textSecondary,
-                              fontSize: 12,
-                              fontWeight: '700',
-                            }}
+                      {rows.map((s, i) => {
+                        // Only the day's best set carries the accent. Colouring
+                        // every logged set just repeated what the checkmark
+                        // already says; this way the colour points at the one
+                        // number worth beating — the same set the trophy marks
+                        // inside the exercise.
+                        const top = s.done && i === bestSetIndex(rows, type);
+                        return (
+                          <View
+                            key={i}
+                            style={[
+                              styles.setChip,
+                              top
+                                ? { backgroundColor: accent + '22', borderColor: accent + '55' }
+                                : { backgroundColor: theme.cardSubtle, borderColor: theme.border },
+                            ]}
                           >
-                            {setChipLabel(s, type, kg, min)}
-                          </Text>
-                        </View>
-                      ))}
+                            <Text
+                              style={{
+                                color: top ? accent : theme.textSecondary,
+                                fontSize: 12,
+                                fontWeight: top ? '800' : '700',
+                              }}
+                            >
+                              {setChipLabel(s, type, kg, min)}
+                            </Text>
+                          </View>
+                        );
+                      })}
                     </View>
                   )}
                 </View>
