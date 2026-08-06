@@ -172,6 +172,10 @@ export const en = {
     skippedToday: 'Skipped today — tap to restore',
     planTarget: 'Target: {{count}} × {{detail}}',
     exerciseCount: '{{count}} exercises',
+    copyDayTitle: 'Copy this workout',
+    copyDayBody: 'Copy the exercises and sets from {{from}} to {{to}}? Nothing counts as done until you tick it off.',
+    copyDayCta: 'Copy',
+    copyNothing: 'Those exercises are already logged on that day.',
     deleteWorkoutConfirm: 'Delete this exercise entry? This cannot be undone.',
   },
   schedule: {

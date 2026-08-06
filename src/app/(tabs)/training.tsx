@@ -138,6 +138,7 @@ export default function Training() {
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const repeatLastSession = useAppStore((s) => s.repeatLastSession);
+  const copyDayTo = useAppStore((s) => s.copyDayTo);
   const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const removeWorkout = useAppStore((s) => s.removeWorkout);
   const setWorkoutTrained = useAppStore((s) => s.setWorkoutTrained);
@@ -179,6 +180,30 @@ export default function Training() {
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => removeWorkout(id) },
     ]);
+
+  // Re-run a past day on the day being viewed. Copied as targets, not as work
+  // already done, so nothing counts as burned until it is ticked off.
+  const copyDay = (from: Date) => {
+    const label = from.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' });
+    const to = selectedIsToday
+      ? t('home.today')
+      : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+    Alert.alert(t('training.copyDayTitle'), t('training.copyDayBody', { from: label, to }), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('training.copyDayCta'),
+        onPress: () => {
+          const n = copyDayTo(from, selected);
+          if (n === 0) {
+            Alert.alert(t('training.copyNothing'));
+            return;
+          }
+          successHaptic();
+          Alert.alert(t('training.repeated', { count: n }));
+        },
+      },
+    ]);
+  };
 
   const repeat = () => {
     const n = repeatLastSession(selected);
@@ -511,6 +536,13 @@ export default function Training() {
                 <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
                   {dayBurn} {t('common.kcal')}
                 </Text>
+                <Pressable
+                  onPress={() => copyDay(g.date)}
+                  hitSlop={8}
+                  style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.5 }]}
+                >
+                  <Ionicons name="copy-outline" size={17} color={theme.primary} />
+                </Pressable>
               </Pressable>
               {open &&
                 g.items.map((w) => {
@@ -650,6 +682,7 @@ const styles = StyleSheet.create({
   },
   workoutTap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
   deleteBtn: { padding: 4 },
+  copyBtn: { padding: 4, marginStart: 2 },
   workoutIcon: {
     width: 36,
     height: 36,

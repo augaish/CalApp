@@ -109,6 +109,11 @@ interface AppState {
    * re-checking marks them done and restores the burn.
    */
   setWorkoutTrained: (workoutId: string, trained: boolean) => void;
+  /**
+   * Clone one day's exercises and sets onto another day, skipping anything
+   * already logged there. Returns how many were added.
+   */
+  copyDayTo: (sourceDay: Date, targetDay: Date) => number;
   /** Clone the most recent previous training day's exercises/sets onto `day`. */
   repeatLastSession: (day: Date) => number;
   addToSchedule: (weekday: number, exerciseId: string) => void;
@@ -352,6 +357,38 @@ export const useAppStore = create<AppState>()(
             }),
           };
         }),
+      copyDayTo: (sourceDay, targetDay) => {
+        const state = get();
+        const srcKey = dayKey(sourceDay);
+        const source = state.workouts.filter((w) => dayKey(new Date(w.at)) === srcKey);
+        if (source.length === 0) return 0;
+        // An exercise already logged on the target day is left alone, so
+        // copying twice cannot double-count it.
+        const targetKey = dayKey(targetDay);
+        const already = new Set(
+          state.workouts
+            .filter((w) => dayKey(new Date(w.at)) === targetKey)
+            .map((w) => w.exerciseId),
+        );
+        const stamp = stampFor(targetDay);
+        const cloned: LoggedWorkout[] = source
+          .filter((w) => !already.has(w.exerciseId))
+          .map((w) => ({
+            id: id(),
+            at: stamp,
+            exerciseId: w.exerciseId,
+            exerciseName: w.exerciseName,
+            type: w.type,
+            // Copied as a target, not a claim: the weights to aim for, with
+            // nothing marked done — and so nothing burned — until it is
+            // ticked off. Checking it on recomputes the burn.
+            sets: w.sets.map((st) => ({ ...st, done: false, isPR: false })),
+            caloriesBurned: 0,
+          }));
+        if (cloned.length === 0) return 0;
+        set((s) => ({ workouts: [...cloned, ...s.workouts] }));
+        return cloned.length;
+      },
       repeatLastSession: (day) => {
         const state = get();
         // Most recent day strictly before `day` that has any workout.
@@ -359,24 +396,7 @@ export const useAppStore = create<AppState>()(
           .filter((w) => new Date(w.at).getTime() < startOfDay(day).getTime())
           .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
         if (prior.length === 0) return 0;
-        const lastKey = dayKey(new Date(prior[0].at));
-        const source = prior.filter((w) => dayKey(new Date(w.at)) === lastKey);
-        const bodyKg = state.profile?.weightKg ?? 75;
-        const stamp = stampFor(day);
-        const cloned: LoggedWorkout[] = source.map((w) => {
-          const sets = w.sets.map((st) => ({ ...st, done: false, isPR: false }));
-          return {
-            id: id(),
-            at: stamp,
-            exerciseId: w.exerciseId,
-            exerciseName: w.exerciseName,
-            type: w.type,
-            sets,
-            caloriesBurned: workoutBurn(sets.length, bodyKg),
-          };
-        });
-        set((s) => ({ workouts: [...cloned, ...s.workouts] }));
-        return cloned.length;
+        return get().copyDayTo(new Date(prior[0].at), day);
       },
       addToSchedule: (weekday, exerciseId) =>
         set((s) => {

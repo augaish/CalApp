@@ -174,6 +174,10 @@ export const ar: TranslationSchema = {
     skippedToday: 'مُتخطّى اليوم — اضغط للاستعادة',
     planTarget: 'الهدف: {{count}} × {{detail}}',
     exerciseCount: '{{count}} تمارين',
+    copyDayTitle: 'نسخ هذا التمرين',
+    copyDayBody: 'نسخ التمارين والمجموعات من {{from}} إلى {{to}}؟ لن يُحتسب أي شيء كمنجز حتى تؤشر عليه.',
+    copyDayCta: 'نسخ',
+    copyNothing: 'هذه التمارين مسجلة بالفعل في ذلك اليوم.',
     deleteWorkoutConfirm: 'حذف هذا التمرين المسجّل؟ لا يمكن التراجع.',
   },
   schedule: {
