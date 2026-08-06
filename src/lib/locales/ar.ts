@@ -167,6 +167,7 @@ export const ar: TranslationSchema = {
     repeated: 'تم نسخ {{count}} تمارين إلى هذا اليوم.',
     emptyDay: 'لا شيء مسجّل لهذا اليوم. أضف تمريناً للبدء.',
     todaysPlan: 'خطة اليوم',
+    todaysWorkout: 'تمرين اليوم',
     buildSchedule: 'أنشئ جدولاً أسبوعياً',
     last: 'آخر مرة',
     best: 'الأفضل',

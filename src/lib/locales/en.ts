@@ -165,6 +165,7 @@ export const en = {
     repeated: '{{count}} exercises copied to this day.',
     emptyDay: 'Nothing logged for this day. Add an exercise to start.',
     todaysPlan: "Today's plan",
+    todaysWorkout: "Today's workout",
     buildSchedule: 'Build a weekly schedule',
     last: 'Last',
     best: 'Best',

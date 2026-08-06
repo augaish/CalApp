@@ -343,25 +343,14 @@ export default function Training() {
           <View style={styles.routineHead}>
             <Ionicons name="calendar" size={18} color={theme.primary} />
             <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
-              {plan?.title || t('training.todaysPlan')}
+              {selectedIsToday
+                ? t('training.todaysWorkout')
+                : selected.toLocaleDateString(locale, {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'short',
+                  })}
             </Text>
-            {/* Labelled rather than a bare pencil: the weekly schedule is now
-                the only place plans come from, so how to reach it has to be
-                obvious. */}
-            <Pressable
-              onPress={() => router.push('/schedule')}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.editPlanBtn,
-                { backgroundColor: theme.cardSubtle },
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <Ionicons name="create-outline" size={15} color={theme.primary} />
-              <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
-                {t('training.editPlan')}
-              </Text>
-            </Pressable>
           </View>
           <View style={{ marginTop: Spacing.sm }}>
             {visiblePlanIds.map((exId) => {
@@ -444,12 +433,13 @@ export default function Training() {
                   {rows.length > 0 && (
                     <View style={styles.setStrip}>
                       {rows.map((s, i) => {
-                        // Only the day's best set carries the accent. Colouring
-                        // every logged set just repeated what the checkmark
-                        // already says; this way the colour points at the one
-                        // number worth beating — the same set the trophy marks
-                        // inside the exercise.
-                        const top = s.done && i === bestSetIndex(rows, type);
+                        // The heaviest set of the row, always — whether it is
+                        // a target or already lifted. The two signals stay
+                        // separate: the checkmark means trained, the colour
+                        // means top set. Tying the colour to this set's own
+                        // done flag made it vanish on rows whose flags were
+                        // mixed, which is unexplainable from the outside.
+                        const top = i === bestSetIndex(rows, type);
                         return (
                           <View
                             key={i}
@@ -707,14 +697,6 @@ const styles = StyleSheet.create({
   burnUnit: { fontSize: 14, fontWeight: '600' },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
   routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  editPlanBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    borderRadius: Radius.full,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-  },
   planItem: { paddingVertical: 4 },
   planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 6 },
   planTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
