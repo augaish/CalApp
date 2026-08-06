@@ -17,6 +17,7 @@ import {
   dateKey,
   historyFor,
   isSameDay,
+  setScore,
   useAppStore,
   workoutFor,
 } from '@/lib/store';
@@ -294,9 +295,14 @@ export default function Training() {
               // Every set for this day, right on the card — what is already
               // logged if you have started, otherwise the plan's targets. No
               // tapping through to find out what you are meant to lift.
-              const rows: WorkoutSet[] = wToday?.sets.length
-                ? wToday.sets
-                : planned.map((p) => ({ ...p, done: false }));
+              // Sorted lightest to heaviest so the strip reads the same way
+              // whether the sets were logged warming up or dropping down, and
+              // the day's best lands at the end. This is a display copy only:
+              // Exercise Detail keeps the real logged order, because its rows
+              // are numbered and edited by index.
+              const rows: WorkoutSet[] = (
+                wToday?.sets.length ? [...wToday.sets] : planned.map((p) => ({ ...p, done: false }))
+              ).sort((a, b) => setScore(a, type) - setScore(b, type));
               // Your highest-ever session, kept as the reference to beat.
               const best = historyFor(workouts, exId).reduce<LoggedWorkout | undefined>(
                 (b, w) => (!b || sessionTopScore(w) > sessionTopScore(b) ? w : b),

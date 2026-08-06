@@ -754,7 +754,12 @@ function stampFor(day: Date): string {
  * heaviest set (weight ranks first, reps only break ties) — that's what users
  * expect. Bodyweight → reps, time → duration, cardio → distance.
  */
-function setScore(s: WorkoutSet, type: LoggedWorkout['type']): number {
+/**
+ * How good a set is, for ranking within a session: load first, reps as the
+ * tie-break. Exported so anything that orders or highlights sets agrees with
+ * the trophy instead of growing its own definition of "best".
+ */
+export function setScore(s: WorkoutSet, type: LoggedWorkout['type']): number {
   if (type === 'bodyweight_reps') return s.reps ?? 0;
   if (type === 'time') return s.seconds ?? 0;
   if (type === 'distance_time') return s.distanceM ?? 0;
