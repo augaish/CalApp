@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Screen } from '@/components/ui';
-import { Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
@@ -21,7 +21,7 @@ import {
   useAppStore,
   workoutFor,
 } from '@/lib/store';
-import type { Exercise, ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
+import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
 /** Whole minutes, for cardio durations stored as seconds. */
 function toMin(seconds: number | undefined): number {
@@ -75,21 +75,6 @@ function sessionTopScore(w: LoggedWorkout): number {
   );
 }
 
-/** Exercises most frequently trained on the same weekday as `day`. */
-function routineFor(workouts: LoggedWorkout[], day: Date): { id: string; name: string }[] {
-  const weekday = day.getDay();
-  const counts = new Map<string, { name: string; n: number }>();
-  for (const w of workouts) {
-    if (new Date(w.at).getDay() !== weekday) continue;
-    const cur = counts.get(w.exerciseId);
-    counts.set(w.exerciseId, { name: w.exerciseName, n: (cur?.n ?? 0) + 1 });
-  }
-  return [...counts.entries()]
-    .sort((a, b) => b[1].n - a[1].n)
-    .slice(0, 4)
-    .map(([id, v]) => ({ id, name: v.name }));
-}
-
 /**
  * Group workouts into date buckets, newest first. The day being viewed is left
  * out: it is already laid out in full above, so repeating it here would just be
@@ -137,7 +122,6 @@ export default function Training() {
   const workouts = useAppStore((s) => s.workouts);
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
-  const repeatLastSession = useAppStore((s) => s.repeatLastSession);
   const copyDayTo = useAppStore((s) => s.copyDayTo);
   const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const removeWorkout = useAppStore((s) => s.removeWorkout);
@@ -155,9 +139,7 @@ export default function Training() {
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = burnedForDay(workouts, selected);
-  const routine = routineFor(workouts, selected);
   const groups = groupByDay(workouts, selected);
-  const weekday = selected.toLocaleDateString(locale, { weekday: 'long' });
   const kg = t('progress.kg');
   const min = t('track.min');
 
@@ -203,16 +185,6 @@ export default function Training() {
         },
       },
     ]);
-  };
-
-  const repeat = () => {
-    const n = repeatLastSession(selected);
-    if (n === 0) {
-      Alert.alert(t('training.noPrevious'));
-      return;
-    }
-    successHaptic();
-    Alert.alert(t('training.repeated', { count: n }));
   };
 
   // Done/undone toggle for the checkbox — never navigates and never loses your
@@ -305,8 +277,22 @@ export default function Training() {
             <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
               {plan.title || t('training.todaysPlan')}
             </Text>
-            <Pressable onPress={() => router.push('/schedule')} hitSlop={8}>
-              <Ionicons name="create-outline" size={18} color={theme.textSecondary} />
+            {/* Labelled rather than a bare pencil: the weekly schedule is now
+                the only place plans come from, so how to reach it has to be
+                obvious. */}
+            <Pressable
+              onPress={() => router.push('/schedule')}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.editPlanBtn,
+                { backgroundColor: theme.cardSubtle },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Ionicons name="create-outline" size={15} color={theme.primary} />
+              <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
+                {t('training.editPlan')}
+              </Text>
             </Pressable>
           </View>
           <View style={{ marginTop: Spacing.sm }}>
@@ -456,49 +442,6 @@ export default function Training() {
         </Pressable>
       )}
 
-      {/* Routine insight + repeat last session */}
-      <Card>
-        <View style={styles.routineHead}>
-          <Text style={[styles.cardTitle, { color: theme.text, flex: 1 }]}>{t('training.routine')}</Text>
-          <Pressable onPress={repeat} hitSlop={8} style={styles.repeatBtn}>
-            <Ionicons name="repeat" size={16} color={theme.primary} />
-            <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>
-              {t('training.repeatLast')}
-            </Text>
-          </Pressable>
-        </View>
-        {routine.length > 0 ? (
-          <>
-            <Text style={{ color: theme.textSecondary, fontSize: 13, marginBottom: Spacing.sm }}>
-              {t('training.routineHint', { weekday })}
-            </Text>
-            <View style={styles.chipWrap}>
-              {routine.map((r) => (
-                <Pressable
-                  key={r.id}
-                  onPress={() => openExercise(r.id)}
-                  style={({ pressed }) => [
-                    styles.chip,
-                    { backgroundColor: theme.cardSubtle },
-                    pressed && { transform: [{ scale: 0.95 }] },
-                  ]}
-                >
-                  <Ionicons name="add" size={14} color={theme.primary} />
-                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}>
-                    {(() => {
-                      const ex: Exercise | undefined = findExercise(r.id, custom);
-                      return ex ? exerciseName(ex, lang) : r.name;
-                    })()}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        ) : (
-          <Text style={{ color: theme.textSecondary }}>{t('training.noRoutine')}</Text>
-        )}
-      </Card>
-
       {/* History grouped by day */}
       <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('training.history')}</Text>
       {groups.length === 0 ? (
@@ -536,13 +479,6 @@ export default function Training() {
                 <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
                   {dayBurn} {t('common.kcal')}
                 </Text>
-                <Pressable
-                  onPress={() => copyDay(g.date)}
-                  hitSlop={8}
-                  style={({ pressed }) => [styles.copyBtn, pressed && { opacity: 0.5 }]}
-                >
-                  <Ionicons name="copy-outline" size={17} color={theme.primary} />
-                </Pressable>
               </Pressable>
               {open &&
                 g.items.map((w) => {
@@ -580,6 +516,28 @@ export default function Training() {
                     </View>
                   );
                 })}
+              {open && (
+                <Pressable
+                  onPress={() => copyDay(g.date)}
+                  style={({ pressed }) => [
+                    styles.copyDayBtn,
+                    { borderColor: theme.primary },
+                    pressed && { opacity: 0.6 },
+                  ]}
+                >
+                  <Ionicons name="copy-outline" size={16} color={theme.primary} />
+                  <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>
+                    {selectedIsToday
+                      ? t('training.duplicateToToday')
+                      : t('training.duplicateTo', {
+                          day: selected.toLocaleDateString(locale, {
+                            day: 'numeric',
+                            month: 'short',
+                          }),
+                        })}
+                  </Text>
+                </Pressable>
+              )}
             </Card>
           );
         })
@@ -617,7 +575,14 @@ const styles = StyleSheet.create({
   burnUnit: { fontSize: 14, fontWeight: '600' },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
   routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  repeatBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: Spacing.sm },
+  editPlanBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    borderRadius: Radius.full,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
   planItem: { paddingVertical: 4 },
   planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 6 },
   planTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
@@ -672,6 +637,7 @@ const styles = StyleSheet.create({
   groupHead: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Spacing.sm,
     marginBottom: Spacing.sm,
   },
   workoutRow: {
@@ -682,7 +648,17 @@ const styles = StyleSheet.create({
   },
   workoutTap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
   deleteBtn: { padding: 4 },
-  copyBtn: { padding: 4, marginStart: 2 },
+  copyDayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: Spacing.sm,
+    paddingVertical: 11,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
   workoutIcon: {
     width: 36,
     height: 36,

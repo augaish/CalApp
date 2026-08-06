@@ -114,8 +114,6 @@ interface AppState {
    * already logged there. Returns how many were added.
    */
   copyDayTo: (sourceDay: Date, targetDay: Date) => number;
-  /** Clone the most recent previous training day's exercises/sets onto `day`. */
-  repeatLastSession: (day: Date) => number;
   addToSchedule: (weekday: number, exerciseId: string) => void;
   removeFromSchedule: (weekday: number, exerciseId: string) => void;
   setScheduleTitle: (weekday: number, title: string) => void;
@@ -388,15 +386,6 @@ export const useAppStore = create<AppState>()(
         if (cloned.length === 0) return 0;
         set((s) => ({ workouts: [...cloned, ...s.workouts] }));
         return cloned.length;
-      },
-      repeatLastSession: (day) => {
-        const state = get();
-        // Most recent day strictly before `day` that has any workout.
-        const prior = state.workouts
-          .filter((w) => new Date(w.at).getTime() < startOfDay(day).getTime())
-          .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
-        if (prior.length === 0) return 0;
-        return get().copyDayTo(new Date(prior[0].at), day);
       },
       addToSchedule: (weekday, exerciseId) =>
         set((s) => {
