@@ -71,6 +71,57 @@ export async function initDb(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // Billing webhooks are retried by the store until acknowledged, so each one
+  // is recorded and replays are dropped rather than re-applied.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS billing_events (
+      event_id    TEXT PRIMARY KEY,
+      ref         TEXT,
+      type        TEXT,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  // Webhooks can also arrive out of order; this remembers how recent the last
+  // applied one was so a stale retry cannot undo a newer state.
+  await pool.query(
+    `ALTER TABLE app_users ADD COLUMN IF NOT EXISTS plan_event_ms BIGINT NOT NULL DEFAULT 0`,
+  );
+}
+
+/**
+ * Record a webhook as handled. Returns false when it has been seen before, so
+ * the caller can skip it — stores retry aggressively and a replayed renewal
+ * must not extend anyone twice.
+ */
+export async function claimBillingEvent(
+  eventId: string,
+  ref: string | null,
+  type: string | null,
+): Promise<boolean> {
+  if (!pool) return true;
+  const res = await pool.query(
+    `INSERT INTO billing_events (event_id, ref, type) VALUES ($1, $2, $3)
+     ON CONFLICT (event_id) DO NOTHING
+     RETURNING event_id`,
+    [eventId, ref, type],
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** True when this event is not older than the last one applied to the account. */
+export async function billingEventIsCurrent(ref: string, eventMs: number): Promise<boolean> {
+  if (!pool || !eventMs) return true;
+  const res = await pool.query('SELECT plan_event_ms FROM app_users WHERE ref = $1', [ref]);
+  const last = Number(res.rows[0]?.plan_event_ms ?? 0);
+  return eventMs >= last;
+}
+
+export async function markBillingEventApplied(ref: string, eventMs: number): Promise<void> {
+  if (!pool || !eventMs) return;
+  await pool.query(
+    `UPDATE app_users SET plan_event_ms = GREATEST(plan_event_ms, $2) WHERE ref = $1`,
+    [ref, eventMs],
+  );
 }
 
 // ── Accounts & entitlement ────────────────────────────────────────────────

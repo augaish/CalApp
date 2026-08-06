@@ -8,8 +8,10 @@ import { PRIVACY_HTML, TERMS_HTML } from './legal-html.js';
 import { checkAccess, featureLocked, PLANS, planLimits, quotaError, release, reserve } from './billing.js';
 import {
   adminStats,
+  billingEventIsCurrent,
   canonicalKey,
   cacheEnabled,
+  claimBillingEvent,
   deleteUser,
   getCachedEquipment,
   getOrCreateUser,
@@ -18,11 +20,13 @@ import {
   initDb,
   linkRefs,
   listUsers,
+  markBillingEventApplied,
   resolveRef,
   setCachedEquipment,
   setSetting,
   setUserPlan,
 } from './db.js';
+import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
   coachSystemPrompt,
   equipmentDetailsPrompt,
@@ -415,6 +419,57 @@ app.post('/api/link', async (c) => {
   } catch (err) {
     console.error('link failed:', err);
     return c.json({ error: 'link_failed' }, 500);
+  }
+});
+
+/**
+ * Subscription webhook (RevenueCat). The store tells RevenueCat, RevenueCat
+ * tells us, and the plan the app already reads from /api/me changes — no other
+ * part of the billing model moves.
+ *
+ * Always answers 200 for events we understand but choose not to act on: a
+ * non-2xx makes RevenueCat retry forever over something that will never
+ * succeed. Genuine failures do return 500, because those deserve a retry.
+ */
+app.post('/api/billing/revenuecat', async (c) => {
+  const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
+  // Without a configured secret anyone could grant themselves Pro, so refuse
+  // to accept billing events at all rather than trust them.
+  if (!secret) return c.json({ error: 'billing_not_configured' }, 503);
+  if ((c.req.header('authorization') ?? '') !== secret) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+
+  const body = await c.req.json<{ event?: RevenueCatEvent }>().catch(() => ({}) as never);
+  const event = body?.event;
+  if (!event) return c.json({ error: 'invalid_request' }, 400);
+
+  try {
+    // Retries are expected; only the first delivery of an event is applied.
+    if (event.id && !(await claimBillingEvent(event.id, event.app_user_id ?? null, event.type ?? null))) {
+      return c.json({ ok: true, result: 'duplicate' });
+    }
+
+    const action = decide(event);
+    if (action.kind === 'ignore') return c.json({ ok: true, result: 'ignored', reason: action.reason });
+
+    // The id the app sends may since have been claimed by an account.
+    const ref = await resolveRef(action.ref);
+    const eventMs = Number(event.event_timestamp_ms ?? 0);
+    if (!(await billingEventIsCurrent(ref, eventMs))) {
+      return c.json({ ok: true, result: 'stale' });
+    }
+
+    if (action.kind === 'grant') {
+      await setUserPlan(ref, action.plan, action.note, action.until);
+    } else {
+      await setUserPlan(ref, 'free', action.note, null);
+    }
+    await markBillingEventApplied(ref, eventMs);
+    return c.json({ ok: true, result: action.kind, plan: action.kind === 'grant' ? action.plan : 'free' });
+  } catch (err) {
+    console.error('billing webhook failed:', err);
+    return c.json({ error: 'webhook_failed' }, 500);
   }
 });
 
