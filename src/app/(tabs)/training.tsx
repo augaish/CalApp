@@ -134,8 +134,19 @@ export default function Training() {
 
   const plan = schedule[selected.getDay()];
   const skippedIds = skips[dateKey(selected)] ?? [];
-  const visiblePlanIds = plan ? plan.exerciseIds.filter((id) => !skippedIds.includes(id)) : [];
+  const scheduledIds = plan ? plan.exerciseIds.filter((id) => !skippedIds.includes(id)) : [];
   const skippedPlanIds = plan ? plan.exerciseIds.filter((id) => skippedIds.includes(id)) : [];
+
+  // Anything logged on this day that the weekly schedule does not know about —
+  // duplicated from another day, scanned in, or picked from the library. The
+  // card has to show what was actually done, not only what was planned, or
+  // those exercises exist in the data with nowhere to appear.
+  const unplannedIds = [
+    ...new Set(
+      workouts.filter((w) => isSameDay(w.at, selected)).map((w) => w.exerciseId),
+    ),
+  ].filter((id) => !scheduledIds.includes(id));
+  const visiblePlanIds = [...scheduledIds, ...unplannedIds];
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = burnedForDay(workouts, selected);
@@ -269,13 +280,13 @@ export default function Training() {
         </View>
       </Card>
 
-      {/* Today's plan (from the weekly schedule) */}
-      {plan && plan.exerciseIds.length > 0 ? (
+      {/* The day itself: the weekly plan plus anything else logged today. */}
+      {visiblePlanIds.length > 0 ? (
         <Card>
           <View style={styles.routineHead}>
             <Ionicons name="calendar" size={18} color={theme.primary} />
             <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
-              {plan.title || t('training.todaysPlan')}
+              {plan?.title || t('training.todaysPlan')}
             </Text>
             {/* Labelled rather than a bare pencil: the weekly schedule is now
                 the only place plans come from, so how to reach it has to be
@@ -300,7 +311,7 @@ export default function Training() {
               const ex = findExercise(exId, custom);
               const wToday = workoutFor(workouts, exId, selected);
               const doneToday = !!wToday && wToday.sets.some((s) => s.done);
-              const planned = plan.plans?.[exId] ?? [];
+              const planned = plan?.plans?.[exId] ?? [];
               const type = ex?.type ?? 'weight_reps';
               const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
               // Every set for this day, right on the card — what is already
@@ -358,7 +369,18 @@ export default function Training() {
                       </View>
                       <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
                     </Pressable>
-                    <Pressable onPress={() => skipPlanToday(selected, exId)} hitSlop={8} style={styles.skipBtn}>
+                    <Pressable
+                      onPress={() =>
+                        // Skipping hides a scheduled exercise for today only.
+                        // One that was never scheduled has nothing to skip, so
+                        // the × removes what was logged instead.
+                        scheduledIds.includes(exId)
+                          ? skipPlanToday(selected, exId)
+                          : wToday && confirmDeleteWorkout(wToday.id)
+                      }
+                      hitSlop={8}
+                      style={styles.skipBtn}
+                    >
                       <Ionicons name="close" size={18} color={theme.textTertiary} />
                     </Pressable>
                   </View>
