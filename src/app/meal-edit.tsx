@@ -46,6 +46,7 @@ export default function MealEdit() {
 
   const meal = useAppStore((s) => s.meals.find((m) => m.id === id));
   const updateMeal = useAppStore((s) => s.updateMeal);
+  const removeMeal = useAppStore((s) => s.removeMeal);
   const duplicateMeal = useAppStore((s) => s.duplicateMeal);
   const setViewDay = useViewDay((s) => s.setDay);
 
@@ -127,6 +128,16 @@ export default function MealEdit() {
     );
   };
 
+  /**
+   * Drop a food the scan got wrong. The portion chips only go down to a
+   * quarter, so without this there was no way to say "I did not eat that" —
+   * the item and its calories were stuck in the meal.
+   */
+  const removeItem = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+    setMults((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const shiftDay = (delta: number) => {
     setDay((prev) => {
       const d = new Date(prev);
@@ -152,6 +163,13 @@ export default function MealEdit() {
   };
 
   const save = () => {
+    // Every food removed is a request to delete the meal, not to keep an empty
+    // one sitting at 0 kcal.
+    if (items.length === 0) {
+      removeMeal(meal.id);
+      finish(day, t('mealEdit.removedMeal'));
+      return;
+    }
     updateMeal(meal.id, { items, mealType, at: stampDay(day, meal.at) });
     finish(day, t('mealEdit.saved'));
   };
@@ -176,14 +194,19 @@ export default function MealEdit() {
               {Math.round(total)} {t('common.kcal')}
             </Text>
           </View>
-          <Button label={t('mealEdit.save')} onPress={save} />
           <Button
-            label={t('mealEdit.duplicateTo', { day: dayLabel })}
-            icon="copy-outline"
-            variant="secondary"
-            onPress={() => duplicateTo(day)}
-            style={{ marginTop: Spacing.xs }}
+            label={items.length === 0 ? t('mealEdit.deleteMeal') : t('mealEdit.save')}
+            onPress={save}
           />
+          {items.length > 0 && (
+            <Button
+              label={t('mealEdit.duplicateTo', { day: dayLabel })}
+              icon="copy-outline"
+              variant="secondary"
+              onPress={() => duplicateTo(day)}
+              style={{ marginTop: Spacing.xs }}
+            />
+          )}
         </View>
       }
     >
@@ -230,6 +253,15 @@ export default function MealEdit() {
         </Pressable>
       </View>
 
+      {items.length === 0 && (
+        <View style={[styles.emptyNote, { borderColor: theme.border }]}>
+          <Ionicons name="information-circle-outline" size={20} color={theme.textTertiary} />
+          <Text style={{ color: theme.textSecondary, flex: 1, fontSize: 13 }}>
+            {t('mealEdit.emptyHint')}
+          </Text>
+        </View>
+      )}
+
       {items.map((item, index) => (
         <Card key={index}>
           <View style={styles.itemHeader}>
@@ -239,6 +271,13 @@ export default function MealEdit() {
               style={[styles.itemNameInput, { color: theme.text, borderColor: theme.border }]}
             />
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
+            <Pressable
+              onPress={() => removeItem(index)}
+              hitSlop={10}
+              style={({ pressed }) => [styles.removeItemBtn, pressed && { opacity: 0.5 }]}
+            >
+              <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+            </Pressable>
           </View>
 
           {item.basePer100 ? (
@@ -334,6 +373,16 @@ const styles = StyleSheet.create({
     direction: 'ltr',
   },
   arrow: { padding: 4 },
+  removeItemBtn: { padding: 2 },
+  emptyNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    padding: Spacing.md,
+  },
   itemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

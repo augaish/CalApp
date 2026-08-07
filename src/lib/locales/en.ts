@@ -487,6 +487,9 @@ export const en = {
     noItems: 'No items left. Swipe back or cancel to discard.',
   },
   mealEdit: {
+    deleteMeal: 'Delete this meal',
+    removedMeal: 'Meal deleted.',
+    emptyHint: 'No foods left — saving will delete this meal.',
     title: 'Edit meal',
     hint: 'Change the amounts or meal, or pick a day below and duplicate this meal to it.',
     day: 'Move / copy to day',
