@@ -551,17 +551,17 @@ export default function Training() {
           )}
         </Card>
       ) : (
-        <Pressable onPress={() => router.push('/schedule')}>
-          <Card>
-            <View style={styles.buildScheduleRow}>
-              <Ionicons name="calendar-outline" size={20} color={theme.primary} />
-              <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>
-                {t('training.buildSchedule')}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-            </View>
-          </Card>
-        </Pressable>
+        // A day with nothing planned and nothing logged. Says so plainly rather
+        // than repeating the schedule link that sits directly above.
+        <View style={[styles.empty, { borderColor: theme.border }]}>
+          <Ionicons name="bed-outline" size={32} color={theme.textTertiary} />
+          <Text style={{ color: theme.text, fontWeight: '700' }}>
+            {selectedIsToday ? t('training.restDay') : t('training.nothingLogged')}
+          </Text>
+          <Text style={{ color: theme.textSecondary, textAlign: 'center', fontSize: 13 }}>
+            {t('training.restDayHint')}
+          </Text>
+        </View>
       )}
 
       {/* History grouped by day */}
@@ -729,7 +729,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buildScheduleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   scheduleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   scheduleIcon: {
     width: 38,

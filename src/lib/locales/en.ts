@@ -130,6 +130,9 @@ export const en = {
     scanMeal: 'Scan your first meal',
     logWorkout: 'Log your first workout',
     buildSchedule: 'Build your weekly schedule',
+    restDay: 'Rest day',
+    nothingLogged: 'Nothing logged',
+    restDayHint: 'Add an exercise below, or duplicate a past day from your history.',
     logWater: 'Log some water',
   },
   celebrate: {

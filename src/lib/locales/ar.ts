@@ -132,6 +132,9 @@ export const ar: TranslationSchema = {
     scanMeal: 'امسح وجبتك الأولى',
     logWorkout: 'سجّل تمرينك الأول',
     buildSchedule: 'ابنِ جدولك الأسبوعي',
+    restDay: 'يوم راحة',
+    nothingLogged: 'لا يوجد تسجيل',
+    restDayHint: 'أضف تمريناً بالأسفل، أو انسخ يوماً سابقاً من سجلك.',
     logWater: 'سجّل بعض الماء',
   },
   celebrate: {
