@@ -333,8 +333,11 @@ export const en = {
     comingSoon: 'Coming soon',
   },
   addMenu: {
+    food: 'Food',
+    training: 'Training',
+    addExercise: 'Add exercise',
     title: 'Add',
-    scanMeal: 'Scan meal with camera',
+    scanMeal: 'Scan a meal',
     scanBarcode: 'Scan barcode',
     describe: 'Describe your meal',
     scanGym: 'Scan gym equipment',

@@ -335,8 +335,11 @@ export const ar: TranslationSchema = {
     comingSoon: 'قريباً',
   },
   addMenu: {
+    food: 'الطعام',
+    training: 'التمرين',
+    addExercise: 'إضافة تمرين',
     title: 'إضافة',
-    scanMeal: 'تصوير وجبة بالكاميرا',
+    scanMeal: 'تصوير وجبة',
     scanBarcode: 'مسح الباركود',
     describe: 'اكتب وصف وجبتك',
     scanGym: 'تصوير جهاز رياضي',

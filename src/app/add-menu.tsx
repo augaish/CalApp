@@ -7,6 +7,63 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+type Theme = ReturnType<typeof useTheme>;
+
+function Tile({
+  icon,
+  label,
+  onPress,
+  theme,
+  primary,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  theme: Theme;
+  primary?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.tile,
+        {
+          backgroundColor: primary ? theme.primary : theme.card,
+          borderColor: primary ? theme.primary : theme.border,
+        },
+        pressed && { transform: [{ scale: 0.96 }] },
+      ]}
+    >
+      <View
+        style={[
+          styles.tileIcon,
+          { backgroundColor: primary ? 'rgba(255,255,255,0.22)' : theme.cardSubtle },
+        ]}
+      >
+        <Ionicons name={icon} size={21} color={primary ? theme.onPrimary : theme.primary} />
+      </View>
+      <Text
+        style={[styles.tileLabel, { color: primary ? theme.onPrimary : theme.text }]}
+        numberOfLines={2}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SectionLabel({ label, theme }: { label: string; theme: Theme }) {
+  return <Text style={[styles.sectionLabel, { color: theme.textTertiary }]}>{label}</Text>;
+}
+
+/**
+ * Everything you can log, in one tap.
+ *
+ * The options are grouped rather than nested. Nesting them under Food /
+ * Training would read more tidily, but it puts a tap in front of scanning a
+ * meal — the thing people do several times a day — to tidy up the paths they
+ * use rarely. Two headings buy the same clarity for free.
+ */
 export default function AddMenu() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -22,114 +79,88 @@ export default function AddMenu() {
 
   return (
     <Pressable style={styles.backdrop} onPress={() => router.back()}>
-      <View style={[styles.content, { paddingBottom: insets.bottom + 96 }]} pointerEvents="box-none">
-        {/* Hero circle(s) */}
-        <View style={styles.circleRow} pointerEvents="box-none">
-          <View style={styles.circleCol}>
-            <Pressable
-              onPress={() => go('/scan?mode=meal')}
-              style={({ pressed }) => [
-                styles.circle,
-                { backgroundColor: theme.primary },
-                cardShadow(theme.shadow),
-                pressed && { transform: [{ scale: 0.93 }] },
-              ]}
-            >
-              <Ionicons name="camera" size={34} color={theme.onPrimary} />
-            </Pressable>
-            <Text style={styles.circleLabel}>{t('home.scanMeal')}</Text>
-          </View>
+      <Pressable
+        style={[
+          styles.sheet,
+          { backgroundColor: theme.background, paddingBottom: insets.bottom + Spacing.lg },
+          cardShadow(theme.shadow),
+        ]}
+        // Swallow taps inside the sheet so it does not close under your finger.
+        onPress={() => {}}
+      >
+        <View style={[styles.grabber, { backgroundColor: theme.border }]} />
 
-          {!foodOnly && (
-            <View style={styles.circleCol}>
-              <Pressable
-                onPress={() => go('/scan?mode=gym')}
-                style={({ pressed }) => [
-                  styles.circle,
-                  { backgroundColor: '#FFFFFF' },
-                  cardShadow(theme.shadow),
-                  pressed && { transform: [{ scale: 0.93 }] },
-                ]}
-              >
-                <Ionicons name="barbell" size={34} color={theme.text} />
-              </Pressable>
-              <Text style={styles.circleLabel}>{t('home.scanGym')}</Text>
+        <SectionLabel label={t('addMenu.food')} theme={theme} />
+        <View style={styles.grid}>
+          <Tile icon="camera" label={t('addMenu.scanMeal')} onPress={() => go('/scan?mode=meal')} theme={theme} primary />
+          <Tile icon="barcode" label={t('addMenu.scanBarcode')} onPress={() => go('/scan?mode=barcode')} theme={theme} />
+          <Tile icon="create" label={t('addMenu.describe')} onPress={() => go('/describe')} theme={theme} />
+          <Tile icon="pencil" label={t('addMenu.manual')} onPress={() => go('/food-edit')} theme={theme} />
+        </View>
+
+        {!foodOnly && (
+          <>
+            <SectionLabel label={t('addMenu.training')} theme={theme} />
+            <View style={styles.grid}>
+              <Tile icon="barbell" label={t('addMenu.scanGym')} onPress={() => go('/scan?mode=gym')} theme={theme} />
+              {/* Previously only reachable from the Training tab's footer, so
+                  the same action lived in two places depending on the tab. */}
+              <Tile icon="add-circle" label={t('addMenu.addExercise')} onPress={() => go('/exercise-library')} theme={theme} />
             </View>
-          )}
-        </View>
-
-        {/* Secondary options */}
-        <View style={styles.pillRow} pointerEvents="box-none">
-          <Pressable
-            onPress={() => go('/scan?mode=barcode')}
-            style={({ pressed }) => [
-              styles.pill,
-              { backgroundColor: 'rgba(255,255,255,0.95)' },
-              pressed && { transform: [{ scale: 0.96 }] },
-            ]}
-          >
-            <Ionicons name="barcode" size={18} color={theme.text} />
-            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('addMenu.scanBarcode')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => go('/describe')}
-            style={({ pressed }) => [
-              styles.pill,
-              { backgroundColor: 'rgba(255,255,255,0.95)' },
-              pressed && { transform: [{ scale: 0.96 }] },
-            ]}
-          >
-            <Ionicons name="create" size={18} color={theme.text} />
-            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('addMenu.describe')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => go('/food-edit')}
-            style={({ pressed }) => [
-              styles.pill,
-              { backgroundColor: 'rgba(255,255,255,0.95)' },
-              pressed && { transform: [{ scale: 0.96 }] },
-            ]}
-          >
-            <Ionicons name="pencil" size={18} color={theme.text} />
-            <Text style={[styles.pillLabel, { color: theme.text }]}>{t('addMenu.manual')}</Text>
-          </Pressable>
-        </View>
-      </View>
+          </>
+        )}
+      </Pressable>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
-  content: { flex: 1, justifyContent: 'flex-end', paddingHorizontal: Spacing.lg },
-  circleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-evenly',
-    marginBottom: Spacing.lg,
+  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' },
+  sheet: {
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
-  circleCol: { alignItems: 'center', gap: Spacing.sm },
-  circle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+  grabber: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: Spacing.md,
   },
-  circleLabel: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' },
-  pillRow: {
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: Spacing.sm,
+  },
+  grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
     gap: Spacing.sm,
+    marginBottom: Spacing.lg,
   },
-  pill: {
+  // Two per row, so labels have room to read at full length.
+  tile: {
+    flexGrow: 1,
+    flexBasis: '46%',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    borderRadius: Radius.full,
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.md,
     paddingHorizontal: Spacing.md,
-    paddingVertical: 10,
-    minHeight: 44,
+    paddingVertical: 14,
+    minHeight: 64,
   },
-  pillLabel: { fontSize: 14, fontWeight: '600' },
+  tileIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tileLabel: { flex: 1, fontSize: 14, fontWeight: '700' },
 });
