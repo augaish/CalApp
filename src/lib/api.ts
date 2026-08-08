@@ -114,6 +114,42 @@ export async function linkInstall(installId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Publish a workout plan and get back a short link to share.
+ *
+ * The plan used to be base64'd into the URL, which made links thousands of
+ * characters long — chat apps linkified only the first part of them, so the
+ * recipient opened a link with no plan in it.
+ */
+export async function createShareLink(payload: unknown): Promise<string | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/share`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ payload }),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { url?: string };
+    return data.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fetch a shared plan by its code. */
+export async function fetchSharedPlan(code: string): Promise<unknown | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/share/${encodeURIComponent(code)}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { payload?: unknown };
+    return data.payload ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Current plan + remaining AI actions (and the sponsor slot, if any). */
 export async function fetchEntitlement(): Promise<Entitlement | null> {
   try {

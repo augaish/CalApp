@@ -12,6 +12,7 @@ import {
   canonicalKey,
   cacheEnabled,
   claimBillingEvent,
+  createShareLink,
   deleteUser,
   getCachedEquipment,
   getOrCreateUser,
@@ -21,6 +22,7 @@ import {
   linkRefs,
   listUsers,
   markBillingEventApplied,
+  readShareLink,
   resolveRef,
   setCachedEquipment,
   setSetting,
@@ -49,6 +51,19 @@ const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
 
 const app = new Hono();
 app.use('*', cors());
+
+/**
+ * The origin to build shareable links from. Behind Railway's proxy the request
+ * arrives as http internally, so the forwarded scheme is what the outside world
+ * actually sees.
+ */
+function publicBase(c: { req: { header: (n: string) => string | undefined; url: string } }): string {
+  const configured = process.env.PUBLIC_URL?.replace(/\/$/, '');
+  if (configured) return configured;
+  const host = c.req.header('x-forwarded-host') ?? c.req.header('host');
+  const proto = c.req.header('x-forwarded-proto') ?? 'https';
+  return host ? `${proto}://${host}` : new URL(c.req.url).origin;
+}
 
 /** Ids are opaque to us; only the shape is checked. */
 function validRef(raw: string): string | null {
@@ -104,17 +119,11 @@ const COMMIT = (
 app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled, commit: COMMIT }));
 
 /**
- * Shareable workout-plan link. Someone taps `/s?d=<base64url>` (sent over
- * WhatsApp etc.); this page bounces them into the app via the `calapp://`
- * deep link, with a manual button as a fallback. The payload is opaque to the
- * server — it's decoded and applied entirely on-device.
+ * The page a shared plan link lands on. It bounces into the app via the
+ * `calapp://` deep link, with a button as the fallback.
  */
-app.get('/s', (c) => {
-  const raw = c.req.query('d') ?? '';
-  // base64url only — reject anything else so nothing untrusted is injected.
-  const data = /^[A-Za-z0-9_-]+$/.test(raw) ? raw : '';
-  const deepLink = `calapp://schedule-import?d=${data}`;
-  const html = `<!doctype html>
+function bouncePage(deepLink: string): string {
+  return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -142,13 +151,77 @@ app.get('/s', (c) => {
   </div>
   <script>
     var link = ${JSON.stringify(deepLink)};
-    if (link.indexOf('calapp://schedule-import?d=') === 0 && link.length > 'calapp://schedule-import?d='.length) {
+    if (link.indexOf('calapp://schedule-import?') === 0) {
       setTimeout(function () { window.location.href = link; }, 300);
     }
   </script>
 </body>
 </html>`;
-  return c.html(html);
+}
+
+/** Code shape for a shared plan; anything else is not one of ours. */
+function validCode(raw: string): string | null {
+  const code = (raw ?? '').trim();
+  return /^[A-Za-z0-9]{6,16}$/.test(code) ? code : null;
+}
+
+/**
+ * Publish a plan and get a short code back.
+ *
+ * The plan used to be base64'd into the link itself, which produced URLs
+ * thousands of characters long — WhatsApp linkified only the first part, so
+ * what arrived was a link with no payload and the app rightly called it
+ * invalid. The payload lives here now and the link is a handful of characters.
+ */
+app.post('/api/share', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ error: 'identify_required' }, 401);
+  const body = await c.req.json<{ payload?: unknown }>().catch(() => ({}) as never);
+  if (!body?.payload || typeof body.payload !== 'object') {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  // A weekly plan is a few kB; anything far larger is not one.
+  if (JSON.stringify(body.payload).length > 256 * 1024) {
+    return c.json({ error: 'payload_too_large' }, 413);
+  }
+  try {
+    const code = await createShareLink(body.payload);
+    if (!code) return c.json({ error: 'share_unavailable' }, 503);
+    return c.json({ code, url: `${publicBase(c)}/s/${code}` });
+  } catch (err) {
+    console.error('create share failed:', err);
+    return c.json({ error: 'share_failed' }, 500);
+  }
+});
+
+/** The app fetches the plan behind a code. */
+app.get('/api/share/:code', async (c) => {
+  const code = validCode(c.req.param('code'));
+  if (!code) return c.json({ error: 'invalid_request' }, 400);
+  const payload = await readShareLink(code);
+  if (!payload) return c.json({ error: 'not_found' }, 404);
+  return c.json({ payload });
+});
+
+/** Short link: what actually gets pasted into a chat. */
+app.get('/s/:code', (c) => {
+  const code = validCode(c.req.param('code'));
+  return c.html(
+    bouncePage(code ? `calapp://schedule-import?c=${code}` : 'calapp://schedule-import'),
+  );
+});
+
+/**
+ * The original link shape, kept working so plans shared before short codes
+ * existed still open.
+ */
+app.get('/s', (c) => {
+  const raw = c.req.query('d') ?? '';
+  // base64url only — reject anything else so nothing untrusted is injected.
+  const data = /^[A-Za-z0-9_-]+$/.test(raw) ? raw : '';
+  return c.html(
+    bouncePage(data ? `calapp://schedule-import?d=${data}` : 'calapp://schedule-import'),
+  );
 });
 
 interface AnalyzeBody {

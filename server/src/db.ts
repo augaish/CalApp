@@ -71,6 +71,18 @@ export async function initDb(): Promise<void> {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // Shared workout plans. The payload used to travel inside the link itself,
+  // which produced URLs long enough for chat apps to break in half; it lives
+  // here now and the link carries only a short code.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS share_links (
+      code       TEXT PRIMARY KEY,
+      payload    JSONB NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at TIMESTAMPTZ NOT NULL,
+      hits       INTEGER NOT NULL DEFAULT 0
+    );
+  `);
   // Billing webhooks are retried by the store until acknowledged, so each one
   // is recorded and replays are dropped rather than re-applied.
   await pool.query(`
@@ -326,6 +338,57 @@ export async function deleteUser(ref: string): Promise<void> {
   await pool.query('DELETE FROM app_users WHERE ref = $1', [ref]);
   await pool.query('DELETE FROM ref_links WHERE from_ref = $1 OR to_ref = $1', [ref]);
   aliasCache.clear();
+}
+
+// ── Shared plans ──────────────────────────────────────────────────────────
+
+/** Unambiguous alphabet: no O/0, I/l/1, so a code can be read aloud. */
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+
+function newCode(len = 8): string {
+  let out = '';
+  for (let i = 0; i < len; i++) {
+    out += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  }
+  return out;
+}
+
+/** Store a shared plan and return its code. */
+export async function createShareLink(
+  payload: unknown,
+  ttlDays = 180,
+): Promise<string | null> {
+  if (!pool) return null;
+  const expires = new Date(Date.now() + ttlDays * 86400000).toISOString();
+  // Retry on the vanishingly unlikely collision rather than overwrite someone
+  // else's plan.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = newCode();
+    const res = await pool.query(
+      `INSERT INTO share_links (code, payload, expires_at) VALUES ($1, $2, $3)
+       ON CONFLICT (code) DO NOTHING RETURNING code`,
+      [code, JSON.stringify(payload), expires],
+    );
+    if (res.rows[0]?.code) return res.rows[0].code as string;
+  }
+  return null;
+}
+
+/** Fetch a shared plan, counting the read. Expired codes read as missing. */
+export async function readShareLink(code: string): Promise<unknown | null> {
+  if (!pool) return null;
+  try {
+    const res = await pool.query(
+      `UPDATE share_links SET hits = hits + 1
+        WHERE code = $1 AND expires_at > now()
+        RETURNING payload`,
+      [code],
+    );
+    return res.rows[0]?.payload ?? null;
+  } catch (err) {
+    console.error('readShareLink failed:', err);
+    return null;
+  }
 }
 
 // ── Identity links ────────────────────────────────────────────────────────

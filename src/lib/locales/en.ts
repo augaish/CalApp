@@ -205,6 +205,7 @@ export const en = {
     addExercise: 'Browse all exercises',
     shareEmpty: 'Add some exercises to your week before sharing.',
     shareMessage: 'Here is my Calgym workout plan — open the link to add it to your app:',
+    shareFailed: 'Could not create a share link. Check your connection and try again.',
     setsPlanned: '{{count}} sets planned · tap to edit',
     addSets: 'Tap to plan target sets',
   },
@@ -217,6 +218,7 @@ export const en = {
     emptyHint: 'No sets planned yet. Set the reps above and tap “Add planned set”.',
   },
   scheduleImport: {
+    loading: 'Fetching the shared plan…',
     title: 'Import workout plan',
     summary: 'This plan has {{days}} training days and {{exercises}} exercises.',
     replaceNote: 'Importing replaces your current weekly schedule.',

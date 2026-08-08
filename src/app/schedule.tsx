@@ -18,11 +18,10 @@ import Sortable from 'react-native-sortables';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { SERVER_URL } from '@/lib/api';
+import { createShareLink } from '@/lib/api';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
 import { lightHaptic } from '@/lib/feedback';
-import { encodeSchedule } from '@/lib/share';
 import { useAppStore } from '@/lib/store';
 
 /** Labels for weekdays 0–6 in the active locale (Jan 7 2024 was a Sunday). */
@@ -48,6 +47,7 @@ export default function ScheduleScreen() {
 
   const [weekday, setWeekday] = useState<number>(viewDay.getDay());
   const pageRef = useAnimatedRef<ScrollView>();
+  const [sharing, setSharing] = useState(false);
   const day = schedule[weekday] ?? { exerciseIds: [] };
 
   const sharePlan = async () => {
@@ -59,10 +59,20 @@ export default function ScheduleScreen() {
     // Carry along only the custom / scan exercises the plan actually uses.
     const referenced = new Set<string>();
     Object.values(schedule).forEach((d) => d.exerciseIds.forEach((exId) => referenced.add(exId)));
-    const exported = custom.filter((e) => referenced.has(e.id));
-    const data = encodeSchedule({ v: 1, schedule, exercises: exported });
-    const url = `${SERVER_URL}/s?d=${data}`;
+    const exported = custom
+      .filter((e) => referenced.has(e.id))
+      // A photoUri points at a file on this phone, so it is meaningless to the
+      // recipient and was a large part of what made the payload huge.
+      .map(({ photoUri: _photoUri, ...rest }) => rest);
+
     lightHaptic();
+    setSharing(true);
+    const url = await createShareLink({ v: 1, schedule, exercises: exported });
+    setSharing(false);
+    if (!url) {
+      Alert.alert(t('schedule.shareFailed'));
+      return;
+    }
     try {
       await Share.share({ message: `${t('schedule.shareMessage')}\n${url}` });
     } catch {
@@ -92,7 +102,12 @@ export default function ScheduleScreen() {
       <View style={styles.header}>
         <Ionicons name="calendar" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('schedule.title')}</Text>
-        <Pressable onPress={sharePlan} hitSlop={10} style={{ marginEnd: Spacing.sm }}>
+        <Pressable
+          onPress={sharePlan}
+          disabled={sharing}
+          hitSlop={10}
+          style={{ marginEnd: Spacing.sm, opacity: sharing ? 0.4 : 1 }}
+        >
           <Ionicons name="share-outline" size={22} color={theme.primary} />
         </Pressable>
         <Pressable onPress={() => router.back()} hitSlop={10}>

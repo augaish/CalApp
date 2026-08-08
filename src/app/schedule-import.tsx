@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -10,7 +10,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { allExercises, exerciseName } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
-import { decodeSchedule } from '@/lib/share';
+import { fetchSharedPlan } from '@/lib/api';
+import { decodeSchedule, type SharedSchedule } from '@/lib/share';
 import { useAppStore } from '@/lib/store';
 
 function weekdayLabel(i: number, locale: string): string {
@@ -22,12 +23,33 @@ export default function ScheduleImport() {
   const theme = useTheme();
   const router = useRouter();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
-  const { d } = useLocalSearchParams<{ d?: string }>();
+  // `c` is a short code the plan is fetched by; `d` is the old inline payload,
+  // still honoured so links shared before short codes keep working.
+  const { c: code, d } = useLocalSearchParams<{ c?: string; d?: string }>();
 
   const custom = useAppStore((s) => s.exercises);
   const importSchedule = useAppStore((s) => s.importSchedule);
 
-  const payload = useMemo(() => (d ? decodeSchedule(d) : null), [d]);
+  const inline = useMemo(() => (d ? decodeSchedule(d) : null), [d]);
+  const [fetched, setFetched] = useState<SharedSchedule | null>(null);
+  const [loading, setLoading] = useState(!!code);
+
+  useEffect(() => {
+    if (!code) return;
+    let alive = true;
+    fetchSharedPlan(code)
+      .then((raw) => {
+        if (!alive) return;
+        const plan = raw as SharedSchedule | null;
+        setFetched(plan && plan.v === 1 && plan.schedule ? plan : null);
+      })
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [code]);
+
+  const payload = inline ?? fetched;
 
   // Preview: how each weekday looks in the shared plan.
   const days = useMemo(() => {
@@ -55,6 +77,20 @@ export default function ScheduleImport() {
     useCelebrate.getState().celebrate(t('scheduleImport.done'));
     router.replace('/(tabs)/training');
   };
+
+  if (loading) {
+    return (
+      <Screen footer={<Button label={t('common.close')} onPress={() => router.back()} />}>
+        <Title>{t('scheduleImport.title')}</Title>
+        <View style={[styles.empty, { borderColor: theme.border }]}>
+          <ActivityIndicator color={theme.primary} />
+          <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
+            {t('scheduleImport.loading')}
+          </Text>
+        </View>
+      </Screen>
+    );
+  }
 
   if (!payload || days.length === 0) {
     return (
