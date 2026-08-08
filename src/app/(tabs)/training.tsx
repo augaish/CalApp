@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
+import { useAnimatedRef } from 'react-native-reanimated';
+import Sortable from 'react-native-sortables';
 
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -12,6 +14,7 @@ import { useViewDay } from '@/lib/day';
 import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
 import {
+  applyOrder,
   bestSetIndex,
   burnedForDay,
   dateKey,
@@ -128,6 +131,8 @@ export default function Training() {
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const copyDayTo = useAppStore((s) => s.copyDayTo);
+  const dayOrder = useAppStore((s) => s.dayOrder);
+  const setDayOrder = useAppStore((s) => s.setDayOrder);
   const saveDayToSchedule = useAppStore((s) => s.saveDayToSchedule);
   const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const removeWorkout = useAppStore((s) => s.removeWorkout);
@@ -153,7 +158,10 @@ export default function Training() {
       workouts.filter((w) => isSameDay(w.at, selected)).map((w) => w.exerciseId),
     ),
   ].filter((id) => !scheduledIds.includes(id));
-  const visiblePlanIds = [...scheduledIds, ...unplannedIds];
+  const visiblePlanIds = applyOrder(
+    [...scheduledIds, ...unplannedIds],
+    dayOrder[dateKey(selected)],
+  );
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = burnedForDay(workouts, selected);
@@ -166,6 +174,11 @@ export default function Training() {
   const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
   const toggleDay = (key: string) => setOpenDays((o) => ({ ...o, [key]: !o[key] }));
   const [pickingWeekday, setPickingWeekday] = useState(false);
+  // While a row is held, the set chips collapse away: nine exercises at full
+  // height means dragging against constant auto-scroll, where the compact list
+  // mostly fits on one screen.
+  const [dragging, setDragging] = useState(false);
+  const pageRef = useAnimatedRef<ScrollView>();
 
   // Resolve a logged exercise's display name live (localized) when it still
   // exists in the library; fall back to the snapshot taken at log time.
@@ -258,6 +271,7 @@ export default function Training() {
 
   return (
     <Screen
+      scrollRef={pageRef}
       footer={
         <View style={styles.footerRow}>
           <Button
@@ -353,7 +367,25 @@ export default function Training() {
             </Text>
           </View>
           <View style={{ marginTop: Spacing.sm }}>
-            {visiblePlanIds.map((exId) => {
+            <Sortable.Grid
+              columns={1}
+              rowGap={0}
+              data={visiblePlanIds}
+              keyExtractor={(exId) => exId}
+              // A press-and-hold, so tapping a row, its checkbox or its × still
+              // works and the page keeps scrolling normally.
+              dragActivationDelay={220}
+              hapticsEnabled
+              // Lets the page scroll itself when a drag reaches either edge.
+              scrollableRef={pageRef}
+              onDragStart={() => setDragging(true)}
+              onDragEnd={({ data }) => {
+                setDragging(false);
+                // Written against this date only. The weekday's plan is
+                // untouched, so every other occurrence of it stays as it was.
+                setDayOrder(selected, data);
+              }}
+              renderItem={({ item: exId }) => {
               const ex = findExercise(exId, custom);
               const wToday = workoutFor(workouts, exId, selected);
               const doneToday = !!wToday && wToday.sets.some((s) => s.done);
@@ -430,7 +462,7 @@ export default function Training() {
                       <Ionicons name="close" size={18} color={theme.textTertiary} />
                     </Pressable>
                   </View>
-                  {rows.length > 0 && (
+                  {rows.length > 0 && !dragging && (
                     <View style={styles.setStrip}>
                       {rows.map((s, i) => {
                         // The heaviest set of the row, always — whether it is
@@ -466,7 +498,8 @@ export default function Training() {
                   )}
                 </View>
               );
-            })}
+              }}
+            />
           </View>
           {skippedPlanIds.length > 0 && (
             <View style={[styles.skippedWrap, { borderTopColor: theme.border }]}>

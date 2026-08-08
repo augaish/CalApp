@@ -59,6 +59,12 @@ interface AppState {
   linkedRef: string | null;
   /** When this device last agreed with the account's stored copy. */
   syncedAt: string | null;
+  /**
+   * Per-date ordering override (dateKey → exerciseIds). A date with no entry
+   * follows its weekday's plan, so editing the weekly schedule still moves
+   * today around until the day itself has been reordered by hand.
+   */
+  dayOrder: Record<string, string[]>;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -114,6 +120,10 @@ interface AppState {
    * already logged there. Returns how many were added.
    */
   copyDayTo: (sourceDay: Date, targetDay: Date) => number;
+  /** Reorder one date only, leaving the weekly plan alone. */
+  setDayOrder: (day: Date, exerciseIds: string[]) => void;
+  /** Reorder a weekday's plan — every later occurrence of it follows suit. */
+  reorderSchedule: (weekday: number, exerciseIds: string[]) => void;
   /**
    * Turn a day that was actually trained into a weekday of the weekly
    * schedule, carrying its sets across as the targets. 'replace' makes the
@@ -174,6 +184,7 @@ interface AppState {
     exercises: Exercise[];
     schedule: AppState['schedule'];
     skips: Record<string, string[]>;
+    dayOrder: Record<string, string[]>;
     workouts: LoggedWorkout[];
     water: WaterEntry[];
     weights: WeightEntry[];
@@ -209,6 +220,7 @@ export const useAppStore = create<AppState>()(
       installId: null,
       linkedRef: null,
       syncedAt: null,
+      dayOrder: {},
       workouts: [],
       water: [],
       weights: [],
@@ -365,8 +377,17 @@ export const useAppStore = create<AppState>()(
       copyDayTo: (sourceDay, targetDay) => {
         const state = get();
         const srcKey = dayKey(sourceDay);
-        const source = state.workouts.filter((w) => dayKey(new Date(w.at)) === srcKey);
-        if (source.length === 0) return 0;
+        const onSource = state.workouts.filter((w) => dayKey(new Date(w.at)) === srcKey);
+        if (onSource.length === 0) return 0;
+        // Clone in the order the source day is displayed in, so a day that was
+        // reordered by hand arrives looking the same.
+        const sourceOrder = applyOrder(
+          onSource.map((w) => w.exerciseId),
+          state.dayOrder[dateKey(sourceDay)],
+        );
+        const source = sourceOrder
+          .map((id) => onSource.find((w) => w.exerciseId === id))
+          .filter((w): w is LoggedWorkout => !!w);
         // An exercise already logged on the target day is left alone, so
         // copying twice cannot double-count it.
         const targetKey = dayKey(targetDay);
@@ -397,8 +418,15 @@ export const useAppStore = create<AppState>()(
       saveDayToSchedule: (day, weekday, mode) => {
         const state = get();
         const dk = dayKey(day);
-        const logged = state.workouts.filter((w) => dayKey(new Date(w.at)) === dk);
-        if (logged.length === 0) return 0;
+        const onDay = state.workouts.filter((w) => dayKey(new Date(w.at)) === dk);
+        if (onDay.length === 0) return 0;
+        // The weekday inherits the order the day is actually displayed in.
+        const logged = applyOrder(
+          onDay.map((w) => w.exerciseId),
+          state.dayOrder[dateKey(day)],
+        )
+          .map((id) => onDay.find((w) => w.exerciseId === id))
+          .filter((w): w is LoggedWorkout => !!w);
 
         const current = state.schedule[weekday];
         const ids = mode === 'replace' ? [] : [...(current?.exerciseIds ?? [])];
@@ -427,6 +455,20 @@ export const useAppStore = create<AppState>()(
         }));
         return logged.length;
       },
+      setDayOrder: (day, exerciseIds) =>
+        set((s) => ({ dayOrder: { ...s.dayOrder, [dateKey(day)]: exerciseIds } })),
+      reorderSchedule: (weekday, exerciseIds) =>
+        set((s) => {
+          const cur = s.schedule[weekday];
+          if (!cur) return {};
+          // Only reshuffle what is actually on that day; never let a stale list
+          // add or drop exercises.
+          const kept = exerciseIds.filter((id) => cur.exerciseIds.includes(id));
+          const missing = cur.exerciseIds.filter((id) => !kept.includes(id));
+          return {
+            schedule: { ...s.schedule, [weekday]: { ...cur, exerciseIds: [...kept, ...missing] } },
+          };
+        }),
       addToSchedule: (weekday, exerciseId) =>
         set((s) => {
           const cur = s.schedule[weekday] ?? { exerciseIds: [] };
@@ -574,6 +616,7 @@ export const useAppStore = create<AppState>()(
           exercises: snap.exercises,
           schedule: snap.schedule,
           skips: snap.skips,
+          dayOrder: snap.dayOrder,
           workouts: snap.workouts,
           water: snap.water,
           weights: snap.weights,
@@ -585,6 +628,7 @@ export const useAppStore = create<AppState>()(
           // sign-in claim this install again.
           linkedRef: null,
           syncedAt: null,
+          dayOrder: {},
           language: null,
           profile: null,
           targets: null,
@@ -621,6 +665,7 @@ export const useAppStore = create<AppState>()(
         installId,
         linkedRef,
         syncedAt,
+        dayOrder,
         workouts,
         water,
         weights,
@@ -643,6 +688,7 @@ export const useAppStore = create<AppState>()(
         installId,
         linkedRef,
         syncedAt,
+        dayOrder,
         workouts,
         water,
         weights,
@@ -772,6 +818,20 @@ export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
     (sum, w) => (isSameDay(w.at, day) ? sum + (w.caloriesBurned ?? 0) : sum),
     0,
   );
+}
+
+/**
+ * Apply an ordering override to a set of ids.
+ *
+ * Ids the override does not mention are appended in their original order, and
+ * ids it mentions but that are not present are dropped — so a stale override
+ * can never hide an exercise or resurrect a removed one.
+ */
+export function applyOrder(ids: string[], order: string[] | undefined): string[] {
+  if (!order || order.length === 0) return ids;
+  const present = new Set(ids);
+  const listed = new Set(order);
+  return [...order.filter((id) => present.has(id)), ...ids.filter((id) => !listed.has(id))];
 }
 
 /** Stable per-day key (local date) for the same-day skip list. */

@@ -2,7 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type ScrollView,
+} from 'react-native';
+import { useAnimatedRef } from 'react-native-reanimated';
+import Sortable from 'react-native-sortables';
 
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -31,10 +42,12 @@ export default function ScheduleScreen() {
   const workouts = useAppStore((s) => s.workouts);
   const addToSchedule = useAppStore((s) => s.addToSchedule);
   const removeFromSchedule = useAppStore((s) => s.removeFromSchedule);
+  const reorderSchedule = useAppStore((s) => s.reorderSchedule);
   const setScheduleTitle = useAppStore((s) => s.setScheduleTitle);
   const viewDay = useViewDay((s) => s.day);
 
   const [weekday, setWeekday] = useState<number>(viewDay.getDay());
+  const pageRef = useAnimatedRef<ScrollView>();
   const day = schedule[weekday] ?? { exerciseIds: [] };
 
   const sharePlan = async () => {
@@ -72,7 +85,10 @@ export default function ScheduleScreen() {
   const historyToAdd = historyExercises.filter((h) => !day.exerciseIds.includes(h.id));
 
   return (
-    <Screen footer={<Button label={t('common.done')} onPress={() => router.back()} />}>
+    <Screen
+      scrollRef={pageRef}
+      footer={<Button label={t('common.done')} onPress={() => router.back()} />}
+    >
       <View style={styles.header}>
         <Ionicons name="calendar" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('schedule.title')}</Text>
@@ -137,7 +153,19 @@ export default function ScheduleScreen() {
         </View>
       ) : (
         <View style={[styles.listCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          {day.exerciseIds.map((exId, i) => {
+          <Sortable.Grid
+            columns={1}
+            rowGap={0}
+            data={day.exerciseIds}
+            keyExtractor={(exId) => exId}
+            dragActivationDelay={220}
+            hapticsEnabled
+            scrollableRef={pageRef}
+            // Reordering here is the weekday's own order, so every later
+            // occurrence of it follows — unlike dragging a single day, which
+            // only overrides that date.
+            onDragEnd={({ data }) => reorderSchedule(weekday, data)}
+            renderItem={({ item: exId, index: i }) => {
             const ex = findExercise(exId, custom);
             const planned = day.plans?.[exId] ?? [];
             return (
@@ -174,7 +202,8 @@ export default function ScheduleScreen() {
                 </Pressable>
               </View>
             );
-          })}
+            }}
+          />
         </View>
       )}
 

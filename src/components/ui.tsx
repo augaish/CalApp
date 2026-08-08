@@ -27,11 +27,17 @@ export function Screen({
   footer,
   scroll = true,
   style,
+  scrollRef,
 }: {
   children: React.ReactNode;
   footer?: React.ReactNode;
   scroll?: boolean;
   style?: StyleProp<ViewStyle>;
+  /**
+   * Exposes the page's scroller. A drag-to-reorder list nested in here needs it
+   * to auto-scroll when the finger nears the top or bottom of the screen.
+   */
+  scrollRef?: React.Ref<ScrollView>;
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
@@ -45,6 +51,7 @@ export function Screen({
     <View style={{ flex: 1, backgroundColor: t.background }}>
       {scroll ? (
         <ScrollView
+          ref={scrollRef}
           style={{ flex: 1 }}
           contentContainerStyle={[content, style]}
           keyboardShouldPersistTaps="handled"
