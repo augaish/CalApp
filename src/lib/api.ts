@@ -136,6 +136,23 @@ export async function createShareLink(payload: unknown): Promise<string | null> 
   }
 }
 
+/**
+ * Tell the server which address this account belongs to, so an operator sees
+ * something recognisable instead of an opaque id. Only ever called for a
+ * signed-in user; guests stay anonymous.
+ */
+export async function identifyEmail(email: string): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/identify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ email }),
+    });
+  } catch {
+    // Cosmetic for the admin list — never worth failing a sign-in over.
+  }
+}
+
 /** Fetch a shared plan by its code. */
 export async function fetchSharedPlan(code: string): Promise<unknown | null> {
   try {

@@ -1,4 +1,4 @@
-import { linkInstall, setInstallId } from './api';
+import { identifyEmail, linkInstall, setInstallId } from './api';
 import type { Account } from './store';
 import { useAppStore } from './store';
 import { getSupabase } from './supabase';
@@ -50,6 +50,9 @@ export async function syncAuthIdentity(): Promise<'restored' | 'uploaded' | 'non
     return 'none';
   }
   setInstallId(uid);
+  // Put a human-readable address next to the account in the admin list.
+  const email = data.session?.user.email;
+  if (email) void identifyEmail(email);
   // The first time this account is seen here, give it what the install already
   // used and owns — otherwise signing in would silently refill the month's
   // allowance. Retried on the next launch if the call does not get through.

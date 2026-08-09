@@ -98,6 +98,9 @@ export async function initDb(): Promise<void> {
   await pool.query(
     `ALTER TABLE app_users ADD COLUMN IF NOT EXISTS plan_event_ms BIGINT NOT NULL DEFAULT 0`,
   );
+  // The address a signed-in account uses, so support has something human to
+  // recognise a row by. Guests never have one.
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`);
 }
 
 /**
@@ -172,6 +175,20 @@ export async function getOrCreateUser(ref: string): Promise<AppUser | null> {
     console.error('getOrCreateUser failed:', err);
     return null;
   }
+}
+
+/**
+ * Record the address a signed-in account uses. Sent by the app rather than
+ * read from the auth provider, which would mean holding a service-role key on
+ * this server for the sake of one column.
+ */
+export async function setUserEmail(ref: string, email: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO app_users (ref, email) VALUES ($1, $2)
+     ON CONFLICT (ref) DO UPDATE SET email = EXCLUDED.email`,
+    [ref, email],
+  );
 }
 
 /** Grant or revoke Pro (admin, and later the billing webhook). */
@@ -514,6 +531,7 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
 
 export interface AdminRow {
   ref: string;
+  email: string | null;
   plan: string;
   planSource: string;
   planUntil: string | null;
@@ -527,7 +545,7 @@ export async function listUsers(limit = 200): Promise<AdminRow[]> {
   if (!pool) return [];
   const period = currentPeriod();
   const res = await pool.query(
-    `SELECT u.ref, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
+    `SELECT u.ref, u.email, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
             COALESCE((SELECT SUM(c.count) FROM usage_counters c
                       WHERE c.ref = u.ref AND c.period = $1), 0)::int AS used
        FROM app_users u
@@ -537,6 +555,7 @@ export async function listUsers(limit = 200): Promise<AdminRow[]> {
   );
   return res.rows.map((r) => ({
     ref: r.ref,
+    email: r.email ?? null,
     plan: r.plan,
     planSource: r.plan_source,
     planUntil: r.plan_until ? new Date(r.plan_until).toISOString() : null,

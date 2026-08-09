@@ -117,7 +117,7 @@ export const ADMIN_HTML = `<!doctype html>
       <b>Users</b>
       <div class="scroll">
         <table>
-          <thead><tr><th>Ref</th><th>Plan</th><th>Source</th><th>Used</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
+          <thead><tr><th>Ref</th><th>Email</th><th>Plan</th><th>Source</th><th>Used</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -171,6 +171,7 @@ export const ADMIN_HTML = `<!doctype html>
       var isPro = u.plan === 'pro' || u.plan === 'proPlus';
       html += '<tr>' +
         '<td style="font-family:monospace">' + esc(u.ref) + '</td>' +
+        '<td>' + (u.email ? esc(u.email) : '<span class="muted">guest</span>') + '</td>' +
         '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + u.plan + '</span></td>' +
         '<td class="muted">' + esc(u.planSource) + '</td>' +
         '<td>' + u.used + '</td>' +
@@ -179,7 +180,7 @@ export const ADMIN_HTML = `<!doctype html>
         '<td><button class="ghost" onclick="pick(\\'' + esc(u.ref) + '\\')">Select</button></td>' +
         '</tr>';
     });
-    document.getElementById('rows').innerHTML = html || '<tr><td colspan="7" class="muted">No users yet.</td></tr>';
+    document.getElementById('rows').innerHTML = html || '<tr><td colspan="8" class="muted">No users yet.</td></tr>';
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }

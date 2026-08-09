@@ -6,7 +6,7 @@
  * Keep these accurate: they describe what the app actually does today.
  */
 const CONTACT = process.env.SUPPORT_EMAIL ?? 'augaishb1@gmail.com';
-const UPDATED = 'July 2026';
+const UPDATED = 'August 2026';
 
 const STYLE = `
   :root { --bg:#F5F3FA; --card:#fff; --text:#2A2440; --muted:#6B6480; --line:#E6E1F0; --primary:#6D5AAB; }
@@ -48,14 +48,17 @@ export const PRIVACY_HTML = page(
 
 <p>Calgym helps you track meals and workouts. This policy explains what we collect and why. We keep it short because we collect very little.</p>
 
-<h2>What stays on your device</h2>
-<p>Your logged data — profile details, meals, workouts, water, weight and your weekly schedule — is stored locally on your phone. It is not uploaded to us or shared with anyone.</p>
+<h2>Where your logged data lives</h2>
+<p>Your logged data — profile details, meals, workouts, water, weight and your weekly schedule — is stored on your phone. If you use the app as a guest it never leaves the device.</p>
+<p>If you create an account, a copy is also kept in that account so your history survives a lost or replaced phone. Only you can read it. Photos are never uploaded — they stay on the phone that took them. Deleting your account deletes that copy.</p>
 
 <h2>What is sent to our servers</h2>
 <ul>
   <li><strong>AI analysis requests.</strong> When you scan a meal, scan gym equipment, describe a meal in words, or message the AI coach, that content (a photo or your text) is sent to our server and forwarded to our AI provider, Anthropic, to generate the result. We do not store your photos or messages after the response is returned.</li>
   <li><strong>Coach context.</strong> If you use the AI coach, a short summary of your recent totals (calories, macros, workouts) is included so the answer can reference your own data. It is used only to produce that reply and is not stored.</li>
-  <li><strong>An anonymous installation ID.</strong> A random identifier generated on your device. It is not linked to your name, email, phone number or advertising ID. We use it only to count how many AI actions you have used in the current month, so we can apply plan limits.</li>
+  <li><strong>An installation ID.</strong> A random identifier generated on your device, used to count how many AI actions you have used in the current month so we can apply plan limits. For a guest it is not linked to any personal detail.</li>
+  <li><strong>Your email address, if you create an account.</strong> Stored alongside your plan and usage so we can recognise your account and help you if you contact support. It is never used for marketing, and guests never provide one.</li>
+  <li><strong>A workout plan you choose to share.</strong> Using the share button stores that plan so the link you send can open it. It contains exercises and target sets only — no personal details and no photos — and it is deleted after six months.</li>
 </ul>
 
 <h2>What we do not do</h2>
@@ -91,14 +94,17 @@ export const PRIVACY_HTML = page(
 <div class="updated">كالجيم · آخر تحديث ${UPDATED}</div>
 <p>يساعدك كالجيم على تتبع وجباتك وتمارينك. نجمع القليل جداً من البيانات.</p>
 
-<h2>ما يبقى على جهازك</h2>
-<p>بياناتك المسجّلة — ملفك الشخصي والوجبات والتمارين والماء والوزن وجدولك الأسبوعي — تُحفظ محلياً على هاتفك ولا تُرفع إلينا.</p>
+<h2>أين تُحفظ بياناتك</h2>
+<p>بياناتك المسجّلة — ملفك الشخصي والوجبات والتمارين والماء والوزن وجدولك الأسبوعي — تُحفظ على هاتفك. وإذا استخدمت التطبيق كضيف فهي لا تغادر الجهاز أبداً.</p>
+<p>وإذا أنشأت حساباً، تُحفظ نسخة أيضاً في حسابك حتى لا تفقد سجلك عند تغيير الهاتف أو فقدانه. لا يمكن لأحد غيرك قراءتها. الصور لا تُرفع إطلاقاً وتبقى على الهاتف الذي التقطها، وحذف حسابك يحذف تلك النسخة.</p>
 
 <h2>ما يُرسل إلى خوادمنا</h2>
 <ul>
   <li><strong>طلبات التحليل بالذكاء الاصطناعي:</strong> عند مسح وجبة أو جهاز، أو وصف وجبة، أو مراسلة المدرب الذكي، يُرسل المحتوى إلى خادمنا ثم إلى مزوّد الذكاء الاصطناعي (Anthropic) لإنتاج النتيجة. لا نحتفظ بصورك أو رسائلك بعد إرجاع النتيجة.</li>
   <li><strong>ملخّص للمدرب:</strong> عند استخدام المدرب الذكي يُرفق ملخص قصير لإجمالياتك الأخيرة ليكون الرد مخصصاً لك، ولا يُخزَّن.</li>
-  <li><strong>معرّف تثبيت مجهول:</strong> رقم عشوائي يُنشأ على جهازك، غير مرتبط باسمك أو بريدك أو رقمك، ونستخدمه فقط لعدّ عمليات الذكاء الاصطناعي خلال الشهر لتطبيق حدود الباقة.</li>
+  <li><strong>معرّف التثبيت:</strong> رقم عشوائي يُنشأ على جهازك، نستخدمه فقط لعدّ عمليات الذكاء الاصطناعي خلال الشهر لتطبيق حدود الباقة. وللضيف لا يرتبط بأي بيانات شخصية.</li>
+  <li><strong>بريدك الإلكتروني إذا أنشأت حساباً:</strong> يُحفظ مع باقتك واستخدامك كي نتعرّف على حسابك ونساعدك عند التواصل مع الدعم. لا يُستخدم للتسويق إطلاقاً، والضيوف لا يقدّمونه.</li>
+  <li><strong>جدول تمرين تختار مشاركته:</strong> عند استخدام زر المشاركة يُحفظ الجدول ليتمكن الرابط من فتحه. يحتوي على التمارين والمجموعات المستهدفة فقط — دون أي بيانات شخصية أو صور — ويُحذف بعد ستة أشهر.</li>
 </ul>
 
 <h2>ما لا نفعله</h2>

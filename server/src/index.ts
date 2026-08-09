@@ -26,6 +26,7 @@ import {
   resolveRef,
   setCachedEquipment,
   setSetting,
+  setUserEmail,
   setUserPlan,
 } from './db.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
@@ -543,6 +544,28 @@ app.post('/api/billing/revenuecat', async (c) => {
   } catch (err) {
     console.error('billing webhook failed:', err);
     return c.json({ error: 'webhook_failed' }, 500);
+  }
+});
+
+/**
+ * Attach the signed-in account's address to its row, so the admin list shows
+ * something recognisable next to an opaque id. Sent by the app because the
+ * alternative — querying the auth provider — would mean keeping a
+ * service-role key on this server for the sake of one column. Guests never
+ * call it.
+ */
+app.post('/api/identify', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ error: 'identify_required' }, 401);
+  const body = await c.req.json<{ email?: string }>().catch(() => ({}) as never);
+  const email = (body?.email ?? '').trim().toLowerCase().slice(0, 200);
+  if (!/^\S+@\S+\.\S+$/.test(email)) return c.json({ error: 'invalid_request' }, 400);
+  try {
+    await setUserEmail(ref, email);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('identify failed:', err);
+    return c.json({ error: 'identify_failed' }, 500);
   }
 });
 
