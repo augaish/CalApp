@@ -1,4 +1,4 @@
-import type { Exercise, PlannedSet } from './types';
+import type { Exercise, FoodItem, MealType, PlannedSet } from './types';
 
 /**
  * Payload embedded in a shareable schedule link. Custom / scan exercises are
@@ -13,6 +13,88 @@ export interface SharedSchedule {
     { title?: string; exerciseIds: string[]; plans?: Record<string, PlannedSet[]> }
   >;
   exercises: Exercise[];
+}
+
+/**
+ * Payload behind a shared meal link. Photos are deliberately left out: a
+ * photoUri points at a file on the sender's phone, so it is meaningless to the
+ * recipient.
+ */
+export interface SharedMeal {
+  v: 1;
+  kind: 'meal';
+  /** What was shared — one meal, or a whole day. */
+  meals: { mealType?: MealType; items: FoodItem[] }[];
+}
+
+export function isSharedMeal(value: unknown): value is SharedMeal {
+  const meal = value as SharedMeal | null;
+  return !!meal && meal.v === 1 && meal.kind === 'meal' && Array.isArray(meal.meals);
+}
+
+/** Sum the macros across every food in a shared payload. */
+export function sharedMealTotals(payload: SharedMeal): {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+} {
+  const totals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+  for (const meal of payload.meals) {
+    for (const item of meal.items ?? []) {
+      totals.calories += item.calories;
+      totals.proteinG += item.proteinG;
+      totals.carbsG += item.carbsG;
+      totals.fatG += item.fatG;
+    }
+  }
+  return totals;
+}
+
+/** The localized strings `mealShareText` needs, resolved by the caller. */
+export interface MealShareLabels {
+  /** Opening line, e.g. "My lunch on Calgym" */
+  heading: string;
+  mealTypeName: (type: MealType) => string;
+  kcal: string;
+  protein: string;
+  carbs: string;
+  fat: string;
+  total: string;
+  /** Invitation shown above the link. */
+  openHint: string;
+}
+
+/**
+ * The message that actually lands in WhatsApp. The macros are written out as
+ * text rather than hidden behind the link, so someone without the app still
+ * sees the numbers — the link is only there for a recipient who wants to log
+ * the same food.
+ */
+export function mealShareText(
+  payload: SharedMeal,
+  labels: MealShareLabels,
+  url?: string | null,
+): string {
+  const lines: string[] = [labels.heading, ''];
+  const multiple = payload.meals.length > 1;
+  for (const meal of payload.meals) {
+    if (multiple && meal.mealType) lines.push(`— ${labels.mealTypeName(meal.mealType)} —`);
+    for (const item of meal.items ?? []) {
+      const portion = item.portion?.trim();
+      lines.push(`• ${item.name}${portion ? ` (${portion})` : ''} — ${Math.round(item.calories)} ${labels.kcal}`);
+      lines.push(
+        `   ${labels.protein} ${Math.round(item.proteinG)}g · ${labels.carbs} ${Math.round(item.carbsG)}g · ${labels.fat} ${Math.round(item.fatG)}g`,
+      );
+    }
+    if (multiple) lines.push('');
+  }
+  const totals = sharedMealTotals(payload);
+  lines.push(
+    `${labels.total}: ${Math.round(totals.calories)} ${labels.kcal} · ${labels.protein} ${Math.round(totals.proteinG)}g · ${labels.carbs} ${Math.round(totals.carbsG)}g · ${labels.fat} ${Math.round(totals.fatG)}g`,
+  );
+  if (url) lines.push('', labels.openHint, url);
+  return lines.join('\n');
 }
 
 // ── Self-contained UTF-8 ⇄ base64url (no btoa/atob/escape dependency) ──────

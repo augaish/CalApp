@@ -73,6 +73,7 @@ export default function RootLayout() {
           <Stack.Screen name="schedule" options={{ presentation: 'modal' }} />
           <Stack.Screen name="schedule-plan" options={{ presentation: 'modal' }} />
           <Stack.Screen name="schedule-import" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="meal-import" options={{ presentation: 'modal' }} />
           <Stack.Screen
             name="water"
             options={{ presentation: 'transparentModal', animation: 'fade' }}

@@ -121,12 +121,16 @@ export async function linkInstall(installId: string): Promise<boolean> {
  * characters long — chat apps linkified only the first part of them, so the
  * recipient opened a link with no plan in it.
  */
-export async function createShareLink(payload: unknown): Promise<string | null> {
+export async function createShareLink(
+  payload: unknown,
+  /** Decides which screen the link opens on the recipient's phone. */
+  kind: 'schedule' | 'meal' = 'schedule',
+): Promise<string | null> {
   try {
     const res = await fetch(`${API_URL}/api/share`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ payload }),
+      body: JSON.stringify({ payload, kind }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { url?: string };

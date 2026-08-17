@@ -119,17 +119,35 @@ const COMMIT = (
 
 app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled, commit: COMMIT }));
 
+/** What a bounce page says, per kind of thing being shared. */
+const BOUNCE_COPY = {
+  'schedule-import': {
+    title: 'Calgym workout plan',
+    body: 'Open this shared plan in the Calgym app to add it to your week.',
+  },
+  'meal-import': {
+    title: 'Calgym food',
+    body: 'Open this shared food in the Calgym app to add it to your day.',
+  },
+} as const;
+
 /**
- * The page a shared plan link lands on. It bounces into the app via the
- * `calapp://` deep link, with a button as the fallback.
+ * The page a share link lands on. It bounces into the app via the `calapp://`
+ * deep link, with a button as the fallback.
  */
 function bouncePage(deepLink: string): string {
+  // Only ever our own two screens — the prefix check below is what stops this
+  // page from redirecting anywhere else.
+  const screen = deepLink.startsWith('calapp://meal-import')
+    ? 'meal-import'
+    : 'schedule-import';
+  const copy = BOUNCE_COPY[screen];
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Calgym workout plan</title>
+<title>${copy.title}</title>
 <style>
   body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
     background:#F5F3FA; color:#2A2440; display:flex; min-height:100vh; align-items:center;
@@ -146,13 +164,13 @@ function bouncePage(deepLink: string): string {
 <body>
   <div class="card">
     <div class="logo"></div>
-    <h1>Calgym workout plan</h1>
-    <p>Open this shared plan in the Calgym app to add it to your week.</p>
+    <h1>${copy.title}</h1>
+    <p>${copy.body}</p>
     <a class="btn" id="open" href="${deepLink}">Open in Calgym</a>
   </div>
   <script>
     var link = ${JSON.stringify(deepLink)};
-    if (link.indexOf('calapp://schedule-import?') === 0) {
+    if (link.indexOf('calapp://schedule-import?') === 0 || link.indexOf('calapp://meal-import?') === 0) {
       setTimeout(function () { window.location.href = link; }, 300);
     }
   </script>
@@ -177,7 +195,7 @@ function validCode(raw: string): string | null {
 app.post('/api/share', async (c) => {
   const ref = await callerRef(c);
   if (!ref) return c.json({ error: 'identify_required' }, 401);
-  const body = await c.req.json<{ payload?: unknown }>().catch(() => ({}) as never);
+  const body = await c.req.json<{ payload?: unknown; kind?: string }>().catch(() => ({}) as never);
   if (!body?.payload || typeof body.payload !== 'object') {
     return c.json({ error: 'invalid_request' }, 400);
   }
@@ -185,10 +203,13 @@ app.post('/api/share', async (c) => {
   if (JSON.stringify(body.payload).length > 256 * 1024) {
     return c.json({ error: 'payload_too_large' }, 413);
   }
+  // The path decides which screen the link opens. Keeping that in the URL means
+  // /s/:code and /m/:code stay a pure redirect with no database read.
+  const path = body.kind === 'meal' ? 'm' : 's';
   try {
     const code = await createShareLink(body.payload);
     if (!code) return c.json({ error: 'share_unavailable' }, 503);
-    return c.json({ code, url: `${publicBase(c)}/s/${code}` });
+    return c.json({ code, url: `${publicBase(c)}/${path}/${code}` });
   } catch (err) {
     console.error('create share failed:', err);
     return c.json({ error: 'share_failed' }, 500);
@@ -210,6 +231,12 @@ app.get('/s/:code', (c) => {
   return c.html(
     bouncePage(code ? `calapp://schedule-import?c=${code}` : 'calapp://schedule-import'),
   );
+});
+
+/** Same, for a shared meal. */
+app.get('/m/:code', (c) => {
+  const code = validCode(c.req.param('code'));
+  return c.html(bouncePage(code ? `calapp://meal-import?c=${code}` : 'calapp://meal-import'));
 });
 
 /**

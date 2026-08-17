@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -7,6 +8,7 @@ import { Card, Screen } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useViewDay } from '@/lib/day';
+import { shareMeals } from '@/lib/meal-share';
 import { isSameDay, mealCalories, totalsForDay, useAppStore } from '@/lib/store';
 import type { LoggedMeal, MealType } from '@/lib/types';
 
@@ -24,12 +26,25 @@ export default function Food() {
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
+  const [sharing, setSharing] = useState(false);
+
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const dayMeals = meals.filter((m) => isSameDay(m.at, selected));
   const totals = totalsForDay(meals, selected);
 
   const mealsOfType = (type: MealType): LoggedMeal[] =>
     dayMeals.filter((m) => (m.mealType ?? 'snack') === type);
+
+  const dayLabel = selectedIsToday
+    ? t('home.today')
+    : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+
+  const shareDay = async () => {
+    setSharing(true);
+    const outcome = await shareMeals(dayMeals, t('mealShare.dayHeading', { day: dayLabel }), t);
+    setSharing(false);
+    if (outcome === 'empty') Alert.alert(t('mealShare.empty'));
+  };
 
   const confirmDelete = (id: string) =>
     Alert.alert(t('home.deleteMealConfirm'), undefined, [
@@ -42,16 +57,20 @@ export default function Food() {
       <View style={styles.headerRow}>
         <Ionicons name="restaurant" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('tabs.food')}</Text>
+        <Pressable
+          onPress={shareDay}
+          disabled={sharing}
+          hitSlop={10}
+          style={{ opacity: sharing ? 0.4 : 1 }}
+        >
+          <Ionicons name="share-outline" size={20} color={theme.primary} />
+        </Pressable>
         <View style={styles.dayNavGroup}>
           <Pressable onPress={() => shift(-1)} hitSlop={10} style={styles.arrow}>
             <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
           </Pressable>
           <Pressable onPress={() => router.push('/calendar')} hitSlop={6}>
-            <Text style={[styles.dayLabel, { color: theme.text }]}>
-              {selectedIsToday
-                ? t('home.today')
-                : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-            </Text>
+            <Text style={[styles.dayLabel, { color: theme.text }]}>{dayLabel}</Text>
           </Pressable>
           <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} style={styles.arrow}>
             <Ionicons

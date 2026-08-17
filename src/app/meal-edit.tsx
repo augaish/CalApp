@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -10,6 +10,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
+import { shareMeals } from '@/lib/meal-share';
 import { useAppStore } from '@/lib/store';
 import type { FoodItem, MealType } from '@/lib/types';
 
@@ -64,6 +65,7 @@ export default function MealEdit() {
     })),
   );
   const [mults, setMults] = useState<number[]>(() => (meal ? meal.items.map(() => 1) : []));
+  const [sharing, setSharing] = useState(false);
 
   if (!meal) {
     return (
@@ -182,6 +184,19 @@ export default function MealEdit() {
 
   const total = items.reduce((sum, i) => sum + i.calories, 0);
 
+  // Shares what is on screen, not what is saved, so a portion the user just
+  // adjusted is the number their friend receives.
+  const share = async () => {
+    setSharing(true);
+    const outcome = await shareMeals(
+      [{ ...meal, items, mealType }],
+      t('mealShare.mealHeading', { meal: t(`home.mealTypes.${mealType}`) }),
+      t,
+    );
+    setSharing(false);
+    if (outcome === 'empty') Alert.alert(t('mealShare.empty'));
+  };
+
   return (
     <Screen
       footer={
@@ -214,6 +229,16 @@ export default function MealEdit() {
         <View style={{ flex: 1 }}>
           <Title>{t('mealEdit.title')}</Title>
         </View>
+        {items.length > 0 && (
+          <Pressable
+            onPress={share}
+            disabled={sharing}
+            hitSlop={10}
+            style={{ marginEnd: Spacing.sm, opacity: sharing ? 0.4 : 1 }}
+          >
+            <Ionicons name="share-outline" size={20} color={theme.primary} />
+          </Pressable>
+        )}
         <Pressable onPress={() => router.back()} hitSlop={10}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>

@@ -1,23 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, MealTypePicker, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
-import { successHaptic } from '@/lib/feedback';
+import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { pastFoods, suggestFoods } from '@/lib/food-history';
 import { usePending } from '@/lib/pending';
 import { mealTypeForNow, useAppStore } from '@/lib/store';
-import type { MealType } from '@/lib/types';
+import type { FoodItem, MealType } from '@/lib/types';
 
 export default function FoodEdit() {
   const { t } = useTranslation();
+  const theme = useTheme();
   const router = useRouter();
   const logMeal = useAppStore((s) => s.logMeal);
+  const meals = useAppStore((s) => s.meals);
   const viewDay = useViewDay((s) => s.day);
   const capturedPhoto = usePending((s) => s.capturedPhoto);
   const setCapturedPhoto = usePending((s) => s.setCapturedPhoto);
@@ -29,6 +33,24 @@ export default function FoodEdit() {
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
   const [mealType, setMealType] = useState<MealType>(mealTypeForNow());
+  // Set once a suggestion is taken, so per-100g scaling survives on packaged
+  // foods that were originally added by barcode.
+  const [basePer100, setBasePer100] = useState<FoodItem['basePer100']>(undefined);
+
+  const history = useMemo(() => pastFoods(meals), [meals]);
+  const suggestions = useMemo(() => suggestFoods(history, name), [history, name]);
+
+  /** Refill the whole form from a food the user has logged before. */
+  const applySuggestion = (item: FoodItem) => {
+    lightHaptic();
+    setName(item.name);
+    setPortion(item.portion ?? '');
+    setCalories(String(Math.round(item.calories)));
+    setProtein(String(Math.round(item.proteinG)));
+    setCarbs(String(Math.round(item.carbsG)));
+    setFat(String(Math.round(item.fatG)));
+    setBasePer100(item.basePer100);
+  };
 
   const save = () => {
     if (name.trim().length < 2) {
@@ -44,6 +66,7 @@ export default function FoodEdit() {
           proteinG: parseInt(protein, 10) || 0,
           carbsG: parseInt(carbs, 10) || 0,
           fatG: parseInt(fat, 10) || 0,
+          ...(basePer100 ? { basePer100 } : {}),
         },
       ],
       capturedPhoto ?? undefined,
@@ -77,10 +100,51 @@ export default function FoodEdit() {
       <Field
         label={t('foodEdit.name')}
         value={name}
-        onChangeText={setName}
+        onChangeText={(text) => {
+          setName(text);
+          // Typing over a filled-in suggestion means this is a different food.
+          setBasePer100(undefined);
+        }}
         placeholder={t('foodEdit.namePlaceholder')}
         maxLength={60}
+        autoCorrect={false}
       />
+
+      {suggestions.length > 0 && (
+        <View style={{ marginTop: -Spacing.sm, marginBottom: Spacing.md }}>
+          <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: 6 }}>
+            {t('foodEdit.fromHistory')}
+          </Text>
+          {suggestions.map((item, i) => (
+            <Pressable
+              key={`${item.name}-${i}`}
+              onPress={() => applySuggestion(item)}
+              style={({ pressed }) => [
+                styles.suggestion,
+                { backgroundColor: theme.card, borderColor: theme.border },
+                pressed && { opacity: 0.6 },
+              ]}
+            >
+              <Ionicons name="time-outline" size={16} color={theme.primary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                {!!item.portion && (
+                  <Text style={{ color: theme.textTertiary, fontSize: 12 }} numberOfLines={1}>
+                    {item.portion}
+                  </Text>
+                )}
+              </View>
+              <Text style={{ color: theme.primary, fontWeight: '800' }}>
+                {Math.round(item.calories)}
+              </Text>
+              <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('common.kcal')}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
       <Field
         label={t('foodEdit.portion')}
         value={portion}
@@ -120,6 +184,16 @@ export default function FoodEdit() {
 
 const styles = StyleSheet.create({
   photo: { width: '100%', height: 160, borderRadius: Radius.lg, marginBottom: Spacing.md },
+  suggestion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    marginBottom: 6,
+  },
   row: { flexDirection: 'row', gap: Spacing.sm },
   flex: { flex: 1 },
 });

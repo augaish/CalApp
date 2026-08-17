@@ -77,13 +77,33 @@ Rules:
 - If the text is not about food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.`;
 }
 
+/**
+ * How the coach must speak. Written in the target language on purpose — an
+ * English instruction to "reply in Arabic" was losing to the rest of the
+ * prompt, which is English, and to an English data block in the middle of it.
+ * The rule is also repeated as the closing line below, because that is the part
+ * of a long system prompt the model weighs most.
+ */
+const VOICE: Record<Language, string> = {
+  en: 'Reply in English, in a warm and direct coaching voice.',
+  ar: `تكلم بالعربية بلهجة سعودية واضحة (نجدية/خليجية)، مثل مدرب سعودي يتكلم مع عميله — لا فصحى جامدة ولا لهجة مصرية.
+- ممنوع كلمات اللهجة المصرية: عشان، إزاي، كده، دلوقتي، عايز، أوي، حاجة، بردو، خلاص.
+- استخدم بدالها: لأن، كيف / وش الطريقة، كذا، الحين، تبغى، مرة / واجد، شي، بعد، تمام.
+- كلمات سعودية طبيعية ومناسبة: وش، ليش، زين، ما عليه، خلنا، شوي، على طول، بالعافية، أبشر.
+- خل الأرقام والوحدات واضحة (كالوري، جرام، كيلو) ولا تكثر من الإنجليزي.`,
+};
+
 export function coachSystemPrompt(language: Language, context?: string): string {
+  const lock = `Write your entire reply in ${LANGUAGE_NAME[language]}, whatever language the user's message is in.`;
   const base = `You are Calgym Coach, a friendly certified nutrition and fitness coach.
-- Reply in ${LANGUAGE_NAME[language]}.
+
+${lock}
+${VOICE[language]}
+
 - Keep replies short: 2-5 sentences, practical and specific.
-- You know Middle Eastern cuisine and gym training well.
+- You know Middle Eastern and Gulf cuisine and gym training well.
 - Never give medical diagnoses; suggest seeing a professional for medical issues.`;
-  if (!context) return base;
+  if (!context) return `${base}\n\n${lock}`;
   return `${base}
 
 The user's own Calgym data is below (today first). USE IT: answer questions
@@ -92,7 +112,9 @@ instead of asking them to repeat it. Days with 0 calories simply were not
 logged — say so rather than assuming they ate nothing. Refer to concrete
 numbers and compare against their targets when relevant.
 
-${context}`;
+${context}
+
+The data above is labelled in English for convenience. ${lock}`;
 }
 
 /** Cheap first pass: just identify the machine (small output = few tokens). */
