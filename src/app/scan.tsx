@@ -1,11 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
-import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
-import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -18,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PhotoProgress } from '@/components/photo-progress';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -31,17 +29,11 @@ import {
 } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
+import { photoPickerAvailable, pickPhoto, prepareImage } from '@/lib/photo';
 import { useAppStore } from '@/lib/store';
 
-// Gallery picking needs the expo-image-picker native module, which only exists
-// in a build that bundled it. Detect it WITHOUT importing the package (its
-// module throws at import time when the native side is missing), so older
-// builds that receive this JS over-the-air keep working — the button is simply
-// hidden until they install the new build.
-const galleryAvailable = requireOptionalNativeModule('ExponentImagePicker') != null;
-
 export default function Scan() {
-  const { mode, pick } = useLocalSearchParams<{ mode?: string; pick?: string }>();
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
   const isGym = mode === 'gym';
   const isBarcode = mode === 'barcode';
   const isPhoto = mode === 'photo';
@@ -93,26 +85,18 @@ export default function Scan() {
 
   // Downscale, then either stash the photo (manual form) or run AI analysis.
   const processImage = async (uri: string) => {
-    const context = ImageManipulator.manipulate(uri);
-    context.resize({ width: 1024 });
-    const rendered = await context.renderAsync();
-    const saved = await rendered.saveAsync({
-      base64: true,
-      compress: 0.7,
-      format: SaveFormat.JPEG,
-    });
-    const base64 = saved.base64 ?? '';
+    const saved = await prepareImage(uri);
 
     if (isPhoto) {
       setCapturedPhoto(saved.uri);
       router.back();
     } else if (isGym) {
-      const analysis = await analyzeEquipment(base64, language);
+      const analysis = await analyzeEquipment(saved.base64, language);
       useEntitlement.getState().spend();
       setEquipment(analysis, saved.uri);
       router.replace('/gym-result');
     } else {
-      const analysis = await analyzeMeal(base64, language);
+      const analysis = await analyzeMeal(saved.base64, language);
       useEntitlement.getState().spend();
       setMeal(analysis, saved.uri);
       router.replace('/meal-result');
@@ -148,24 +132,18 @@ export default function Scan() {
   };
 
   // Analyze a picture the user already took (meal / equipment / manual photo).
-  // Loaded lazily so the module's native binding is only touched when present.
   const pickFromGallery = async () => {
     if (analyzing) return;
-    if (!galleryAvailable) {
+    if (!photoPickerAvailable) {
       Alert.alert(t('scan.galleryUnavailableTitle'), t('scan.galleryUnavailable'));
       return;
     }
     try {
-      const ImagePicker = await import('expo-image-picker');
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.8,
-      });
-      const asset = result.canceled ? undefined : result.assets?.[0];
-      if (!asset) return;
+      const uri = await pickPhoto();
+      if (!uri) return;
       setAnalyzing(true);
-      setShot(asset.uri);
-      await processImage(asset.uri);
+      setShot(uri);
+      await processImage(uri);
     } catch (err) {
       if (err instanceof QuotaError) return onLocked('quota');
       if (err instanceof FeatureLockedError) return onLocked('equipment');
@@ -173,18 +151,6 @@ export default function Scan() {
       reset();
     }
   };
-
-  // "Upload photo" in the add menu lands here with the picker already opening,
-  // so choosing a photo is one tap and does not look like a camera screen that
-  // happens to have a gallery button hidden in the corner.
-  const autoPicked = useRef(false);
-  useEffect(() => {
-    if (pick !== '1' || autoPicked.current) return;
-    autoPicked.current = true;
-    void pickFromGallery();
-    // Runs once per mount; pickFromGallery is stable enough for that.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pick]);
 
   const busyLabel = isBarcode
     ? t('barcode.searching')
@@ -200,18 +166,7 @@ export default function Scan() {
   //
   // Checked before camera permission on purpose: a photo chosen from the
   // library needs no camera, and its progress should still be visible.
-  if (shot) {
-    return (
-      <View style={styles.container}>
-        <Image source={{ uri: shot }} style={StyleSheet.absoluteFill} contentFit="cover" />
-        <View style={styles.busyScrim}>
-          <ActivityIndicator color="#fff" size="large" />
-          <Text style={styles.busyText}>{busyLabel}</Text>
-          <Text style={styles.busyHint}>{t('scan.analyzingHint')}</Text>
-        </View>
-      </View>
-    );
-  }
+  if (shot) return <PhotoProgress uri={shot} label={busyLabel} />;
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 
@@ -385,25 +340,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   galleryText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  busyScrim: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
-  },
-  busyText: { color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' },
-  busyHint: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 14,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
   shutterOuter: {
     width: 76,
     height: 76,

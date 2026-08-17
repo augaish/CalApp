@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { photoPickerAvailable, pickPhoto } from '@/lib/photo';
 
 type Theme = ReturnType<typeof useTheme>;
 
@@ -72,9 +74,34 @@ export default function AddMenu() {
   const { scope } = useLocalSearchParams<{ scope?: string }>();
   const foodOnly = scope === 'food';
 
+  const [picking, setPicking] = useState(false);
+
   const go = (href: Href) => {
     router.back();
     router.push(href);
+  };
+
+  /**
+   * Straight to the photo library. Routing through the camera screen first
+   * meant a viewfinder flash and a camera-permission prompt before the picker
+   * appeared, for a flow that needs neither.
+   */
+  const uploadPhoto = async (mode: 'meal' | 'gym') => {
+    if (picking) return;
+    if (!photoPickerAvailable) {
+      Alert.alert(t('scan.galleryUnavailableTitle'), t('scan.galleryUnavailable'));
+      return;
+    }
+    setPicking(true);
+    let uri: string | null = null;
+    try {
+      uri = await pickPhoto();
+    } catch {
+      Alert.alert(t('common.error'));
+    }
+    setPicking(false);
+    // Cancelled: leave the sheet open so another option is one tap away.
+    if (uri) go(`/photo-analyze?mode=${mode}&uri=${encodeURIComponent(uri)}`);
   };
 
   return (
@@ -95,7 +122,7 @@ export default function AddMenu() {
           <Tile icon="camera" label={t('addMenu.scanMeal')} onPress={() => go('/scan?mode=meal')} theme={theme} primary />
           {/* Picking an existing photo used to be reachable only from a small
               corner button inside the camera screen, so nobody found it. */}
-          <Tile icon="images" label={t('addMenu.uploadPhoto')} onPress={() => go('/scan?mode=meal&pick=1')} theme={theme} />
+          <Tile icon="images" label={t('addMenu.uploadPhoto')} onPress={() => uploadPhoto('meal')} theme={theme} />
           <Tile icon="barcode" label={t('addMenu.scanBarcode')} onPress={() => go('/scan?mode=barcode')} theme={theme} />
           <Tile icon="create" label={t('addMenu.describe')} onPress={() => go('/describe')} theme={theme} />
           <Tile icon="pencil" label={t('addMenu.manual')} onPress={() => go('/food-edit')} theme={theme} />
