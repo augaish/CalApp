@@ -34,7 +34,14 @@ export default function Describe() {
         router.replace('/upgrade?reason=quota');
         return;
       }
-      Alert.alert(t('common.error'));
+      // "Something went wrong" told the user nothing and left them retyping the
+      // same description. A failed request and a rejected one need different
+      // advice, so they get different messages.
+      const reachedServer = err instanceof Error && err.message.startsWith('API ');
+      Alert.alert(
+        t('describe.failedTitle'),
+        reachedServer ? t('describe.failed') : t('describe.offline'),
+      );
       setBusy(false);
     }
   };

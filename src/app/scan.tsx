@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Image } from 'expo-image';
 import Svg, { Path } from 'react-native-svg';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { requireOptionalNativeModule } from 'expo-modules-core';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -40,7 +41,7 @@ import { useAppStore } from '@/lib/store';
 const galleryAvailable = requireOptionalNativeModule('ExponentImagePicker') != null;
 
 export default function Scan() {
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { mode, pick } = useLocalSearchParams<{ mode?: string; pick?: string }>();
   const isGym = mode === 'gym';
   const isBarcode = mode === 'barcode';
   const isPhoto = mode === 'photo';
@@ -56,25 +57,12 @@ export default function Scan() {
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [analyzing, setAnalyzing] = useState(false);
+  // The shot being analysed. Showing it — and unmounting the camera — is what
+  // makes the wait feel like "reading your photo" rather than a live viewfinder
+  // that has stopped responding to the shutter.
+  const [shot, setShot] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const frameSize = Math.round(width * 0.78);
-
-  if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
-
-  if (!permission.granted) {
-    return (
-      <View style={[styles.permission, { backgroundColor: theme.background }]}>
-        <Text style={[styles.permissionTitle, { color: theme.text }]}>
-          {t('scan.noPermissionTitle')}
-        </Text>
-        <Text style={[styles.permissionBody, { color: theme.textSecondary }]}>
-          {t('scan.noPermissionBody')}
-        </Text>
-        <Button label={t('scan.grantPermission')} onPress={requestPermission} />
-        <Button label={t('common.cancel')} variant="ghost" onPress={() => router.back()} />
-      </View>
-    );
-  }
 
   const onBarcode = async (data: string) => {
     if (analyzing) return;
@@ -137,24 +125,36 @@ export default function Scan() {
     router.replace(`/upgrade?reason=${reason}`);
   };
 
+  /** Back to a live viewfinder after a failure, so the shot can be retaken. */
+  const reset = () => {
+    setAnalyzing(false);
+    setShot(null);
+  };
+
   const capture = async () => {
     if (analyzing || !cameraRef.current) return;
     setAnalyzing(true);
     try {
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+      // Freeze on the captured frame before the slow part starts.
+      setShot(photo.uri);
       await processImage(photo.uri);
     } catch (err) {
       if (err instanceof QuotaError) return onLocked('quota');
       if (err instanceof FeatureLockedError) return onLocked('equipment');
       Alert.alert(t('common.error'));
-      setAnalyzing(false);
+      reset();
     }
   };
 
   // Analyze a picture the user already took (meal / equipment / manual photo).
   // Loaded lazily so the module's native binding is only touched when present.
   const pickFromGallery = async () => {
-    if (analyzing || !galleryAvailable) return;
+    if (analyzing) return;
+    if (!galleryAvailable) {
+      Alert.alert(t('scan.galleryUnavailableTitle'), t('scan.galleryUnavailable'));
+      return;
+    }
     try {
       const ImagePicker = await import('expo-image-picker');
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -164,14 +164,71 @@ export default function Scan() {
       const asset = result.canceled ? undefined : result.assets?.[0];
       if (!asset) return;
       setAnalyzing(true);
+      setShot(asset.uri);
       await processImage(asset.uri);
     } catch (err) {
       if (err instanceof QuotaError) return onLocked('quota');
       if (err instanceof FeatureLockedError) return onLocked('equipment');
       Alert.alert(t('common.error'));
-      setAnalyzing(false);
+      reset();
     }
   };
+
+  // "Upload photo" in the add menu lands here with the picker already opening,
+  // so choosing a photo is one tap and does not look like a camera screen that
+  // happens to have a gallery button hidden in the corner.
+  const autoPicked = useRef(false);
+  useEffect(() => {
+    if (pick !== '1' || autoPicked.current) return;
+    autoPicked.current = true;
+    void pickFromGallery();
+    // Runs once per mount; pickFromGallery is stable enough for that.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pick]);
+
+  const busyLabel = isBarcode
+    ? t('barcode.searching')
+    : isGym
+      ? t('scan.analyzingGym')
+      : isPhoto
+        ? t('scan.preparingPhoto')
+        : t('scan.analyzingMeal');
+
+  // Once there is a shot to work on, the camera comes down. Leaving a live
+  // preview running behind a spinner was the confusing part: the viewfinder
+  // looked ready while the shutter no longer did anything.
+  //
+  // Checked before camera permission on purpose: a photo chosen from the
+  // library needs no camera, and its progress should still be visible.
+  if (shot) {
+    return (
+      <View style={styles.container}>
+        <Image source={{ uri: shot }} style={StyleSheet.absoluteFill} contentFit="cover" />
+        <View style={styles.busyScrim}>
+          <ActivityIndicator color="#fff" size="large" />
+          <Text style={styles.busyText}>{busyLabel}</Text>
+          <Text style={styles.busyHint}>{t('scan.analyzingHint')}</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
+
+  if (!permission.granted) {
+    return (
+      <View style={[styles.permission, { backgroundColor: theme.background }]}>
+        <Text style={[styles.permissionTitle, { color: theme.text }]}>
+          {t('scan.noPermissionTitle')}
+        </Text>
+        <Text style={[styles.permissionBody, { color: theme.textSecondary }]}>
+          {t('scan.noPermissionBody')}
+        </Text>
+        <Button label={t('scan.grantPermission')} onPress={requestPermission} />
+        <Button label={t('common.cancel')} variant="ghost" onPress={() => router.back()} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -211,26 +268,25 @@ export default function Scan() {
         {analyzing ? (
           <View style={styles.analyzing}>
             <ActivityIndicator color="#fff" size="large" />
-            <Text style={styles.analyzingText}>
-              {isBarcode
-                ? t('barcode.searching')
-                : isGym
-                  ? t('scan.analyzingGym')
-                  : t('scan.analyzingMeal')}
-            </Text>
+            <Text style={styles.analyzingText}>{busyLabel}</Text>
           </View>
         ) : (
           <>
             {!isBarcode && (
               <View style={styles.controlsRow}>
-                {galleryAvailable ? (
-                  <Pressable onPress={pickFromGallery} style={styles.galleryBtn}>
-                    <Ionicons name="images-outline" size={26} color="#fff" />
-                    <Text style={styles.galleryText}>{t('scan.gallery')}</Text>
-                  </Pressable>
-                ) : (
-                  <View style={styles.galleryBtn} />
-                )}
+                {/* Always shown. It used to disappear entirely on a build
+                    without the image-picker module, which read as a missing
+                    feature; tapping it now explains that instead. */}
+                <Pressable
+                  onPress={pickFromGallery}
+                  style={({ pressed }) => [styles.galleryBtn, pressed && { opacity: 0.6 }]}
+                  hitSlop={8}
+                >
+                  <View style={styles.galleryIcon}>
+                    <Ionicons name="images" size={24} color="#fff" />
+                  </View>
+                  <Text style={styles.galleryText}>{t('scan.gallery')}</Text>
+                </Pressable>
                 <Pressable onPress={capture} style={styles.shutterOuter}>
                   <View style={styles.shutterInner} />
                 </Pressable>
@@ -317,8 +373,37 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: Spacing.xl,
   },
-  galleryBtn: { width: 64, alignItems: 'center', gap: 3 },
+  galleryBtn: { width: 72, alignItems: 'center', gap: 4 },
+  galleryIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   galleryText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  busyScrim: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+  },
+  busyText: { color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  busyHint: {
+    color: 'rgba(255,255,255,0.75)',
+    fontSize: 14,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
   shutterOuter: {
     width: 76,
     height: 76,

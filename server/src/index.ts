@@ -29,6 +29,7 @@ import {
   setUserEmail,
   setUserPlan,
 } from './db.js';
+import { extractJson, toMealAnalysis, type MealAnalysis } from './parse.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
   coachSystemPrompt,
@@ -266,10 +267,29 @@ function parseBody(body: AnalyzeBody): { image: string; language: Language } | n
   return { image, language };
 }
 
-async function analyze(image: string, prompt: string, model: string = MODEL): Promise<unknown> {
+/**
+ * Text of a completion, with the one failure that is worth its own error:
+ * hitting the token ceiling truncates the JSON mid-string, and "invalid JSON"
+ * is a misleading thing to log for what is really "the answer did not fit".
+ */
+function replyText(response: { content: unknown[]; stop_reason?: string | null }): string {
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('model reply hit max_tokens and was cut off');
+  }
+  const block = (response.content as { type: string; text?: string }[]).find(
+    (b) => b.type === 'text',
+  );
+  return block?.text ?? '';
+}
+
+async function analyzeMealImage(
+  image: string,
+  prompt: string,
+  model: string = MODEL,
+): Promise<MealAnalysis> {
   const response = await anthropic.messages.create({
     model,
-    max_tokens: 1500,
+    max_tokens: 2000,
     messages: [
       {
         role: 'user',
@@ -284,22 +304,38 @@ async function analyze(image: string, prompt: string, model: string = MODEL): Pr
     ],
   });
 
-  return parseJson(response.content.find((b) => b.type === 'text')?.text ?? '');
+  return toMealAnalysis(replyText(response));
+}
+
+async function analyze(image: string, prompt: string, model: string = MODEL): Promise<unknown> {
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: 2000,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: 'image/jpeg', data: image },
+          },
+          { type: 'text', text: prompt },
+        ],
+      },
+    ],
+  });
+
+  return extractJson(replyText(response));
 }
 
 /** Text-only completion (no image) — used for cacheable equipment details. */
-async function textCall(prompt: string, maxTokens = 1000): Promise<unknown> {
+async function textCall(prompt: string, maxTokens = 1500): Promise<unknown> {
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   });
-  return parseJson(response.content.find((b) => b.type === 'text')?.text ?? '');
-}
-
-function parseJson(text: string): unknown {
-  // Strip accidental markdown fences before parsing.
-  return JSON.parse(text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
+  return extractJson(replyText(response));
 }
 
 app.post('/api/analyze-meal', async (c) => {
@@ -311,7 +347,7 @@ app.post('/api/analyze-meal', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const model = access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL;
-    const result = await analyze(parsed.image, mealPrompt(parsed.language), model);
+    const result = await analyzeMealImage(parsed.image, mealPrompt(parsed.language), model);
     return c.json(result);
   } catch (err) {
     console.error('analyze-meal failed:', err);
@@ -380,13 +416,18 @@ app.post('/api/analyze-text', async (c) => {
   try {
     const response = await anthropic.messages.create({
       model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
-      max_tokens: 1000,
+      // A described meal can list several dishes, and an Arabic answer costs
+      // roughly twice the tokens of the same answer in English — 1000 was
+      // close enough to the ceiling that a four-dish Arabic meal came back
+      // truncated, and therefore unparseable.
+      max_tokens: 2000,
       messages: [{ role: 'user', content: textMealPrompt(language, text) }],
     });
-    const raw = response.content.find((b) => b.type === 'text')?.text ?? '';
-    return c.json(JSON.parse(raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')));
+    return c.json(toMealAnalysis(replyText(response)));
   } catch (err) {
-    console.error('analyze-text failed:', err);
+    // The text is logged (trimmed) because the failures worth fixing here are
+    // all about what the user wrote, and they are invisible otherwise.
+    console.error(`analyze-text failed for "${text.slice(0, 120)}":`, err);
     await release(ref, 'describe');
     return c.json({ error: 'analysis_failed' }, 502);
   }

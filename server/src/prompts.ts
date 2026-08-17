@@ -6,6 +6,20 @@ const LANGUAGE_NAME: Record<Language, string> = {
 };
 
 /**
+ * Shared JSON rules for every route that parses the reply.
+ *
+ * The digit rule is not pedantry: asked to answer in Arabic about a meal the
+ * user described using Arabic-Indic digits ("٧٠٠ جرام"), the model answered in
+ * kind and wrote `"calories": ٦٢٠` — not valid JSON, so a good analysis
+ * surfaced in the app as "Something went wrong". The server now rewrites those
+ * digits defensively as well; both belt and braces are cheap here.
+ */
+const JSON_RULES = `NUMBER AND FORMAT RULES (strict):
+- Output the JSON object only. No prose before or after it, and no markdown fences.
+- Every numeric value must be a plain ASCII number: 620, not "620", not ٦٢٠, not "620 kcal", not "600-700". Write ONE number, using digits 0-9 only, even when the rest of your answer is in Arabic.
+- Arabic text belongs only in the string fields.`;
+
+/**
  * Calibration guidance shared by the photo + text meal prompts. The single most
  * common error is UNDER-counting (estimates come out ~half of reality), because
  * models pick small "diet" portions and ignore cooking fat. This pushes toward
@@ -42,11 +56,13 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
   "notes": string
 }
 
+${JSON_RULES}
+
 Rules:
 - "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
 - "portion" MUST include an approximate weight in grams, e.g. "1 plate (~500 g)".
 - "confidence" is 0-1 for the overall analysis; use lower values when identification is uncertain.
-- "notes" (in ${LANGUAGE_NAME[language]}) should state the portion size you assumed (or "" if none).
+- "notes" (in ${LANGUAGE_NAME[language]}) should state the portion size you assumed (or "" if none). Keep it under 200 characters.
 - If the image contains no food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.
 - Estimate the portion from what is visible, but size it realistically (a full plate, not a token serving).`;
 }
@@ -69,10 +85,13 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
   "notes": string
 }
 
+${JSON_RULES}
+
 Rules:
 - "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
 - "portion" MUST include an approximate weight in grams, e.g. "1 plate (~500 g)".
-- "notes" (in ${LANGUAGE_NAME[language]}) MUST state the portion size and key assumptions you used so the user can verify them, e.g. "Assumed ~1.5 cups rice cooked in ghee + 250 g chicken".
+- The user may write amounts in Arabic-Indic digits (٧٠٠ = 700, ٣ = 3). Read them, and respect the amounts they gave instead of substituting a standard serving.
+- "notes" (in ${LANGUAGE_NAME[language]}) MUST state the portion size and key assumptions you used so the user can verify them, e.g. "Assumed ~1.5 cups rice cooked in ghee + 250 g chicken". Keep it under 200 characters.
 - "confidence" is 0-1.
 - If the text is not about food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.`;
 }

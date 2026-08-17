@@ -93,6 +93,9 @@ export default function AddMenu() {
         <SectionLabel label={t('addMenu.food')} theme={theme} />
         <View style={styles.grid}>
           <Tile icon="camera" label={t('addMenu.scanMeal')} onPress={() => go('/scan?mode=meal')} theme={theme} primary />
+          {/* Picking an existing photo used to be reachable only from a small
+              corner button inside the camera screen, so nobody found it. */}
+          <Tile icon="images" label={t('addMenu.uploadPhoto')} onPress={() => go('/scan?mode=meal&pick=1')} theme={theme} />
           <Tile icon="barcode" label={t('addMenu.scanBarcode')} onPress={() => go('/scan?mode=barcode')} theme={theme} />
           <Tile icon="create" label={t('addMenu.describe')} onPress={() => go('/describe')} theme={theme} />
           <Tile icon="pencil" label={t('addMenu.manual')} onPress={() => go('/food-edit')} theme={theme} />
