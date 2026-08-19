@@ -445,6 +445,9 @@ export const en = {
     edit: 'Edit targets',
     reset: 'Reset to recommended',
     hint: 'Set your own numbers, or reset to the values we calculated from your profile.',
+    macroSum: 'Your macros add up to {{kcal}} kcal',
+    macroMismatch: 'your calorie target is {{kcal}}',
+    macroFix: 'Fix carbs',
   },
   reminders: {
     section: 'Reminders',

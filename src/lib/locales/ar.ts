@@ -444,6 +444,9 @@ export const ar: TranslationSchema = {
     edit: 'تعديل الأهداف',
     reset: 'استعادة الموصى به',
     hint: 'ضع أرقامك الخاصة، أو استعد القيم التي حسبناها من ملفك الشخصي.',
+    macroSum: 'مجموع الماكروز {{kcal}} كالوري',
+    macroMismatch: 'وهدف السعرات {{kcal}}',
+    macroFix: 'صحّح الكارب',
   },
   reminders: {
     section: 'التذكيرات',

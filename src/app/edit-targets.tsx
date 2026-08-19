@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Field, Screen, Title } from '@/components/ui';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
 import { useAppStore } from '@/lib/store';
-import { dailyTargets } from '@/lib/tdee';
+import { atwater, carbsForCalories, dailyTargets } from '@/lib/tdee';
 
 export default function EditTargets() {
   const { t } = useTranslation();
@@ -38,6 +38,24 @@ export default function EditTargets() {
     });
     successHaptic();
     router.back();
+  };
+
+  // What the three macro fields actually add up to, against the calorie field.
+  // Nothing used to check this, so a hand-edited macro could leave the Overview
+  // showing a calorie goal its own macro row disagreed with — 120/282/85 g is
+  // 2373 kcal, not the 2300 next to it.
+  const goalKcal = parseInt(calories, 10) || 0;
+  const macroKcal = atwater(
+    parseInt(protein, 10) || 0,
+    parseInt(carbs, 10) || 0,
+    parseInt(fat, 10) || 0,
+  );
+  // A few kcal is just whole-gram rounding; anything more was a real edit.
+  const mismatch = goalKcal > 0 && Math.abs(macroKcal - goalKcal) > 5;
+
+  /** Rebalance carbs so the macros hit the calorie target exactly. */
+  const fixWithCarbs = () => {
+    setCarbs(String(carbsForCalories(goalKcal, parseInt(protein, 10) || 0, parseInt(fat, 10) || 0)));
   };
 
   // Restore the values we calculated from the user's profile (live preview;
@@ -96,6 +114,33 @@ export default function EditTargets() {
         </View>
       </View>
 
+      <View
+        style={[
+          styles.sumRow,
+          {
+            backgroundColor: mismatch ? theme.cardSubtle : 'transparent',
+            borderColor: mismatch ? theme.fat : 'transparent',
+          },
+        ]}
+      >
+        <Ionicons
+          name={mismatch ? 'alert-circle-outline' : 'checkmark-circle-outline'}
+          size={16}
+          color={mismatch ? theme.fat : theme.textTertiary}
+        />
+        <Text style={{ color: mismatch ? theme.text : theme.textTertiary, fontSize: 13, flex: 1 }}>
+          {t('editTargets.macroSum', { kcal: macroKcal })}
+          {mismatch ? ` · ${t('editTargets.macroMismatch', { kcal: goalKcal })}` : ''}
+        </Text>
+        {mismatch && (
+          <Pressable onPress={fixWithCarbs} hitSlop={8}>
+            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
+              {t('editTargets.macroFix')}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+
       <Button
         label={t('editTargets.reset')}
         variant="secondary"
@@ -114,5 +159,15 @@ export default function EditTargets() {
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: Spacing.sm },
   flex: { flex: 1 },
+  sumRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    marginBottom: Spacing.md,
+  },
   hintRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md },
 });

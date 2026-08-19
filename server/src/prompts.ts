@@ -17,7 +17,8 @@ const LANGUAGE_NAME: Record<Language, string> = {
 const JSON_RULES = `NUMBER AND FORMAT RULES (strict):
 - Output the JSON object only. No prose before or after it, and no markdown fences.
 - Every numeric value must be a plain ASCII number: 620, not "620", not ٦٢٠, not "620 kcal", not "600-700". Write ONE number, using digits 0-9 only, even when the rest of your answer is in Arabic.
-- Arabic text belongs only in the string fields.`;
+- Arabic text belongs only in the string fields.
+- For each food, "calories" MUST equal proteinG × 4 + carbsG × 4 + fatG × 9. Estimate the portion's calories first, then split them into macros that add back up to it. A breakdown that does not add up is shown to the user as a total that disagrees with its own parts.`;
 
 /**
  * Calibration guidance shared by the photo + text meal prompts. The single most

@@ -85,6 +85,61 @@ export interface MealAnalysis {
   notes: string;
 }
 
+/** Food energy from macros: the Atwater factors every nutrition label uses. */
+export function atwater(item: Pick<FoodItem, 'proteinG' | 'carbsG' | 'fatG'>): number {
+  return item.proteinG * 4 + item.carbsG * 4 + item.fatG * 9;
+}
+
+/**
+ * Make one item's calories agree with its own macros.
+ *
+ * The model estimates calories and macros separately, and its two answers rarely
+ * match to the kcal — so the ring said "2119 eaten" while the macro row added up
+ * to 2098, and a user checking the arithmetic found the app wrong. It was: those
+ * were two independent estimates of the same meal.
+ *
+ * Calories become the exact Atwater sum, which makes the two rows agree by
+ * construction at every level (the totals are plain sums, so if each item
+ * balances, so does the day). Where the model's own calorie figure is HIGHER
+ * than its macros imply, the macros are scaled up to meet it first: the calorie
+ * estimate is the number the prompt is tuned for, and for a calorie tracker
+ * quietly rounding a meal down is the worse failure.
+ */
+/**
+ * Grow the macros by `scale`, handing out the leftover grams so the total energy
+ * lands as close to `target` as whole grams allow.
+ *
+ * Rounding each macro on its own looks equivalent and is not: at a large scale
+ * factor three downward roundings compound, and 5/5/5 g stretched to 620 kcal
+ * came out at 612 — the very kind of quiet shortfall this reconciliation exists
+ * to prevent.
+ */
+function scaleMacros(item: FoodItem, scale: number, target: number): FoodItem {
+  const exact = [item.proteinG * scale, item.carbsG * scale, item.fatG * scale];
+  const grams = exact.map(Math.floor);
+  const kcalPerG = [4, 4, 9];
+  const energy = () => grams[0] * 4 + grams[1] * 4 + grams[2] * 9;
+  // Largest fractional part first, and only while it closes the gap.
+  const order = [0, 1, 2].sort((a, b) => exact[b] - grams[b] - (exact[a] - grams[a]));
+  for (const i of order) {
+    if (Math.abs(energy() + kcalPerG[i] - target) < Math.abs(energy() - target)) grams[i] += 1;
+  }
+  return { ...item, proteinG: grams[0], carbsG: grams[1], fatG: grams[2] };
+}
+
+function balance(item: FoodItem): FoodItem {
+  const implied = atwater(item);
+  // No macro breakdown to reconcile against — keep the stated calories.
+  if (implied === 0) return item;
+  // Within whole-gram rounding noise: leave the estimate's macros untouched and
+  // simply state the energy they actually represent.
+  if (item.calories > implied * 1.02) {
+    item = scaleMacros(item, item.calories / implied, item.calories);
+  }
+  // Recomputed from the final whole grams, so it is exact rather than close.
+  return { ...item, calories: atwater(item) };
+}
+
 /**
  * Coerce a model reply into the shape the app renders. Items without a name are
  * dropped rather than shown as a blank row; macros are rounded because the app
@@ -98,14 +153,16 @@ export function toMealAnalysis(raw: string): MealAnalysis {
     const item = entry as Record<string, unknown>;
     const name = str(item?.name);
     if (!name) continue;
-    items.push({
-      name,
-      calories: Math.max(0, Math.round(num(item.calories))),
-      proteinG: Math.max(0, Math.round(num(item.proteinG))),
-      carbsG: Math.max(0, Math.round(num(item.carbsG))),
-      fatG: Math.max(0, Math.round(num(item.fatG))),
-      portion: str(item.portion, '1'),
-    });
+    items.push(
+      balance({
+        name,
+        calories: Math.max(0, Math.round(num(item.calories))),
+        proteinG: Math.max(0, Math.round(num(item.proteinG))),
+        carbsG: Math.max(0, Math.round(num(item.carbsG))),
+        fatG: Math.max(0, Math.round(num(item.fatG))),
+        portion: str(item.portion, '1'),
+      }),
+    );
   }
   // An empty items array is a legitimate answer ("this photo has no food"), so
   // it is passed through — the app already has a message for it.

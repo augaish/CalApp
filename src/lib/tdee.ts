@@ -26,14 +26,28 @@ export function tdee(p: Profile): number {
 }
 
 /**
+ * Food energy from macros: the Atwater factors every nutrition label uses.
+ * 4 kcal per gram of protein and carbs, 9 per gram of fat.
+ */
+export function atwater(proteinG: number, carbsG: number, fatG: number): number {
+  return proteinG * 4 + carbsG * 4 + fatG * 9;
+}
+
+/** The carb figure that makes protein + carbs + fat add up to a calorie target. */
+export function carbsForCalories(calories: number, proteinG: number, fatG: number): number {
+  return Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
+}
+
+/**
  * Daily calorie + macro targets.
  * Protein: 1.6 g/kg (2.0 when cutting, to preserve muscle).
- * Fat: 30% of calories. Carbs: remainder.
+ * Fat: 30% of calories. Carbs: whatever is left, so the three macros add back
+ * up to the calorie target.
  */
 export function dailyTargets(p: Profile): DailyTargets {
   const calories = Math.max(1200, Math.round(tdee(p) + GOAL_ADJUSTMENTS[p.goal]));
   const proteinG = Math.round(p.weightKg * (p.goal === 'lose' ? 2.0 : 1.6));
   const fatG = Math.round((calories * 0.3) / 9);
-  const carbsG = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
+  const carbsG = carbsForCalories(calories, proteinG, fatG);
   return { calories, proteinG, carbsG, fatG };
 }
