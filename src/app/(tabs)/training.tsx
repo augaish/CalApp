@@ -22,6 +22,7 @@ import {
   isSameDay,
   setScore,
   useAppStore,
+  workoutDays,
   workoutFor,
 } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
@@ -83,30 +84,6 @@ function sessionTopScore(w: LoggedWorkout): number {
   );
 }
 
-/**
- * Group workouts into date buckets, newest first. The day being viewed is left
- * out: it is already laid out in full above, so repeating it here would just be
- * the same sets twice.
- */
-function groupByDay(
-  workouts: LoggedWorkout[],
-  exclude: Date,
-): { key: string; date: Date; items: LoggedWorkout[] }[] {
-  const groups: { key: string; date: Date; items: LoggedWorkout[] }[] = [];
-  for (const w of workouts) {
-    if (isSameDay(w.at, exclude)) continue;
-    const d = new Date(w.at);
-    const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-    let g = groups.find((x) => x.key === key);
-    if (!g) {
-      g = { key, date: d, items: [] };
-      groups.push(g);
-    }
-    g.items.push(w);
-  }
-  return groups;
-}
-
 /** Short one-line summary of a logged exercise: sets · top load. */
 function summarize(w: LoggedWorkout, sets: string, top: string, kg: string): string {
   const parts = [`${w.sets.length} ${sets}`];
@@ -165,7 +142,7 @@ export default function Training() {
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = burnedForDay(workouts, selected);
-  const groups = groupByDay(workouts, selected);
+  const groups = workoutDays(workouts, selected);
   const kg = t('progress.kg');
   const min = t('track.min');
 

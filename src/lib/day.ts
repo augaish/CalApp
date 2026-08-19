@@ -31,6 +31,24 @@ export function timestampFor(day: Date): string {
   return d.toISOString();
 }
 
+/**
+ * Is `remoteAt` a later instant than `localAt`? Used to decide whether the
+ * account's copy should replace this device's.
+ *
+ * Compared as instants, not as strings. Our own writes are stamped by
+ * `toISOString()` ("…123Z") while the value read back from Postgres carries an
+ * offset ("…123+00:00"), and '+' sorts below 'Z' — so the same moment compared
+ * as text looked older than itself. An unparseable stamp counts as not newer,
+ * which pushes rather than pulls and so cannot lose local logs.
+ */
+export function isNewerStamp(remoteAt: string, localAt: string | null): boolean {
+  if (!localAt) return true;
+  const remote = Date.parse(remoteAt);
+  const local = Date.parse(localAt);
+  if (Number.isNaN(remote) || Number.isNaN(local)) return false;
+  return remote > local;
+}
+
 export const useViewDay = create<DayState>((set, get) => ({
   day: new Date(),
   setDay: (day) => set({ day: notFuture(day) }),

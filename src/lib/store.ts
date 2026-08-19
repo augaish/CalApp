@@ -309,7 +309,7 @@ export const useAppStore = create<AppState>()(
             return {
               workouts: s.workouts.map((w) =>
                 w.id === existing.id
-                  ? { ...w, sets: withPR, caloriesBurned: workoutBurn(withPR.length, bodyKg) }
+                  ? { ...w, sets: withPR, caloriesBurned: burnForSets(withPR, bodyKg) }
                   : w,
               ),
             };
@@ -324,7 +324,7 @@ export const useAppStore = create<AppState>()(
                 exerciseName: exercise.name,
                 type: exercise.type,
                 sets,
-                caloriesBurned: workoutBurn(sets.length, bodyKg),
+                caloriesBurned: burnForSets(sets, bodyKg),
               },
               ...s.workouts,
             ],
@@ -352,7 +352,7 @@ export const useAppStore = create<AppState>()(
             workouts.push({
               ...w,
               sets: markPRs(sets, w.type),
-              caloriesBurned: workoutBurn(sets.length, bodyKg),
+              caloriesBurned: burnForSets(sets, bodyKg),
             });
           }
           return { workouts };
@@ -369,7 +369,7 @@ export const useAppStore = create<AppState>()(
               return {
                 ...w,
                 sets,
-                caloriesBurned: trained ? workoutBurn(sets.length, bodyKg) : 0,
+                caloriesBurned: burnForSets(sets, bodyKg),
               };
             }),
           };
@@ -550,9 +550,14 @@ export const useAppStore = create<AppState>()(
         // first, then by name — so next time you pick up from your record to
         // beat, not just whatever you did last.
         const norm = (v: string) => v.trim().toLowerCase();
+        // Strictly earlier days only. Filtering on "not this day" also swept in
+        // later sessions, so checking off a day you had missed seeded it from a
+        // workout you had not done yet — a back-filled Monday arrived carrying
+        // Friday's heavier weights.
+        const dayStart = startOfDay(day).getTime();
         const priors = state.workouts.filter(
           (w) =>
-            !isSameDay(w.at, day) &&
+            new Date(w.at).getTime() < dayStart &&
             (w.exerciseId === exercise.id || norm(w.exerciseName) === norm(exercise.name)),
         );
         const sessionBest = (w: LoggedWorkout) =>
@@ -813,6 +818,18 @@ export function workoutBurn(setCount: number, bodyKg: number): number {
   return Math.round(((5 * 3.5 * bodyKg) / 200) * 2 * setCount);
 }
 
+/**
+ * Calories for a session, counting only the sets actually marked done.
+ *
+ * Burning by set COUNT looked equivalent and was not: unticking an exercise
+ * zeroed its burn, but then editing it — adding a set, deleting one — recomputed
+ * the burn from the length of the list and quietly credited work nobody had
+ * claimed to do. Reading the flag makes the two paths agree.
+ */
+export function burnForSets(sets: WorkoutSet[], bodyKg: number): number {
+  return workoutBurn(sets.filter((s) => s.done).length, bodyKg);
+}
+
 export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
   return workouts.reduce(
     (sum, w) => (isSameDay(w.at, day) ? sum + (w.caloriesBurned ?? 0) : sum),
@@ -915,6 +932,32 @@ export function historyFor(workouts: LoggedWorkout[], exerciseId: string): Logge
   return workouts
     .filter((w) => w.exerciseId === exerciseId)
     .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime());
+}
+
+/**
+ * The other days that have training on them, newest first, for the History
+ * list. The day being viewed is left out: it is already laid out in full above.
+ *
+ * The sort is the point. `workouts` is in insertion order, not date order —
+ * anything logged against an earlier day (checking off a day you missed,
+ * duplicating a session backwards, a restored cloud snapshot) goes to the front
+ * of the array — so grouping without sorting put those days at the top of
+ * History regardless of when they happened.
+ */
+export function workoutDays(
+  workouts: LoggedWorkout[],
+  exclude: Date,
+): { key: string; date: Date; items: LoggedWorkout[] }[] {
+  const groups = new Map<string, { key: string; date: Date; items: LoggedWorkout[] }>();
+  for (const w of workouts) {
+    if (isSameDay(w.at, exclude)) continue;
+    const d = new Date(w.at);
+    const key = dateKey(d);
+    const g = groups.get(key);
+    if (g) g.items.push(w);
+    else groups.set(key, { key, date: d, items: [w] });
+  }
+  return [...groups.values()].sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
 /** The (exercise, day) workout if it exists. */

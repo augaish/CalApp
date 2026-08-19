@@ -1,3 +1,4 @@
+import { isNewerStamp } from './day';
 import { useAppStore } from './store';
 import { getSupabase } from './supabase';
 import type {
@@ -153,7 +154,7 @@ export async function syncOnLaunch(): Promise<void> {
   if (!(await currentUid())) return;
   const remote = await fetchRemote();
   const localSyncedAt = useAppStore.getState().syncedAt;
-  if (remote && (!localSyncedAt || remote.updatedAt > localSyncedAt)) {
+  if (remote && isNewerStamp(remote.updatedAt, localSyncedAt)) {
     apply(remote.data, remote.updatedAt);
     return;
   }
