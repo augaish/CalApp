@@ -91,22 +91,13 @@ export default function ExerciseDetail() {
     );
   }, [exercise, today, schedule, viewDay, workouts, lang, markExerciseDone]);
 
-  // Seed the steppers once (lazy initial state) from your HIGHEST logged set so
-  // you start from the record to beat (progressive overload), not whatever the
-  // last set happened to be.
-  const setVal = (s: WorkoutSet): number =>
-    exercise?.type === 'weight_reps'
-      ? (s.weightKg ?? 0) * 1000 + (s.reps ?? 0)
-      : exercise?.type === 'bodyweight_reps'
-        ? (s.reps ?? 0)
-        : exercise?.type === 'time'
-          ? (s.seconds ?? 0)
-          : (s.distanceM ?? 0);
-  const lastSet = exercise
-    ? historyFor(workouts, exercise.id)
-        .flatMap((w) => w.sets)
-        .reduce<WorkoutSet | undefined>((b, s) => (!b || setVal(s) > setVal(b) ? s : b), undefined)
-    : undefined;
+  // Seed the steppers once (lazy initial state) from the last set of the most
+  // recent session — where you actually left off. Seeding from the highest set
+  // ever logged put a personal best from weeks ago in front of you every time,
+  // which is a number to aim at, not a number to start from. The record still
+  // shows as "Max" on the Training tab and as the trophy in History.
+  const recent = exercise ? historyFor(workouts, exercise.id)[0] : undefined;
+  const lastSet = recent?.sets[recent.sets.length - 1];
   const repsSeed = exercise && (exercise.type === 'weight_reps' || exercise.type === 'bodyweight_reps') ? 10 : 0;
 
   const [tab, setTab] = useState<Tab>('track');

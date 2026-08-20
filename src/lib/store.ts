@@ -546,29 +546,30 @@ export const useAppStore = create<AppState>()(
         if (state.workouts.some((w) => w.exerciseId === exercise.id && isSameDay(w.at, day))) {
           return; // already logged that day
         }
-        // Best (highest) earlier session for this exercise — matched by id
-        // first, then by name — so next time you pick up from your record to
-        // beat, not just whatever you did last.
+        // The last time you did this exercise — matched by id first, then by
+        // name. Strictly earlier days only: filtering on "not this day" also
+        // swept in later sessions, so checking off a day you had missed seeded
+        // it from a workout you had not done yet.
         const norm = (v: string) => v.trim().toLowerCase();
-        // Strictly earlier days only. Filtering on "not this day" also swept in
-        // later sessions, so checking off a day you had missed seeded it from a
-        // workout you had not done yet — a back-filled Monday arrived carrying
-        // Friday's heavier weights.
         const dayStart = startOfDay(day).getTime();
         const priors = state.workouts.filter(
           (w) =>
             new Date(w.at).getTime() < dayStart &&
             (w.exerciseId === exercise.id || norm(w.exerciseName) === norm(exercise.name)),
         );
-        const sessionBest = (w: LoggedWorkout) =>
-          Math.max(0, ...w.sets.map((st) => setScore(st, w.type)));
+        // Most recent, not heaviest. Seeding from the best session ever meant
+        // ticking an exercise off filled in a personal best from weeks ago —
+        // both the wrong weights and the wrong number of sets — which reads as
+        // numbers invented out of nowhere rather than as your last session. The
+        // record to beat is still shown next to the exercise as "Max".
         const src = priors.reduce<LoggedWorkout | undefined>(
-          (best, w) => (!best || sessionBest(w) > sessionBest(best) ? w : best),
+          (latest, w) =>
+            !latest || new Date(w.at).getTime() > new Date(latest.at).getTime() ? w : latest,
           undefined,
         );
         const bodyKg = state.profile?.weightKg ?? 75;
-        // Seed order: your best prior session (progressive overload) → else the
-        // sets planned for this weekday → else a single empty done set.
+        // Seed order: your last session → else the sets planned for this
+        // weekday → else a single empty done set.
         const planned = state.schedule[day.getDay()]?.plans?.[exercise.id];
         const base: WorkoutSet[] = src
           ? src.sets.map((st) => ({ ...st, done: trained, isPR: false }))
