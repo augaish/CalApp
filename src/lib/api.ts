@@ -1,5 +1,12 @@
 import { useAppStore } from './store';
-import type { ChatMessage, EquipmentAnalysis, FoodItem, Language, MealAnalysis } from './types';
+import type {
+  ChatMessage,
+  CoachSchedulePlan,
+  EquipmentAnalysis,
+  FoodItem,
+  Language,
+  MealAnalysis,
+} from './types';
 
 /**
  * Base URL of the CalApp AI server (see server/ in this repo).
@@ -246,18 +253,23 @@ export async function analyzeText(text: string, language: Language): Promise<Mea
   return post<MealAnalysis>('/api/analyze-text', { text, language });
 }
 
+export interface CoachReply {
+  reply: string;
+  /** Present when the coach proposed a weekly schedule the user can add. */
+  schedulePlan?: CoachSchedulePlan;
+}
+
 export async function coachChat(
   messages: ChatMessage[],
   language: Language,
   /** Compact snapshot of the user's own logs, so answers are personalized. */
   context?: unknown,
-): Promise<string> {
+): Promise<CoachReply> {
   if (isMockMode) {
     await delay(900);
-    return ''; // caller substitutes the localized mock reply
+    return { reply: '' }; // caller substitutes the localized mock reply
   }
-  const res = await post<{ reply: string }>('/api/coach', { messages, language, context });
-  return res.reply;
+  return post<CoachReply>('/api/coach', { messages, language, context });
 }
 
 /** Open Food Facts lookup — free public API, called directly from the app. */

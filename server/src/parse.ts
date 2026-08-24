@@ -15,6 +15,54 @@
  * out: the app gets a well-formed MealAnalysis or a thrown error, never a
  * half-filled object.
  */
+import Anthropic from '@anthropic-ai/sdk';
+
+/**
+ * Every text block of a reply joined into one string — not just the first.
+ * A plain answer has exactly one, so this changes nothing for it; a
+ * web-search turn puts "Let me look that up…" in one block and the actual
+ * answer in a later one, and taking only the first used to hand back prose
+ * with no JSON in it at all.
+ */
+export function replyText(response: { content: unknown[]; stop_reason?: string | null }): string {
+  if (response.stop_reason === 'max_tokens') {
+    throw new Error('model reply hit max_tokens and was cut off');
+  }
+  return (response.content as { type: string; text?: string }[])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text ?? '')
+    .join('\n')
+    .trim();
+}
+
+/**
+ * Domains a web search actually cited, for a small "checked: mcdonalds.com"
+ * credibility note — capped low since this is a courtesy, not a citation
+ * requirement (the numbers are reprocessed into macros, not quoted verbatim).
+ */
+export function citationDomains(response: { content: unknown[] }): string[] {
+  const seen = new Set<string>();
+  for (const block of response.content as {
+    type: string;
+    citations?: { type: string; url?: string }[];
+  }[]) {
+    if (block.type !== 'text') continue;
+    for (const citation of block.citations ?? []) {
+      if (citation.type !== 'web_search_result_location' || !citation.url) continue;
+      try {
+        seen.add(new URL(citation.url).hostname.replace(/^www\./, ''));
+      } catch {
+        // malformed url from the tool result — skip it
+      }
+    }
+  }
+  return [...seen].slice(0, 3);
+}
+
+/** True when the account/org has web search turned off in the Console. */
+export function isWebSearchDisabled(err: unknown): boolean {
+  return err instanceof Anthropic.APIError && err.status === 400 && /web search/i.test(err.message);
+}
 
 /** Arabic-Indic (٠-٩) and Extended/Persian (۰-۹) digits → ASCII. */
 export function asciiDigits(text: string): string {
@@ -83,6 +131,8 @@ export interface MealAnalysis {
   items: FoodItem[];
   confidence: number;
   notes: string;
+  /** Domains checked via web search, when a named restaurant/product triggered one. */
+  sources?: string[];
 }
 
 /** Food energy from macros: the Atwater factors every nutrition label uses. */
@@ -144,8 +194,12 @@ function balance(item: FoodItem): FoodItem {
  * Coerce a model reply into the shape the app renders. Items without a name are
  * dropped rather than shown as a blank row; macros are rounded because the app
  * never displays decimals.
+ *
+ * `sources` comes from outside the JSON — the citations attached to a web
+ * search the model ran while answering — so it is passed in separately rather
+ * than trusted from the model's own text.
  */
-export function toMealAnalysis(raw: string): MealAnalysis {
+export function toMealAnalysis(raw: string, sources?: string[]): MealAnalysis {
   const parsed = extractJson(raw) as Record<string, unknown>;
   const rawItems = Array.isArray(parsed?.items) ? parsed.items : [];
   const items: FoodItem[] = [];
@@ -167,5 +221,74 @@ export function toMealAnalysis(raw: string): MealAnalysis {
   // An empty items array is a legitimate answer ("this photo has no food"), so
   // it is passed through — the app already has a message for it.
   const confidence = Math.min(1, Math.max(0, num(parsed?.confidence, items.length ? 0.5 : 0)));
-  return { items, confidence, notes: str(parsed?.notes) };
+  return {
+    items,
+    confidence,
+    notes: str(parsed?.notes),
+    ...(sources && sources.length > 0 ? { sources } : {}),
+  };
+}
+
+// ── Coach: a proposed weekly schedule, as a client-executed tool call ──────
+
+export interface CoachScheduleExercise {
+  name: string;
+  sets: number;
+  reps: string;
+}
+
+export interface CoachScheduleDay {
+  weekday: number;
+  title?: string;
+  exercises: CoachScheduleExercise[];
+}
+
+export interface CoachSchedulePlan {
+  summary?: string;
+  days: CoachScheduleDay[];
+}
+
+/**
+ * Validate the coach's `propose_weekly_schedule` tool call before it ever
+ * reaches the client. The tool's JSON schema is a strong hint to the model,
+ * not a guarantee — a stray string weekday or a runaway set count must not
+ * become a broken "Add to my schedule" card.
+ *
+ * No weight is accepted or invented here: the coach does not know what the
+ * user can lift, so a proposed plan carries only sets and reps, the same way
+ * a manually-planned day starts with the weight left for the user to fill in.
+ */
+export function sanitizeSchedulePlan(raw: unknown): CoachSchedulePlan | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, unknown>;
+  const rawDays = Array.isArray(input.days) ? input.days : [];
+  const days: CoachScheduleDay[] = [];
+  for (const entry of rawDays.slice(0, 7)) {
+    const d = entry as Record<string, unknown>;
+    const weekday = Math.round(num(d?.weekday, -1));
+    if (weekday < 0 || weekday > 6) continue;
+    const rawExercises = Array.isArray(d?.exercises) ? d.exercises : [];
+    const exercises: CoachScheduleExercise[] = [];
+    for (const ex of rawExercises.slice(0, 12)) {
+      const e = ex as Record<string, unknown>;
+      const name = str(e?.name).slice(0, 60);
+      if (!name) continue;
+      exercises.push({
+        name,
+        sets: Math.min(8, Math.max(1, Math.round(num(e?.sets, 3)))),
+        reps: str(e?.reps, '10').slice(0, 12),
+      });
+    }
+    if (exercises.length === 0) continue;
+    const title = str(d?.title).slice(0, 40) || undefined;
+    // A weekday named twice keeps its last occurrence — what the model said
+    // most recently is what it meant.
+    const existing = days.findIndex((x) => x.weekday === weekday);
+    const day: CoachScheduleDay = { weekday, title, exercises };
+    if (existing >= 0) days[existing] = day;
+    else days.push(day);
+  }
+  if (days.length === 0) return undefined;
+  days.sort((a, b) => a.weekday - b.weekday);
+  return { summary: str(input.summary).slice(0, 200) || undefined, days };
 }

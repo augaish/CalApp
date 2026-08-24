@@ -77,6 +77,13 @@ Estimate the foods, realistic portions, calories and macros AS ACTUALLY SERVED.
 
 ${REALISM_BLOCK(language)}
 
+RESTAURANT AND BRANDED-PRODUCT ACCURACY:
+- If the description names a specific restaurant, chain, or packaged product (e.g. "McDonald's Big Mac meal", "Starbucks grande latte", "كودو ساندويش دجاج"), use the web_search tool BEFORE estimating — check the brand's own published nutrition info, or a reputable database (nutritionix, myfitnesspal, fatsecret). 1-3 searches is normally enough; if two sources disagree, prefer the brand's own listing.
+- When you have official nutrition for the exact item, use THOSE figures instead of the general realism guidance above, and say what you used in "notes", e.g. "Used McDonald's official Big Mac meal nutrition (medium fries + regular Coke)."
+- If a size or side isn't specified (e.g. "a Big Mac meal" with no size given), assume the standard/medium size and say so in "notes".
+- Do NOT search for generic home-cooked or unbranded food ("rice with chicken", "a sandwich") — answer those directly, as before.
+- If search finds nothing usable (a small local place, or the tool is unavailable), fall back to the realism-based estimate — never invent a source you did not actually check.
+
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 {
   "items": [
@@ -113,6 +120,13 @@ const VOICE: Record<Language, string> = {
 - خل الأرقام والوحدات واضحة (كالوري، جرام، كيلو) ولا تكثر من الإنجليزي.`,
 };
 
+/**
+ * Guidance for the `propose_weekly_schedule` tool. Kept separate from the base
+ * prompt so it reads as one clear instruction rather than being buried among
+ * the voice/data rules above it.
+ */
+const SCHEDULE_TOOL_GUIDE = `WEEKLY SCHEDULE: If the user asks you to build, suggest, or change a training plan/schedule/split/routine, call propose_weekly_schedule instead of writing it out as prose — it renders as a card they add to their app with one tap. Base it on their goal (from their data, if you have it) and whatever day-count or frequency they mentioned. If you genuinely don't know how many days a week they want and it is not obvious from their data, ask ONE short question first rather than guessing. Keep any text alongside the tool call to one short sentence — the card shows the detail. Never call the tool for anything short of an explicit request for a plan.`;
+
 export function coachSystemPrompt(language: Language, context?: string): string {
   const lock = `Write your entire reply in ${LANGUAGE_NAME[language]}, whatever language the user's message is in.`;
   const base = `You are Calgym Coach, a friendly certified nutrition and fitness coach.
@@ -122,7 +136,9 @@ ${VOICE[language]}
 
 - Keep replies short: 2-5 sentences, practical and specific.
 - You know Middle Eastern and Gulf cuisine and gym training well.
-- Never give medical diagnoses; suggest seeing a professional for medical issues.`;
+- Never give medical diagnoses; suggest seeing a professional for medical issues.
+
+${SCHEDULE_TOOL_GUIDE}`;
   if (!context) return `${base}\n\n${lock}`;
   return `${base}
 
@@ -131,6 +147,13 @@ about their calories, macros, training and streaks directly from this data
 instead of asking them to repeat it. Days with 0 calories simply were not
 logged — say so rather than assuming they ate nothing. Refer to concrete
 numbers and compare against their targets when relevant.
+
+Whenever an answer draws on this data, SAY SO EXPLICITLY by naming the actual
+figure(s) you are using (e.g. "You've logged 1,850 kcal today, 120 g
+protein…" / "طلعت 3 أيام تمرين هالأسبوع"), so it is clear the reply is
+personalized rather than generic advice. If the user asks something general
+that has nothing to do with their own numbers, or says not to use their data,
+answer generically instead — do not force their figures into every reply.
 
 ${context}
 

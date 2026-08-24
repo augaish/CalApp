@@ -29,7 +29,16 @@ import {
   setUserEmail,
   setUserPlan,
 } from './db.js';
-import { extractJson, toMealAnalysis, type MealAnalysis } from './parse.js';
+import {
+  citationDomains,
+  extractJson,
+  isWebSearchDisabled,
+  replyText,
+  sanitizeSchedulePlan,
+  toMealAnalysis,
+  type CoachSchedulePlan,
+  type MealAnalysis,
+} from './parse.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
   coachSystemPrompt,
@@ -50,6 +59,80 @@ const PREMIUM_MODEL = process.env.PREMIUM_MODEL ?? MEAL_MODEL;
 const PORT = Number(process.env.PORT ?? 3000);
 
 const anthropic = new Anthropic(); // reads ANTHROPIC_API_KEY
+
+/**
+ * Lets the describe-a-meal call look up a named restaurant or packaged
+ * product instead of guessing at a generic portion. `max_uses` bounds it to a
+ * few searches ($10/1000 on top of normal tokens) — see textMealPrompt for
+ * when the model is told to actually use it.
+ */
+const WEB_SEARCH_TOOL: Anthropic.WebSearchTool20250305 = {
+  type: 'web_search_20250305',
+  name: 'web_search',
+  max_uses: 4,
+};
+
+/**
+ * A client-executed tool: the coach fills this in, the app renders it as a
+ * card, and the user taps to add it — the server never touches the user's
+ * actual schedule. No weight field on purpose; the coach has no way to know
+ * what the user can lift, so a set is (reps only), same as a freshly
+ * hand-planned one.
+ */
+const SCHEDULE_TOOL: Anthropic.Tool = {
+  name: 'propose_weekly_schedule',
+  description:
+    "Propose a weekly workout schedule for the user to review and add to their app with one tap. Call this only for an explicit request for a training plan/schedule/split/routine — never for casual chat.",
+  input_schema: {
+    type: 'object',
+    properties: {
+      summary: {
+        type: 'string',
+        description:
+          "One short sentence, in the user's language, on the plan's rationale (goal, split, frequency).",
+      },
+      days: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 7,
+        items: {
+          type: 'object',
+          properties: {
+            weekday: {
+              type: 'integer',
+              minimum: 0,
+              maximum: 6,
+              description: '0 = Sunday … 6 = Saturday',
+            },
+            title: {
+              type: 'string',
+              description: "Short day label in the user's language, e.g. 'Push day'.",
+            },
+            exercises: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 10,
+              items: {
+                type: 'object',
+                properties: {
+                  name: {
+                    type: 'string',
+                    description: "Common exercise name, in the user's language.",
+                  },
+                  sets: { type: 'integer', minimum: 1, maximum: 8 },
+                  reps: { type: 'string', description: "A count or range, e.g. '10' or '8-12'." },
+                },
+                required: ['name', 'sets', 'reps'],
+              },
+            },
+          },
+          required: ['weekday', 'exercises'],
+        },
+      },
+    },
+    required: ['days'],
+  },
+};
 
 const app = new Hono();
 app.use('*', cors());
@@ -267,21 +350,6 @@ function parseBody(body: AnalyzeBody): { image: string; language: Language } | n
   return { image, language };
 }
 
-/**
- * Text of a completion, with the one failure that is worth its own error:
- * hitting the token ceiling truncates the JSON mid-string, and "invalid JSON"
- * is a misleading thing to log for what is really "the answer did not fit".
- */
-function replyText(response: { content: unknown[]; stop_reason?: string | null }): string {
-  if (response.stop_reason === 'max_tokens') {
-    throw new Error('model reply hit max_tokens and was cut off');
-  }
-  const block = (response.content as { type: string; text?: string }[]).find(
-    (b) => b.type === 'text',
-  );
-  return block?.text ?? '';
-}
-
 async function analyzeMealImage(
   image: string,
   prompt: string,
@@ -414,16 +482,27 @@ app.post('/api/analyze-text', async (c) => {
   const claim = await reserve(ref, access, 'describe');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
-    const response = await anthropic.messages.create({
+    const request = {
       model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
       // A described meal can list several dishes, and an Arabic answer costs
       // roughly twice the tokens of the same answer in English — 1000 was
       // close enough to the ceiling that a four-dish Arabic meal came back
-      // truncated, and therefore unparseable.
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: textMealPrompt(language, text) }],
-    });
-    return c.json(toMealAnalysis(replyText(response)));
+      // truncated, and therefore unparseable. Higher still now that a
+      // restaurant lookup can add a search-and-reason turn before the answer.
+      max_tokens: 3000,
+      messages: [{ role: 'user' as const, content: textMealPrompt(language, text) }],
+    };
+    let response;
+    try {
+      response = await anthropic.messages.create({ ...request, tools: [WEB_SEARCH_TOOL] });
+    } catch (err) {
+      // Web search is an org-level Console setting; a disabled account must
+      // still get its meal estimated, just without a restaurant lookup.
+      if (!isWebSearchDisabled(err)) throw err;
+      console.warn('web search unavailable, retrying analyze-text without it');
+      response = await anthropic.messages.create(request);
+    }
+    return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
   } catch (err) {
     // The text is logged (trimmed) because the failures worth fixing here are
     // all about what the user wrote, and they are invisible otherwise.
@@ -499,12 +578,21 @@ app.post('/api/coach', async (c) => {
   try {
     const response = await anthropic.messages.create({
       model: MODEL,
-      max_tokens: 500,
+      // A plain reply fits easily in 500, but a full week's worth of days and
+      // exercises inside the propose_weekly_schedule tool call does not.
+      max_tokens: 2000,
       system: coachSystemPrompt(language, contextText(body.context)),
       messages,
+      tools: [SCHEDULE_TOOL],
     });
-    const reply = response.content.find((b) => b.type === 'text')?.text ?? '';
-    return c.json({ reply });
+    const reply = replyText(response);
+    const toolUse = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_weekly_schedule',
+    );
+    const schedulePlan: CoachSchedulePlan | undefined = toolUse
+      ? sanitizeSchedulePlan(toolUse.input)
+      : undefined;
+    return c.json({ reply, schedulePlan });
   } catch (err) {
     console.error('coach failed:', err);
     await release(ref, 'coach');

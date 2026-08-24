@@ -173,6 +173,24 @@ export default function MealResult() {
         </Card>
       )}
 
+      {(!!analysis.notes || !!analysis.sources?.length) && (
+        <View style={styles.infoRow}>
+          <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
+          <View style={{ flex: 1, gap: 2 }}>
+            {!!analysis.notes && (
+              <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                {t('mealResult.notes', { notes: analysis.notes })}
+              </Text>
+            )}
+            {!!analysis.sources?.length && (
+              <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                {t('mealResult.sources', { domains: analysis.sources.join(', ') })}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
+
       {items.length === 0 && (
         <View style={[styles.emptyItems, { borderColor: theme.border }]}>
           <Ionicons name="fast-food-outline" size={28} color={theme.textTertiary} />
@@ -412,4 +430,10 @@ const styles = StyleSheet.create({
   },
   totalValue: { fontSize: 22, fontWeight: '800' },
   disclaimer: { fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: Spacing.xs },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 6,
+    marginBottom: Spacing.md,
+  },
 });

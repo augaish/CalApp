@@ -149,6 +149,21 @@ interface AppState {
     exercises: Exercise[];
   }) => void;
   /**
+   * Add a coach-proposed plan: new custom exercises for anything not already
+   * in the library, and each named weekday replaced with exactly what was
+   * proposed. Every weekday the plan doesn't mention is left alone — unlike
+   * `importSchedule`, this is a partial plan, not a whole shared week.
+   */
+  applyCoachSchedule: (input: {
+    newExercises: Exercise[];
+    days: {
+      weekday: number;
+      title?: string;
+      exerciseIds: string[];
+      plans: Record<string, PlannedSet[]>;
+    }[];
+  }) => void;
+  /**
    * Mark a planned exercise done for `day` (checkbox on): clones its last
    * session's sets when available, otherwise records a single empty "done"
    * set. No-op if it's already logged that day.
@@ -541,6 +556,17 @@ export const useAppStore = create<AppState>()(
             schedule: payload.schedule ?? {},
           };
         }),
+      applyCoachSchedule: ({ newExercises, days }) =>
+        set((s) => ({
+          exercises: [...s.exercises, ...newExercises],
+          schedule: days.reduce(
+            (acc, d) => ({
+              ...acc,
+              [d.weekday]: { title: d.title, exerciseIds: d.exerciseIds, plans: d.plans },
+            }),
+            s.schedule,
+          ),
+        })),
       markExerciseDone: (exercise, day, trained = true) => {
         const state = get();
         if (state.workouts.some((w) => w.exerciseId === exercise.id && isSameDay(w.at, day))) {

@@ -50,6 +50,8 @@ export interface MealAnalysis {
   /** 0–1, how confident the model is overall */
   confidence: number;
   notes?: string;
+  /** Domains a restaurant/product lookup actually checked, e.g. "mcdonalds.com". */
+  sources?: string[];
 }
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -71,6 +73,28 @@ export interface WeightEntry {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** A proposed weekly schedule, rendered as a card the user can add with one tap. */
+  schedulePlan?: CoachSchedulePlan;
+}
+
+/** One exercise inside a day the coach proposed — sets and reps only, no weight
+ * (the coach has no way to know what the user can lift). */
+export interface CoachScheduleExercise {
+  name: string;
+  sets: number;
+  reps: string;
+}
+
+export interface CoachScheduleDay {
+  weekday: number;
+  title?: string;
+  exercises: CoachScheduleExercise[];
+}
+
+/** A weekly training plan the coach proposed, awaiting the user's tap to add it. */
+export interface CoachSchedulePlan {
+  summary?: string;
+  days: CoachScheduleDay[];
 }
 
 export interface EquipmentAnalysis {

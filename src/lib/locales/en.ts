@@ -435,6 +435,18 @@ export const en = {
     lockedBody: 'Upgrade to keep asking about your meals, macros and training.',
     mockReply:
       'Demo mode: connect the AI server to chat with your real coach. Meanwhile: protein at every meal, water before coffee, and never skip leg day. 😉',
+    schedulePlan: {
+      fallbackIntro: "Here's a plan for you:",
+      cardTitle: 'Suggested weekly schedule',
+      setsReps: '{{sets}} × {{reps}}',
+      add: 'Add to my weekly schedule',
+      added: 'Added to your schedule',
+      overwriteTitle: 'Replace existing days?',
+      overwriteBody:
+        'You already have exercises on {{days}}. Adding this plan replaces them — everything else on your schedule stays as it is.',
+      overwriteCta: 'Replace and add',
+      failed: 'Could not add the plan. Try again.',
+    },
   },
   editProfile: {
     title: 'Edit profile & goals',
@@ -506,6 +518,8 @@ export const en = {
     editHint2: 'Tap any value to correct it, set the portion, or tap the trash icon to remove an item.',
     portion: 'Portion',
     noItems: 'No items left. Swipe back or cancel to discard.',
+    notes: 'Assumed: {{notes}}',
+    sources: 'Checked against: {{domains}}',
   },
   mealEdit: {
     deleteMeal: 'Delete this meal',
