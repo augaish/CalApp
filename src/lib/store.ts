@@ -996,10 +996,15 @@ export function workoutFor(
   return workouts.find((w) => w.exerciseId === exerciseId && isSameDay(w.at, day));
 }
 
-/** Consecutive days (ending today) with at least one logged meal. */
+/**
+ * Consecutive days with at least one logged meal, ending today if today
+ * already has one — otherwise ending yesterday, so the count doesn't drop to
+ * 0 the moment the calendar rolls over, only once a full day is missed.
+ */
 export function streakDays(meals: LoggedMeal[]): number {
   let streak = 0;
   const day = new Date();
+  if (!meals.some((m) => isSameDay(m.at, day))) day.setDate(day.getDate() - 1);
   for (;;) {
     if (meals.some((m) => isSameDay(m.at, day))) {
       streak += 1;
@@ -1011,10 +1016,15 @@ export function streakDays(meals: LoggedMeal[]): number {
   return streak;
 }
 
-/** Consecutive days (ending today) with at least one logged workout. */
+/**
+ * Consecutive days with at least one logged workout, ending today if today
+ * already has one — otherwise ending yesterday, so the count doesn't drop to
+ * 0 the moment the calendar rolls over, only once a full day is missed.
+ */
 export function workoutStreakDays(workouts: LoggedWorkout[]): number {
   let streak = 0;
   const day = new Date();
+  if (!workouts.some((w) => isSameDay(w.at, day))) day.setDate(day.getDate() - 1);
   for (;;) {
     if (workouts.some((w) => isSameDay(w.at, day))) {
       streak += 1;
