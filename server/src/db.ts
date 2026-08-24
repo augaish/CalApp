@@ -101,6 +101,9 @@ export async function initDb(): Promise<void> {
   // The address a signed-in account uses, so support has something human to
   // recognise a row by. Guests never have one.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`);
+  // What the row was last seen on — set from the launch ping, so it covers
+  // guests too, not only signed-in accounts.
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS device TEXT`);
 }
 
 /**
@@ -188,6 +191,20 @@ export async function setUserEmail(ref: string, email: string): Promise<void> {
     `INSERT INTO app_users (ref, email) VALUES ($1, $2)
      ON CONFLICT (ref) DO UPDATE SET email = EXCLUDED.email`,
     [ref, email],
+  );
+}
+
+/**
+ * Record what device an account was last seen on. Sent with the launch ping
+ * (`/api/me`), so it covers every install — guest or signed-in — not only the
+ * ones that ever reach a sign-in screen.
+ */
+export async function setUserDevice(ref: string, device: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO app_users (ref, device) VALUES ($1, $2)
+     ON CONFLICT (ref) DO UPDATE SET device = EXCLUDED.device`,
+    [ref, device],
   );
 }
 
@@ -532,6 +549,7 @@ export async function setSetting(key: string, value: unknown): Promise<void> {
 export interface AdminRow {
   ref: string;
   email: string | null;
+  device: string | null;
   plan: string;
   planSource: string;
   planUntil: string | null;
@@ -541,11 +559,19 @@ export interface AdminRow {
   lastSeenAt: string;
 }
 
-export async function listUsers(limit = 200): Promise<AdminRow[]> {
+/**
+ * Rows for the admin table, most recently active first.
+ *
+ * `limit` caps how many come back in one response, not how many exist — the
+ * admin page compares this length against `adminStats().totalUsers` and warns
+ * when they differ, because a silent gap between "shown" and "total" reads as
+ * "some users are missing" when they are really just past the cutoff.
+ */
+export async function listUsers(limit = 1000): Promise<AdminRow[]> {
   if (!pool) return [];
   const period = currentPeriod();
   const res = await pool.query(
-    `SELECT u.ref, u.email, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
+    `SELECT u.ref, u.email, u.device, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
             COALESCE((SELECT SUM(c.count) FROM usage_counters c
                       WHERE c.ref = u.ref AND c.period = $1), 0)::int AS used
        FROM app_users u
@@ -556,6 +582,7 @@ export async function listUsers(limit = 200): Promise<AdminRow[]> {
   return res.rows.map((r) => ({
     ref: r.ref,
     email: r.email ?? null,
+    device: r.device ?? null,
     plan: r.plan,
     planSource: r.plan_source,
     planUntil: r.plan_until ? new Date(r.plan_until).toISOString() : null,

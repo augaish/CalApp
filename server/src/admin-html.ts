@@ -115,9 +115,10 @@ export const ADMIN_HTML = `<!doctype html>
 
     <div class="card">
       <b>Users</b>
+      <div class="err hide" id="rowerr"></div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Ref</th><th>Email</th><th>Plan</th><th>Source</th><th>Used</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
+          <thead><tr><th>Ref</th><th>Email</th><th>Device</th><th>Plan</th><th>Source</th><th>Used</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -166,12 +167,24 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('sp_link').value = sp.linkUrl || '';
     document.getElementById('sp_on').checked = !!sp.enabled;
 
+    // The table can only ever show what listUsers() returned in one response;
+    // when that is fewer than the true total, say so instead of leaving a
+    // silent gap that reads as "some users are missing".
+    var rowerr = document.getElementById('rowerr');
+    if (data.users.length < s.totalUsers) {
+      rowerr.textContent = 'Showing ' + data.users.length + ' of ' + s.totalUsers + ' users — the oldest, least-recently-active ones are cut off. Raise the limit on the server if you need to see them.';
+      rowerr.classList.remove('hide');
+    } else {
+      rowerr.classList.add('hide');
+    }
+
     var html = '';
     data.users.forEach(function (u) {
       var isPro = u.plan === 'pro' || u.plan === 'proPlus';
       html += '<tr>' +
         '<td style="font-family:monospace">' + esc(u.ref) + '</td>' +
         '<td>' + (u.email ? esc(u.email) : '<span class="muted">guest</span>') + '</td>' +
+        '<td class="muted">' + (u.device ? esc(u.device) : '—') + '</td>' +
         '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + u.plan + '</span></td>' +
         '<td class="muted">' + esc(u.planSource) + '</td>' +
         '<td>' + u.used + '</td>' +
@@ -180,7 +193,7 @@ export const ADMIN_HTML = `<!doctype html>
         '<td><button class="ghost" onclick="pick(\\'' + esc(u.ref) + '\\')">Select</button></td>' +
         '</tr>';
     });
-    document.getElementById('rows').innerHTML = html || '<tr><td colspan="8" class="muted">No users yet.</td></tr>';
+    document.getElementById('rows').innerHTML = html || '<tr><td colspan="9" class="muted">No users yet.</td></tr>';
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }

@@ -1,3 +1,4 @@
+import { deviceLabel } from './device';
 import { useAppStore } from './store';
 import type {
   ChatMessage,
@@ -181,7 +182,11 @@ export async function fetchSharedPlan(code: string): Promise<unknown | null> {
 /** Current plan + remaining AI actions (and the sponsor slot, if any). */
 export async function fetchEntitlement(): Promise<Entitlement | null> {
   try {
-    const res = await fetch(`${API_URL}/api/me`, { headers: authHeaders() });
+    // Piggybacks on the launch ping every screen already depends on, so the
+    // admin table gets a device for every account — guest or signed-in — not
+    // only the ones that ever reach a sign-in screen.
+    const device = encodeURIComponent(deviceLabel());
+    const res = await fetch(`${API_URL}/api/me?device=${device}`, { headers: authHeaders() });
     if (!res.ok) return null;
     return (await res.json()) as Entitlement;
   } catch {

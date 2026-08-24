@@ -26,6 +26,7 @@ import {
   resolveRef,
   setCachedEquipment,
   setSetting,
+  setUserDevice,
   setUserEmail,
   setUserPlan,
 } from './db.js';
@@ -612,6 +613,12 @@ app.get('/api/me', async (c) => {
     ref && typeof access.spec.coachCap === 'number'
       ? await getUsageKind(ref, 'coach', access.period)
       : 0;
+  // The app sends this on every launch — guest or signed-in — so it is the
+  // one place a device gets recorded for every account the admin table shows,
+  // not only the ones that reach a sign-in screen. Best-effort: a failed
+  // write here must never break the entitlement fetch every screen relies on.
+  const device = (c.req.query('device') ?? '').trim().slice(0, 80);
+  if (ref && device) await setUserDevice(ref, device).catch(() => {});
   return c.json({
     plan: access.plan,
     used: access.used,
@@ -755,7 +762,7 @@ app.get('/admin/api/data', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const [stats, users, limits, sponsor] = await Promise.all([
     adminStats(),
-    listUsers(200),
+    listUsers(),
     planLimits(),
     getSetting<Record<string, unknown> | null>('sponsor', null),
   ]);
