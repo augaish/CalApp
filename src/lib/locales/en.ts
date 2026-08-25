@@ -244,6 +244,7 @@ export const en = {
     muscleMap: 'Muscle map',
     listView: 'List',
     targets: 'Targets',
+    alsoWorks: 'Also works',
   },
   muscles: {
     chest: 'Chest',
@@ -252,6 +253,7 @@ export const en = {
     biceps: 'Biceps',
     triceps: 'Triceps',
     legs: 'Legs',
+    calves: 'Calves',
     glutes: 'Glutes',
     core: 'Core',
     forearms: 'Forearms',

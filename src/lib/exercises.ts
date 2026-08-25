@@ -13,30 +13,32 @@ type Seed = {
   en: string;
   ar: string;
   category: MuscleGroup;
+  /** Other groups this exercise also works, shown as a lighter tint on the muscle map. */
+  secondary?: MuscleGroup[];
   type?: ExerciseType; // defaults to 'weight_reps'
   aliases?: string[];
 };
 
 const SEEDS: Seed[] = [
   // ── Chest ──────────────────────────────────────────────
-  { id: 'bench-press', en: 'Barbell Bench Press', ar: 'ضغط بار مسطح', category: 'chest', aliases: ['bench press', 'flat bench', 'بنش', 'ضغط صدر'] },
-  { id: 'incline-bench', en: 'Incline Bench Press', ar: 'ضغط بار مائل', category: 'chest', aliases: ['incline bench', 'incline press', 'ضغط مائل'] },
-  { id: 'dumbbell-press', en: 'Dumbbell Bench Press', ar: 'ضغط دمبل مسطح', category: 'chest', aliases: ['dumbbell press', 'db press', 'ضغط دمبل'] },
+  { id: 'bench-press', en: 'Barbell Bench Press', ar: 'ضغط بار مسطح', category: 'chest', secondary: ['triceps', 'shoulders'], aliases: ['bench press', 'flat bench', 'بنش', 'ضغط صدر'] },
+  { id: 'incline-bench', en: 'Incline Bench Press', ar: 'ضغط بار مائل', category: 'chest', secondary: ['triceps', 'shoulders'], aliases: ['incline bench', 'incline press', 'ضغط مائل'] },
+  { id: 'dumbbell-press', en: 'Dumbbell Bench Press', ar: 'ضغط دمبل مسطح', category: 'chest', secondary: ['triceps', 'shoulders'], aliases: ['dumbbell press', 'db press', 'ضغط دمبل'] },
   { id: 'chest-fly', en: 'Pec Deck / Chest Fly', ar: 'جهاز تفتيح الصدر', category: 'chest', aliases: ['pec deck', 'pec fly', 'chest fly machine', 'butterfly', 'فراشة'] },
   { id: 'cable-crossover', en: 'Cable Crossover', ar: 'كابل كروس أوفر', category: 'chest', aliases: ['cable crossover', 'cable fly', 'كابل صدر'] },
-  { id: 'chest-press-machine', en: 'Chest Press Machine', ar: 'جهاز ضغط الصدر', category: 'chest', aliases: ['chest press', 'seated chest press', 'جهاز صدر'] },
-  { id: 'push-up', en: 'Push-Up', ar: 'تمرين الضغط', category: 'chest', type: 'bodyweight_reps', aliases: ['push up', 'pushup', 'ضغط'] },
+  { id: 'chest-press-machine', en: 'Chest Press Machine', ar: 'جهاز ضغط الصدر', category: 'chest', secondary: ['triceps', 'shoulders'], aliases: ['chest press', 'seated chest press', 'جهاز صدر'] },
+  { id: 'push-up', en: 'Push-Up', ar: 'تمرين الضغط', category: 'chest', secondary: ['triceps', 'shoulders', 'core'], type: 'bodyweight_reps', aliases: ['push up', 'pushup', 'ضغط'] },
 
   // ── Back ───────────────────────────────────────────────
-  { id: 'lat-pulldown', en: 'Lat Pulldown', ar: 'سحب علوي (لات)', category: 'back', aliases: ['lat pulldown', 'lat pull down', 'pulldown', 'سحب علوي', 'لات بول داون', 'جهاز سحب علوي'] },
-  { id: 'seated-row', en: 'Seated Cable Row', ar: 'تجديف جالس بالكابل', category: 'back', aliases: ['seated row', 'cable row', 'low row', 'تجديف', 'روو'] },
-  { id: 'bent-over-row', en: 'Barbell Row', ar: 'تجديف بار منحني', category: 'back', aliases: ['barbell row', 'bent over row', 'تجديف بار'] },
-  { id: 'pull-up', en: 'Pull-Up', ar: 'العقلة', category: 'back', type: 'bodyweight_reps', aliases: ['pull up', 'pullup', 'chin up', 'عقلة', 'سحب عقلة'] },
-  { id: 'deadlift', en: 'Deadlift', ar: 'الرفعة الميتة', category: 'back', aliases: ['deadlift', 'ديدليفت', 'رفعة ميتة'] },
-  { id: 't-bar-row', en: 'T-Bar Row', ar: 'تجديف تي بار', category: 'back', aliases: ['t-bar row', 't bar', 'تي بار'] },
+  { id: 'lat-pulldown', en: 'Lat Pulldown', ar: 'سحب علوي (لات)', category: 'back', secondary: ['biceps', 'forearms'], aliases: ['lat pulldown', 'lat pull down', 'pulldown', 'سحب علوي', 'لات بول داون', 'جهاز سحب علوي'] },
+  { id: 'seated-row', en: 'Seated Cable Row', ar: 'تجديف جالس بالكابل', category: 'back', secondary: ['biceps'], aliases: ['seated row', 'cable row', 'low row', 'تجديف', 'روو'] },
+  { id: 'bent-over-row', en: 'Barbell Row', ar: 'تجديف بار منحني', category: 'back', secondary: ['biceps'], aliases: ['barbell row', 'bent over row', 'تجديف بار'] },
+  { id: 'pull-up', en: 'Pull-Up', ar: 'العقلة', category: 'back', secondary: ['biceps', 'forearms'], type: 'bodyweight_reps', aliases: ['pull up', 'pullup', 'chin up', 'عقلة', 'سحب عقلة'] },
+  { id: 'deadlift', en: 'Deadlift', ar: 'الرفعة الميتة', category: 'back', secondary: ['glutes', 'legs', 'forearms', 'core'], aliases: ['deadlift', 'ديدليفت', 'رفعة ميتة'] },
+  { id: 't-bar-row', en: 'T-Bar Row', ar: 'تجديف تي بار', category: 'back', secondary: ['biceps'], aliases: ['t-bar row', 't bar', 'تي بار'] },
 
   // ── Shoulders ──────────────────────────────────────────
-  { id: 'shoulder-press', en: 'Shoulder Press', ar: 'ضغط الكتف', category: 'shoulders', aliases: ['shoulder press', 'overhead press', 'military press', 'ضغط كتف', 'جهاز كتف'] },
+  { id: 'shoulder-press', en: 'Shoulder Press', ar: 'ضغط الكتف', category: 'shoulders', secondary: ['triceps'], aliases: ['shoulder press', 'overhead press', 'military press', 'ضغط كتف', 'جهاز كتف'] },
   { id: 'lateral-raise', en: 'Lateral Raise', ar: 'رفرفة جانبية', category: 'shoulders', aliases: ['lateral raise', 'side raise', 'رفرفة جانبية'] },
   { id: 'front-raise', en: 'Front Raise', ar: 'رفرفة أمامية', category: 'shoulders', aliases: ['front raise', 'رفرفة أمامية', 'رفع أمامي'] },
   { id: 'rear-delt-fly', en: 'Rear Delt Fly', ar: 'رفرفة خلفية', category: 'shoulders', aliases: ['rear delt', 'reverse fly', 'رفرفة خلفية'] },
@@ -44,35 +46,35 @@ const SEEDS: Seed[] = [
   { id: 'shrug', en: 'Shrug', ar: 'هز الأكتاف', category: 'shoulders', aliases: ['shrug', 'trap', 'هز أكتاف'] },
 
   // ── Biceps ─────────────────────────────────────────────
-  { id: 'barbell-curl', en: 'Barbell Curl', ar: 'مرجحة بار', category: 'biceps', aliases: ['barbell curl', 'bicep curl', 'باي بار', 'مرجحة'] },
-  { id: 'dumbbell-curl', en: 'Dumbbell Curl', ar: 'مرجحة دمبل', category: 'biceps', aliases: ['dumbbell curl', 'db curl', 'باي دمبل'] },
-  { id: 'hammer-curl', en: 'Hammer Curl', ar: 'مرجحة مطرقة', category: 'biceps', aliases: ['hammer curl', 'هامر'] },
+  { id: 'barbell-curl', en: 'Barbell Curl', ar: 'مرجحة بار', category: 'biceps', secondary: ['forearms'], aliases: ['barbell curl', 'bicep curl', 'باي بار', 'مرجحة'] },
+  { id: 'dumbbell-curl', en: 'Dumbbell Curl', ar: 'مرجحة دمبل', category: 'biceps', secondary: ['forearms'], aliases: ['dumbbell curl', 'db curl', 'باي دمبل'] },
+  { id: 'hammer-curl', en: 'Hammer Curl', ar: 'مرجحة مطرقة', category: 'biceps', secondary: ['forearms'], aliases: ['hammer curl', 'هامر'] },
   { id: 'preacher-curl', en: 'Preacher Curl', ar: 'مرجحة كرسي القسيس', category: 'biceps', aliases: ['preacher curl', 'preacher', 'بريتشر'] },
-  { id: 'cable-curl', en: 'Cable Curl', ar: 'مرجحة كابل', category: 'biceps', aliases: ['cable curl', 'باي كابل'] },
+  { id: 'cable-curl', en: 'Cable Curl', ar: 'مرجحة كابل', category: 'biceps', secondary: ['forearms'], aliases: ['cable curl', 'باي كابل'] },
 
   // ── Triceps ────────────────────────────────────────────
   { id: 'tricep-pushdown', en: 'Triceps Pushdown', ar: 'دفع الترايسبس بالكابل', category: 'triceps', aliases: ['pushdown', 'tricep pushdown', 'rope pushdown', 'تراي كابل', 'دفع ترايسبس'] },
   { id: 'tricep-extension', en: 'Overhead Triceps Extension', ar: 'تمديد الترايسبس علوي', category: 'triceps', aliases: ['overhead extension', 'tricep extension', 'تمديد ترايسبس'] },
-  { id: 'dips', en: 'Dips', ar: 'الغطس (ديبس)', category: 'triceps', type: 'bodyweight_reps', aliases: ['dips', 'dip', 'ديبس', 'غطس'] },
+  { id: 'dips', en: 'Dips', ar: 'الغطس (ديبس)', category: 'triceps', secondary: ['chest', 'shoulders'], type: 'bodyweight_reps', aliases: ['dips', 'dip', 'ديبس', 'غطس'] },
   { id: 'skull-crusher', en: 'Skull Crusher', ar: 'كسر الجمجمة', category: 'triceps', aliases: ['skull crusher', 'lying extension', 'سكل كراشر'] },
-  { id: 'close-grip-bench', en: 'Close-Grip Bench Press', ar: 'ضغط بقبضة ضيقة', category: 'triceps', aliases: ['close grip bench', 'قبضة ضيقة'] },
+  { id: 'close-grip-bench', en: 'Close-Grip Bench Press', ar: 'ضغط بقبضة ضيقة', category: 'triceps', secondary: ['chest', 'shoulders'], aliases: ['close grip bench', 'قبضة ضيقة'] },
 
   // ── Legs ───────────────────────────────────────────────
-  { id: 'squat', en: 'Barbell Squat', ar: 'سكوات بار', category: 'legs', aliases: ['squat', 'back squat', 'سكوات', 'قرفصاء'] },
-  { id: 'leg-press', en: 'Leg Press', ar: 'جهاز دفع الأرجل', category: 'legs', aliases: ['leg press', 'جهاز أرجل', 'دفع أرجل', 'ليج برس'] },
+  { id: 'squat', en: 'Barbell Squat', ar: 'سكوات بار', category: 'legs', secondary: ['glutes', 'core'], aliases: ['squat', 'back squat', 'سكوات', 'قرفصاء'] },
+  { id: 'leg-press', en: 'Leg Press', ar: 'جهاز دفع الأرجل', category: 'legs', secondary: ['glutes'], aliases: ['leg press', 'جهاز أرجل', 'دفع أرجل', 'ليج برس'] },
   { id: 'leg-extension', en: 'Leg Extension', ar: 'تمديد الأرجل', category: 'legs', aliases: ['leg extension', 'quad extension', 'تمديد أرجل', 'مقدمة فخذ'] },
   { id: 'leg-curl', en: 'Lying Leg Curl', ar: 'ثني الأرجل مستلقياً', category: 'legs', aliases: ['leg curl', 'lying leg curl', 'hamstring curl', 'ثني أرجل', 'خلفية فخذ'] },
-  { id: 'lunge', en: 'Lunge', ar: 'الطعنات', category: 'legs', aliases: ['lunge', 'walking lunge', 'طعنات'] },
-  { id: 'calf-raise', en: 'Standing Calf Raise', ar: 'رفع السمانة واقفاً', category: 'legs', aliases: ['calf raise', 'standing calf raise', 'سمانة', 'رفع سمانة'] },
-  { id: 'romanian-deadlift', en: 'Romanian Deadlift', ar: 'الرفعة الرومانية', category: 'legs', aliases: ['romanian deadlift', 'rdl', 'رفعة رومانية'] },
+  { id: 'lunge', en: 'Lunge', ar: 'الطعنات', category: 'legs', secondary: ['glutes', 'core'], aliases: ['lunge', 'walking lunge', 'طعنات'] },
+  { id: 'calf-raise', en: 'Standing Calf Raise', ar: 'رفع السمانة واقفاً', category: 'calves', aliases: ['calf raise', 'standing calf raise', 'سمانة', 'رفع سمانة'] },
+  { id: 'romanian-deadlift', en: 'Romanian Deadlift', ar: 'الرفعة الرومانية', category: 'legs', secondary: ['glutes', 'back'], aliases: ['romanian deadlift', 'rdl', 'رفعة رومانية'] },
 
   // ── Glutes ─────────────────────────────────────────────
-  { id: 'hip-thrust', en: 'Hip Thrust', ar: 'دفع الحوض', category: 'glutes', aliases: ['hip thrust', 'glute bridge', 'دفع حوض', 'هيب ثرست'] },
+  { id: 'hip-thrust', en: 'Hip Thrust', ar: 'دفع الحوض', category: 'glutes', secondary: ['legs'], aliases: ['hip thrust', 'glute bridge', 'دفع حوض', 'هيب ثرست'] },
   { id: 'glute-kickback', en: 'Glute Kickback', ar: 'ركلة المؤخرة', category: 'glutes', aliases: ['kickback', 'glute kickback', 'ركلة خلفية'] },
   { id: 'abductor', en: 'Hip Abductor Machine', ar: 'جهاز مباعدة الأرجل', category: 'glutes', aliases: ['abductor', 'hip abduction', 'مباعدة'] },
 
   // ── Core ───────────────────────────────────────────────
-  { id: 'plank', en: 'Plank', ar: 'البلانك', category: 'core', type: 'time', aliases: ['plank', 'بلانك'] },
+  { id: 'plank', en: 'Plank', ar: 'البلانك', category: 'core', secondary: ['shoulders'], type: 'time', aliases: ['plank', 'بلانك'] },
   { id: 'crunch', en: 'Crunch', ar: 'الكرنش', category: 'core', type: 'bodyweight_reps', aliases: ['crunch', 'كرنش', 'بطن'] },
   { id: 'leg-raise', en: 'Hanging Leg Raise', ar: 'رفع الأرجل معلقاً', category: 'core', type: 'bodyweight_reps', aliases: ['leg raise', 'رفع أرجل'] },
   { id: 'cable-crunch', en: 'Cable Crunch', ar: 'كرنش بالكابل', category: 'core', aliases: ['cable crunch', 'كرنش كابل'] },
@@ -108,14 +110,14 @@ const SEEDS: Seed[] = [
   // Triceps
   { id: 'pushdown-triangle', en: 'Triangle Bar Pushdown', ar: 'دفع الترايسبس بالمقبض المثلث', category: 'triceps', aliases: ['push down triangle', 'v-bar pushdown', 'دفع مثلث'] },
   // Legs
-  { id: 'bulgarian-split-squat', en: 'Bulgarian Split Squat', ar: 'سكوات بلغاري', category: 'legs', aliases: ['bulgarian split squat', 'split squat', 'سكوات بلغاري'] },
-  { id: 'hack-squat', en: 'Hack Squat', ar: 'هاك سكوات', category: 'legs', aliases: ['hack squat', 'hack squat calf', 'هاك سكوات'] },
-  { id: 'seated-calf-raise', en: 'Seated Calf Raise', ar: 'رفع السمانة جالساً', category: 'legs', aliases: ['seated calf raise', 'رفع سمانة جالس'] },
+  { id: 'bulgarian-split-squat', en: 'Bulgarian Split Squat', ar: 'سكوات بلغاري', category: 'legs', secondary: ['glutes', 'core'], aliases: ['bulgarian split squat', 'split squat', 'سكوات بلغاري'] },
+  { id: 'hack-squat', en: 'Hack Squat', ar: 'هاك سكوات', category: 'legs', secondary: ['glutes'], aliases: ['hack squat', 'hack squat calf', 'هاك سكوات'] },
+  { id: 'seated-calf-raise', en: 'Seated Calf Raise', ar: 'رفع السمانة جالساً', category: 'calves', aliases: ['seated calf raise', 'رفع سمانة جالس'] },
   // Glutes
   { id: 'hip-thrust-machine', en: 'Hip Thrust Machine', ar: 'جهاز دفع الحوض', category: 'glutes', aliases: ['hip thrust machine', 'جهاز هيب ثرست', 'جهاز دفع حوض'] },
   { id: 'glute-master', en: 'Glute Master', ar: 'جهاز مدرب المؤخرة', category: 'glutes', aliases: ['glute master', 'glute machine', 'جهاز جلوت'] },
   // Core
-  { id: 'bird-dog', en: 'Bird Dog', ar: 'وضعية الطائر والكلب', category: 'core', type: 'bodyweight_reps', aliases: ['bird dog', 'بيرد دوق'] },
+  { id: 'bird-dog', en: 'Bird Dog', ar: 'وضعية الطائر والكلب', category: 'core', secondary: ['glutes', 'shoulders'], type: 'bodyweight_reps', aliases: ['bird dog', 'بيرد دوق'] },
   { id: 'one-leg-stretch', en: 'Single-Leg Stretch', ar: 'تمديد الساق الواحدة', category: 'core', type: 'bodyweight_reps', aliases: ['one leg stretch', 'single leg stretch', 'تمديد ساق'] },
   { id: 'iso-hold', en: 'Iso Hold', ar: 'ثبات إيزومتري', category: 'core', type: 'time', aliases: ['iso hold', 'isometric hold', 'ثبات'] },
   { id: 'cat-cow', en: 'Cat-Cow', ar: 'وضعية القط والبقرة', category: 'core', type: 'bodyweight_reps', aliases: ['cat cow', 'كات كاو'] },
@@ -127,7 +129,7 @@ const SEEDS: Seed[] = [
   // ── Added library (round 2) ────────────────────────────
   { id: 'machine-bent-over-row', en: 'Machine Bent-Over Row', ar: 'تجديف منحنٍ بالجهاز', category: 'back', aliases: ['machine bent over row', 'chest supported row machine', 'تجديف بالجهاز'] },
   { id: 'rear-delt-pec-deck', en: 'Rear Delt Pec Deck', ar: 'جهاز الرفرفة الخلفية (بيك دِك عكسي)', category: 'shoulders', aliases: ['rear delt pec deck', 'reverse pec deck', 'rear delt machine', 'بيك دك عكسي'] },
-  { id: 'calf-press-leg-press', en: 'Calf Press on Leg Press', ar: 'ضغط السمانة على جهاز الأرجل', category: 'legs', aliases: ['calf press on leg press', 'calf press', 'leg press calf raise', 'ضغط سمانة'] },
+  { id: 'calf-press-leg-press', en: 'Calf Press on Leg Press', ar: 'ضغط السمانة على جهاز الأرجل', category: 'calves', aliases: ['calf press on leg press', 'calf press', 'leg press calf raise', 'ضغط سمانة'] },
   { id: 'hanging-knee-raise', en: 'Hanging Knee Raise', ar: 'رفع الركبتين معلقاً', category: 'core', type: 'bodyweight_reps', aliases: ['hanging knee raise', 'knee raise', 'رفع ركبتين'] },
   { id: 'reverse-crunch', en: 'Reverse Crunch', ar: 'الكرنش العكسي', category: 'core', type: 'bodyweight_reps', aliases: ['reverse crunch', 'كرنش عكسي'] },
 
@@ -155,6 +157,7 @@ export const BUILTIN_EXERCISES: Exercise[] = SEEDS.map((s) => ({
   nameEn: s.en,
   nameAr: s.ar,
   category: s.category,
+  secondary: s.secondary,
   type: s.type ?? 'weight_reps',
   aliases: s.aliases,
   source: 'builtin',
@@ -168,6 +171,7 @@ export const MUSCLE_GROUPS: MuscleGroup[] = [
   'biceps',
   'triceps',
   'legs',
+  'calves',
   'glutes',
   'core',
   'forearms',
@@ -183,6 +187,7 @@ export const MUSCLE_COLORS: Record<MuscleGroup, string> = {
   biceps: '#4C86E0', // blue
   triceps: '#9B6DD6', // violet
   legs: '#E8863B', // orange
+  calves: '#C1440E', // rust
   glutes: '#E06AA6', // pink
   core: '#2CB8A6', // teal
   forearms: '#B98A4E', // amber/brown

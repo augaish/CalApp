@@ -211,10 +211,20 @@ export default function ExerciseDetail() {
 
       {viewForGroup(exercise.category) && (
         <Card style={styles.muscleMapCard}>
-          <BodyMap view={viewForGroup(exercise.category)!} highlighted={[exercise.category]} size={110} />
+          <BodyMap
+            view={viewForGroup(exercise.category)!}
+            highlighted={[exercise.category]}
+            secondary={exercise.secondary}
+            size={110}
+          />
           <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
             {t('exercises.targets')} {t(`muscles.${exercise.category}`)}
           </Text>
+          {!!exercise.secondary?.length && (
+            <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '500' }}>
+              {t('exercises.alsoWorks')} {exercise.secondary.map((g) => t(`muscles.${g}`)).join(', ')}
+            </Text>
+          )}
         </Card>
       )}
 

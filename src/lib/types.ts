@@ -117,6 +117,7 @@ export type MuscleGroup =
   | 'biceps'
   | 'triceps'
   | 'legs'
+  | 'calves'
   | 'glutes'
   | 'core'
   | 'forearms'
@@ -134,6 +135,8 @@ export interface Exercise {
   nameEn?: string;
   nameAr?: string;
   category: MuscleGroup;
+  /** Other groups this exercise also works, shown as a lighter tint on the muscle map. */
+  secondary?: MuscleGroup[];
   type: ExerciseType;
   /** Photo of the machine/movement — from the camera or an equipment scan. */
   photoUri?: string;

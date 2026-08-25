@@ -20,7 +20,9 @@ import type { MuscleGroup } from '@/lib/types';
  * drawable region and simply never appear here.
  */
 const FRONT_GROUPS: MuscleGroup[] = ['chest', 'shoulders', 'biceps', 'forearms', 'core', 'legs'];
-const BACK_GROUPS: MuscleGroup[] = ['back', 'triceps', 'glutes'];
+// Calves live on the back view — the gastrocnemius bulge reads clearly there,
+// while the front view mostly shows the shin (tibialis), which we don't tag.
+const BACK_GROUPS: MuscleGroup[] = ['back', 'triceps', 'glutes', 'calves'];
 
 export type BodyMapView = 'front' | 'back';
 
@@ -37,19 +39,24 @@ export function viewForGroup(group: MuscleGroup): BodyMapView | null {
 }
 
 /**
- * `highlighted` colors the groups it lists (in MUSCLE_COLORS) and leaves
- * everything else neutral. Pass `onSelect` to make a group's own paths
- * tappable directly — real anatomical regions tile against their neighbors
- * with no gap, so no separate invisible hit-target is needed.
+ * `highlighted` colors the groups it lists at full strength (in
+ * MUSCLE_COLORS) — the muscle(s) an exercise actually targets. `secondary`
+ * colors other groups it also works, in the same color but faded, so it
+ * reads as "worked, but not the point of the exercise." Everything else
+ * stays neutral. Pass `onSelect` to make a group's own paths tappable
+ * directly — real anatomical regions tile against their neighbors with no
+ * gap, so no separate invisible hit-target is needed.
  */
 export function BodyMap({
   view,
   highlighted,
+  secondary,
   onSelect,
   size = 200,
 }: {
   view: BodyMapView;
   highlighted: MuscleGroup[];
+  secondary?: MuscleGroup[];
   onSelect?: (group: MuscleGroup) => void;
   size?: number;
 }) {
@@ -62,11 +69,15 @@ export function BodyMap({
     <View style={{ width: size, height, alignItems: 'center' }}>
       <Svg width={size} height={height} viewBox={viewBox}>
         {parts.map((part, i) => {
-          const color = part.group && highlighted.includes(part.group) ? MUSCLE_COLORS[part.group] : theme.cardSubtle;
+          const isPrimary = !!part.group && highlighted.includes(part.group);
+          const isSecondary = !!part.group && !isPrimary && !!secondary?.includes(part.group);
+          const color = isPrimary || isSecondary ? MUSCLE_COLORS[part.group as MuscleGroup] : theme.cardSubtle;
+          const opacity = isSecondary ? 0.4 : 1;
           return (
             <Path
               key={i}
               d={part.d}
+              fillOpacity={opacity}
               fill={color}
               stroke={theme.card}
               strokeWidth={1}

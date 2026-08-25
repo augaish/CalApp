@@ -246,6 +246,7 @@ export const ar: TranslationSchema = {
     muscleMap: 'خريطة العضلات',
     listView: 'قائمة',
     targets: 'يستهدف',
+    alsoWorks: 'يشارك أيضاً',
   },
   muscles: {
     chest: 'الصدر',
@@ -254,6 +255,7 @@ export const ar: TranslationSchema = {
     biceps: 'البايسبس',
     triceps: 'الترايسبس',
     legs: 'الأرجل',
+    calves: 'السمانة',
     glutes: 'المؤخرة',
     core: 'الوسط (البطن)',
     forearms: 'الساعد',
