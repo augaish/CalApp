@@ -847,12 +847,20 @@ app.get('/api/whoop/callback', async (c) => {
   }
 });
 
+/**
+ * Whether WHOOP is usable right now, not just whether a connection row
+ * exists. A row with a dead access token and no refresh_token to renew it
+ * (see setWhoopConnection's comment — WHOOP doesn't always reissue one) is
+ * not meaningfully "connected": nothing can actually be pulled with it, so
+ * the app should prompt reconnecting instead of showing a green check that
+ * silently does nothing.
+ */
 app.get('/api/whoop/status', async (c) => {
   const ref = await callerRef(c);
   if (!ref) return c.json({ connected: false });
-  const conn = await getWhoopConnection(ref);
+  const [conn, token] = await Promise.all([getWhoopConnection(ref), getValidAccessToken(ref)]);
   return c.json(
-    conn
+    conn && token
       ? { connected: true, scope: conn.scope, connectedAt: conn.connectedAt }
       : { connected: false },
   );
