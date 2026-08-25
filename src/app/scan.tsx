@@ -20,6 +20,7 @@ import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
+  analyzeBodyReading,
   analyzeEquipment,
   analyzeMeal,
   FeatureLockedError,
@@ -37,6 +38,7 @@ export default function Scan() {
   const isGym = mode === 'gym';
   const isBarcode = mode === 'barcode';
   const isPhoto = mode === 'photo';
+  const isBody = mode === 'body';
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
@@ -44,6 +46,7 @@ export default function Scan() {
   const language = useAppStore((s) => s.language) ?? 'en';
   const setMeal = usePending((s) => s.setMeal);
   const setEquipment = usePending((s) => s.setEquipment);
+  const setBodyReading = usePending((s) => s.setBodyReading);
   const setCapturedPhoto = usePending((s) => s.setCapturedPhoto);
 
   const cameraRef = useRef<CameraView>(null);
@@ -95,6 +98,11 @@ export default function Scan() {
       useEntitlement.getState().spend();
       setEquipment(analysis, saved.uri);
       router.replace('/gym-result');
+    } else if (isBody) {
+      const analysis = await analyzeBodyReading(saved.base64, language);
+      useEntitlement.getState().spend();
+      setBodyReading(analysis, saved.uri);
+      router.replace('/body-reading?fromScan=1');
     } else {
       const analysis = await analyzeMeal(saved.base64, language);
       useEntitlement.getState().spend();
@@ -156,9 +164,11 @@ export default function Scan() {
     ? t('barcode.searching')
     : isGym
       ? t('scan.analyzingGym')
-      : isPhoto
-        ? t('scan.preparingPhoto')
-        : t('scan.analyzingMeal');
+      : isBody
+        ? t('scan.analyzingBody')
+        : isPhoto
+          ? t('scan.preparingPhoto')
+          : t('scan.analyzingMeal');
 
   // Once there is a shot to work on, the camera comes down. Leaving a live
   // preview running behind a spinner was the confusing part: the viewfinder
@@ -203,14 +213,22 @@ export default function Scan() {
         <Text style={styles.title}>
           {isGym
             ? t('scan.gymTitle')
-            : isBarcode
-              ? t('addMenu.scanBarcode')
-              : isPhoto
-                ? t('foodEdit.addPhoto')
-                : t('scan.mealTitle')}
+            : isBody
+              ? t('scan.bodyTitle')
+              : isBarcode
+                ? t('addMenu.scanBarcode')
+                : isPhoto
+                  ? t('foodEdit.addPhoto')
+                  : t('scan.mealTitle')}
         </Text>
         <Text style={styles.hint}>
-          {isGym ? t('scan.gymHint') : isBarcode ? t('barcode.hint') : t('scan.mealHint')}
+          {isGym
+            ? t('scan.gymHint')
+            : isBody
+              ? t('scan.bodyHint')
+              : isBarcode
+                ? t('barcode.hint')
+                : t('scan.mealHint')}
         </Text>
         {isMockMode && !isPhoto && <Text style={styles.mockBadge}>{t('scan.mockBadge')}</Text>}
       </View>

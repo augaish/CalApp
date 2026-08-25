@@ -213,6 +213,15 @@ export default function Profile() {
               </View>
             </Card>
           </Pressable>
+          <Pressable onPress={() => router.push('/body-reading')}>
+            <Card style={styles.linkRow}>
+              <Ionicons name="body-outline" size={18} color={theme.textSecondary} style={{ marginEnd: Spacing.sm }} />
+              <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>
+                {t('settings.bodyReadings')}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+            </Card>
+          </Pressable>
         </>
       )}
 

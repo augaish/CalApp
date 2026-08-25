@@ -59,6 +59,7 @@ import {
 } from './whoop.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
+  bodyReadingPrompt,
   coachSystemPrompt,
   equipmentDetailsPrompt,
   exerciseInfoPrompt,
@@ -486,6 +487,24 @@ app.post('/api/analyze-equipment', async (c) => {
   } catch (err) {
     console.error('analyze-equipment failed:', err);
     await release(ref, 'equipment');
+    return c.json({ error: 'analysis_failed' }, 502);
+  }
+});
+
+app.post('/api/analyze-body-reading', async (c) => {
+  const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
+  if (!parsed) return c.json({ error: 'invalid_request' }, 400);
+  const ref = (await callerRef(c))!;
+  const access = await checkAccess(ref, 'bodyReading');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
+  const claim = await reserve(ref, access, 'bodyReading');
+  if (!claim.ok) return c.json(quotaError(access), 402);
+  try {
+    const result = await analyze(parsed.image, bodyReadingPrompt(parsed.language));
+    return c.json(result);
+  } catch (err) {
+    console.error('analyze-body-reading failed:', err);
+    await release(ref, 'bodyReading');
     return c.json({ error: 'analysis_failed' }, 502);
   }
 });

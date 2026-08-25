@@ -1,6 +1,7 @@
 import { deviceLabel } from './device';
 import { useAppStore } from './store';
 import type {
+  BodyReadingAnalysis,
   ChatMessage,
   CoachSchedulePlan,
   EquipmentAnalysis,
@@ -321,6 +322,14 @@ export async function analyzeEquipment(
   return post<EquipmentAnalysis>('/api/analyze-equipment', { image: imageBase64, language });
 }
 
+export async function analyzeBodyReading(
+  imageBase64: string,
+  language: Language,
+): Promise<BodyReadingAnalysis> {
+  if (isMockMode) return mockBodyReading(language);
+  return post<BodyReadingAnalysis>('/api/analyze-body-reading', { image: imageBase64, language });
+}
+
 export interface ExerciseInfo {
   category: string;
   type: string;
@@ -483,4 +492,16 @@ async function mockEquipment(language: Language): Promise<EquipmentAnalysis> {
         suggestion: { sets: 3, reps: '10–12', note: 'Start with a weight you can control' },
         confidence: 0.85,
       };
+}
+
+async function mockBodyReading(language: Language): Promise<BodyReadingAnalysis> {
+  await delay(1500);
+  return {
+    deviceLabel: language === 'ar' ? 'InBody 270 (تجريبي)' : 'InBody 270 (demo)',
+    weightKg: 78.4,
+    bodyFatPercent: 19.5,
+    skeletalMuscleMassKg: 34.2,
+    segmentalLeanMassKg: { leftArm: 3.1, rightArm: 3.2, trunk: 27.8, leftLeg: 9.4, rightLeg: 9.6 },
+    confidence: 0.85,
+  };
 }

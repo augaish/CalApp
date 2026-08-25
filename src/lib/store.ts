@@ -193,6 +193,9 @@ interface AppState {
   setWhoopBackfilledAt: (iso: string | null) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
+  /** A fuller reading (manual or scanned) — same log as logWeight, with the
+   * optional body-fat/segmental fields a quick Overview weigh-in never sets. */
+  logBodyReading: (entry: Omit<WeightEntry, 'at'> & { at?: string }) => void;
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
   setRemindWorkouts: (on: boolean) => void;
@@ -661,6 +664,10 @@ export const useAppStore = create<AppState>()(
         set((s) => ({ water: [{ at: at ?? new Date().toISOString(), ml }, ...s.water] })),
       logWeight: (kg, at) =>
         set((s) => ({ weights: [{ at: at ?? new Date().toISOString(), kg }, ...s.weights] })),
+      logBodyReading: (entry) =>
+        set((s) => ({
+          weights: [{ ...entry, at: entry.at ?? new Date().toISOString() }, ...s.weights],
+        })),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
       setRemindWorkouts: (on) => set({ remindWorkouts: on }),

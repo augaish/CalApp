@@ -6,7 +6,7 @@ import { BACK_PARTS, FRONT_PARTS, type MusclePath } from '@/components/body-map-
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MUSCLE_COLORS, MUSCLE_ID_COLORS } from '@/lib/exercises';
-import type { MuscleGroup, MuscleId } from '@/lib/types';
+import type { MuscleGroup, MuscleId, SegmentalLeanMass } from '@/lib/types';
 
 /**
  * A real anatomical body diagram (see body-map-parts.ts for the path data's
@@ -23,6 +23,18 @@ const FRONT_GROUPS: MuscleGroup[] = ['chest', 'shoulders', 'biceps', 'forearms',
 const BACK_GROUPS: MuscleGroup[] = ['back', 'triceps', 'glutes', 'calves'];
 
 export type BodyMapView = 'front' | 'back';
+
+export type BodyZone = 'arms' | 'trunk' | 'legs';
+
+/** Which MuscleGroups fall under each of the three broad zones a body
+ * reading's segmental lean mass can drive — arms/legs each average their
+ * left+right figure, since individual muscle regions aren't reliably
+ * addressable as anatomical left/right within the flat path data. */
+const ZONE_GROUPS: Record<BodyZone, MuscleGroup[]> = {
+  arms: ['biceps', 'triceps', 'forearms'],
+  trunk: ['chest', 'back', 'core'],
+  legs: ['legs', 'calves', 'glutes'],
+};
 
 /** Every drawable group, front first — used to build a front/back toggle. */
 export const BODY_MAP_GROUPS: { group: MuscleGroup; view: BodyMapView }[] = [
@@ -52,16 +64,38 @@ export function viewForMuscles(muscles: MuscleId[]): BodyMapView | null {
 }
 
 /**
- * Two ways to drive coloring, mutually exclusive:
+ * How a body reading's segmental lean mass splits across arms/trunk/legs,
+ * scaled so the biggest zone reads fully saturated and the others sit
+ * proportionally lighter — a purely descriptive "where your measured lean
+ * mass concentrates" glance, not a judgment about any zone. Null when the
+ * reading has no segmental breakdown at all (most manual entries and many
+ * single-purpose scales).
+ */
+export function zoneIntensityFromSegmental(
+  seg: SegmentalLeanMass | undefined,
+): Partial<Record<BodyZone, number>> | null {
+  if (!seg) return null;
+  const zones: Record<BodyZone, number> = {
+    arms: (seg.leftArm ?? 0) + (seg.rightArm ?? 0),
+    trunk: seg.trunk ?? 0,
+    legs: (seg.leftLeg ?? 0) + (seg.rightLeg ?? 0),
+  };
+  const max = Math.max(zones.arms, zones.trunk, zones.legs);
+  if (max <= 0) return null;
+  return { arms: zones.arms / max, trunk: zones.trunk / max, legs: zones.legs / max };
+}
+
+/**
+ * Three ways to drive coloring, mutually exclusive (checked in this order):
+ * - Muscle mode (`highlightedMuscles`/`secondaryMuscles`, MuscleId[]) — for
+ *   one exercise's actual primary/secondary muscles.
+ * - Zone mode (`zoneIntensity`, BodyZone -> 0..1) — for a body reading's
+ *   relative arms/trunk/legs lean-mass split. Opacity is continuous instead
+ *   of the binary primary/secondary split the other two modes use.
  * - Group mode (`highlighted`/`secondary`, MuscleGroup[]) — for browsing by
  *   broad category, e.g. the exercise library's picker. Supports `onSelect`
  *   since real anatomical regions tile against their neighbors with no gap,
- *   so no separate invisible hit-target is needed.
- * - Muscle mode (`highlightedMuscles`/`secondaryMuscles`, MuscleId[]) — for
- *   one exercise's actual primary/secondary muscles. Takes over whenever
- *   `highlightedMuscles` is passed.
- * Either way: the primary set is full color, the secondary set is the same
- * color faded, everything else stays neutral.
+ *   so no separate invisible hit-target is needed. This is the default.
  */
 export function BodyMap({
   view,
@@ -69,6 +103,8 @@ export function BodyMap({
   secondary,
   highlightedMuscles,
   secondaryMuscles,
+  zoneIntensity,
+  zoneColor,
   onSelect,
   size = 200,
 }: {
@@ -77,6 +113,8 @@ export function BodyMap({
   secondary?: MuscleGroup[];
   highlightedMuscles?: MuscleId[];
   secondaryMuscles?: MuscleId[];
+  zoneIntensity?: Partial<Record<BodyZone, number>>;
+  zoneColor?: string;
   onSelect?: (group: MuscleGroup) => void;
   size?: number;
 }) {
@@ -85,6 +123,8 @@ export function BodyMap({
   const viewBox = view === 'front' ? '0 0 724 1448' : '724 0 724 1448';
   const height = size * 2;
   const muscleMode = !!highlightedMuscles;
+  const zoneMode = !muscleMode && !!zoneIntensity;
+  const accent = zoneColor ?? theme.warning;
 
   return (
     <View style={{ width: size, height, alignItems: 'center' }}>
@@ -99,6 +139,17 @@ export function BodyMap({
             else if (secondaryMatch) {
               color = MUSCLE_ID_COLORS[secondaryMatch];
               opacity = 0.4;
+            }
+          } else if (zoneMode) {
+            const zone = (Object.keys(ZONE_GROUPS) as BodyZone[]).find(
+              (z) => part.group && ZONE_GROUPS[z].includes(part.group),
+            );
+            const intensity = zone ? zoneIntensity![zone] : undefined;
+            if (intensity != null) {
+              color = accent;
+              // Floor at 0.15 so a low-intensity zone still reads as "measured"
+              // rather than disappearing into the neutral, unmeasured regions.
+              opacity = Math.max(0.15, Math.min(1, intensity));
             }
           } else {
             const isPrimary = !!part.group && !!highlighted?.includes(part.group);

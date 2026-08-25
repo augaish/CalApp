@@ -65,9 +65,29 @@ export interface LoggedMeal {
   mealType?: MealType;
 }
 
+/** Lean mass per body region (kg), as broken down by a bioimpedance/InBody-style
+ * scan. Optional per-region — most manual entries and many scan models won't
+ * have all five. */
+export interface SegmentalLeanMass {
+  leftArm?: number;
+  rightArm?: number;
+  trunk?: number;
+  leftLeg?: number;
+  rightLeg?: number;
+}
+
 export interface WeightEntry {
   at: string;
   kg: number;
+  /** The fuller reading fields below are optional — a quick Overview weigh-in
+   * only ever sets `kg`; a full body reading (manual or scanned) can add the
+   * rest. */
+  bodyFatPercent?: number;
+  skeletalMuscleMassKg?: number;
+  segmentalLeanMassKg?: SegmentalLeanMass;
+  source?: 'manual' | 'scan';
+  /** Device/brand read off a scanned report, e.g. "InBody 270" — display only. */
+  reportLabel?: string;
 }
 
 export interface ChatMessage {
@@ -106,6 +126,20 @@ export interface EquipmentAnalysis {
   formCues: string[];
   commonMistakes: string[];
   suggestion: { sets: number; reps: string; note?: string };
+  confidence: number;
+}
+
+/**
+ * Extracted (never estimated) from a photo of a body-composition report —
+ * InBody, Tanita, DEXA or similar. Every field is null when the report
+ * simply doesn't print that number; nothing here is a visual guess.
+ */
+export interface BodyReadingAnalysis {
+  deviceLabel?: string;
+  weightKg?: number;
+  bodyFatPercent?: number;
+  skeletalMuscleMassKg?: number;
+  segmentalLeanMassKg?: SegmentalLeanMass;
   confidence: number;
 }
 
