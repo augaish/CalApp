@@ -18,7 +18,8 @@ export const WHOOP_SCOPES = ['read:cycles', 'read:workout', 'read:recovery', 're
 
 export interface WhoopTokenResponse {
   accessToken: string;
-  refreshToken: string;
+  /** Not always reissued — observed missing on a re-authorization. */
+  refreshToken?: string;
   expiresAt: Date;
   scope: string;
 }
@@ -57,7 +58,7 @@ async function parseTokenResponse(res: Response): Promise<WhoopTokenResponse> {
   }
   const json = (await res.json()) as {
     access_token: string;
-    refresh_token: string;
+    refresh_token?: string;
     expires_in: number;
     scope: string;
   };
@@ -113,6 +114,10 @@ export async function getValidAccessToken(ref: string): Promise<string | null> {
   if (!conn) return null;
   // A minute of slack so a token doesn't expire mid-request.
   if (new Date(conn.expiresAt).getTime() > Date.now() + 60_000) return conn.accessToken;
+  // No refresh_token on file (WHOOP doesn't always reissue one) — nothing to
+  // refresh with. The access token is expired, so this really is a dead end;
+  // the user will need to reconnect from the app.
+  if (!conn.refreshToken) return null;
   try {
     const refreshed = await refreshWhoopToken(conn.refreshToken);
     await setWhoopConnection(ref, refreshed);

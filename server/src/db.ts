@@ -112,12 +112,18 @@ export async function initDb(): Promise<void> {
     CREATE TABLE IF NOT EXISTS whoop_connections (
       ref           TEXT PRIMARY KEY,
       access_token  TEXT NOT NULL,
-      refresh_token TEXT NOT NULL,
+      refresh_token TEXT,
       expires_at    TIMESTAMPTZ NOT NULL,
       scope         TEXT NOT NULL,
       connected_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // WHOOP only sends a refresh_token on some grants (observed: not
+  // reliably on a re-authorization of an app the user already approved
+  // before) — this used to be NOT NULL, which crashed the whole connect
+  // flow on exactly that case instead of just losing the ability to
+  // auto-refresh later.
+  await pool.query(`ALTER TABLE whoop_connections ALTER COLUMN refresh_token DROP NOT NULL`);
   // One-time CSRF token for the OAuth redirect round trip: the authorize step
   // writes ref-by-state here, the callback reads and deletes it, so a forged
   // callback with a guessed or reused state matches no one.
@@ -135,7 +141,8 @@ export async function initDb(): Promise<void> {
 
 export interface WhoopConnection {
   accessToken: string;
-  refreshToken: string;
+  /** Null when WHOOP didn't reissue one on this grant — see getValidAccessToken. */
+  refreshToken: string | null;
   expiresAt: string;
   scope: string;
   connectedAt: string;
@@ -166,18 +173,21 @@ export async function consumeWhoopOAuthState(state: string): Promise<string | nu
 
 export async function setWhoopConnection(
   ref: string,
-  tokens: { accessToken: string; refreshToken: string; expiresAt: Date; scope: string },
+  tokens: { accessToken: string; refreshToken?: string; expiresAt: Date; scope: string },
 ): Promise<void> {
   if (!pool) return;
+  // A grant that didn't come back with a refresh_token (see the column
+  // comment above) must not blow away one already on file from an earlier
+  // successful connection — COALESCE keeps the existing value in that case.
   await pool.query(
     `INSERT INTO whoop_connections (ref, access_token, refresh_token, expires_at, scope)
      VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (ref) DO UPDATE SET
        access_token = EXCLUDED.access_token,
-       refresh_token = EXCLUDED.refresh_token,
+       refresh_token = COALESCE(EXCLUDED.refresh_token, whoop_connections.refresh_token),
        expires_at = EXCLUDED.expires_at,
        scope = EXCLUDED.scope`,
-    [ref, tokens.accessToken, tokens.refreshToken, tokens.expiresAt.toISOString(), tokens.scope],
+    [ref, tokens.accessToken, tokens.refreshToken ?? null, tokens.expiresAt.toISOString(), tokens.scope],
   );
 }
 
