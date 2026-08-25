@@ -28,6 +28,7 @@ import { normalizeDigits } from '@/lib/numbers';
 import {
   actualBurnedForDay,
   isSameDay,
+  programProgress,
   streakDays,
   totalsForDay,
   useAppStore,
@@ -61,6 +62,7 @@ export default function Overview() {
   const workouts = useAppStore((s) => s.workouts);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const weights = useAppStore((s) => s.weights);
+  const activeProgram = useAppStore((s) => s.activeProgram);
   const schedule = useAppStore((s) => s.schedule);
   const checklistDismissed = useAppStore((s) => s.checklistDismissed);
   const dismissChecklist = useAppStore((s) => s.dismissChecklist);
@@ -109,6 +111,7 @@ export default function Overview() {
   const burned = actualBurnedForDay(workouts, whoopBurnByDay, selected);
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const streak = streakDays(meals);
+  const programGlance = activeProgram ? programProgress(activeProgram) : null;
 
   // The strip shows the current week (ending today) whenever the selected day
   // is still inside it, so tapping a day in view never reshuffles the row.
@@ -439,6 +442,50 @@ export default function Overview() {
           </Pressable>
         </View>
 
+        {/* AI program glance */}
+        <Pressable
+          onPress={() => router.push('/program')}
+          style={({ pressed }) => [
+            styles.card,
+            { backgroundColor: theme.card },
+            cardShadow(theme.shadow),
+            pressed && { opacity: 0.85 },
+          ]}
+        >
+          {activeProgram ? (
+            <>
+              <View style={styles.programHead}>
+                <Ionicons name="sparkles" size={18} color={theme.primary} />
+                <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
+                  {t('program.title')}
+                </Text>
+                <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+              </View>
+              <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
+                {t('program.weekProgress', { current: programGlance!.weekNumber, total: activeProgram.durationWeeks })}
+                {' · '}
+                {t('program.daysLeft', { count: programGlance!.daysLeft })}
+              </Text>
+              <View style={[styles.programTrack, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.programTrackFill,
+                    { backgroundColor: theme.primary, width: `${programGlance!.pct}%` },
+                  ]}
+                />
+              </View>
+            </>
+          ) : (
+            <View style={styles.programHead}>
+              <Ionicons name="sparkles-outline" size={18} color={theme.primary} />
+              <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flex: 1 }}>
+                {t('program.introTitle')}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+            </View>
+          )}
+        </Pressable>
+
         {/* Calories week chart */}
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.calories7d')}</Text>
@@ -454,7 +501,16 @@ export default function Overview() {
 
         {/* Weight */}
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.weight')}</Text>
+          <View style={styles.weightHead}>
+            <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, flex: 1 }]}>
+              {t('progress.weight')}
+            </Text>
+            <Pressable onPress={() => router.push('/body-reading')} hitSlop={8}>
+              <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
+                {t('progress.fullReading')}
+              </Text>
+            </Pressable>
+          </View>
           {weightSeries.length >= 2 ? (
             <TrendLine
               values={weightSeries}
@@ -583,6 +639,9 @@ const styles = StyleSheet.create({
   ringValue: { fontSize: 34, fontWeight: '800' },
   card: { borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.md },
+  programHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  programTrack: { height: 5, borderRadius: 2.5, marginTop: Spacing.sm, overflow: 'hidden' },
+  programTrackFill: { height: 5, borderRadius: 2.5 },
   macroRow: { flexDirection: 'row', gap: Spacing.md },
   tourBanner: {
     flexDirection: 'row',
@@ -619,6 +678,7 @@ const styles = StyleSheet.create({
   },
   halfValue: { fontSize: 20, fontWeight: '800' },
   halfTarget: { fontSize: 12, fontWeight: '600' },
+  weightHead: { flexDirection: 'row', alignItems: 'center' },
   weightRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm },
   weightBtn: { minWidth: 54, marginBottom: Spacing.md },
 });

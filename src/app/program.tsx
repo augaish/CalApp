@@ -13,7 +13,7 @@ import { buildCoachContext } from '@/lib/coach-context';
 import { resolveCoachSchedule } from '@/lib/coach-schedule';
 import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
-import { streakDays, totalsForDay, useAppStore, workoutStreakDays } from '@/lib/store';
+import { programProgress, streakDays, totalsForDay, useAppStore, workoutStreakDays } from '@/lib/store';
 import type { GeneratedProgram, Program } from '@/lib/types';
 
 function newProgramId(): string {
@@ -156,11 +156,7 @@ export default function ProgramScreen() {
 
   // ── Active: an accepted program, with progress against it ──────────────
   if (activeProgram) {
-    const startedAt = new Date(activeProgram.createdAt);
-    const daysElapsed = Math.max(0, Math.floor((Date.now() - startedAt.getTime()) / 86400000));
-    const totalDays = activeProgram.durationWeeks * 7;
-    const daysLeft = Math.max(0, totalDays - daysElapsed);
-    const weekNumber = Math.min(activeProgram.durationWeeks, Math.floor(daysElapsed / 7) + 1);
+    const { daysLeft, weekNumber, pct } = programProgress(activeProgram);
     const todayTotals = totalsForDay(meals, new Date());
 
     return (
@@ -186,7 +182,7 @@ export default function ProgramScreen() {
             <View
               style={[
                 styles.trackFill,
-                { backgroundColor: theme.primary, width: `${Math.min(100, (daysElapsed / totalDays) * 100)}%` },
+                { backgroundColor: theme.primary, width: `${pct}%` },
               ]}
             />
           </View>

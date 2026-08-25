@@ -1,5 +1,5 @@
 import i18n from './i18n';
-import { isSameDay, useAppStore, workoutStreakDays } from './store';
+import { isSameDay, streakDays, useAppStore, workoutStreakDays } from './store';
 import type { MealType } from './types';
 
 /**
@@ -60,6 +60,13 @@ function todayAt(hour: number, minute: number): Date | null {
 }
 
 /**
+ * Round numbers worth calling out — a streak's own count changes daily, so
+ * checking "is today's count one of these" is enough to fire exactly once
+ * per milestone with no extra "already congratulated" state to track.
+ */
+const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 100, 150, 200, 365];
+
+/**
  * Recompute and reschedule all reminders from the current on-device state.
  * Called on first launch, on app foreground, and after each log. Baseline
  * water/workout reminders repeat daily; meal prompts, the streak saver and the
@@ -114,6 +121,19 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
     if (streak >= 2 && !trainedToday && streakAt) {
       await once('rem-streak', streakAt, i18n.t('reminders.streakTitle'), i18n.t('reminders.streakBody', { count: streak }));
     }
+    // Celebrate a round-number streak — gated on having actually trained
+    // today so this fires exactly once, the day the count reaches it, not
+    // again tomorrow while workoutStreakDays is still reporting yesterday's
+    // number ahead of today's first log.
+    const workoutCelebrateAt = todayAt(19, 30);
+    if (trainedToday && STREAK_MILESTONES.includes(streak) && workoutCelebrateAt) {
+      await once(
+        'rem-encourage-workout',
+        workoutCelebrateAt,
+        i18n.t('reminders.encourageWorkoutStreakTitle', { count: streak }),
+        i18n.t('reminders.encourageWorkoutStreakBody', { count: streak }),
+      );
+    }
   }
 
   // Meal prompts + evening check-in — recurring so they fire without the app
@@ -130,6 +150,46 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
       );
     }
     await daily('rem-macro', 21, 0, i18n.t('reminders.macroTitle'), i18n.t('reminders.eveningBody'));
+
+    // Same round-number celebration as the workout streak, mirrored for
+    // logging days — gated on today already having an entry, same reason.
+    const loggedToday = s.meals.some((m) => isSameDay(m.at, now));
+    const mealStreak = streakDays(s.meals);
+    const mealCelebrateAt = todayAt(21, 30);
+    if (loggedToday && STREAK_MILESTONES.includes(mealStreak) && mealCelebrateAt) {
+      await once(
+        'rem-encourage-meal',
+        mealCelebrateAt,
+        i18n.t('reminders.encourageStreakTitle', { count: mealStreak }),
+        i18n.t('reminders.encourageStreakBody', { count: mealStreak }),
+      );
+    }
+  }
+
+  // Program milestones — a new week starting, or the whole program finishing
+  // — each only true on the exact day the boundary is crossed, so this fires
+  // once per milestone with no extra "already sent" bookkeeping.
+  if ((s.remindWorkouts || s.remindMeals) && s.activeProgram) {
+    const program = s.activeProgram;
+    const daysElapsed = Math.floor((now.getTime() - new Date(program.createdAt).getTime()) / 86400000);
+    const totalDays = program.durationWeeks * 7;
+    const programAt = todayAt(19, 0);
+    if (programAt && daysElapsed > 0 && daysElapsed < totalDays && daysElapsed % 7 === 0) {
+      const week = Math.floor(daysElapsed / 7) + 1;
+      await once(
+        'rem-program-week',
+        programAt,
+        i18n.t('reminders.encourageProgramWeekTitle', { week }),
+        i18n.t('reminders.encourageProgramWeekBody', { week, total: program.durationWeeks }),
+      );
+    } else if (programAt && daysElapsed === totalDays) {
+      await once(
+        'rem-program-done',
+        programAt,
+        i18n.t('reminders.encourageProgramDoneTitle'),
+        i18n.t('reminders.encourageProgramDoneBody', { total: program.durationWeeks }),
+      );
+    }
   }
 
   return { granted: true };

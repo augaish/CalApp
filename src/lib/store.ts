@@ -1154,6 +1154,22 @@ export function workoutStreakDays(workouts: LoggedWorkout[]): number {
   return streak;
 }
 
+/** Where an accepted program stands today — shared by the Overview glance card and the full program screen. */
+export function programProgress(program: Program): {
+  daysElapsed: number;
+  totalDays: number;
+  daysLeft: number;
+  weekNumber: number;
+  pct: number;
+} {
+  const daysElapsed = Math.max(0, Math.floor((Date.now() - new Date(program.createdAt).getTime()) / 86400000));
+  const totalDays = program.durationWeeks * 7;
+  const daysLeft = Math.max(0, totalDays - daysElapsed);
+  const weekNumber = Math.min(program.durationWeeks, Math.floor(daysElapsed / 7) + 1);
+  const pct = totalDays > 0 ? Math.min(100, (daysElapsed / totalDays) * 100) : 0;
+  return { daysElapsed, totalDays, daysLeft, weekNumber, pct };
+}
+
 /** Meal types already logged on `day`. */
 export function mealTypesLogged(meals: LoggedMeal[], day: Date): Set<MealType> {
   const set = new Set<MealType>();
