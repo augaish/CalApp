@@ -90,8 +90,8 @@ export default function Overview() {
     const end = new Date(selected);
     end.setHours(23, 59, 59, 999);
     let alive = true;
-    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then((kcal) => {
-      if (alive) setWhoopDayBurn(selected, kcal);
+    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(({ totalKcal }) => {
+      if (alive) setWhoopDayBurn(selected, totalKcal);
     });
     return () => {
       alive = false;

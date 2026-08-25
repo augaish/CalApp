@@ -14,6 +14,7 @@ import type {
   PlannedSet,
   Profile,
   WeightEntry,
+  WhoopDayWorkout,
   WorkoutSet,
 } from './types';
 
@@ -72,6 +73,8 @@ interface AppState {
    * than trying to attribute WHOOP's number to one exercise.
    */
   whoopBurnByDay: Record<string, number>;
+  /** The individual WHOOP workouts a day's `whoopBurnByDay` total is made of. */
+  whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -183,6 +186,8 @@ interface AppState {
   ) => void;
   /** Set (or, with null, clear) WHOOP's real burn for a day — see whoopBurnByDay. */
   setWhoopDayBurn: (day: Date, kcal: number | null) => void;
+  /** Set (or, with [], clear) the individual WHOOP workouts a day is made of. */
+  setWhoopDayWorkouts: (day: Date, workouts: WhoopDayWorkout[]) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
@@ -246,6 +251,7 @@ export const useAppStore = create<AppState>()(
       syncedAt: null,
       dayOrder: {},
       whoopBurnByDay: {},
+      whoopWorkoutsByDay: {},
       workouts: [],
       water: [],
       weights: [],
@@ -491,6 +497,15 @@ export const useAppStore = create<AppState>()(
           }
           return { whoopBurnByDay: { ...s.whoopBurnByDay, [key]: kcal } };
         }),
+      setWhoopDayWorkouts: (day, workouts) =>
+        set((s) => {
+          const key = dateKey(day);
+          if (workouts.length === 0) {
+            const { [key]: _, ...rest } = s.whoopWorkoutsByDay;
+            return { whoopWorkoutsByDay: rest };
+          }
+          return { whoopWorkoutsByDay: { ...s.whoopWorkoutsByDay, [key]: workouts } };
+        }),
       reorderSchedule: (weekday, exerciseIds) =>
         set((s) => {
           const cur = s.schedule[weekday];
@@ -681,6 +696,7 @@ export const useAppStore = create<AppState>()(
           syncedAt: null,
           dayOrder: {},
           whoopBurnByDay: {},
+          whoopWorkoutsByDay: {},
           language: null,
           profile: null,
           targets: null,
@@ -719,6 +735,7 @@ export const useAppStore = create<AppState>()(
         syncedAt,
         dayOrder,
         whoopBurnByDay,
+        whoopWorkoutsByDay,
         workouts,
         water,
         weights,
@@ -743,6 +760,7 @@ export const useAppStore = create<AppState>()(
         syncedAt,
         dayOrder,
         whoopBurnByDay,
+        whoopWorkoutsByDay,
         workouts,
         water,
         weights,
@@ -887,15 +905,51 @@ export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
 }
 
 /**
+ * How much higher or lower a connected WHOOP's real burn tends to run
+ * compared to the set/rep formula, learned from the days both exist for —
+ * this is what lets a day with NO WHOOP coverage still benefit from history
+ * instead of falling back to the same generic formula forever. 1 (no
+ * adjustment) until there are at least 2 usable days to learn from, and
+ * clamped to 0.5–2× so one outlier day (a WHOOP workout landing on a day
+ * with almost nothing logged in Calgym) can't produce a wild multiplier.
+ */
+export function whoopCalibrationFactor(
+  workouts: LoggedWorkout[],
+  whoopBurnByDay: Record<string, number>,
+  dayCount = 30,
+): number {
+  const ratios: number[] = [];
+  for (let i = 0; i < dayCount; i++) {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    const whoopKcal = whoopBurnByDay[dateKey(d)];
+    if (whoopKcal == null) continue;
+    const formulaKcal = burnedForDay(workouts, d);
+    // Too little logged that day for the ratio to mean anything.
+    if (formulaKcal < 50) continue;
+    ratios.push(whoopKcal / formulaKcal);
+  }
+  if (ratios.length < 2) return 1;
+  const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
+  return Math.min(2, Math.max(0.5, avg));
+}
+
+/**
  * `burnedForDay`, but a connected WHOOP's real heart-rate-based number wins
- * over the set/rep formula estimate for any day it's available for.
+ * outright for any day it's directly available for, and every other day
+ * gets the formula estimate corrected by `whoopCalibrationFactor` — so
+ * accuracy improves for the whole history, not only days WHOOP covers.
  */
 export function actualBurnedForDay(
   workouts: LoggedWorkout[],
   whoopBurnByDay: Record<string, number>,
   day: Date,
 ): number {
-  return whoopBurnByDay[dateKey(day)] ?? burnedForDay(workouts, day);
+  const whoopKcal = whoopBurnByDay[dateKey(day)];
+  if (whoopKcal != null) return whoopKcal;
+  const formula = burnedForDay(workouts, day);
+  if (formula === 0) return 0;
+  return Math.round(formula * whoopCalibrationFactor(workouts, whoopBurnByDay));
 }
 
 /**

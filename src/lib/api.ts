@@ -7,6 +7,7 @@ import type {
   FoodItem,
   Language,
   MealAnalysis,
+  WhoopDayWorkout,
 } from './types';
 
 /**
@@ -233,23 +234,30 @@ export async function disconnectWhoop(): Promise<boolean> {
   }
 }
 
+export interface WhoopDayBurn {
+  totalKcal: number | null;
+  workouts: WhoopDayWorkout[];
+}
+
 /**
  * WHOOP's real burn for a local day (start/end are that day's midnight-to-
  * midnight in the caller's own timezone — the server has no timezone of its
- * own to guess with). Null when not connected or nothing was found, so the
- * caller falls back to the formula estimate rather than showing 0.
+ * own to guess with), plus the individual workouts it's made of — so "how
+ * much did today's training actually take" can be shown per session, not
+ * only as one combined number. totalKcal is null when not connected or
+ * nothing was found, so the caller falls back to the formula estimate
+ * rather than showing 0.
  */
-export async function fetchWhoopDayBurn(startIso: string, endIso: string): Promise<number | null> {
+export async function fetchWhoopDayBurn(startIso: string, endIso: string): Promise<WhoopDayBurn> {
   try {
     const params = new URLSearchParams({ start: startIso, end: endIso });
     const res = await fetch(`${API_URL}/api/whoop/day-burn?${params.toString()}`, {
       headers: authHeaders(),
     });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { totalKcal: number | null };
-    return data.totalKcal;
+    if (!res.ok) return { totalKcal: null, workouts: [] };
+    return (await res.json()) as WhoopDayBurn;
   } catch {
-    return null;
+    return { totalKcal: null, workouts: [] };
   }
 }
 

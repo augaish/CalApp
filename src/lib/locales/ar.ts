@@ -157,6 +157,9 @@ export const ar: TranslationSchema = {
   training: {
     burned: 'المحروق',
     estimated: 'تقدير من مجموعاتك المسجلة',
+    fromWhoop: 'من WHOOP',
+    adjustedFromWhoop: 'تقدير، معدّل بناءً على سجل WHOOP',
+    whoopBreakdown: 'من WHOOP اليوم',
     scanCta: 'مسح جهاز رياضي',
     history: 'السجل',
     routine: 'روتينك',

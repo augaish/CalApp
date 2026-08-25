@@ -23,6 +23,7 @@ import {
   isSameDay,
   setScore,
   useAppStore,
+  whoopCalibrationFactor,
   workoutDays,
   workoutFor,
 } from '@/lib/store';
@@ -36,6 +37,12 @@ function weekdayLabel(i: number, locale: string): string {
 /** Whole minutes, for cardio durations stored as seconds. */
 function toMin(seconds: number | undefined): number {
   return Math.round((seconds ?? 0) / 60);
+}
+
+/** WHOOP's sport names are lowercase/underscored ("functional_fitness") — just clean them up for display. */
+function formatSportName(sportName: string): string {
+  const spaced = sportName.replace(/_/g, ' ');
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
 
 /**
@@ -108,6 +115,8 @@ export default function Training() {
   const workouts = useAppStore((s) => s.workouts);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
+  const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
+  const setWhoopDayWorkouts = useAppStore((s) => s.setWhoopDayWorkouts);
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const copyDayTo = useAppStore((s) => s.copyDayTo);
@@ -145,6 +154,9 @@ export default function Training() {
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = actualBurnedForDay(workouts, whoopBurnByDay, selected);
+  const whoopDayTotal = whoopBurnByDay[dateKey(selected)] ?? null;
+  const whoopWorkouts = whoopWorkoutsByDay[dateKey(selected)] ?? [];
+  const whoopCalibrated = whoopDayTotal == null && whoopCalibrationFactor(workouts, whoopBurnByDay) !== 1;
   const groups = workoutDays(workouts, selected);
   const kg = t('progress.kg');
   const min = t('track.min');
@@ -159,8 +171,10 @@ export default function Training() {
     const end = new Date(selected);
     end.setHours(23, 59, 59, 999);
     let alive = true;
-    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then((kcal) => {
-      if (alive) setWhoopDayBurn(selected, kcal);
+    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(({ totalKcal, workouts: w }) => {
+      if (!alive) return;
+      setWhoopDayBurn(selected, totalKcal);
+      setWhoopDayWorkouts(selected, w);
     });
     return () => {
       alive = false;
@@ -313,18 +327,45 @@ export default function Training() {
         </View>
       </View>
 
-      <Card style={styles.burnCard}>
-        <View style={[styles.burnIcon, { backgroundColor: 'rgba(245,166,35,0.15)' }]}>
-          <Ionicons name="flame" size={26} color={theme.carbs} />
+      <Card>
+        <View style={styles.burnCard}>
+          <View style={[styles.burnIcon, { backgroundColor: 'rgba(245,166,35,0.15)' }]}>
+            <Ionicons name="flame" size={26} color={theme.carbs} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.burnValue, { color: theme.text }]}>
+              {burned} <Text style={styles.burnUnit}>{t('common.kcal')}</Text>
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+              {t('training.burned')} ·{' '}
+              {whoopDayTotal != null
+                ? t('training.fromWhoop')
+                : whoopCalibrated
+                  ? t('training.adjustedFromWhoop')
+                  : t('training.estimated')}
+            </Text>
+          </View>
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.burnValue, { color: theme.text }]}>
-            {burned} <Text style={styles.burnUnit}>{t('common.kcal')}</Text>
-          </Text>
-          <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-            {t('training.burned')} · {t('training.estimated')}
-          </Text>
-        </View>
+        {whoopWorkouts.length > 0 && (
+          <View style={[styles.whoopBreakdown, { borderTopColor: theme.border }]}>
+            <Text style={[styles.whoopBreakdownTitle, { color: theme.textSecondary }]}>
+              {t('training.whoopBreakdown')}
+            </Text>
+            {whoopWorkouts.map((w, i) => (
+              <View key={`${w.start}-${i}`} style={styles.whoopBreakdownRow}>
+                <Text style={{ color: theme.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
+                  {formatSportName(w.sportName)}
+                </Text>
+                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                  {new Date(w.start).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '700' }}>
+                  {w.kcal} {t('common.kcal')}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </Card>
 
       {/* One fixed way into the planning model, whether or not today has a
@@ -727,6 +768,9 @@ const styles = StyleSheet.create({
   },
   burnValue: { fontSize: 26, fontWeight: '800' },
   burnUnit: { fontSize: 14, fontWeight: '600' },
+  whoopBreakdown: { marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
+  whoopBreakdownTitle: { fontSize: 12, fontWeight: '700', marginBottom: Spacing.xs },
+  whoopBreakdownRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 },
   cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
   routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   planItem: { paddingVertical: 4 },

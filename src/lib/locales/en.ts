@@ -155,6 +155,9 @@ export const en = {
   training: {
     burned: 'Burned',
     estimated: 'Estimated from your logged sets',
+    fromWhoop: 'From WHOOP',
+    adjustedFromWhoop: 'Estimate, adjusted from your WHOOP history',
+    whoopBreakdown: 'From WHOOP today',
     scanCta: 'Scan equipment',
     history: 'History',
     routine: 'Your routine',

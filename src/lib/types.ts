@@ -180,3 +180,13 @@ export interface LoggedWorkout {
   /** Rough estimate, kcal */
   caloriesBurned?: number;
 }
+
+/** One workout WHOOP detected on a given day (real heart-rate-based numbers, not an estimate). */
+export interface WhoopDayWorkout {
+  sportName: string;
+  start: string;
+  end: string;
+  kcal: number;
+  strain: number | null;
+  avgHeartRate: number | null;
+}
