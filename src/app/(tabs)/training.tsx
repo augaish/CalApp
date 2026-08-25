@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
 import { useAnimatedRef } from 'react-native-reanimated';
@@ -9,14 +9,15 @@ import Sortable from 'react-native-sortables';
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { fetchWhoopDayBurn } from '@/lib/api';
 import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
 import {
+  actualBurnedForDay,
   applyOrder,
   bestSetIndex,
-  burnedForDay,
   dateKey,
   historyFor,
   isSameDay,
@@ -105,6 +106,8 @@ export default function Training() {
   const locale = lang;
 
   const workouts = useAppStore((s) => s.workouts);
+  const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
+  const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const copyDayTo = useAppStore((s) => s.copyDayTo);
@@ -141,10 +144,29 @@ export default function Training() {
   );
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
-  const burned = burnedForDay(workouts, selected);
+  const burned = actualBurnedForDay(workouts, whoopBurnByDay, selected);
   const groups = workoutDays(workouts, selected);
   const kg = t('progress.kg');
   const min = t('track.min');
+
+  // Pull WHOOP's real number for today whenever this screen is looking at
+  // today — covers both "just checked something off" and "WHOOP finished
+  // syncing a couple minutes after I left the gym and reopened the app".
+  useEffect(() => {
+    if (!selectedIsToday) return;
+    const start = new Date(selected);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(selected);
+    end.setHours(23, 59, 59, 999);
+    let alive = true;
+    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then((kcal) => {
+      if (alive) setWhoopDayBurn(selected, kcal);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIsToday, loggedTodayCount]);
 
   // Past days start collapsed — history is for looking something up, not for
   // scrolling past on the way to today.

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -22,10 +22,11 @@ import { SponsorCard } from '@/components/sponsor-card';
 import { Button, Field } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { fetchWhoopDayBurn } from '@/lib/api';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { normalizeDigits } from '@/lib/numbers';
 import {
-  burnedForDay,
+  actualBurnedForDay,
   isSameDay,
   streakDays,
   totalsForDay,
@@ -58,6 +59,7 @@ export default function Overview() {
   const meals = useAppStore((s) => s.meals);
   const water = useAppStore((s) => s.water);
   const workouts = useAppStore((s) => s.workouts);
+  const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const weights = useAppStore((s) => s.weights);
   const schedule = useAppStore((s) => s.schedule);
   const checklistDismissed = useAppStore((s) => s.checklistDismissed);
@@ -65,6 +67,7 @@ export default function Overview() {
   const tourSeen = useAppStore((s) => s.tourSeen);
   const setTourSeen = useAppStore((s) => s.setTourSeen);
   const logWeight = useAppStore((s) => s.logWeight);
+  const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
 
   const selected = useViewDay((s) => s.day);
   const setDay = useViewDay((s) => s.setDay);
@@ -77,6 +80,25 @@ export default function Overview() {
   const [tourSteps, setTourSteps] = useState<TourStep[] | null>(null);
   const [tourIndex, setTourIndex] = useState(0);
 
+  // Same WHOOP refresh as the Training tab (see its effect for why): Overview
+  // is often the first screen opened, so it shouldn't need a Training visit
+  // to pick up today's real burn.
+  useEffect(() => {
+    if (!isSameDay(new Date().toISOString(), selected)) return;
+    const start = new Date(selected);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(selected);
+    end.setHours(23, 59, 59, 999);
+    let alive = true;
+    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then((kcal) => {
+      if (alive) setWhoopDayBurn(selected, kcal);
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
+
   if (!targets || !profile) return null;
 
   const totals = totalsForDay(meals, selected);
@@ -84,7 +106,7 @@ export default function Overview() {
   const over = remaining < 0;
   const waterMl = waterForDay(water, selected);
   const waterTarget = waterTargetMl(profile.weightKg);
-  const burned = burnedForDay(workouts, selected);
+  const burned = actualBurnedForDay(workouts, whoopBurnByDay, selected);
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const streak = streakDays(meals);
 

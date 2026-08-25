@@ -65,6 +65,13 @@ interface AppState {
    * today around until the day itself has been reordered by hand.
    */
   dayOrder: Record<string, string[]>;
+  /**
+   * A day's real burn straight from a connected WHOOP, keyed like `dayOrder`.
+   * Calgym has no whole-session concept (exercises are checked off one at a
+   * time), so this stands in for the whole day's `burnedForDay` total rather
+   * than trying to attribute WHOOP's number to one exercise.
+   */
+  whoopBurnByDay: Record<string, number>;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -174,6 +181,8 @@ interface AppState {
     /** false seeds the record but leaves it not-trained (no burn). */
     trained?: boolean,
   ) => void;
+  /** Set (or, with null, clear) WHOOP's real burn for a day — see whoopBurnByDay. */
+  setWhoopDayBurn: (day: Date, kcal: number | null) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
@@ -236,6 +245,7 @@ export const useAppStore = create<AppState>()(
       linkedRef: null,
       syncedAt: null,
       dayOrder: {},
+      whoopBurnByDay: {},
       workouts: [],
       water: [],
       weights: [],
@@ -472,6 +482,15 @@ export const useAppStore = create<AppState>()(
       },
       setDayOrder: (day, exerciseIds) =>
         set((s) => ({ dayOrder: { ...s.dayOrder, [dateKey(day)]: exerciseIds } })),
+      setWhoopDayBurn: (day, kcal) =>
+        set((s) => {
+          const key = dateKey(day);
+          if (kcal == null) {
+            const { [key]: _, ...rest } = s.whoopBurnByDay;
+            return { whoopBurnByDay: rest };
+          }
+          return { whoopBurnByDay: { ...s.whoopBurnByDay, [key]: kcal } };
+        }),
       reorderSchedule: (weekday, exerciseIds) =>
         set((s) => {
           const cur = s.schedule[weekday];
@@ -661,6 +680,7 @@ export const useAppStore = create<AppState>()(
           linkedRef: null,
           syncedAt: null,
           dayOrder: {},
+          whoopBurnByDay: {},
           language: null,
           profile: null,
           targets: null,
@@ -698,6 +718,7 @@ export const useAppStore = create<AppState>()(
         linkedRef,
         syncedAt,
         dayOrder,
+        whoopBurnByDay,
         workouts,
         water,
         weights,
@@ -721,6 +742,7 @@ export const useAppStore = create<AppState>()(
         linkedRef,
         syncedAt,
         dayOrder,
+        whoopBurnByDay,
         workouts,
         water,
         weights,
@@ -862,6 +884,18 @@ export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
     (sum, w) => (isSameDay(w.at, day) ? sum + (w.caloriesBurned ?? 0) : sum),
     0,
   );
+}
+
+/**
+ * `burnedForDay`, but a connected WHOOP's real heart-rate-based number wins
+ * over the set/rep formula estimate for any day it's available for.
+ */
+export function actualBurnedForDay(
+  workouts: LoggedWorkout[],
+  whoopBurnByDay: Record<string, number>,
+  day: Date,
+): number {
+  return whoopBurnByDay[dateKey(day)] ?? burnedForDay(workouts, day);
 }
 
 /**

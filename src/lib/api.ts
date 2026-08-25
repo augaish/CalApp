@@ -233,6 +233,47 @@ export async function disconnectWhoop(): Promise<boolean> {
   }
 }
 
+/**
+ * WHOOP's real burn for a local day (start/end are that day's midnight-to-
+ * midnight in the caller's own timezone — the server has no timezone of its
+ * own to guess with). Null when not connected or nothing was found, so the
+ * caller falls back to the formula estimate rather than showing 0.
+ */
+export async function fetchWhoopDayBurn(startIso: string, endIso: string): Promise<number | null> {
+  try {
+    const params = new URLSearchParams({ start: startIso, end: endIso });
+    const res = await fetch(`${API_URL}/api/whoop/day-burn?${params.toString()}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { totalKcal: number | null };
+    return data.totalKcal;
+  } catch {
+    return null;
+  }
+}
+
+export interface WhoopSummary {
+  connected: boolean;
+  recoveryScore?: number | null;
+  hrvMs?: number | null;
+  restingHr?: number | null;
+  sleepPerformancePercent?: number | null;
+  sleepHours?: number | null;
+  todayStrain?: number | null;
+}
+
+/** Recovery/strain/sleep snapshot for the coach's context — see coach-context.ts. */
+export async function fetchWhoopSummary(): Promise<WhoopSummary | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/whoop/summary`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    return (await res.json()) as WhoopSummary;
+  } catch {
+    return null;
+  }
+}
+
 export async function analyzeMeal(
   imageBase64: string,
   language: Language,

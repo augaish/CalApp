@@ -70,7 +70,7 @@ export default function Coach() {
     setInput('');
     setBusy(true);
     try {
-      const { reply, schedulePlan } = await coachChat(next, language, buildCoachContext(language));
+      const { reply, schedulePlan } = await coachChat(next, language, await buildCoachContext(language));
       useEntitlement.getState().spend('coach');
       const text = isMockMode
         ? t('coach.mockReply')

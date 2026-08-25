@@ -45,7 +45,17 @@ import {
   type CoachSchedulePlan,
   type MealAnalysis,
 } from './parse.js';
-import { buildAuthorizeUrl, exchangeCodeForToken, whoopConfigured } from './whoop.js';
+import {
+  buildAuthorizeUrl,
+  exchangeCodeForToken,
+  fetchLatestRecovery,
+  fetchLatestSleep,
+  fetchTodayStrain,
+  fetchWorkoutsInRange,
+  getValidAccessToken,
+  kilojoulesToKcal,
+  whoopConfigured,
+} from './whoop.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
   coachSystemPrompt,
@@ -841,6 +851,73 @@ app.post('/api/whoop/disconnect', async (c) => {
   if (!ref) return c.json({ error: 'identify_required' }, 401);
   await deleteWhoopConnection(ref);
   return c.json({ ok: true });
+});
+
+/**
+ * The actual burn for a day, straight from WHOOP's heart-rate-based workout
+ * data, instead of Calgym's set/rep formula estimate. `start`/`end` are the
+ * caller's local day boundaries — Calgym has no session concept (exercises
+ * are checked off individually), so this sums every WHOOP workout that
+ * overlaps the day rather than trying to match one Calgym exercise to one
+ * WHOOP workout.
+ */
+app.get('/api/whoop/day-burn', async (c) => {
+  const ref = await callerRef(c);
+  const start = c.req.query('start');
+  const end = c.req.query('end');
+  if (!ref || !start || !end || Number.isNaN(Date.parse(start)) || Number.isNaN(Date.parse(end))) {
+    return c.json({ totalKcal: null, workouts: [] });
+  }
+  const token = await getValidAccessToken(ref);
+  if (!token) return c.json({ totalKcal: null, workouts: [] });
+  try {
+    const workouts = await fetchWorkoutsInRange(token, start, end);
+    const scored = workouts.filter((w) => w.kilojoule != null);
+    const totalKcal = scored.length
+      ? Math.round(scored.reduce((sum, w) => sum + kilojoulesToKcal(w.kilojoule!), 0))
+      : null;
+    return c.json({
+      totalKcal,
+      workouts: scored.map((w) => ({
+        sportName: w.sportName,
+        start: w.start,
+        end: w.end,
+        kcal: Math.round(kilojoulesToKcal(w.kilojoule!)),
+        strain: w.strain,
+        avgHeartRate: w.avgHeartRate,
+      })),
+    });
+  } catch (err) {
+    console.error('whoop day-burn failed:', err);
+    return c.json({ totalKcal: null, workouts: [] });
+  }
+});
+
+/**
+ * A compact recovery/strain/sleep snapshot for the coach's context — see
+ * coachSystemPrompt's WHOOP guidance for how it's meant to be used. Every
+ * field is independently best-effort: WHOOP can score recovery without
+ * having scored today's cycle yet, and vice versa.
+ */
+app.get('/api/whoop/summary', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ connected: false });
+  const token = await getValidAccessToken(ref);
+  if (!token) return c.json({ connected: false });
+  const [recovery, sleep, todayStrain] = await Promise.all([
+    fetchLatestRecovery(token).catch(() => null),
+    fetchLatestSleep(token).catch(() => null),
+    fetchTodayStrain(token).catch(() => null),
+  ]);
+  return c.json({
+    connected: true,
+    recoveryScore: recovery?.recoveryScore ?? null,
+    hrvMs: recovery?.hrvMs ?? null,
+    restingHr: recovery?.restingHr ?? null,
+    sleepPerformancePercent: sleep?.performancePercent ?? null,
+    sleepHours: sleep?.hours ?? null,
+    todayStrain: todayStrain ?? null,
+  });
 });
 
 // ── Admin ─────────────────────────────────────────────────────────────────

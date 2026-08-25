@@ -1,6 +1,7 @@
+import { fetchWhoopSummary } from './api';
 import { exerciseName, findExercise } from './exercises';
 import {
-  burnedForDay,
+  actualBurnedForDay,
   streakDays,
   totalsForDay,
   useAppStore,
@@ -37,6 +38,15 @@ export interface CoachContext {
   }[];
   streakDays: number;
   workoutStreakDays: number;
+  /** Only present when WHOOP is connected and has scored data — see server/src/prompts.ts for how the coach is told to read these. */
+  whoop?: {
+    recoveryScore?: number | null;
+    hrvMs?: number | null;
+    restingHr?: number | null;
+    sleepPerformancePercent?: number | null;
+    sleepHours?: number | null;
+    todayStrain?: number | null;
+  };
 }
 
 function ymd(d: Date): string {
@@ -44,7 +54,7 @@ function ymd(d: Date): string {
 }
 
 /** Build the snapshot for the last `dayCount` days (today first). */
-export function buildCoachContext(lang: Language, dayCount = 7): CoachContext {
+export async function buildCoachContext(lang: Language, dayCount = 7): Promise<CoachContext> {
   const s = useAppStore.getState();
   const days: CoachContext['days'] = [];
 
@@ -71,11 +81,29 @@ export function buildCoachContext(lang: Language, dayCount = 7): CoachContext {
       proteinG: Math.round(totals.proteinG),
       carbsG: Math.round(totals.carbsG),
       fatG: Math.round(totals.fatG),
-      burned: burnedForDay(s.workouts, d),
+      burned: actualBurnedForDay(s.workouts, s.whoopBurnByDay, d),
       waterMl: waterForDay(s.water, d),
       workouts: names.slice(0, 8),
     });
   }
+
+  // A no-op single query when there's no connection — cheap enough to just
+  // always ask rather than caching "are we connected" separately.
+  const whoopSummary = await fetchWhoopSummary();
+  const whoop =
+    whoopSummary?.connected &&
+    (whoopSummary.recoveryScore != null ||
+      whoopSummary.sleepPerformancePercent != null ||
+      whoopSummary.todayStrain != null)
+      ? {
+          recoveryScore: whoopSummary.recoveryScore,
+          hrvMs: whoopSummary.hrvMs,
+          restingHr: whoopSummary.restingHr,
+          sleepPerformancePercent: whoopSummary.sleepPerformancePercent,
+          sleepHours: whoopSummary.sleepHours,
+          todayStrain: whoopSummary.todayStrain,
+        }
+      : undefined;
 
   return {
     profile: s.profile
@@ -99,5 +127,6 @@ export function buildCoachContext(lang: Language, dayCount = 7): CoachContext {
     days,
     streakDays: streakDays(s.meals),
     workoutStreakDays: workoutStreakDays(s.workouts),
+    whoop,
   };
 }

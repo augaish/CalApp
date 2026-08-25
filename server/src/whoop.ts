@@ -1,14 +1,17 @@
 /**
- * WHOOP OAuth 2.0 — connecting a user's wearable so recovery/strain/sleep can
- * eventually inform the coach. This module only handles the auth round trip
- * (authorize URL, code-for-token exchange, refresh); pulling actual workout
- * data is a separate, later step once a connection exists.
+ * WHOOP OAuth 2.0 and the v2 data endpoints — connecting a user's wearable so
+ * recovery/strain/sleep can inform calorie-burn accuracy and the coach.
  *
- * Endpoints confirmed via developer.whoop.com/docs/developing/oauth — WHOOP
- * uses a single URL for both the initial token exchange and refreshes.
+ * Endpoints confirmed via developer.whoop.com (OAuth, workout, cycle,
+ * recovery, sleep, pagination docs) — WHOOP uses a single URL for both the
+ * initial token exchange and refreshes, and every collection endpoint shares
+ * the same { records, next_token } shape.
  */
+import { getWhoopConnection, setWhoopConnection } from './db.js';
+
 const AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth';
 const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
+const API_BASE = 'https://api.prod.whoop.com/developer/v2';
 
 /** Kept to the data the coach could plausibly use — see the playbook's wearable-sync entry. */
 export const WHOOP_SCOPES = ['read:cycles', 'read:workout', 'read:recovery', 'read:sleep'];
@@ -97,4 +100,152 @@ export async function refreshWhoopToken(refreshToken: string): Promise<WhoopToke
     }),
   });
   return parseTokenResponse(res);
+}
+
+/**
+ * A usable access token for `ref`, refreshing and persisting a new one first
+ * if the stored one is at or near expiry. Returns null when there's no WHOOP
+ * connection at all — every caller treats that as "nothing to add", not an
+ * error, since WHOOP is optional.
+ */
+export async function getValidAccessToken(ref: string): Promise<string | null> {
+  const conn = await getWhoopConnection(ref);
+  if (!conn) return null;
+  // A minute of slack so a token doesn't expire mid-request.
+  if (new Date(conn.expiresAt).getTime() > Date.now() + 60_000) return conn.accessToken;
+  try {
+    const refreshed = await refreshWhoopToken(conn.refreshToken);
+    await setWhoopConnection(ref, refreshed);
+    return refreshed.accessToken;
+  } catch (err) {
+    console.error('whoop token refresh failed:', err);
+    return null;
+  }
+}
+
+async function whoopGet<T>(accessToken: string, path: string): Promise<T | null> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  if (!res.ok) {
+    console.error(`whoop GET ${path} failed:`, res.status, await res.text().catch(() => ''));
+    return null;
+  }
+  return (await res.json()) as T;
+}
+
+export interface WhoopWorkout {
+  start: string;
+  end: string;
+  sportName: string;
+  kilojoule: number | null;
+  strain: number | null;
+  avgHeartRate: number | null;
+  maxHeartRate: number | null;
+}
+
+interface WhoopWorkoutRaw {
+  start: string;
+  end: string;
+  sport_name: string;
+  score_state: string;
+  score?: {
+    kilojoule?: number;
+    strain?: number;
+    average_heart_rate?: number;
+    max_heart_rate?: number;
+  };
+}
+
+function toWorkout(raw: WhoopWorkoutRaw): WhoopWorkout {
+  const scored = raw.score_state === 'SCORED';
+  return {
+    start: raw.start,
+    end: raw.end,
+    sportName: raw.sport_name,
+    kilojoule: scored ? (raw.score?.kilojoule ?? null) : null,
+    strain: scored ? (raw.score?.strain ?? null) : null,
+    avgHeartRate: scored ? (raw.score?.average_heart_rate ?? null) : null,
+    maxHeartRate: scored ? (raw.score?.max_heart_rate ?? null) : null,
+  };
+}
+
+/**
+ * Workouts overlapping [start, end). One page (25) is always enough for a
+ * single day's gym session(s) — no need to paginate further for this.
+ */
+export async function fetchWorkoutsInRange(
+  accessToken: string,
+  start: string,
+  end: string,
+): Promise<WhoopWorkout[]> {
+  const params = new URLSearchParams({ start, end, limit: '25' });
+  const data = await whoopGet<{ records: WhoopWorkoutRaw[] }>(
+    accessToken,
+    `/activity/workout?${params.toString()}`,
+  );
+  return (data?.records ?? []).map(toWorkout);
+}
+
+export interface WhoopRecovery {
+  recoveryScore: number | null;
+  hrvMs: number | null;
+  restingHr: number | null;
+}
+
+/** Most recent scored recovery, or null if there isn't one yet (e.g. still calibrating). */
+export async function fetchLatestRecovery(accessToken: string): Promise<WhoopRecovery | null> {
+  const data = await whoopGet<{
+    records: { score_state: string; score?: { recovery_score?: number; hrv_rmssd_milli?: number; resting_heart_rate?: number } }[];
+  }>(accessToken, '/recovery?limit=1');
+  const r = data?.records?.[0];
+  if (!r || r.score_state !== 'SCORED') return null;
+  return {
+    recoveryScore: r.score?.recovery_score ?? null,
+    hrvMs: r.score?.hrv_rmssd_milli ?? null,
+    restingHr: r.score?.resting_heart_rate ?? null,
+  };
+}
+
+export interface WhoopSleep {
+  performancePercent: number | null;
+  hours: number | null;
+}
+
+/** Most recent scored sleep (the last main sleep, not a nap). */
+export async function fetchLatestSleep(accessToken: string): Promise<WhoopSleep | null> {
+  const data = await whoopGet<{
+    records: {
+      nap: boolean;
+      score_state: string;
+      score?: { sleep_performance_percentage?: number; stage_summary?: { total_in_bed_time_milli?: number; total_awake_time_milli?: number } };
+    }[];
+  }>(accessToken, '/activity/sleep?limit=5');
+  const r = data?.records?.find((rec) => !rec.nap && rec.score_state === 'SCORED');
+  if (!r) return null;
+  const stage = r.score?.stage_summary;
+  const asleepMs =
+    stage?.total_in_bed_time_milli != null && stage?.total_awake_time_milli != null
+      ? stage.total_in_bed_time_milli - stage.total_awake_time_milli
+      : null;
+  return {
+    performancePercent: r.score?.sleep_performance_percentage ?? null,
+    hours: asleepMs != null ? Math.round((asleepMs / 3_600_000) * 10) / 10 : null,
+  };
+}
+
+/** Strain accumulated so far in the current (still-open) physiological cycle. */
+export async function fetchTodayStrain(accessToken: string): Promise<number | null> {
+  const data = await whoopGet<{ records: { score_state: string; score?: { strain?: number } }[] }>(
+    accessToken,
+    '/cycle?limit=1',
+  );
+  const r = data?.records?.[0];
+  if (!r || r.score_state !== 'SCORED') return null;
+  return r.score?.strain ?? null;
+}
+
+/** 1 kJ ≈ 0.239 kcal — WHOOP reports energy in kilojoules, everywhere else in this app is kcal. */
+export function kilojoulesToKcal(kj: number): number {
+  return kj / 4.184;
 }

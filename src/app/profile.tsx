@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -360,13 +360,19 @@ function WhoopConnectionRow() {
 
   const refresh = () => fetchWhoopStatus().then((s) => setStatus(s?.connected ? 'connected' : 'disconnected'));
 
-  useEffect(() => {
-    let alive = true;
-    fetchWhoopStatus().then((s) => alive && setStatus(s?.connected ? 'connected' : 'disconnected'));
-    return () => {
-      alive = false;
-    };
-  }, []);
+  // The connect button opens a system browser session, so coming back to this
+  // screen — not the openAuthSessionAsync promise resolving — is the one
+  // signal that reliably fires whether the browser closed itself via the
+  // calapp:// redirect or the user just switched back to the app manually.
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      fetchWhoopStatus().then((s) => alive && setStatus(s?.connected ? 'connected' : 'disconnected'));
+      return () => {
+        alive = false;
+      };
+    }, []),
+  );
 
   const connect = async () => {
     if (busy) return;
