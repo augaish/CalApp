@@ -154,6 +154,8 @@ interface WhoopWorkoutRaw {
   end: string;
   sport_name: string;
   score_state: string;
+  /** e.g. "-05:00" — the offset the workout was actually recorded in, not the server's or the request's. */
+  timezone_offset: string;
   score?: {
     kilojoule?: number;
     strain?: number;
@@ -190,6 +192,62 @@ export async function fetchWorkoutsInRange(
     `/activity/workout?${params.toString()}`,
   );
   return (data?.records ?? []).map(toWorkout);
+}
+
+/**
+ * The calendar date (YYYY-MM-DD) a workout falls on in the timezone it was
+ * actually recorded in — a backfill spans many past days and the user may
+ * have traveled or simply live somewhere other than wherever this server
+ * happens to run, so the workout's own `timezone_offset` is the only
+ * trustworthy source for "what day was this," not the server's clock.
+ */
+function localDateOf(startIso: string, timezoneOffset: string): string {
+  const sign = timezoneOffset.startsWith('-') ? -1 : 1;
+  const [hh, mm] = timezoneOffset.replace(/^[+-]/, '').split(':').map(Number);
+  const offsetMs = sign * ((hh || 0) * 60 + (mm || 0)) * 60_000;
+  const local = new Date(new Date(startIso).getTime() + offsetMs);
+  const y = local.getUTCFullYear();
+  const m = String(local.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(local.getUTCDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export interface WhoopHistoryWorkout extends WhoopWorkout {
+  /** The workout's own local calendar date, YYYY-MM-DD — see localDateOf. */
+  localDate: string;
+}
+
+/**
+ * Every workout from the last `sinceDays`, for a one-time (or periodic)
+ * backfill so a WHOOP that already has months of history doesn't start
+ * from a blank slate — see the day-burn endpoint for the single-day
+ * version this reuses the same scoring rules as. Paginates up to 6 pages
+ * (150 workouts) — plenty for months of even twice-daily training, and a
+ * firm cap so one very long history can't turn into an unbounded fetch.
+ */
+export async function fetchWorkoutHistory(
+  accessToken: string,
+  sinceDays: number,
+): Promise<WhoopHistoryWorkout[]> {
+  const start = new Date(Date.now() - sinceDays * 86_400_000).toISOString();
+  const end = new Date().toISOString();
+  const results: WhoopHistoryWorkout[] = [];
+  let nextToken: string | undefined;
+  for (let page = 0; page < 6; page++) {
+    const params = new URLSearchParams({ start, end, limit: '25' });
+    if (nextToken) params.set('nextToken', nextToken);
+    const data = await whoopGet<{ records: WhoopWorkoutRaw[]; next_token?: string }>(
+      accessToken,
+      `/activity/workout?${params.toString()}`,
+    );
+    if (!data) break;
+    for (const r of data.records) {
+      results.push({ ...toWorkout(r), localDate: localDateOf(r.start, r.timezone_offset) });
+    }
+    if (!data.next_token) break;
+    nextToken = data.next_token;
+  }
+  return results;
 }
 
 export interface WhoopRecovery {

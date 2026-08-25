@@ -75,6 +75,8 @@ interface AppState {
   whoopBurnByDay: Record<string, number>;
   /** The individual WHOOP workouts a day's `whoopBurnByDay` total is made of. */
   whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>;
+  /** When the one-time history backfill last actually found data — null means try again on next visit. */
+  whoopBackfilledAt: string | null;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -188,6 +190,7 @@ interface AppState {
   setWhoopDayBurn: (day: Date, kcal: number | null) => void;
   /** Set (or, with [], clear) the individual WHOOP workouts a day is made of. */
   setWhoopDayWorkouts: (day: Date, workouts: WhoopDayWorkout[]) => void;
+  setWhoopBackfilledAt: (iso: string | null) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
   setRemindMeals: (on: boolean) => void;
@@ -252,6 +255,7 @@ export const useAppStore = create<AppState>()(
       dayOrder: {},
       whoopBurnByDay: {},
       whoopWorkoutsByDay: {},
+      whoopBackfilledAt: null,
       workouts: [],
       water: [],
       weights: [],
@@ -506,6 +510,7 @@ export const useAppStore = create<AppState>()(
           }
           return { whoopWorkoutsByDay: { ...s.whoopWorkoutsByDay, [key]: workouts } };
         }),
+      setWhoopBackfilledAt: (iso) => set({ whoopBackfilledAt: iso }),
       reorderSchedule: (weekday, exerciseIds) =>
         set((s) => {
           const cur = s.schedule[weekday];
@@ -697,6 +702,7 @@ export const useAppStore = create<AppState>()(
           dayOrder: {},
           whoopBurnByDay: {},
           whoopWorkoutsByDay: {},
+          whoopBackfilledAt: null,
           language: null,
           profile: null,
           targets: null,
@@ -736,6 +742,7 @@ export const useAppStore = create<AppState>()(
         dayOrder,
         whoopBurnByDay,
         whoopWorkoutsByDay,
+        whoopBackfilledAt,
         workouts,
         water,
         weights,
@@ -761,6 +768,7 @@ export const useAppStore = create<AppState>()(
         dayOrder,
         whoopBurnByDay,
         whoopWorkoutsByDay,
+        whoopBackfilledAt,
         workouts,
         water,
         weights,

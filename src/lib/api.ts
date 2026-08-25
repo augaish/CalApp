@@ -261,6 +261,29 @@ export async function fetchWhoopDayBurn(startIso: string, endIso: string): Promi
   }
 }
 
+export interface WhoopHistoryWorkout extends WhoopDayWorkout {
+  /** The workout's own local calendar date (YYYY-MM-DD), for grouping into day buckets. */
+  localDate: string;
+}
+
+/**
+ * Every WHOOP workout from the last `days` — a one-time backfill so a WHOOP
+ * with months of existing history doesn't sit unused just because it was
+ * connected today. Empty on any failure, including "not connected", so the
+ * caller can treat "nothing came back" as "try again another time" rather
+ * than crashing.
+ */
+export async function fetchWhoopHistory(days = 60): Promise<WhoopHistoryWorkout[]> {
+  try {
+    const res = await fetch(`${API_URL}/api/whoop/history?days=${days}`, { headers: authHeaders() });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { workouts: WhoopHistoryWorkout[] };
+    return data.workouts;
+  } catch {
+    return [];
+  }
+}
+
 export interface WhoopSummary {
   connected: boolean;
   recoveryScore?: number | null;

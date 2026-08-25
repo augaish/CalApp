@@ -51,6 +51,7 @@ import {
   fetchLatestRecovery,
   fetchLatestSleep,
   fetchTodayStrain,
+  fetchWorkoutHistory,
   fetchWorkoutsInRange,
   getValidAccessToken,
   kilojoulesToKcal,
@@ -901,6 +902,39 @@ app.get('/api/whoop/day-burn', async (c) => {
   } catch (err) {
     console.error('whoop day-burn failed:', err);
     return c.json({ totalKcal: null, workouts: [] });
+  }
+});
+
+/**
+ * One-time (or periodic) backfill: every WHOOP workout from the last
+ * `days`, each tagged with the local calendar date it happened on (using
+ * the workout's own recorded timezone, not a guess). The app groups these
+ * into its own day buckets — a connection made after months of WHOOP
+ * history shouldn't start the burn calibration from a blank slate.
+ */
+app.get('/api/whoop/history', async (c) => {
+  const ref = await callerRef(c);
+  const days = Math.min(180, Math.max(1, Number(c.req.query('days') ?? 60) || 60));
+  if (!ref) return c.json({ workouts: [] });
+  const token = await getValidAccessToken(ref);
+  if (!token) return c.json({ workouts: [] });
+  try {
+    const history = await fetchWorkoutHistory(token, days);
+    const scored = history.filter((w) => w.kilojoule != null);
+    return c.json({
+      workouts: scored.map((w) => ({
+        localDate: w.localDate,
+        sportName: w.sportName,
+        start: w.start,
+        end: w.end,
+        kcal: Math.round(kilojoulesToKcal(w.kilojoule!)),
+        strain: w.strain,
+        avgHeartRate: w.avgHeartRate,
+      })),
+    });
+  } catch (err) {
+    console.error('whoop history failed:', err);
+    return c.json({ workouts: [] });
   }
 });
 

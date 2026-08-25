@@ -9,7 +9,7 @@ import Sortable from 'react-native-sortables';
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { fetchWhoopDayBurn } from '@/lib/api';
+import { fetchWhoopDayBurn, fetchWhoopHistory } from '@/lib/api';
 import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
@@ -117,6 +117,8 @@ export default function Training() {
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const setWhoopDayWorkouts = useAppStore((s) => s.setWhoopDayWorkouts);
+  const whoopBackfilledAt = useAppStore((s) => s.whoopBackfilledAt);
+  const setWhoopBackfilledAt = useAppStore((s) => s.setWhoopBackfilledAt);
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const copyDayTo = useAppStore((s) => s.copyDayTo);
@@ -181,6 +183,40 @@ export default function Training() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIsToday, loggedTodayCount]);
+
+  // One-time (then daily-refreshed) backfill: someone connecting WHOOP after
+  // months of using it shouldn't start the burn calibration from nothing.
+  // Only a run that actually finds workouts marks it done — "not connected
+  // yet" costs the server a single fast lookup, so it's fine to keep retrying
+  // that for free until a connection actually exists.
+  useEffect(() => {
+    const last = whoopBackfilledAt ? new Date(whoopBackfilledAt).getTime() : 0;
+    if (Date.now() - last < 24 * 3600_000) return;
+    let alive = true;
+    fetchWhoopHistory(60).then((entries) => {
+      if (!alive || entries.length === 0) return;
+      const byDay = new Map<string, typeof entries>();
+      for (const entry of entries) {
+        const list = byDay.get(entry.localDate) ?? [];
+        list.push(entry);
+        byDay.set(entry.localDate, list);
+      }
+      for (const [localDate, dayEntries] of byDay) {
+        const [y, m, d] = localDate.split('-').map(Number);
+        const day = new Date(y, m - 1, d);
+        setWhoopDayBurn(day, dayEntries.reduce((sum, e) => sum + e.kcal, 0));
+        setWhoopDayWorkouts(
+          day,
+          dayEntries.map(({ localDate: _localDate, ...w }) => w),
+        );
+      }
+      setWhoopBackfilledAt(new Date().toISOString());
+    });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Past days start collapsed — history is for looking something up, not for
   // scrolling past on the way to today.
