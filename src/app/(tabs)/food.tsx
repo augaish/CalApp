@@ -9,6 +9,7 @@ import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useViewDay } from '@/lib/day';
 import { shareMeals } from '@/lib/meal-share';
+import { usePending } from '@/lib/pending';
 import { isSameDay, mealCalories, totalsForDay, useAppStore } from '@/lib/store';
 import type { LoggedMeal, MealType } from '@/lib/types';
 
@@ -23,6 +24,7 @@ export default function Food() {
   const meals = useAppStore((s) => s.meals);
   const targets = useAppStore((s) => s.targets);
   const removeMeal = useAppStore((s) => s.removeMeal);
+  const updateMeal = useAppStore((s) => s.updateMeal);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
@@ -50,6 +52,26 @@ export default function Food() {
     Alert.alert(t('home.deleteMealConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => removeMeal(id) },
+    ]);
+
+  /**
+   * A scan that finds several dishes (e.g. rice and chicken) still saves as
+   * one LoggedMeal with several items — meal-edit already lists them
+   * separately, so this list should too rather than collapsing them into one
+   * joined-name row. Deleting the last remaining item deletes the meal.
+   */
+  const confirmDeleteItem = (meal: LoggedMeal, itemIndex: number) =>
+    Alert.alert(t('home.deleteMealConfirm'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.delete'),
+        style: 'destructive',
+        onPress: () => {
+          const items = meal.items.filter((_, i) => i !== itemIndex);
+          if (items.length === 0) removeMeal(meal.id);
+          else updateMeal(meal.id, { items });
+        },
+      },
     ]);
 
   return (
@@ -114,7 +136,10 @@ export default function Food() {
                 </Text>
               )}
               <Pressable
-                onPress={() => router.push('/add-menu?scope=food')}
+                onPress={() => {
+                  usePending.getState().setMealTypeHint(type);
+                  router.push('/add-menu?scope=food');
+                }}
                 hitSlop={8}
                 style={({ pressed }) => [
                   styles.sectionAdd,
@@ -125,39 +150,43 @@ export default function Food() {
                 <Ionicons name="add" size={18} color={theme.primary} />
               </Pressable>
             </View>
-            {sectionMeals.map((meal) => (
-              <View key={meal.id} style={styles.mealRow}>
-                <Pressable
-                  onPress={() => router.push(`/meal-edit?id=${encodeURIComponent(meal.id)}`)}
-                  style={({ pressed }) => [styles.mealTap, pressed && { opacity: 0.6 }]}
-                >
-                  <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
-                    <Ionicons name="restaurant" size={16} color={theme.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
-                      {meal.items.map((i) => i.name).join(' · ')}
+            {sectionMeals.map((meal) =>
+              meal.items.map((item, itemIndex) => (
+                <View key={`${meal.id}-${itemIndex}`} style={styles.mealRow}>
+                  <Pressable
+                    onPress={() => router.push(`/meal-edit?id=${encodeURIComponent(meal.id)}`)}
+                    style={({ pressed }) => [styles.mealTap, pressed && { opacity: 0.6 }]}
+                  >
+                    <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>
+                      <Ionicons name="restaurant" size={16} color={theme.primary} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.mealName, { color: theme.text }]} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                        {new Date(meal.at).toLocaleTimeString(locale, {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
+                    </View>
+                    <Text style={[styles.mealKcal, { color: theme.primary }]}>
+                      {Math.round(item.calories)}
                     </Text>
-                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                      {new Date(meal.at).toLocaleTimeString(locale, {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-                  </View>
-                  <Text style={[styles.mealKcal, { color: theme.primary }]}>
-                    {Math.round(mealCalories(meal))}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => confirmDelete(meal.id)}
-                  hitSlop={8}
-                  style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
-                >
-                  <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
-                </Pressable>
-              </View>
-            ))}
+                  </Pressable>
+                  <Pressable
+                    onPress={() =>
+                      meal.items.length > 1 ? confirmDeleteItem(meal, itemIndex) : confirmDelete(meal.id)
+                    }
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
+                  >
+                    <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                  </Pressable>
+                </View>
+              )),
+            )}
           </Card>
         );
       })}

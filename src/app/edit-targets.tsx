@@ -8,6 +8,7 @@ import { Button, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
+import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
 import { atwater, carbsForCalories, dailyTargets } from '@/lib/tdee';
 
@@ -76,7 +77,7 @@ export default function EditTargets() {
       <Field
         label={t('onboarding.dailyCalories')}
         value={calories}
-        onChangeText={setCalories}
+        onChangeText={(t) => setCalories(normalizeDigits(t))}
         keyboardType="number-pad"
         maxLength={5}
         suffix={t('common.kcal')}
@@ -86,7 +87,7 @@ export default function EditTargets() {
           <Field
             label={t('onboarding.protein')}
             value={protein}
-            onChangeText={setProtein}
+            onChangeText={(t) => setProtein(normalizeDigits(t))}
             keyboardType="number-pad"
             maxLength={4}
             suffix={t('common.grams')}
@@ -96,7 +97,7 @@ export default function EditTargets() {
           <Field
             label={t('onboarding.carbs')}
             value={carbs}
-            onChangeText={setCarbs}
+            onChangeText={(t) => setCarbs(normalizeDigits(t))}
             keyboardType="number-pad"
             maxLength={4}
             suffix={t('common.grams')}
@@ -106,7 +107,7 @@ export default function EditTargets() {
           <Field
             label={t('onboarding.fat')}
             value={fat}
-            onChangeText={setFat}
+            onChangeText={(t) => setFat(normalizeDigits(t))}
             keyboardType="number-pad"
             maxLength={4}
             suffix={t('common.grams')}

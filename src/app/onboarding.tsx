@@ -8,6 +8,7 @@ import { Button, Card, Field, OptionRow, Screen, StepDots, Subtitle, Title } fro
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
+import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
 import { dailyTargets } from '@/lib/tdee';
 import type { ActivityLevel, Goal, Language, Profile, Sex } from '@/lib/types';
@@ -136,9 +137,9 @@ export default function Onboarding() {
             <OptionRow emoji="👩" label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
           </View>
         </View>
-        <Field label={t('onboarding.age')} value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} />
-        <Field label={t('onboarding.height')} value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
-        <Field label={t('onboarding.weight')} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={5} suffix="kg" />
+        <Field label={t('onboarding.age')} value={age} onChangeText={(v) => setAge(normalizeDigits(v))} keyboardType="number-pad" maxLength={3} />
+        <Field label={t('onboarding.height')} value={height} onChangeText={(v) => setHeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
+        <Field label={t('onboarding.weight')} value={weight} onChangeText={(v) => setWeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="kg" />
       </Screen>
     );
   }

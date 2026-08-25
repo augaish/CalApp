@@ -17,6 +17,7 @@ import { Button } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
+import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
 
 const QUICK_ML = [250, 500, 750];
@@ -79,7 +80,7 @@ export default function WaterSheet() {
           <View style={styles.customRow}>
             <TextInput
               value={custom}
-              onChangeText={setCustom}
+              onChangeText={(v) => setCustom(normalizeDigits(v))}
               keyboardType="number-pad"
               maxLength={4}
               placeholder="330"

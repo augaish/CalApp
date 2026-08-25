@@ -6,6 +6,7 @@ import { Alert, StyleSheet, Text, View } from 'react-native';
 import { Button, Field, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
 import type { ActivityLevel, Goal, Sex } from '@/lib/types';
 
@@ -49,9 +50,9 @@ export default function EditProfile() {
           <OptionRow label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
         </View>
       </View>
-      <Field label={t('onboarding.age')} value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} />
-      <Field label={t('onboarding.height')} value={height} onChangeText={setHeight} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
-      <Field label={t('onboarding.weight')} value={weight} onChangeText={setWeight} keyboardType="decimal-pad" maxLength={5} suffix="kg" />
+      <Field label={t('onboarding.age')} value={age} onChangeText={(v) => setAge(normalizeDigits(v))} keyboardType="number-pad" maxLength={3} />
+      <Field label={t('onboarding.height')} value={height} onChangeText={(v) => setHeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
+      <Field label={t('onboarding.weight')} value={weight} onChangeText={(v) => setWeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="kg" />
 
       <Text style={[styles.heading, { color: theme.text }]}>{t('onboarding.activityTitle')}</Text>
       {ACTIVITY_LEVELS.map((level) => (

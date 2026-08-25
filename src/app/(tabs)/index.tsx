@@ -23,6 +23,7 @@ import { Button, Field } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { timestampFor, useViewDay } from '@/lib/day';
+import { normalizeDigits } from '@/lib/numbers';
 import {
   burnedForDay,
   isSameDay,
@@ -432,7 +433,7 @@ export default function Overview() {
               <Field
                 label={t('progress.logWeight')}
                 value={kg}
-                onChangeText={setKg}
+                onChangeText={(t) => setKg(normalizeDigits(t))}
                 keyboardType="decimal-pad"
                 maxLength={5}
                 suffix={t('progress.kg')}

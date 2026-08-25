@@ -12,6 +12,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { pastFoods, suggestFoods } from '@/lib/food-history';
+import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
 import { mealTypeForNow, useAppStore } from '@/lib/store';
 import type { FoodItem, MealType } from '@/lib/types';
@@ -32,7 +33,9 @@ export default function FoodEdit() {
   const [protein, setProtein] = useState('');
   const [carbs, setCarbs] = useState('');
   const [fat, setFat] = useState('');
-  const [mealType, setMealType] = useState<MealType>(mealTypeForNow());
+  const [mealType, setMealType] = useState<MealType>(
+    () => usePending.getState().consumeMealTypeHint() ?? mealTypeForNow(),
+  );
   // Set once a suggestion is taken, so per-100g scaling survives on packaged
   // foods that were originally added by barcode.
   const [basePer100, setBasePer100] = useState<FoodItem['basePer100']>(undefined);
@@ -155,20 +158,20 @@ export default function FoodEdit() {
       <Field
         label={t('foodEdit.calories')}
         value={calories}
-        onChangeText={setCalories}
+        onChangeText={(v) => setCalories(normalizeDigits(v))}
         keyboardType="number-pad"
         maxLength={5}
         suffix={t('common.kcal')}
       />
       <View style={styles.row}>
         <View style={styles.flex}>
-          <Field label={t('home.protein')} value={protein} onChangeText={setProtein} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
+          <Field label={t('home.protein')} value={protein} onChangeText={(v) => setProtein(normalizeDigits(v))} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
         </View>
         <View style={styles.flex}>
-          <Field label={t('home.carbs')} value={carbs} onChangeText={setCarbs} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
+          <Field label={t('home.carbs')} value={carbs} onChangeText={(v) => setCarbs(normalizeDigits(v))} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
         </View>
         <View style={styles.flex}>
-          <Field label={t('home.fat')} value={fat} onChangeText={setFat} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
+          <Field label={t('home.fat')} value={fat} onChangeText={(v) => setFat(normalizeDigits(v))} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
         </View>
       </View>
 

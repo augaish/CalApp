@@ -20,6 +20,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { sendEmailCode, syncAuthIdentity, verifyEmailCode } from '@/lib/auth';
 import { appleSignInAvailable, signInWithApple } from '@/lib/auth-apple';
+import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
 
 type Step = 'choose' | 'email' | 'code';
@@ -186,7 +187,7 @@ export default function Login() {
               <Text style={styles.note}>{t('auth.codeSent', { email })}</Text>
               <TextInput
                 value={code}
-                onChangeText={setCode}
+                onChangeText={(v) => setCode(normalizeDigits(v))}
                 placeholder="123456"
                 placeholderTextColor="rgba(255,255,255,0.6)"
                 keyboardType="number-pad"

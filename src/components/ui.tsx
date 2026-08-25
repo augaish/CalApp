@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { normalizeDigits } from '@/lib/numbers';
 
 /**
  * Screen shell. `footer` renders pinned to the bottom (thumb zone) above the
@@ -345,7 +346,7 @@ export function Stepper({
               onChange(Number.isFinite(n) ? clamp(n) : 0);
             }}
             onChangeText={(txt) => {
-              const cleaned = txt.replace(decimals > 0 ? /[^0-9.]/g : /[^0-9]/g, '');
+              const cleaned = normalizeDigits(txt).replace(decimals > 0 ? /[^0-9.]/g : /[^0-9]/g, '');
               setText(cleaned);
               const n = decimals > 0 ? parseFloat(cleaned) : parseInt(cleaned, 10);
               if (Number.isFinite(n)) onChange(clamp(n));

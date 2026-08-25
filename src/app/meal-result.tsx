@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
 import { mealTypeForNow, useAppStore } from '@/lib/store';
 import type { FoodItem, MealType } from '@/lib/types';
@@ -52,7 +53,9 @@ export default function MealResult() {
           },
     ),
   );
-  const [mealType, setMealType] = useState<MealType>(mealTypeForNow());
+  const [mealType, setMealType] = useState<MealType>(
+    () => usePending.getState().consumeMealTypeHint() ?? mealTypeForNow(),
+  );
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -260,7 +263,7 @@ export default function MealResult() {
                 defaultValue={String(Math.round(item.gramsEaten ?? 100))}
                 keyboardType="number-pad"
                 maxLength={4}
-                onChangeText={(text) => setGrams(index, parseInt(text, 10) || 0)}
+                onChangeText={(text) => setGrams(index, parseInt(normalizeDigits(text), 10) || 0)}
                 style={[
                   styles.gramsInput,
                   { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },
@@ -322,7 +325,7 @@ function NumBox({
         defaultValue={String(Math.round(value))}
         keyboardType="number-pad"
         maxLength={4}
-        onChangeText={(text) => onChange(parseInt(text, 10) || 0)}
+        onChangeText={(text) => onChange(parseInt(normalizeDigits(text), 10) || 0)}
         style={[
           styles.numInput,
           { color: theme.text, borderColor: theme.border, backgroundColor: theme.background },

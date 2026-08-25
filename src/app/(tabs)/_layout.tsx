@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 
 import { useTheme } from '@/hooks/use-theme';
+import { usePending } from '@/lib/pending';
 import { syncReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
 
@@ -89,7 +90,12 @@ export default function TabLayout() {
           tabBarButton: () => (
             <View style={styles.fabWrap}>
               <Pressable
-                onPress={() => router.push('/add-menu')}
+                onPress={() => {
+                  // A stale hint from a Food-tab "+" the user backed out of
+                  // must not silently redirect this unrelated, general add.
+                  usePending.getState().setMealTypeHint(null);
+                  router.push('/add-menu');
+                }}
                 style={({ pressed }) => [
                   styles.fab,
                   { backgroundColor: theme.primary },
