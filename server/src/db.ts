@@ -104,6 +104,104 @@ export async function initDb(): Promise<void> {
   // What the row was last seen on — set from the launch ping, so it covers
   // guests too, not only signed-in accounts.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS device TEXT`);
+  // A user's WHOOP connection, one row per account. Kept separate from
+  // app_users (rather than more ALTER-ADD columns) since disconnecting is a
+  // single DELETE and the row simply doesn't exist for anyone who hasn't
+  // connected — no nullable columns to thread through every user query.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS whoop_connections (
+      ref           TEXT PRIMARY KEY,
+      access_token  TEXT NOT NULL,
+      refresh_token TEXT NOT NULL,
+      expires_at    TIMESTAMPTZ NOT NULL,
+      scope         TEXT NOT NULL,
+      connected_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  // One-time CSRF token for the OAuth redirect round trip: the authorize step
+  // writes ref-by-state here, the callback reads and deletes it, so a forged
+  // callback with a guessed or reused state matches no one.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS whoop_oauth_state (
+      state      TEXT PRIMARY KEY,
+      ref        TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  // Abandoned attempts (closed the browser, never finished) are the only
+  // thing that accumulates here — sweep anything stale on every boot.
+  await pool.query(`DELETE FROM whoop_oauth_state WHERE created_at < now() - INTERVAL '1 day'`);
+}
+
+export interface WhoopConnection {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: string;
+  scope: string;
+  connectedAt: string;
+}
+
+/** Start (or restart) an OAuth attempt: remember which user `state` belongs to. */
+export async function saveWhoopOAuthState(state: string, ref: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(`INSERT INTO whoop_oauth_state (state, ref) VALUES ($1, $2)`, [state, ref]);
+}
+
+/**
+ * Redeem a `state` value from the callback. One-time use — deletes it as it
+ * reads, so a replayed callback (or a guessed state) matches nothing the
+ * second time. Anything older than 10 minutes is treated as expired; the
+ * user closed the browser without finishing, not a slow legitimate flow.
+ */
+export async function consumeWhoopOAuthState(state: string): Promise<string | null> {
+  if (!pool) return null;
+  const res = await pool.query(
+    `DELETE FROM whoop_oauth_state
+     WHERE state = $1 AND created_at > now() - INTERVAL '10 minutes'
+     RETURNING ref`,
+    [state],
+  );
+  return res.rows[0]?.ref ?? null;
+}
+
+export async function setWhoopConnection(
+  ref: string,
+  tokens: { accessToken: string; refreshToken: string; expiresAt: Date; scope: string },
+): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO whoop_connections (ref, access_token, refresh_token, expires_at, scope)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (ref) DO UPDATE SET
+       access_token = EXCLUDED.access_token,
+       refresh_token = EXCLUDED.refresh_token,
+       expires_at = EXCLUDED.expires_at,
+       scope = EXCLUDED.scope`,
+    [ref, tokens.accessToken, tokens.refreshToken, tokens.expiresAt.toISOString(), tokens.scope],
+  );
+}
+
+export async function getWhoopConnection(ref: string): Promise<WhoopConnection | null> {
+  if (!pool) return null;
+  const res = await pool.query(
+    `SELECT access_token, refresh_token, expires_at, scope, connected_at
+       FROM whoop_connections WHERE ref = $1`,
+    [ref],
+  );
+  const r = res.rows[0];
+  if (!r) return null;
+  return {
+    accessToken: r.access_token,
+    refreshToken: r.refresh_token,
+    expiresAt: new Date(r.expires_at).toISOString(),
+    scope: r.scope,
+    connectedAt: new Date(r.connected_at).toISOString(),
+  };
+}
+
+export async function deleteWhoopConnection(ref: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(`DELETE FROM whoop_connections WHERE ref = $1`, [ref]);
 }
 
 /**

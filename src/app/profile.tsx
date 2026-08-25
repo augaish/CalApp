@@ -2,6 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -9,9 +11,10 @@ import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { buildExport, deleteAccount } from '@/lib/account';
-import { SERVER_URL } from '@/lib/api';
+import { disconnectWhoop, fetchWhoopStatus, SERVER_URL, whoopAuthorizeUrl } from '@/lib/api';
 import { signOutAuth } from '@/lib/auth';
 import { useEntitlement } from '@/lib/entitlement';
+import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { syncReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
@@ -249,7 +252,7 @@ export default function Profile() {
       <Card>
         <ConnectionRow icon="watch-outline" label={t('profile.appleHealth')} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <ConnectionRow icon="fitness-outline" label={t('profile.whoop')} />
+        <WhoopConnectionRow />
       </Card>
 
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.about')}</Text>
@@ -340,6 +343,82 @@ function ConnectionRow({
         </Text>
       </View>
     </View>
+  );
+}
+
+/**
+ * The other row in this card (ConnectionRow) is still a "coming soon"
+ * placeholder — Apple Health needs a native HealthKit module this app
+ * doesn't have yet. WHOOP only needs an OAuth round trip through a browser,
+ * so it gets a real, working row instead.
+ */
+function WhoopConnectionRow() {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const [status, setStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => fetchWhoopStatus().then((s) => setStatus(s?.connected ? 'connected' : 'disconnected'));
+
+  useEffect(() => {
+    let alive = true;
+    fetchWhoopStatus().then((s) => alive && setStatus(s?.connected ? 'connected' : 'disconnected'));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const connect = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(whoopAuthorizeUrl(), 'calapp://whoop-callback');
+      if (result.type === 'success' && result.url.includes('status=success')) {
+        successHaptic();
+      }
+    } finally {
+      setBusy(false);
+      await refresh();
+    }
+  };
+
+  const confirmDisconnect = () => {
+    Alert.alert(t('profile.whoopDisconnectConfirm'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('common.disconnect'),
+        style: 'destructive',
+        onPress: async () => {
+          setBusy(true);
+          const ok = await disconnectWhoop();
+          setBusy(false);
+          if (ok) {
+            lightHaptic();
+            setStatus('disconnected');
+          }
+        },
+      },
+    ]);
+  };
+
+  return (
+    <Pressable
+      onPress={status === 'connected' ? confirmDisconnect : connect}
+      disabled={busy || status === 'loading'}
+      style={({ pressed }) => [styles.connRow, pressed && { opacity: 0.6 }]}
+    >
+      <Ionicons name="fitness-outline" size={22} color={theme.text} />
+      <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>{t('profile.whoop')}</Text>
+      <View style={[styles.soonBadge, { backgroundColor: theme.cardSubtle }]}>
+        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
+          {status === 'loading'
+            ? t('common.loading')
+            : status === 'connected'
+              ? t('profile.whoopConnected')
+              : t('profile.connect')}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 

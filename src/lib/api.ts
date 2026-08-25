@@ -194,6 +194,45 @@ export async function fetchEntitlement(): Promise<Entitlement | null> {
   }
 }
 
+export interface WhoopStatus {
+  connected: boolean;
+  scope?: string;
+  connectedAt?: string;
+}
+
+/**
+ * URL to open in a system browser session (see profile.tsx) to start the
+ * WHOOP OAuth flow. Not a fetch — it's a full-page navigation the user's
+ * browser follows to WHOOP's own consent screen — so the caller ref travels
+ * as a query param rather than the usual x-calgym-user header.
+ */
+export function whoopAuthorizeUrl(): string {
+  const ref = installId ?? useAppStore.getState().ensureInstallId();
+  return `${API_URL}/api/whoop/authorize?ref=${encodeURIComponent(ref)}`;
+}
+
+export async function fetchWhoopStatus(): Promise<WhoopStatus | null> {
+  try {
+    const res = await fetch(`${API_URL}/api/whoop/status`, { headers: authHeaders() });
+    if (!res.ok) return null;
+    return (await res.json()) as WhoopStatus;
+  } catch {
+    return null;
+  }
+}
+
+export async function disconnectWhoop(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/whoop/disconnect`, {
+      method: 'POST',
+      headers: authHeaders(),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function analyzeMeal(
   imageBase64: string,
   language: Language,

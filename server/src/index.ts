@@ -12,23 +12,28 @@ import {
   canonicalKey,
   cacheEnabled,
   claimBillingEvent,
+  consumeWhoopOAuthState,
   createShareLink,
   deleteUser,
+  deleteWhoopConnection,
   getCachedEquipment,
   getOrCreateUser,
   getSetting,
   getUsageKind,
+  getWhoopConnection,
   initDb,
   linkRefs,
   listUsers,
   markBillingEventApplied,
   readShareLink,
   resolveRef,
+  saveWhoopOAuthState,
   setCachedEquipment,
   setSetting,
   setUserDevice,
   setUserEmail,
   setUserPlan,
+  setWhoopConnection,
 } from './db.js';
 import {
   citationDomains,
@@ -40,6 +45,7 @@ import {
   type CoachSchedulePlan,
   type MealAnalysis,
 } from './parse.js';
+import { buildAuthorizeUrl, exchangeCodeForToken, whoopConfigured } from './whoop.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
   coachSystemPrompt,
@@ -747,6 +753,95 @@ app.delete('/api/me', async (c) => {
 
 app.get('/privacy', (c) => c.html(PRIVACY_HTML));
 app.get('/terms', (c) => c.html(TERMS_HTML));
+
+// ── WHOOP ─────────────────────────────────────────────────────────────────
+// Connecting a wearable (see the growth playbook's wearable-sync entry).
+// Only the auth round trip lives here; pulling recovery/strain/sleep data
+// once connected is a separate, later step.
+
+function whoopRedirectUri(c: { req: { header: (n: string) => string | undefined; url: string } }): string {
+  return `${publicBase(c)}/api/whoop/callback`;
+}
+
+/** Small standalone confirmation page — this loads in a system browser tab, not inside the app. */
+function whoopStatusPage(ok: boolean, message: string): string {
+  return `<!doctype html><html><head><meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WHOOP</title>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:#F5F3FA; color:#2A2440; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  @media (prefers-color-scheme: dark) { body { background:#17141F; color:#F2EFF8; } }
+  .card { text-align:center; padding:32px; max-width:320px; }
+  .icon { font-size:40px; margin-bottom:12px; }
+  p { color:#6B6480; line-height:1.5; }
+</style></head>
+<body><div class="card">
+  <div class="icon">${ok ? '✅' : '⚠️'}</div>
+  <h2>${ok ? 'WHOOP connected' : 'Connection failed'}</h2>
+  <p>${message}</p>
+  <p>You can close this tab and return to Calgym.</p>
+</div>
+<script>
+  // Only takes effect when this ran inside the app's in-app browser session,
+  // which is watching for exactly this scheme to close itself automatically.
+  window.location.href = 'calapp://whoop-callback?status=${ok ? 'success' : 'error'}';
+</script>
+</body></html>`;
+}
+
+/** Step 1: send the user's browser to WHOOP's consent screen. `ref` travels as a query param — this is a plain navigation, not a fetch, so no auth header is available. */
+app.get('/api/whoop/authorize', async (c) => {
+  if (!whoopConfigured()) {
+    return c.html(whoopStatusPage(false, 'WHOOP is not configured on the server yet.'), 503);
+  }
+  const ref = validRef(c.req.query('ref') ?? '');
+  if (!ref) return c.html(whoopStatusPage(false, 'Missing or invalid user reference.'), 400);
+  const resolved = await resolveRef(ref);
+  const state = crypto.randomUUID();
+  await saveWhoopOAuthState(state, resolved);
+  return c.redirect(buildAuthorizeUrl(whoopRedirectUri(c), state), 302);
+});
+
+/** Step 2: WHOOP redirects back here with a code (or an error/denial). */
+app.get('/api/whoop/callback', async (c) => {
+  const deniedReason = c.req.query('error');
+  if (deniedReason) {
+    return c.html(whoopStatusPage(false, `WHOOP said: ${deniedReason}`));
+  }
+  const state = c.req.query('state') ?? '';
+  const code = c.req.query('code') ?? '';
+  const ref = state ? await consumeWhoopOAuthState(state) : null;
+  if (!ref || !code) {
+    return c.html(whoopStatusPage(false, 'This link expired or was already used — try connecting again from the app.'));
+  }
+  try {
+    const tokens = await exchangeCodeForToken(code, whoopRedirectUri(c));
+    await setWhoopConnection(ref, tokens);
+    return c.html(whoopStatusPage(true, 'Recovery, strain and sleep can now be pulled into Calgym.'));
+  } catch (err) {
+    console.error('whoop token exchange failed:', err);
+    return c.html(whoopStatusPage(false, 'Something went wrong talking to WHOOP. Please try again.'));
+  }
+});
+
+app.get('/api/whoop/status', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ connected: false });
+  const conn = await getWhoopConnection(ref);
+  return c.json(
+    conn
+      ? { connected: true, scope: conn.scope, connectedAt: conn.connectedAt }
+      : { connected: false },
+  );
+});
+
+app.post('/api/whoop/disconnect', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ error: 'identify_required' }, 401);
+  await deleteWhoopConnection(ref);
+  return c.json({ ok: true });
+});
 
 // ── Admin ─────────────────────────────────────────────────────────────────
 

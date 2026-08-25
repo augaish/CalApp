@@ -11,6 +11,7 @@ export const ar: TranslationSchema = {
     done: 'تم',
     delete: 'حذف',
     close: 'إغلاق',
+    disconnect: 'إلغاء الربط',
     kcal: 'سعرة',
     grams: 'غ',
     loading: 'جارٍ التحميل…',
@@ -334,6 +335,8 @@ export const ar: TranslationSchema = {
     appleHealth: 'Apple Health / Apple Watch',
     whoop: 'WHOOP',
     connect: 'ربط',
+    whoopConnected: 'مرتبط',
+    whoopDisconnectConfirm: 'إلغاء ربط WHOOP؟ سيتوقف كالجيم عن جلب بيانات التعافي والإجهاد والنوم.',
     comingSoon: 'قريباً',
   },
   addMenu: {

@@ -9,6 +9,7 @@ export const en = {
     done: 'Done',
     delete: 'Delete',
     close: 'Close',
+    disconnect: 'Disconnect',
     kcal: 'kcal',
     grams: 'g',
     loading: 'Loading…',
@@ -332,6 +333,8 @@ export const en = {
     appleHealth: 'Apple Health / Apple Watch',
     whoop: 'WHOOP',
     connect: 'Connect',
+    whoopConnected: 'Connected',
+    whoopDisconnectConfirm: 'Disconnect WHOOP? Calgym will stop pulling recovery, strain and sleep data.',
     comingSoon: 'Coming soon',
   },
   addMenu: {
