@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { BodyMap, BodyMapViewSwitch, type BodyMapView } from '@/components/body-map';
-import { Button, Screen } from '@/components/ui';
+import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
@@ -175,7 +175,7 @@ export default function ExerciseLibrary() {
           })}
         </ScrollView>
       ) : (
-        <View style={styles.mapWrap}>
+        <Card style={styles.mapWrap}>
           <BodyMap
             view={mapView}
             highlighted={category === 'all' ? [] : [category]}
@@ -183,7 +183,7 @@ export default function ExerciseLibrary() {
             size={150}
           />
           <BodyMapViewSwitch view={mapView} onChange={setMapView} />
-        </View>
+        </Card>
       )}
 
       <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: Spacing.sm }}>
