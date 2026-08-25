@@ -334,6 +334,7 @@ export const en = {
     whoop: 'WHOOP',
     connect: 'Connect',
     whoopConnected: 'Connected',
+    whoopConnectFailed: "Couldn't connect WHOOP",
     whoopDisconnectConfirm: 'Disconnect WHOOP? Calgym will stop pulling recovery, strain and sleep data.',
     comingSoon: 'Coming soon',
   },

@@ -773,6 +773,11 @@ function whoopRedirectUri(c: { req: { header: (n: string) => string | undefined;
   return `${publicBase(c)}/api/whoop/callback`;
 }
 
+/** WHOOP's own `error` param (denial reasons, etc.) reaches here unvalidated. */
+function escapeHtml(s: string): string {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
 /** Small standalone confirmation page — this loads in a system browser tab, not inside the app. */
 function whoopStatusPage(ok: boolean, message: string): string {
   return `<!doctype html><html><head><meta charset="utf-8" />
@@ -789,13 +794,15 @@ function whoopStatusPage(ok: boolean, message: string): string {
 <body><div class="card">
   <div class="icon">${ok ? '✅' : '⚠️'}</div>
   <h2>${ok ? 'WHOOP connected' : 'Connection failed'}</h2>
-  <p>${message}</p>
+  <p>${escapeHtml(message)}</p>
   <p>You can close this tab and return to Calgym.</p>
 </div>
 <script>
   // Only takes effect when this ran inside the app's in-app browser session,
-  // which is watching for exactly this scheme to close itself automatically.
-  window.location.href = 'calapp://whoop-callback?status=${ok ? 'success' : 'error'}';
+  // which is watching for exactly this scheme to close itself automatically
+  // the instant it sees this redirect — usually before a person can read the
+  // text above, which is why the reason travels along with it instead.
+  window.location.href = 'calapp://whoop-callback?status=${ok ? 'success' : 'error'}&reason=${encodeURIComponent(message)}';
 </script>
 </body></html>`;
 }
@@ -831,7 +838,11 @@ app.get('/api/whoop/callback', async (c) => {
     return c.html(whoopStatusPage(true, 'Recovery, strain and sleep can now be pulled into Calgym.'));
   } catch (err) {
     console.error('whoop token exchange failed:', err);
-    return c.html(whoopStatusPage(false, 'Something went wrong talking to WHOOP. Please try again.'));
+    // The confirmation page closes almost instantly inside the app's auth
+    // session, so the detail travels in the redirect (see whoopStatusPage)
+    // rather than relying on anyone reading it here.
+    const detail = err instanceof Error ? err.message.slice(0, 300) : 'unknown error';
+    return c.html(whoopStatusPage(false, `Something went wrong talking to WHOOP: ${detail}`));
   }
 });
 

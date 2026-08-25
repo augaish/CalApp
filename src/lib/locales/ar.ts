@@ -336,6 +336,7 @@ export const ar: TranslationSchema = {
     whoop: 'WHOOP',
     connect: 'ربط',
     whoopConnected: 'مرتبط',
+    whoopConnectFailed: 'تعذر ربط WHOOP',
     whoopDisconnectConfirm: 'إلغاء ربط WHOOP؟ سيتوقف كالجيم عن جلب بيانات التعافي والإجهاد والنوم.',
     comingSoon: 'قريباً',
   },
