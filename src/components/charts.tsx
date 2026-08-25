@@ -1,48 +1,91 @@
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 
 import { useTheme } from '@/hooks/use-theme';
 
 const CHART_H = 96;
+const BAR_ZONE = CHART_H - 18;
 
-/** 7-column bar chart with the value printed above each bar; labels underneath. */
+/**
+ * 7-column bar chart with the value printed above each bar, a dashed line
+ * marking the goal, and each bar's opacity rising toward full color as it
+ * nears (or passes) that goal — a day that barely moved the needle reads as
+ * faint, a day that hit the target reads as solid. Tapping a bar is
+ * optional (`onSelect`); the tapped column gets a light highlight behind it.
+ */
 export function WeekBars({
   values,
   target,
   labels,
   color,
+  onSelect,
+  selectedIndex,
 }: {
   values: number[];
   target: number;
   labels: string[];
   color: string;
+  onSelect?: (index: number) => void;
+  selectedIndex?: number;
 }) {
   const t = useTheme();
   const max = Math.max(target, ...values, 1);
+  const goalTop = target > 0 ? BAR_ZONE - (Math.min(target, max) / max) * BAR_ZONE : null;
   return (
     <View>
-      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: CHART_H }}>
-        {values.map((v, i) => {
-          const h = Math.max(4, (v / max) * (CHART_H - 18));
-          return (
-            <View key={i} style={{ flex: 1, alignItems: 'center', justifyContent: 'flex-end' }}>
-              {v > 0 && (
-                <Text style={{ fontSize: 10, fontWeight: '700', color: t.textSecondary, marginBottom: 3 }}>
-                  {v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}
-                </Text>
-              )}
-              <View
+      <View style={{ height: CHART_H }}>
+        {goalTop !== null && (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: goalTop,
+              borderTopWidth: 1.5,
+              borderStyle: 'dashed',
+              borderColor: t.textTertiary,
+            }}
+          />
+        )}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8, height: CHART_H }}>
+          {values.map((v, i) => {
+            const h = Math.max(4, (v / max) * BAR_ZONE);
+            const ratio = target > 0 ? Math.min(1, v / target) : v > 0 ? 1 : 0;
+            const opacity = v > 0 ? 0.4 + ratio * 0.6 : 1;
+            return (
+              <Pressable
+                key={i}
+                disabled={!onSelect}
+                onPress={() => onSelect?.(i)}
                 style={{
-                  width: '70%',
-                  height: h,
-                  borderRadius: 5,
-                  backgroundColor: v > 0 ? color : t.border,
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'flex-end',
+                  height: CHART_H,
+                  borderRadius: 8,
+                  backgroundColor: i === selectedIndex ? t.cardSubtle : 'transparent',
                 }}
-              />
-            </View>
-          );
-        })}
+              >
+                {v > 0 && (
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: t.textSecondary, marginBottom: 3 }}>
+                    {v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}
+                  </Text>
+                )}
+                <View
+                  style={{
+                    width: '70%',
+                    height: h,
+                    borderRadius: 5,
+                    backgroundColor: v > 0 ? color : t.border,
+                    opacity: v > 0 ? opacity : 1,
+                  }}
+                />
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
       <View style={{ flexDirection: 'row', gap: 8, marginTop: 6 }}>
         {labels.map((l, i) => (

@@ -79,6 +79,8 @@ export const ar: TranslationSchema = {
     goal: 'الهدف',
     water: 'الماء',
     ml: 'مل',
+    streakTitle: 'سلسلة {{count}} يوم',
+    streakBody: 'سجّل وجبة واحدة على الأقل كل يوم للحفاظ على سلسلتك. إذا فاتك يوم كامل بدون تسجيل، تعود السلسلة إلى صفر.',
     mealTypes: {
       breakfast: 'الفطور',
       lunch: 'الغداء',
@@ -429,7 +431,7 @@ export const ar: TranslationSchema = {
   },
   progress: {
     title: 'التقدم',
-    calories7d: 'السعرات · آخر ٧ أيام',
+    calories7d: 'مخطط استهلاك السعرات',
     water7d: 'الماء · آخر ٧ أيام',
     weight: 'الوزن',
     logWeight: 'تسجيل الوزن',

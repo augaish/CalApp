@@ -31,19 +31,6 @@ function notifications(): NotificationsModule | null {
   return cached;
 }
 
-// Every notification this module manages — cancelled and rebuilt on each sync.
-const MANAGED_IDS = [
-  'rem-water-1',
-  'rem-water-2',
-  'rem-water-3',
-  'rem-workout',
-  'rem-streak',
-  'rem-meal-breakfast',
-  'rem-meal-lunch',
-  'rem-meal-dinner',
-  'rem-macro',
-];
-
 const WATER_HOURS = [10, 15, 20];
 const MEAL_PROMPT: Record<'breakfast' | 'lunch' | 'dinner', { hour: number; minute: number }> = {
   breakfast: { hour: 9, minute: 0 },
@@ -85,7 +72,11 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
   const s = useAppStore.getState();
   const anyOn = s.remindMeals || s.remindWater || s.remindWorkouts;
 
-  for (const id of MANAGED_IDS) await mod.cancelScheduledNotificationAsync(id);
+  // Wipe every scheduled local notification (this module is the only thing
+  // in the app that schedules any) rather than cancelling by a fixed ID list
+  // — a toggle switched off must never leave a stray notification still
+  // firing, including any left over from an older identifier scheme.
+  await mod.cancelAllScheduledNotificationsAsync();
   if (!anyOn) return { granted: true };
   if (!(await requestPermission(mod))) return { granted: false };
 

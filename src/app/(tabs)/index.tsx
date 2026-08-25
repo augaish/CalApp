@@ -110,7 +110,12 @@ export default function Overview() {
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const streak = streakDays(meals);
 
-  const days = sevenDaysEnding(selected);
+  // The strip shows the current week (ending today) whenever the selected day
+  // is still inside it, so tapping a day in view never reshuffles the row.
+  // Only once you arrow back past that window does it start following you —
+  // otherwise there'd be no way to see where you are.
+  const thisWeek = sevenDaysEnding(new Date());
+  const days = thisWeek.some((d) => isSameDay(d.toISOString(), selected)) ? thisWeek : sevenDaysEnding(selected);
   const chartLabels = days.map((d) => d.toLocaleDateString(locale, { weekday: 'narrow' }));
   const calValues = days.map((d) => Math.round(totalsForDay(meals, d).calories));
   // Last 8 weight entries oldest→newest, with short date labels for the x-axis.
@@ -190,12 +195,17 @@ export default function Overview() {
             contentFit="contain"
           />
           <View style={{ flex: 1 }} />
-          <View style={[styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
+          <Pressable
+            onPress={() =>
+              Alert.alert(t('home.streakTitle', { count: streak }), t('home.streakBody'))
+            }
+            style={[styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+          >
             <Ionicons name="flame" size={16} color="#FFD166" />
             <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 14 }}>
               {streak}
             </Text>
-          </View>
+          </Pressable>
           <Pressable
             onPress={() => router.push('/profile')}
             style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
@@ -432,7 +442,14 @@ export default function Overview() {
         {/* Calories week chart */}
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.calories7d')}</Text>
-          <WeekBars values={calValues} target={targets.calories} labels={chartLabels} color={theme.primary} />
+          <WeekBars
+            values={calValues}
+            target={targets.calories}
+            labels={chartLabels}
+            color={theme.primary}
+            onSelect={(i) => setDay(days[i])}
+            selectedIndex={days.findIndex((d) => isSameDay(d.toISOString(), selected))}
+          />
         </View>
 
         {/* Weight */}

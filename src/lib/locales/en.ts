@@ -77,6 +77,8 @@ export const en = {
     goal: 'goal',
     water: 'Water',
     ml: 'ml',
+    streakTitle: '{{count}}-day streak',
+    streakBody: 'Log at least one meal every day to keep your streak going. Miss a full day without logging and it resets to 0.',
     mealTypes: {
       breakfast: 'Breakfast',
       lunch: 'Lunch',
@@ -430,7 +432,7 @@ export const en = {
   },
   progress: {
     title: 'Progress',
-    calories7d: 'Calories · last 7 days',
+    calories7d: 'Calorie spend graph',
     water7d: 'Water · last 7 days',
     weight: 'Weight',
     logWeight: 'Log weight',
