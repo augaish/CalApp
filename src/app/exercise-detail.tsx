@@ -13,7 +13,7 @@ import {
   View,
 } from 'react-native';
 
-import { BodyMap, viewForGroup } from '@/components/body-map';
+import { BodyMap, BodyMapViewSwitch, viewForGroup, viewForMuscles } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -108,6 +108,13 @@ export default function ExerciseDetail() {
   const [distance, setDistance] = useState(lastSet?.distanceM ?? 0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [note, setNote] = useState('');
+  const initialMapView =
+    exercise?.primaryMuscles?.length
+      ? viewForMuscles(exercise.primaryMuscles)
+      : exercise
+        ? viewForGroup(exercise.category)
+        : null;
+  const [mapView, setMapView] = useState(initialMapView);
 
   if (!exercise) return null;
 
@@ -209,20 +216,28 @@ export default function ExerciseDetail() {
         </View>
       </View>
 
-      {viewForGroup(exercise.category) && (
+      {mapView && (
         <Card style={styles.muscleMapCard}>
-          <BodyMap
-            view={viewForGroup(exercise.category)!}
-            highlighted={[exercise.category]}
-            secondary={exercise.secondary}
-            size={110}
-          />
+          {exercise.primaryMuscles?.length ? (
+            <BodyMap
+              view={mapView}
+              highlightedMuscles={exercise.primaryMuscles}
+              secondaryMuscles={exercise.secondaryMuscles}
+              size={110}
+            />
+          ) : (
+            <BodyMap view={mapView} highlighted={[exercise.category]} size={110} />
+          )}
+          <BodyMapViewSwitch view={mapView} onChange={setMapView} />
           <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
-            {t('exercises.targets')} {t(`muscles.${exercise.category}`)}
+            {t('exercises.targets')}{' '}
+            {exercise.primaryMuscles?.length
+              ? exercise.primaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')
+              : t(`muscles.${exercise.category}`)}
           </Text>
-          {!!exercise.secondary?.length && (
+          {!!exercise.secondaryMuscles?.length && (
             <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '500' }}>
-              {t('exercises.alsoWorks')} {exercise.secondary.map((g) => t(`muscles.${g}`)).join(', ')}
+              {t('exercises.alsoWorks')} {exercise.secondaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')}
             </Text>
           )}
         </Card>

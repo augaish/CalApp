@@ -124,6 +124,33 @@ export type MuscleGroup =
   | 'cardio'
   | 'fullBody';
 
+/**
+ * A specific muscle, finer-grained than MuscleGroup — used only to drive the
+ * muscle-map illustration on a single exercise's detail page (which exact
+ * muscle lights up, and how strongly), never for library browsing/filtering.
+ * That stays on MuscleGroup/category, which is coarser on purpose.
+ */
+export type MuscleId =
+  | 'chest'
+  | 'front_delts'
+  | 'side_delts'
+  | 'rear_delts'
+  | 'biceps'
+  | 'triceps'
+  | 'forearms'
+  | 'abs'
+  | 'obliques'
+  | 'lats'
+  | 'traps'
+  | 'rhomboids'
+  | 'lower_back'
+  | 'glutes'
+  | 'quads'
+  | 'hamstrings'
+  | 'adductors'
+  | 'hip_flexors'
+  | 'calves';
+
 /** How each set of an exercise is measured. */
 export type ExerciseType = 'weight_reps' | 'bodyweight_reps' | 'time' | 'distance_time';
 
@@ -135,8 +162,14 @@ export interface Exercise {
   nameEn?: string;
   nameAr?: string;
   category: MuscleGroup;
-  /** Other groups this exercise also works, shown as a lighter tint on the muscle map. */
-  secondary?: MuscleGroup[];
+  /**
+   * Precise muscles this exercise targets, for the muscle-map illustration.
+   * Falls back to `category` (shown at full strength, no secondary) when
+   * absent — e.g. for cardio, "it depends" holds like Iso Hold, or any
+   * custom/scanned exercise that never got this level of detail.
+   */
+  primaryMuscles?: MuscleId[];
+  secondaryMuscles?: MuscleId[];
   type: ExerciseType;
   /** Photo of the machine/movement — from the camera or an equipment scan. */
   photoUri?: string;
