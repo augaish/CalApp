@@ -241,6 +241,11 @@ export const ar: TranslationSchema = {
     noResults: 'لا توجد تمارين. أنشئ واحداً بالأسفل.',
     count: '{{count}} تمرين',
     doneAdding: 'تم ({{count}} مضافة)',
+    bodyFront: 'أمامي',
+    bodyBack: 'خلفي',
+    muscleMap: 'خريطة العضلات',
+    listView: 'قائمة',
+    targets: 'يستهدف',
   },
   muscles: {
     chest: 'الصدر',

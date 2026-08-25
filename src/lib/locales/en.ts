@@ -239,6 +239,11 @@ export const en = {
     noResults: 'No exercises found. Create one below.',
     count: '{{count}} exercises',
     doneAdding: 'Done ({{count}} added)',
+    bodyFront: 'Front',
+    bodyBack: 'Back',
+    muscleMap: 'Muscle map',
+    listView: 'List',
+    targets: 'Targets',
   },
   muscles: {
     chest: 'Chest',

@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { BodyMap, viewForGroup } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -207,6 +208,15 @@ export default function ExerciseDetail() {
           </Text>
         </View>
       </View>
+
+      {viewForGroup(exercise.category) && (
+        <Card style={styles.muscleMapCard}>
+          <BodyMap view={viewForGroup(exercise.category)!} highlighted={[exercise.category]} size={110} />
+          <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+            {t('exercises.targets')} {t(`muscles.${exercise.category}`)}
+          </Text>
+        </Card>
+      )}
 
       {exercise.photoUri ? (
         <Image source={{ uri: exercise.photoUri }} style={styles.photo} contentFit="cover" />
@@ -519,6 +529,7 @@ const styles = StyleSheet.create({
   headerBtn: { padding: 2 },
   metaRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   tag: { borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 5 },
+  muscleMapCard: { alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.md },
   photo: { width: '100%', height: 150, borderRadius: Radius.lg, marginBottom: Spacing.md },
   videoLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
   tabBar: { flexDirection: 'row', borderRadius: Radius.full, padding: 4, marginBottom: Spacing.md },

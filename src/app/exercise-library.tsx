@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { BodyMap, BodyMapViewSwitch, type BodyMapView } from '@/components/body-map';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -41,6 +42,8 @@ export default function ExerciseLibrary() {
 
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<MuscleGroup | 'all'>('all');
+  const [pickerMode, setPickerMode] = useState<'chips' | 'map'>('chips');
+  const [mapView, setMapView] = useState<BodyMapView>('front');
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -114,35 +117,74 @@ export default function ExerciseLibrary() {
         )}
       </View>
 
-      {/* Category filter */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-        style={styles.filterScroll}
-      >
-        {(['all', ...MUSCLE_GROUPS] as const).map((cat) => {
-          const active = category === cat;
-          const accent = cat === 'all' ? theme.primary : MUSCLE_COLORS[cat];
+      {/* Category filter: chips (fast, scannable) or a tappable body map
+          (visual, answers "what does this train"). Both just set `category`
+          — the results below don't know or care which one was used. */}
+      <View style={styles.modeRow}>
+        {(['chips', 'map'] as const).map((mode) => {
+          const active = pickerMode === mode;
           return (
-            <Pressable
-              key={cat}
-              onPress={() => setCategory(cat)}
-              style={[
-                styles.filterChip,
-                { backgroundColor: active ? accent : theme.card, borderColor: active ? accent : theme.border },
-              ]}
-            >
-              {cat !== 'all' && !active && (
-                <View style={[styles.chipDot, { backgroundColor: accent }]} />
-              )}
-              <Text style={{ color: active ? '#fff' : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
-                {cat === 'all' ? t('exercises.all') : t(`muscles.${cat}`)}
-              </Text>
+            <Pressable key={mode} onPress={() => setPickerMode(mode)} hitSlop={6}>
+              <View
+                style={[
+                  styles.modeChip,
+                  { backgroundColor: active ? theme.primary : theme.card, borderColor: active ? theme.primary : theme.border },
+                ]}
+              >
+                <Ionicons
+                  name={mode === 'chips' ? 'list-outline' : 'body-outline'}
+                  size={14}
+                  color={active ? theme.onPrimary : theme.textSecondary}
+                />
+                <Text style={{ color: active ? theme.onPrimary : theme.textSecondary, fontSize: 12, fontWeight: '700' }}>
+                  {mode === 'chips' ? t('exercises.listView') : t('exercises.muscleMap')}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </View>
+
+      {pickerMode === 'chips' ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScroll}
+        >
+          {(['all', ...MUSCLE_GROUPS] as const).map((cat) => {
+            const active = category === cat;
+            const accent = cat === 'all' ? theme.primary : MUSCLE_COLORS[cat];
+            return (
+              <Pressable
+                key={cat}
+                onPress={() => setCategory(cat)}
+                style={[
+                  styles.filterChip,
+                  { backgroundColor: active ? accent : theme.card, borderColor: active ? accent : theme.border },
+                ]}
+              >
+                {cat !== 'all' && !active && (
+                  <View style={[styles.chipDot, { backgroundColor: accent }]} />
+                )}
+                <Text style={{ color: active ? '#fff' : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
+                  {cat === 'all' ? t('exercises.all') : t(`muscles.${cat}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : (
+        <View style={styles.mapWrap}>
+          <BodyMap
+            view={mapView}
+            highlighted={category === 'all' ? [] : [category]}
+            onSelect={(g) => setCategory(category === g ? 'all' : g)}
+            size={150}
+          />
+          <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+        </View>
+      )}
 
       <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: Spacing.sm }}>
         {t('exercises.count', { count: total })}
@@ -209,6 +251,17 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   searchInput: { flex: 1, fontSize: 16, padding: 0 },
+  modeRow: { flexDirection: 'row', gap: Spacing.xs, marginBottom: Spacing.sm },
+  modeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: 12,
+    height: 32,
+  },
+  mapWrap: { alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
   // flexGrow:0 stops this horizontal strip from absorbing the Screen's spare
   // vertical space (which stretched the chips into tall pills on short lists).
   filterScroll: { flexGrow: 0, marginBottom: Spacing.sm },

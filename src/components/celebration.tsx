@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
+import { Animated, StyleSheet, Text, type TextStyle } from 'react-native';
 
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -43,7 +43,7 @@ export function Celebration() {
         },
       ]}
     >
-      <Text style={[styles.pill, { backgroundColor: theme.primary, color: theme.onPrimary }, cardShadow(theme.shadow)]}>
+      <Text style={[styles.pill, { backgroundColor: theme.primary, color: theme.onPrimary }, cardShadow(theme.shadow) as TextStyle]}>
         {message}
       </Text>
     </Animated.View>
