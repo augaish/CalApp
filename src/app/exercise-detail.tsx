@@ -276,6 +276,7 @@ export default function ExerciseDetail() {
           setNote={setNote}
           editing={editingIndex !== null}
           dayLabel={dayLabel}
+          caloriesBurned={today?.caloriesBurned}
           sets={todaySets}
           editingIndex={editingIndex}
           onSelect={selectSet}
@@ -317,6 +318,7 @@ function TrackTab({
   editing,
   dayLabel,
   sets,
+  caloriesBurned,
   editingIndex,
   onSelect,
   onDelete,
@@ -335,6 +337,8 @@ function TrackTab({
   editing: boolean;
   dayLabel: string;
   sets: WorkoutSet[];
+  /** This exercise's own estimate for today, independent of the day-wide WHOOP total up top — WHOOP has no way to attribute its number to one exercise. */
+  caloriesBurned?: number;
   editingIndex: number | null;
   onSelect: (s: WorkoutSet, i: number) => void;
   onDelete: (i: number) => void;
@@ -345,9 +349,16 @@ function TrackTab({
 
   return (
     <View>
-      <View style={styles.dayChip}>
-        <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
-        <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>{dayLabel}</Text>
+      <View style={[styles.dayChip, { justifyContent: 'space-between' }]}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
+          <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>{dayLabel}</Text>
+        </View>
+        {!!caloriesBurned && (
+          <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
+            {caloriesBurned} {t('common.kcal')}
+          </Text>
+        )}
       </View>
 
       <Card>

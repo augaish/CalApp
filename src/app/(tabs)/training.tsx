@@ -521,6 +521,11 @@ export default function Training() {
                           </Text>
                         ) : null}
                       </View>
+                      {!!wToday?.caloriesBurned && (
+                        <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12, marginEnd: 6 }}>
+                          {wToday.caloriesBurned} {t('common.kcal')}
+                        </Text>
+                      )}
                       <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
                     </Pressable>
                     <Pressable
@@ -736,6 +741,11 @@ export default function Training() {
                             {summarize(w, t('training.sets'), t('training.top'), kg)}
                           </Text>
                         </View>
+                        {!!w.caloriesBurned && (
+                          <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12 }}>
+                            {w.caloriesBurned} {t('common.kcal')}
+                          </Text>
+                        )}
                       </Pressable>
                       <Pressable
                         onPress={() => confirmDeleteWorkout(w.id)}
