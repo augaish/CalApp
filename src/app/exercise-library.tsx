@@ -11,7 +11,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { allExercises, exerciseIcon, exerciseName, MUSCLE_COLORS, MUSCLE_GROUPS } from '@/lib/exercises';
 import { useAppStore } from '@/lib/store';
-import type { Exercise, MuscleGroup } from '@/lib/types';
+import type { Exercise, MuscleGroup, MuscleId } from '@/lib/types';
+
+/** Groups with more than one distinct muscle worth separating out. Groups
+ * absent here (chest, biceps, triceps, forearms, glutes, calves, cardio,
+ * fullBody) are already 1:1 with a single MuscleId, so a sub-filter would
+ * just repeat the category chip. */
+const SUB_MUSCLES: Partial<Record<MuscleGroup, MuscleId[]>> = {
+  back: ['lats', 'traps', 'rhomboids', 'lower_back'],
+  shoulders: ['front_delts', 'side_delts', 'rear_delts'],
+  legs: ['quads', 'hamstrings', 'adductors', 'hip_flexors'],
+  core: ['abs', 'obliques'],
+};
 
 export default function ExerciseLibrary() {
   const { t, i18n } = useTranslation();
@@ -42,13 +53,22 @@ export default function ExerciseLibrary() {
 
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<MuscleGroup | 'all'>('all');
+  const [subMuscle, setSubMuscle] = useState<MuscleId | 'all'>('all');
   const [pickerMode, setPickerMode] = useState<'chips' | 'map'>('chips');
   const [mapView, setMapView] = useState<BodyMapView>('front');
+
+  const subOptions = category !== 'all' ? SUB_MUSCLES[category] : undefined;
+
+  const setCategoryAndResetSub = (cat: MuscleGroup | 'all') => {
+    setCategory(cat);
+    setSubMuscle('all');
+  };
 
   const grouped = useMemo(() => {
     const q = query.trim().toLowerCase();
     const pool = allExercises(custom).filter((ex) => {
       if (category !== 'all' && ex.category !== category) return false;
+      if (subMuscle !== 'all' && !ex.primaryMuscles?.includes(subMuscle)) return false;
       if (!q) return true;
       return [ex.name, ex.nameEn, ex.nameAr, ...(ex.aliases ?? [])]
         .filter(Boolean)
@@ -66,7 +86,7 @@ export default function ExerciseLibrary() {
         exerciseName(a, lang).localeCompare(exerciseName(b, lang), lang),
       ),
     })).filter((g) => g.items.length > 0);
-  }, [custom, query, category, lang]);
+  }, [custom, query, category, subMuscle, lang]);
 
   const total = grouped.reduce((n, g) => n + g.items.length, 0);
 
@@ -158,7 +178,7 @@ export default function ExerciseLibrary() {
             return (
               <Pressable
                 key={cat}
-                onPress={() => setCategory(cat)}
+                onPress={() => setCategoryAndResetSub(cat)}
                 style={[
                   styles.filterChip,
                   { backgroundColor: active ? accent : theme.card, borderColor: active ? accent : theme.border },
@@ -179,11 +199,41 @@ export default function ExerciseLibrary() {
           <BodyMap
             view={mapView}
             highlighted={category === 'all' ? [] : [category]}
-            onSelect={(g) => setCategory(category === g ? 'all' : g)}
+            onSelect={(g) => setCategoryAndResetSub(category === g ? 'all' : g)}
             size={150}
           />
           <BodyMapViewSwitch view={mapView} onChange={setMapView} />
         </Card>
+      )}
+
+      {/* Fine-grained sub-filter — only for categories with more than one
+          distinct muscle worth separating (see SUB_MUSCLES above). */}
+      {subOptions && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterRow}
+          style={styles.filterScroll}
+        >
+          {(['all', ...subOptions] as const).map((m) => {
+            const active = subMuscle === m;
+            const accent = category !== 'all' ? MUSCLE_COLORS[category] : theme.primary;
+            return (
+              <Pressable
+                key={m}
+                onPress={() => setSubMuscle(m)}
+                style={[
+                  styles.subChip,
+                  { backgroundColor: active ? accent : theme.cardSubtle, borderColor: active ? accent : theme.border },
+                ]}
+              >
+                <Text style={{ color: active ? '#fff' : theme.textSecondary, fontWeight: '600', fontSize: 12 }}>
+                  {m === 'all' ? t('exercises.all') : t(`muscleIds.${m}`)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
       )}
 
       <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: Spacing.sm }}>
@@ -276,6 +326,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   chipDot: { width: 8, height: 8, borderRadius: 4 },
+  subChip: {
+    height: 30,
+    borderWidth: 1,
+    borderRadius: Radius.full,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+  },
   groupTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginTop: Spacing.xs },
   groupDot: { width: 9, height: 9, borderRadius: 4.5 },
   groupTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
