@@ -7,6 +7,7 @@ import type {
   LoggedMeal,
   LoggedWorkout,
   Profile,
+  Program,
   WeightEntry,
 } from './types';
 import type { WaterEntry } from './store';
@@ -39,6 +40,7 @@ export interface Snapshot {
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
+  activeProgram: Program | null;
 }
 
 /** The syncable slice: logs and profile, never device-local preferences. */
@@ -56,6 +58,7 @@ export function snapshot(): Snapshot {
     workouts: s.workouts,
     water: s.water,
     weights: s.weights,
+    activeProgram: s.activeProgram,
   };
 }
 
@@ -121,6 +124,7 @@ function apply(snap: Snapshot, updatedAt: string) {
       workouts: snap.workouts ?? [],
       water: snap.water ?? [],
       weights: snap.weights ?? [],
+      activeProgram: snap.activeProgram ?? null,
     });
     useAppStore.getState().setSyncedAt(updatedAt);
   } finally {

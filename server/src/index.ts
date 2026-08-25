@@ -40,6 +40,7 @@ import {
   extractJson,
   isWebSearchDisabled,
   replyText,
+  sanitizeProgram,
   sanitizeSchedulePlan,
   toMealAnalysis,
   type CoachSchedulePlan,
@@ -65,6 +66,7 @@ import {
   exerciseInfoPrompt,
   identifyEquipmentPrompt,
   mealPrompt,
+  programPrompt,
   textMealPrompt,
   type Language,
 } from './prompts.js';
@@ -98,6 +100,46 @@ const WEB_SEARCH_TOOL: Anthropic.WebSearchTool20250305 = {
  * what the user can lift, so a set is (reps only), same as a freshly
  * hand-planned one.
  */
+/** Shared between SCHEDULE_TOOL and PROGRAM_TOOL — a week of training days. */
+const SCHEDULE_DAYS_SCHEMA = {
+  type: 'array' as const,
+  minItems: 1,
+  maxItems: 7,
+  items: {
+    type: 'object' as const,
+    properties: {
+      weekday: {
+        type: 'integer' as const,
+        minimum: 0,
+        maximum: 6,
+        description: '0 = Sunday … 6 = Saturday',
+      },
+      title: {
+        type: 'string' as const,
+        description: "Short day label in the user's language, e.g. 'Push day'.",
+      },
+      exercises: {
+        type: 'array' as const,
+        minItems: 1,
+        maxItems: 10,
+        items: {
+          type: 'object' as const,
+          properties: {
+            name: {
+              type: 'string' as const,
+              description: "Common exercise name, in the user's language.",
+            },
+            sets: { type: 'integer' as const, minimum: 1, maximum: 8 },
+            reps: { type: 'string' as const, description: "A count or range, e.g. '10' or '8-12'." },
+          },
+          required: ['name', 'sets', 'reps'],
+        },
+      },
+    },
+    required: ['weekday', 'exercises'],
+  },
+};
+
 const SCHEDULE_TOOL: Anthropic.Tool = {
   name: 'propose_weekly_schedule',
   description:
@@ -110,46 +152,43 @@ const SCHEDULE_TOOL: Anthropic.Tool = {
         description:
           "One short sentence, in the user's language, on the plan's rationale (goal, split, frequency).",
       },
-      days: {
-        type: 'array',
-        minItems: 1,
-        maxItems: 7,
-        items: {
-          type: 'object',
-          properties: {
-            weekday: {
-              type: 'integer',
-              minimum: 0,
-              maximum: 6,
-              description: '0 = Sunday … 6 = Saturday',
-            },
-            title: {
-              type: 'string',
-              description: "Short day label in the user's language, e.g. 'Push day'.",
-            },
-            exercises: {
-              type: 'array',
-              minItems: 1,
-              maxItems: 10,
-              items: {
-                type: 'object',
-                properties: {
-                  name: {
-                    type: 'string',
-                    description: "Common exercise name, in the user's language.",
-                  },
-                  sets: { type: 'integer', minimum: 1, maximum: 8 },
-                  reps: { type: 'string', description: "A count or range, e.g. '10' or '8-12'." },
-                },
-                required: ['name', 'sets', 'reps'],
-              },
-            },
-          },
-          required: ['weekday', 'exercises'],
-        },
-      },
+      days: SCHEDULE_DAYS_SCHEMA,
     },
     required: ['days'],
+  },
+};
+
+const PROGRAM_TOOL: Anthropic.Tool = {
+  name: 'propose_program',
+  description: 'Design one complete program: calorie/macro targets plus a weekly training schedule.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      summary: {
+        type: 'string',
+        description: "2-3 sentences, in the user's language, on the program's approach and why — naming any concrete figures (their own data, WHOOP, a body reading) that shaped it.",
+      },
+      durationWeeks: { type: 'integer', minimum: 4, maximum: 16 },
+      targets: {
+        type: 'object',
+        properties: {
+          calories: { type: 'integer' },
+          proteinG: { type: 'integer' },
+          carbsG: { type: 'integer' },
+          fatG: { type: 'integer' },
+        },
+        required: ['calories', 'proteinG', 'carbsG', 'fatG'],
+      },
+      schedule: {
+        type: 'object',
+        properties: {
+          summary: { type: 'string', description: "One short sentence on the split/frequency, in the user's language." },
+          days: SCHEDULE_DAYS_SCHEMA,
+        },
+        required: ['days'],
+      },
+    },
+    required: ['summary', 'durationWeeks', 'targets', 'schedule'],
   },
 };
 
@@ -634,6 +673,46 @@ app.post('/api/coach', async (c) => {
     console.error('coach failed:', err);
     await release(ref, 'coach');
     return c.json({ error: 'coach_failed' }, 502);
+  }
+});
+
+interface ProgramBody {
+  language?: string;
+  context?: unknown;
+}
+
+app.post('/api/generate-program', async (c) => {
+  const body = await c.req.json<ProgramBody>().catch(() => ({}) as ProgramBody);
+  const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const ref = (await callerRef(c))!;
+  const access = await checkAccess(ref, 'program');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
+  const claim = await reserve(ref, access, 'program');
+  if (!claim.ok) return c.json(quotaError(access), 402);
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      // A full week's schedule alongside targets and a real summary needs more
+      // room than a plain coach reply.
+      max_tokens: 2500,
+      system: programPrompt(language, contextText(body.context)),
+      messages: [{ role: 'user', content: 'Design my program.' }],
+      tools: [PROGRAM_TOOL],
+      tool_choice: { type: 'tool', name: 'propose_program' },
+    });
+    const toolUse = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_program',
+    );
+    const program = toolUse ? sanitizeProgram(toolUse.input) : undefined;
+    if (!program) {
+      await release(ref, 'program');
+      return c.json({ error: 'analysis_failed' }, 502);
+    }
+    return c.json(program);
+  } catch (err) {
+    console.error('generate-program failed:', err);
+    await release(ref, 'program');
+    return c.json({ error: 'analysis_failed' }, 502);
   }
 });
 

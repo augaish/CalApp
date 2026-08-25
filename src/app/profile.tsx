@@ -222,6 +222,15 @@ export default function Profile() {
               <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
             </Card>
           </Pressable>
+          <Pressable onPress={() => router.push('/program')}>
+            <Card style={styles.linkRow}>
+              <Ionicons name="sparkles-outline" size={18} color={theme.textSecondary} style={{ marginEnd: Spacing.sm }} />
+              <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>
+                {t('settings.aiProgram')}
+              </Text>
+              <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+            </Card>
+          </Pressable>
         </>
       )}
 

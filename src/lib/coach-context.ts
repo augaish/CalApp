@@ -47,6 +47,14 @@ export interface CoachContext {
     sleepHours?: number | null;
     todayStrain?: number | null;
   };
+  /** The most recent logged body reading, when it has more than just a bare
+   * weigh-in — feeds the AI program prompt's targets/schedule reasoning. */
+  latestBodyReading?: {
+    daysAgo: number;
+    weightKg: number;
+    bodyFatPercent?: number;
+    skeletalMuscleMassKg?: number;
+  };
 }
 
 function ymd(d: Date): string {
@@ -105,6 +113,19 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
         }
       : undefined;
 
+  // Only worth sending when it carries more than the bare weigh-in the
+  // Overview screen logs — a plain kg entry adds nothing a program needs.
+  const latest = s.weights[0];
+  const latestBodyReading =
+    latest && (latest.bodyFatPercent != null || latest.skeletalMuscleMassKg != null)
+      ? {
+          daysAgo: Math.max(0, Math.round((Date.now() - new Date(latest.at).getTime()) / 86400000)),
+          weightKg: latest.kg,
+          bodyFatPercent: latest.bodyFatPercent,
+          skeletalMuscleMassKg: latest.skeletalMuscleMassKg,
+        }
+      : undefined;
+
   return {
     profile: s.profile
       ? {
@@ -128,5 +149,6 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
     streakDays: streakDays(s.meals),
     workoutStreakDays: workoutStreakDays(s.workouts),
     whoop,
+    latestBodyReading,
   };
 }

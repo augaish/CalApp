@@ -292,3 +292,46 @@ export function sanitizeSchedulePlan(raw: unknown): CoachSchedulePlan | undefine
   days.sort((a, b) => a.weekday - b.weekday);
   return { summary: str(input.summary).slice(0, 200) || undefined, days };
 }
+
+// ── AI program: targets + a schedule, as one client-executed tool call ─────
+
+export interface ProgramTargets {
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+export interface ProgramPlan {
+  summary: string;
+  durationWeeks: number;
+  targets: ProgramTargets;
+  schedule: CoachSchedulePlan;
+}
+
+/**
+ * Validate the `propose_program` tool call the same way sanitizeSchedulePlan
+ * validates a plain schedule — the JSON schema is a strong hint to the model,
+ * not a guarantee. A program with no usable schedule is not a program, so
+ * this returns undefined rather than a half-formed one.
+ */
+export function sanitizeProgram(raw: unknown): ProgramPlan | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, unknown>;
+  const schedule = sanitizeSchedulePlan(input.schedule);
+  if (!schedule) return undefined;
+  const t = (input.targets ?? {}) as Record<string, unknown>;
+  const calories = Math.max(1200, Math.round(num(t.calories, 2000)));
+  const proteinG = Math.max(0, Math.round(num(t.proteinG, 0)));
+  const fatG = Math.max(0, Math.round(num(t.fatG, 0)));
+  // Carbs are recomputed from calories/protein/fat rather than trusted as
+  // written, the same way toMealAnalysis reconciles a meal's own numbers —
+  // three independently-estimated macros rarely add up to the stated total.
+  const carbsG = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
+  return {
+    summary: str(input.summary).slice(0, 400),
+    durationWeeks: Math.min(16, Math.max(4, Math.round(num(input.durationWeeks, 8)))),
+    targets: { calories, proteinG, carbsG, fatG },
+    schedule,
+  };
+}

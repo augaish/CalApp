@@ -117,6 +117,27 @@ export interface CoachSchedulePlan {
   days: CoachScheduleDay[];
 }
 
+/**
+ * A full AI-designed program: calorie/macro targets plus a weekly schedule
+ * that work toward one goal together, over a set duration. Distinct from a
+ * bare CoachSchedulePlan (which only ever proposes the schedule half) — the
+ * accept flow commits both `targets` and `schedule` in one step.
+ */
+export interface Program {
+  id: string;
+  createdAt: string;
+  goal: Goal;
+  durationWeeks: number;
+  summary: string;
+  targets: DailyTargets;
+  schedule: CoachSchedulePlan;
+}
+
+/** What the server hands back before the user has accepted it — everything
+ * a Program has except the bookkeeping fields (id/createdAt/goal) the store
+ * adds on acceptance. */
+export type GeneratedProgram = Pick<Program, 'summary' | 'durationWeeks' | 'targets' | 'schedule'>;
+
 export interface EquipmentAnalysis {
   /** Machine name in the user's language */
   name: string;

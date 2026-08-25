@@ -6,6 +6,7 @@ import type {
   CoachSchedulePlan,
   EquipmentAnalysis,
   FoodItem,
+  GeneratedProgram,
   Language,
   MealAnalysis,
   WhoopDayWorkout,
@@ -397,6 +398,15 @@ export async function coachChat(
   return post<CoachReply>('/api/coach', { messages, language, context });
 }
 
+/** One-shot AI program: calorie/macro targets plus a weekly schedule, designed together. */
+export async function generateProgram(
+  language: Language,
+  context?: unknown,
+): Promise<GeneratedProgram> {
+  if (isMockMode) return mockProgram(language);
+  return post<GeneratedProgram>('/api/generate-program', { language, context });
+}
+
 /** Open Food Facts lookup — free public API, called directly from the app. */
 export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
   const res = await fetch(
@@ -491,6 +501,37 @@ async function mockEquipment(language: Language): Promise<EquipmentAnalysis> {
         commonMistakes: ['Swinging the torso', 'Pulling behind the neck', 'Going too heavy'],
         suggestion: { sets: 3, reps: '10–12', note: 'Start with a weight you can control' },
         confidence: 0.85,
+      };
+}
+
+async function mockProgram(language: Language): Promise<GeneratedProgram> {
+  await delay(1800);
+  return language === 'ar'
+    ? {
+        summary: 'برنامج تجريبي — اربط الخادم للحصول على برنامج مبني على بياناتك. هدف افتراضي: 2200 سعرة، 4 أيام تمرين أسبوعياً.',
+        durationWeeks: 8,
+        targets: { calories: 2200, proteinG: 150, carbsG: 220, fatG: 73 },
+        schedule: {
+          summary: 'تقسيم دفع/سحب/أرجل، 4 أيام',
+          days: [
+            { weekday: 0, title: 'دفع', exercises: [{ name: 'ضغط بار', sets: 4, reps: '8-10' }] },
+            { weekday: 2, title: 'سحب', exercises: [{ name: 'سحب علوي', sets: 4, reps: '8-10' }] },
+            { weekday: 4, title: 'أرجل', exercises: [{ name: 'سكوات بار', sets: 4, reps: '8-10' }] },
+          ],
+        },
+      }
+    : {
+        summary: 'Demo program — connect the AI server for one built from your real data. Default goal: 2,200 kcal, 4 training days a week.',
+        durationWeeks: 8,
+        targets: { calories: 2200, proteinG: 150, carbsG: 220, fatG: 73 },
+        schedule: {
+          summary: 'Push/pull/legs split, 4 days',
+          days: [
+            { weekday: 0, title: 'Push', exercises: [{ name: 'Bench Press', sets: 4, reps: '8-10' }] },
+            { weekday: 2, title: 'Pull', exercises: [{ name: 'Lat Pulldown', sets: 4, reps: '8-10' }] },
+            { weekday: 4, title: 'Legs', exercises: [{ name: 'Barbell Squat', sets: 4, reps: '8-10' }] },
+          ],
+        },
       };
 }
 

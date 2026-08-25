@@ -44,7 +44,7 @@ export const PLANS: Record<Plan, PlanSpec> = {
   proPlus: { limit: 500, coach: true, equipment: true, highAccuracy: true },
 };
 
-export type Feature = 'meal' | 'describe' | 'equipment' | 'coach' | 'bodyReading';
+export type Feature = 'meal' | 'describe' | 'equipment' | 'coach' | 'bodyReading' | 'program';
 
 /** Admin-overridable per-plan limits. */
 export async function planLimits(): Promise<Record<Plan, number>> {

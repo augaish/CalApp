@@ -13,6 +13,7 @@ import type {
   MealType,
   PlannedSet,
   Profile,
+  Program,
   WeightEntry,
   WhoopDayWorkout,
   WorkoutSet,
@@ -80,6 +81,8 @@ interface AppState {
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
+  /** The one AI-designed program currently in effect, if the user has accepted one. */
+  activeProgram: Program | null;
   remindMeals: boolean;
   remindWater: boolean;
   remindWorkouts: boolean;
@@ -196,6 +199,11 @@ interface AppState {
   /** A fuller reading (manual or scanned) — same log as logWeight, with the
    * optional body-fat/segmental fields a quick Overview weigh-in never sets. */
   logBodyReading: (entry: Omit<WeightEntry, 'at'> & { at?: string }) => void;
+  /** Accept, replace, or end (pass null) the active AI-designed program.
+   * Committing its targets/schedule is a separate step (setTargets /
+   * applyCoachSchedule) so a program is just data here, same as any other
+   * proposal the coach hands the UI to act on. */
+  setActiveProgram: (program: Program | null) => void;
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
   setRemindWorkouts: (on: boolean) => void;
@@ -223,6 +231,7 @@ interface AppState {
     workouts: LoggedWorkout[];
     water: WaterEntry[];
     weights: WeightEntry[];
+    activeProgram: Program | null;
   }) => void;
   /** Wipes all local data and returns to the login/onboarding flow. */
   resetAll: () => void;
@@ -262,6 +271,7 @@ export const useAppStore = create<AppState>()(
       workouts: [],
       water: [],
       weights: [],
+      activeProgram: null,
       remindMeals: true,
       remindWater: true,
       remindWorkouts: true,
@@ -668,6 +678,7 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           weights: [{ ...entry, at: entry.at ?? new Date().toISOString() }, ...s.weights],
         })),
+      setActiveProgram: (activeProgram) => set({ activeProgram }),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
       setRemindWorkouts: (on) => set({ remindWorkouts: on }),
@@ -698,6 +709,7 @@ export const useAppStore = create<AppState>()(
           workouts: snap.workouts,
           water: snap.water,
           weights: snap.weights,
+          activeProgram: snap.activeProgram,
         }),
       resetAll: () =>
         set({
@@ -720,6 +732,7 @@ export const useAppStore = create<AppState>()(
           workouts: [],
           water: [],
           weights: [],
+          activeProgram: null,
           remindMeals: true,
           remindWater: true,
           remindWorkouts: true,
@@ -753,6 +766,7 @@ export const useAppStore = create<AppState>()(
         workouts,
         water,
         weights,
+        activeProgram,
         remindMeals,
         remindWater,
         remindWorkouts,
@@ -779,6 +793,7 @@ export const useAppStore = create<AppState>()(
         workouts,
         water,
         weights,
+        activeProgram,
         remindMeals,
         remindWater,
         remindWorkouts,
