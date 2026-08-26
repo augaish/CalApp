@@ -33,7 +33,8 @@ function REALISM_BLOCK(_language: Language): string {
 - Gulf rice-and-meat dishes (kabsa, bukhari, mandi, machboos, biryani, maqluba) are cooked with generous ghee/oil and often topped with fried onions, nuts and raisins: ONE restaurant plate WITH chicken is typically 800-1200 kcal — never return half of that.
 - Grilled or fried meats include the oil/marinade/butter they are cooked in.
 - Bread, rice and sauces served alongside a dish must each be counted.
-- When uncertain between a smaller and a larger portion, choose the higher realistic one — for a calorie tracker, under-counting is worse than a slight over-count.`;
+- When uncertain between a smaller and a larger portion, choose the higher realistic one — for a calorie tracker, under-counting is worse than a slight over-count.
+- This upward bias is for HIDDEN, unstated fat and portion size — it does not override what the user actually told you. When they explicitly state a reduction ("skinless", "no sauce", "grilled not fried", "no rice/bread", "lean cut", "no oil"), treat it as a REAL calorie cut and estimate from that leaner baseline, not the fattier default. Skinless grilled chicken meat with just a light dry or oil-based marinade is typically 150-200 kcal per 100g cooked — go higher only if a specific heavy oil/butter marinade, sauce, or skin-on preparation is actually described.`;
 }
 
 export function mealPrompt(language: Language): string {
@@ -78,7 +79,7 @@ Estimate the foods, realistic portions, calories and macros AS ACTUALLY SERVED.
 ${REALISM_BLOCK(language)}
 
 RESTAURANT AND BRANDED-PRODUCT ACCURACY:
-- If the description names a specific restaurant, chain, or packaged product (e.g. "McDonald's Big Mac meal", "Starbucks grande latte", "كودو ساندويش دجاج"), use the web_search tool BEFORE estimating — check the brand's own published nutrition info, or a reputable database (nutritionix, myfitnesspal, fatsecret). 1-3 searches is normally enough; if two sources disagree, prefer the brand's own listing.
+- If the description names a specific restaurant, chain, or packaged product — international (e.g. "McDonald's Big Mac meal", "Starbucks grande latte") OR regional Gulf/Levant chains (e.g. "كودو", "الطازج", "البيك", "هرفي", "مام نورة", or their English names Kudu, Al Tazaj, Al Baik, Herfy, Mama Noura) — use the web_search tool BEFORE estimating — check the brand's own published nutrition info, or a reputable database (nutritionix, myfitnesspal, fatsecret). 1-3 searches is normally enough; if two sources disagree, prefer the brand's own listing.
 - When you have official nutrition for the exact item, use THOSE figures instead of the general realism guidance above, and say what you used in "notes", e.g. "Used McDonald's official Big Mac meal nutrition (medium fries + regular Coke)."
 - If a size or side isn't specified (e.g. "a Big Mac meal" with no size given), assume the standard/medium size and say so in "notes".
 - Do NOT search for generic home-cooked or unbranded food ("rice with chicken", "a sandwich") — answer those directly, as before.
