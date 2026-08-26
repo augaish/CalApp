@@ -28,8 +28,8 @@ import { timestampFor, useViewDay } from '@/lib/day';
 import { normalizeDigits } from '@/lib/numbers';
 import {
   actualBurnedForDay,
-  bodyStatsFor,
   isSameDay,
+  overviewBodyStats,
   programProgress,
   streakDays,
   totalsForDay,
@@ -130,10 +130,12 @@ export default function Overview() {
   selectedEnd.setHours(23, 59, 59, 999);
   const weightsAsOf = weights.filter((w) => new Date(w.at).getTime() <= selectedEnd.getTime());
   const latestWeight = weightsAsOf[0];
-  const previousWeight = weightsAsOf[1];
-  const zoneIntensity = zoneIntensityFromSegmental(latestWeight?.segmentalLeanMassKg);
-  const zoneStatus = zoneStatusFromSegmental(latestWeight?.segmentalLeanMassStatus);
-  const stats = latestWeight && profile ? bodyStatsFor(latestWeight, previousWeight, profile) : undefined;
+  // Body-map coloring should keep showing the last known scan even when the
+  // most recent log on/before this day was just a bare weigh-in.
+  const latestScan = weightsAsOf.find((w) => w.segmentalLeanMassKg && zoneIntensityFromSegmental(w.segmentalLeanMassKg));
+  const zoneIntensity = zoneIntensityFromSegmental(latestScan?.segmentalLeanMassKg);
+  const zoneStatus = zoneStatusFromSegmental(latestScan?.segmentalLeanMassStatus);
+  const stats = profile ? overviewBodyStats(weightsAsOf, selected, profile) : undefined;
 
   // First-run activation checklist — derived from real data, auto-hides once complete.
   const checklist = [

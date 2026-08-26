@@ -1364,6 +1364,52 @@ export function bodyStatsFor(entry: WeightEntry, previous: WeightEntry | undefin
   };
 }
 
+/** Same shape as `bodyStatsFor`, but for the Overview "as of a viewed day"
+ * card: weight/BMI come from the single most recent entry on or before
+ * `asOf`, while body fat % and muscle % are each backfilled independently
+ * from the most recent entry (on or before `asOf`) that actually carries
+ * that field — a quick weight-only log shouldn't blank out fat/muscle
+ * numbers that are still the best data we have. `weights` must be sorted
+ * most-recent-first. */
+export function overviewBodyStats(weights: WeightEntry[], asOf: Date, profile: Profile): BodyStats | undefined {
+  const cutoff = new Date(asOf);
+  cutoff.setHours(23, 59, 59, 999);
+  const upToDate = weights.filter((w) => new Date(w.at).getTime() <= cutoff.getTime());
+  const latest = upToDate[0];
+  if (!latest) return undefined;
+  const previous = upToDate[1];
+  const bmi = bmiFor(latest.kg, profile.heightCm);
+  const previousBmi = previous ? bmiFor(previous.kg, profile.heightCm) : undefined;
+  const weightDelta = previous ? latest.kg - previous.kg : undefined;
+  const bmiDelta = previousBmi != null ? bmi - previousBmi : undefined;
+
+  const fatEntries = upToDate.filter((w) => w.bodyFatPercent != null);
+  const bodyFatPercent = fatEntries[0]?.bodyFatPercent;
+  const bodyFatDelta =
+    bodyFatPercent != null && fatEntries[1]?.bodyFatPercent != null ? bodyFatPercent - fatEntries[1].bodyFatPercent : undefined;
+
+  const muscleEntries = upToDate
+    .filter((w) => w.skeletalMuscleMassKg != null && w.kg)
+    .map((w) => (w.skeletalMuscleMassKg! / w.kg) * 100);
+  const musclePercent = muscleEntries[0];
+  const muscleDelta = musclePercent != null && muscleEntries[1] != null ? musclePercent - muscleEntries[1] : undefined;
+
+  return {
+    weightKg: latest.kg,
+    bmi,
+    bodyFatPercent,
+    musclePercent,
+    weightDelta,
+    bmiDelta,
+    bodyFatDelta,
+    muscleDelta,
+    weightTrend: weightDelta != null ? weightTrend(weightDelta, profile.goal) : 'neutral',
+    bmiTrend: bmiDelta != null ? bmiTrend(bmiDelta, profile.goal) : 'neutral',
+    bodyFatTrend: bodyFatDelta != null ? bodyFatTrend(bodyFatDelta) : 'neutral',
+    muscleTrend: muscleDelta != null ? muscleTrend(muscleDelta) : 'neutral',
+  };
+}
+
 /** Meal types already logged on `day`. */
 export function mealTypesLogged(meals: LoggedMeal[], day: Date): Set<MealType> {
   const set = new Set<MealType>();

@@ -147,28 +147,22 @@ export default function BodyReading() {
   const muscleSeries = musclePoints.map((w) => (w.skeletalMuscleMassKg! / w.kg) * 100);
   const muscleLabels = musclePoints.map((w) => dateLabel(w.at));
 
-  // Each chart's line is colored by whether its latest move is trending the
-  // right way — green/amber/red, same read as the Overview card's arrows —
-  // rather than one flat brand color that says nothing about direction.
+  // Each chart's line is colored by whether the whole visible window is
+  // trending the right way — first point vs. last point, not just the last
+  // two (which can read as flat even when the chart clearly isn't, e.g. two
+  // identical back-to-back weigh-ins) — green/amber/red, same read as the
+  // Overview card's arrows, rather than one flat brand color that says
+  // nothing about direction.
   const trendColor = (trend: MetricTrend) =>
     trend === 'good' ? theme.success : trend === 'bad' ? theme.danger : theme.warning;
   const weightLineTrend: MetricTrend =
-    weights[1] && profile ? weightTrend(weights[0].kg - weights[1].kg, profile.goal) : 'neutral';
+    profile && weightSeries.length >= 2 ? weightTrend(weightSeries.at(-1)! - weightSeries[0], profile.goal) : 'neutral';
   const bmiLineTrend: MetricTrend =
-    profile && trendSeries.length >= 2
-      ? bmiTrend(
-          bmiFor(trendSeries.at(-1)!.kg, profile.heightCm) - bmiFor(trendSeries.at(-2)!.kg, profile.heightCm),
-          profile.goal,
-        )
-      : 'neutral';
+    profile && bmiSeries.length >= 2 ? bmiTrend(bmiSeries.at(-1)! - bmiSeries[0], profile.goal) : 'neutral';
   const bodyFatLineTrend: MetricTrend =
-    bodyFatPoints.length >= 2
-      ? bodyFatTrend(bodyFatPoints.at(-1)!.bodyFatPercent! - bodyFatPoints.at(-2)!.bodyFatPercent!)
-      : 'neutral';
+    bodyFatSeries.length >= 2 ? bodyFatTrend(bodyFatSeries.at(-1)! - bodyFatSeries[0]) : 'neutral';
   const muscleLineTrend: MetricTrend =
-    musclePoints.length >= 2
-      ? muscleTrend(muscleSeries.at(-1)! - muscleSeries.at(-2)!)
-      : 'neutral';
+    muscleSeries.length >= 2 ? muscleTrend(muscleSeries.at(-1)! - muscleSeries[0]) : 'neutral';
 
   // Builds a chat-ready summary of the latest reading (with deltas vs the
   // one before it, when there is one) and hands it to the coach as an
@@ -272,13 +266,17 @@ export default function BodyReading() {
   // Weight/BMI/fat/muscle for whatever's currently on screen — a fresh
   // draft, or a past reading loaded via the date picker — against the
   // closest saved entry strictly before it (not necessarily weights[1]. if
-  // we're viewing history rather than the latest).
+  // we're viewing history rather than the latest). A blank draft (opened
+  // without a fresh scan) falls back to the latest saved entry, same as the
+  // composition map already does above, instead of showing nothing.
   const currentWeightNum = num(kg);
   const currentTimestamp = isoFromDateInput(date);
   const currentEntry: WeightEntry | undefined = currentWeightNum
     ? { at: currentTimestamp, kg: currentWeightNum, bodyFatPercent: num(bodyFat), skeletalMuscleMassKg: num(muscleMass) }
-    : undefined;
-  const previousEntry = weights.find((w) => new Date(w.at).getTime() < new Date(currentTimestamp).getTime());
+    : weights[0];
+  const previousEntry = currentWeightNum
+    ? weights.find((w) => new Date(w.at).getTime() < new Date(currentTimestamp).getTime())
+    : weights[1];
   const stats = currentEntry && profile ? bodyStatsFor(currentEntry, previousEntry, profile) : undefined;
 
   // Picking an existing date loads that day's saved reading into the whole
@@ -514,7 +512,7 @@ export default function BodyReading() {
           <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
             {activeMetric === 'fat' ? t('bodyReading.compositionFat') : t('bodyReading.composition')}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.md }}>
             {(zoneIntensity || fatZoneIntensity) && (
               <BodyMap
                 view={mapView}
