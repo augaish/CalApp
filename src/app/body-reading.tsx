@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import {
   BodyMap,
@@ -565,44 +565,61 @@ function UploadProgress({
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
+  const [trackWidth, setTrackWidth] = useState(0);
+  const [anim] = useState(() => new Animated.Value(0));
+
+  // An indeterminate bar (a segment sliding end-to-end, looping) rather than
+  // a determinate one — there's no real percentage to report for "reading a
+  // file" or "waiting on the AI", so a moving bar is what actually reads as
+  // "still working" instead of stalled, the way static highlighted dots didn't.
+  useEffect(() => {
+    if (stage === 'error') return;
+    anim.setValue(0);
+    const loop = Animated.loop(
+      Animated.timing(anim, { toValue: 1, duration: 1100, useNativeDriver: true }),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [stage, anim]);
+
   if (stage === 'error') {
     return (
-      <View style={[styles.uploadProgress, { backgroundColor: theme.cardSubtle }]}>
+      <View
+        style={[
+          styles.uploadProgress,
+          { backgroundColor: theme.cardSubtle, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+        ]}
+      >
         <Ionicons name="alert-circle" size={16} color={theme.danger} />
         <Text style={{ color: theme.danger, fontSize: 12, flex: 1 }}>{error}</Text>
       </View>
     );
   }
-  const steps = [
-    { key: 'picking' as const, label: t('bodyReading.stepReading') },
-    { key: 'analyzing' as const, label: t('bodyReading.stepAnalyzing') },
-  ];
-  const activeIndex = steps.findIndex((s) => s.key === stage);
+
+  const segmentWidth = Math.max(48, trackWidth * 0.4);
+  const translateX = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-segmentWidth, trackWidth],
+  });
+
   return (
     <View style={[styles.uploadProgress, { backgroundColor: theme.cardSubtle }]}>
-      {steps.map((s, i) => (
-        <View key={s.key} style={{ flexDirection: 'row', alignItems: 'center', flex: i < steps.length - 1 ? 1 : undefined }}>
-          <View style={[styles.uploadDot, { backgroundColor: i <= activeIndex ? theme.primary : theme.border }]} />
-          <Text
-            style={{
-              fontSize: 12,
-              fontWeight: i === activeIndex ? '700' : '500',
-              color: i <= activeIndex ? theme.text : theme.textTertiary,
-              marginStart: 6,
-            }}
-          >
-            {s.label}
-          </Text>
-          {i < steps.length - 1 && (
-            <View
-              style={[
-                styles.uploadConnector,
-                { backgroundColor: i < activeIndex ? theme.primary : theme.border },
-              ]}
-            />
-          )}
-        </View>
-      ))}
+      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.text, marginBottom: 8 }}>
+        {stage === 'picking' ? t('bodyReading.stepReading') : t('bodyReading.stepAnalyzing')}
+      </Text>
+      <View
+        style={[styles.uploadTrack, { backgroundColor: theme.border }]}
+        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
+      >
+        {trackWidth > 0 && (
+          <Animated.View
+            style={[
+              styles.uploadBar,
+              { width: segmentWidth, backgroundColor: theme.primary, transform: [{ translateX }] },
+            ]}
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -616,13 +633,10 @@ const styles = StyleSheet.create({
   historyCard: { borderRadius: Radius.md, overflow: 'hidden' },
   historyRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md },
   uploadProgress: {
-    flexDirection: 'row',
-    alignItems: 'center',
     borderRadius: Radius.md,
     padding: Spacing.sm,
-    gap: Spacing.sm,
     marginTop: Spacing.xs,
   },
-  uploadDot: { width: 8, height: 8, borderRadius: 4 },
-  uploadConnector: { height: 2, flex: 1, marginHorizontal: 8 },
+  uploadTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  uploadBar: { position: 'absolute', top: 0, bottom: 0, borderRadius: 3 },
 });
