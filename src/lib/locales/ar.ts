@@ -624,7 +624,7 @@ export const ar: TranslationSchema = {
     logWorkout: 'سجّل هذا التمرين',
     watchVideo: 'شاهد فيديو تعليمي',
     videoQuery: 'طريقة استخدام {{name}} في النادي بشكل صحيح',
-    saveToLibrary: 'حفظ في تماريني',
+    savedTitle: 'تم الحفظ في تمارينك',
     savedToLibrary: 'تم الحفظ — يمكنك تسجيله لاحقاً بدون مسح جديد.',
     matchedTitle: 'موجود في مكتبتك',
     matchedBody: 'تعرّفنا عليه من تمارينك، فلم نحتج إلى مسح بالذكاء الاصطناعي.',

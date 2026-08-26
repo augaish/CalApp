@@ -1,15 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { matchExerciseByName } from '@/lib/exercises';
-import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
 
@@ -22,25 +21,24 @@ export default function GymResult() {
   const custom = useAppStore((s) => s.exercises);
   const addExercise = useAppStore((s) => s.addExercise);
 
-  // If this machine is already in the library (built-in or saved earlier), we
-  // reuse it — no need to keep it around or spend AI tokens next time.
-  const matched = useMemo(
-    () => (analysis ? matchExerciseByName(analysis.name, custom) : undefined),
-    [analysis, custom],
-  );
+  // Whether this machine was ALREADY in the library (built-in or saved from
+  // an earlier scan) before this screen ever ran — computed once, from the
+  // library as it stood on arrival, so auto-saving a brand-new machine below
+  // doesn't retroactively flip this to "already knew it" and misreport what
+  // just happened.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const matched = useMemo(() => (analysis ? matchExerciseByName(analysis.name, custom) : undefined), [analysis]);
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
   }, [analysis, router]);
 
-  if (!analysis) return null;
-
   // Turn the scan into (or reuse) a reusable library exercise.
   const ensureExercise = (): string => {
     if (matched) return matched.id;
-    const description = [...analysis.setupSteps, ...analysis.formCues].map((s) => `• ${s}`).join('\n');
+    const description = [...analysis!.setupSteps, ...analysis!.formCues].map((s) => `• ${s}`).join('\n');
     return addExercise({
-      name: analysis.name,
+      name: analysis!.name,
       category: 'fullBody',
       type: 'weight_reps',
       photoUri: photoUri ?? undefined,
@@ -49,16 +47,26 @@ export default function GymResult() {
     });
   };
 
+  // The scan itself is the save — a machine you looked up here must be in
+  // the library next time regardless of which button (if any) you tap to
+  // leave, not only if you happen to tap a dedicated "save" action. Guarded
+  // by a ref (not just the effect's own dependency array) so a duplicate
+  // isn't created if the effect ever fires twice for one screen instance.
+  const savedRef = useRef(false);
+  useEffect(() => {
+    if (analysis && !savedRef.current) {
+      savedRef.current = true;
+      ensureExercise();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysis]);
+
+  if (!analysis) return null;
+
   // "Log this exercise" → opens the per-set Track page for this exercise.
   const logIt = () => {
     const id = ensureExercise();
     router.replace(`/exercise-detail?id=${encodeURIComponent(id)}`);
-  };
-
-  const saveOnly = () => {
-    ensureExercise();
-    successHaptic();
-    Alert.alert(t('gymResult.savedToLibrary'));
   };
 
   return (
@@ -66,15 +74,6 @@ export default function GymResult() {
       footer={
         <View>
           <Button label={t('gymResult.logWorkout')} icon="add" onPress={logIt} />
-          {!matched && (
-            <Button
-              label={t('gymResult.saveToLibrary')}
-              variant="secondary"
-              icon="bookmark-outline"
-              onPress={saveOnly}
-              style={{ marginTop: Spacing.xs }}
-            />
-          )}
           <Button
             label={t('common.done')}
             variant="ghost"
@@ -88,17 +87,19 @@ export default function GymResult() {
     >
       <Title>{analysis.name}</Title>
 
-      {matched && (
-        <Card style={{ backgroundColor: theme.cardSubtle }}>
-          <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
-            <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.text, fontWeight: '700' }}>{t('gymResult.matchedTitle')}</Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('gymResult.matchedBody')}</Text>
-            </View>
+      <Card style={{ backgroundColor: theme.cardSubtle }}>
+        <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
+          <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.text, fontWeight: '700' }}>
+              {t(matched ? 'gymResult.matchedTitle' : 'gymResult.savedTitle')}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+              {t(matched ? 'gymResult.matchedBody' : 'gymResult.savedToLibrary')}
+            </Text>
           </View>
-        </Card>
-      )}
+        </View>
+      </Card>
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
 

@@ -626,7 +626,7 @@ export const en = {
     logWorkout: 'Log this exercise',
     watchVideo: 'Watch video tutorial',
     videoQuery: 'how to use {{name}} gym machine proper form',
-    saveToLibrary: 'Save to my exercises',
+    savedTitle: 'Saved to your exercises',
     savedToLibrary: 'Saved — you can log it any time without scanning again.',
     matchedTitle: 'Already in your library',
     matchedBody: 'We recognized this from your exercises, so no AI scan was needed.',
