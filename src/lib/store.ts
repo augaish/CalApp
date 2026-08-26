@@ -381,13 +381,21 @@ export const useAppStore = create<AppState>()(
           };
         }),
       updateSet: (workoutId, index, patch, at) =>
-        set((s) => ({
-          workouts: s.workouts.map((w) => {
-            if (w.id !== workoutId) return w;
-            const sets = w.sets.map((st, i) => (i === index ? { ...st, ...patch } : st));
-            return { ...w, sets: markPRs(sets, w.type), updatedAt: at ?? w.updatedAt };
-          }),
-        })),
+        set((s) => {
+          const bodyKg = s.profile?.weightKg ?? 75;
+          return {
+            workouts: s.workouts.map((w) => {
+              if (w.id !== workoutId) return w;
+              const sets = w.sets.map((st, i) => (i === index ? { ...st, ...patch } : st));
+              return {
+                ...w,
+                sets: markPRs(sets, w.type),
+                updatedAt: at ?? w.updatedAt,
+                caloriesBurned: burnForSets(sets, bodyKg),
+              };
+            }),
+          };
+        }),
       removeSet: (workoutId, index) =>
         set((s) => {
           const bodyKg = s.profile?.weightKg ?? 75;
@@ -758,7 +766,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 3,
+      version: 4,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -832,6 +840,13 @@ export const useAppStore = create<AppState>()(
  * that fix can have entries genuinely out of order — every reader in the
  * app treats index 0 as "the latest reading", so a one-time sort here
  * straightens out whatever the old insert order left behind.
+ *
+ * v3 → v4: `updateSet` used to skip recomputing `caloriesBurned` — a
+ * workout completed by editing an existing (often plan-copied, born at 0)
+ * set rather than logging a brand new one could get stuck showing no
+ * calories at all. Recomputing every workout's burn from its own sets here
+ * fixes whatever that left behind; new edits are already fixed at the
+ * source.
  */
 function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
@@ -841,6 +856,14 @@ function migrateStore(persisted: unknown, version: number): unknown {
     state.weights = [...(state.weights as { at: string }[])].sort(
       (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
     );
+  }
+
+  if (version < 4 && Array.isArray(state.workouts)) {
+    const bodyKg = (state.profile as { weightKg?: number } | null | undefined)?.weightKg ?? 75;
+    state.workouts = (state.workouts as LoggedWorkout[]).map((w) => ({
+      ...w,
+      caloriesBurned: burnForSets(w.sets, bodyKg),
+    }));
   }
 
   if (version >= 2) return state;
