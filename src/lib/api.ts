@@ -63,6 +63,18 @@ export class FeatureLockedError extends Error {
   }
 }
 
+/** Raised when the request actually reached the server and it responded
+ * with a failure — as opposed to a plain network error (offline, timeout,
+ * DNS), which surfaces as fetch's own thrown error instead. `code` is the
+ * server's own error string (e.g. "invalid_request", "analysis_failed")
+ * when it sent one, so a caller can show *why* rather than just "failed". */
+export class ApiError extends Error {
+  constructor(public code: string) {
+    super(code);
+    this.name = 'ApiError';
+  }
+}
+
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
@@ -79,7 +91,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     throw new QuotaError(q.plan ?? 'free', q.used ?? 0, q.limit ?? 0);
   }
   if (!res.ok) {
-    throw new Error(`API ${path} failed: ${res.status}`);
+    const errBody = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(errBody.error ?? `http_${res.status}`);
   }
   return (await res.json()) as T;
 }
@@ -549,6 +562,7 @@ async function mockBodyReading(language: Language): Promise<BodyReadingAnalysis>
     bodyFatPercent: 19.5,
     skeletalMuscleMassKg: 34.2,
     segmentalLeanMassKg: { leftArm: 3.1, rightArm: 3.2, trunk: 27.8, leftLeg: 9.4, rightLeg: 9.6 },
+    segmentalFatMassKg: { leftArm: 0.9, rightArm: 0.9, trunk: 8.1, leftLeg: 1.8, rightLeg: 1.8 },
     confidence: 0.85,
   };
 }

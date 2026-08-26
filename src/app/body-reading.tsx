@@ -3,14 +3,21 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
-import { BodyMap, BodyMapViewSwitch, zoneIntensityFromSegmental, type BodyMapView } from '@/components/body-map';
+import {
+  BodyMap,
+  BodyMapMetricSwitch,
+  BodyMapViewSwitch,
+  zoneIntensityFromSegmental,
+  type BodyMapMetric,
+  type BodyMapView,
+} from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeBodyReading, FeatureLockedError, QuotaError } from '@/lib/api';
+import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
 import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
@@ -61,6 +68,8 @@ export default function BodyReading() {
   const scanned = fromScan === '1' ? bodyReading : null;
   const scannedSeg = scanned?.segmentalLeanMassKg;
   const hasScannedSeg = !!scannedSeg && Object.values(scannedSeg).some((v) => v != null);
+  const scannedFatSeg = scanned?.segmentalFatMassKg;
+  const hasScannedFatSeg = !!scannedFatSeg && Object.values(scannedFatSeg).some((v) => v != null);
 
   const [kg, setKg] = useState(scanned?.weightKg != null ? String(scanned.weightKg) : '');
   const [bodyFat, setBodyFat] = useState(scanned?.bodyFatPercent != null ? String(scanned.bodyFatPercent) : '');
@@ -77,7 +86,18 @@ export default function BodyReading() {
     }),
   );
   const [showSegmental, setShowSegmental] = useState(hasScannedSeg);
+  const [segmentalFat, setSegmentalFat] = useState<Record<'leftArm' | 'rightArm' | 'trunk' | 'leftLeg' | 'rightLeg', string>>(
+    () => ({
+      leftArm: scannedFatSeg?.leftArm != null ? String(scannedFatSeg.leftArm) : '',
+      rightArm: scannedFatSeg?.rightArm != null ? String(scannedFatSeg.rightArm) : '',
+      trunk: scannedFatSeg?.trunk != null ? String(scannedFatSeg.trunk) : '',
+      leftLeg: scannedFatSeg?.leftLeg != null ? String(scannedFatSeg.leftLeg) : '',
+      rightLeg: scannedFatSeg?.rightLeg != null ? String(scannedFatSeg.rightLeg) : '',
+    }),
+  );
+  const [showSegmentalFat, setShowSegmentalFat] = useState(hasScannedFatSeg);
   const [mapView, setMapView] = useState<BodyMapView>('front');
+  const [metric, setMetric] = useState<BodyMapMetric>('muscle');
   const [deviceLabel, setDeviceLabel] = useState(scanned?.deviceLabel);
   const [source, setSource] = useState<'manual' | 'scan'>(scanned ? 'scan' : 'manual');
   const [lowConfidence, setLowConfidence] = useState(scanned != null && scanned.confidence < 0.5);
@@ -88,7 +108,8 @@ export default function BodyReading() {
   // Set only when a PDF (not the camera) produced the current fields, so the
   // confirmation card can show a document icon instead of a photo thumbnail.
   const [pdfName, setPdfName] = useState<string | undefined>(undefined);
-  const [uploading, setUploading] = useState(false);
+  const [uploadStage, setUploadStage] = useState<'idle' | 'picking' | 'analyzing' | 'error'>('idle');
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const recent = useMemo(() => weights.slice(0, 6), [weights]);
   const trendSeries = useMemo(() => [...weights].slice(0, 8).reverse(), [weights]);
@@ -169,6 +190,25 @@ export default function BodyReading() {
   const compositionSeg = Object.values(liveSeg).some((v) => v != null) ? liveSeg : latestSavedSeg?.segmentalLeanMassKg;
   const zoneIntensity = zoneIntensityFromSegmental(compositionSeg);
 
+  // Same idea, for the separate fat-mass-by-zone breakdown some fuller
+  // reports also print — its own diagram on the report, its own toggle here.
+  const liveFatSeg = {
+    leftArm: num(segmentalFat.leftArm),
+    rightArm: num(segmentalFat.rightArm),
+    trunk: num(segmentalFat.trunk),
+    leftLeg: num(segmentalFat.leftLeg),
+    rightLeg: num(segmentalFat.rightLeg),
+  };
+  const latestSavedFatSeg = weights.find((w) => w.segmentalFatMassKg && zoneIntensityFromSegmental(w.segmentalFatMassKg));
+  const compositionFatSeg = Object.values(liveFatSeg).some((v) => v != null) ? liveFatSeg : latestSavedFatSeg?.segmentalFatMassKg;
+  const fatZoneIntensity = zoneIntensityFromSegmental(compositionFatSeg);
+  const hasFatComposition = fatZoneIntensity != null;
+  // Falls back to whichever of the two actually has data when the preferred
+  // one doesn't — e.g. a reading with only a fat breakdown still shows it
+  // by default instead of an empty card.
+  const activeMetric: BodyMapMetric = zoneIntensity == null && hasFatComposition ? 'fat' : metric;
+  const activeZoneIntensity = activeMetric === 'fat' ? fatZoneIntensity : zoneIntensity;
+
   // Fills the form from a freshly-analyzed report — used by the PDF upload
   // below (an in-place update, unlike the camera scan's route-param prefill
   // above, since there's no navigation involved).
@@ -187,6 +227,17 @@ export default function BodyReading() {
       });
       setShowSegmental(true);
     }
+    const fatSeg = a.segmentalFatMassKg;
+    if (fatSeg && Object.values(fatSeg).some((v) => v != null)) {
+      setSegmentalFat({
+        leftArm: fatSeg.leftArm != null ? String(fatSeg.leftArm) : '',
+        rightArm: fatSeg.rightArm != null ? String(fatSeg.rightArm) : '',
+        trunk: fatSeg.trunk != null ? String(fatSeg.trunk) : '',
+        leftLeg: fatSeg.leftLeg != null ? String(fatSeg.leftLeg) : '',
+        rightLeg: fatSeg.rightLeg != null ? String(fatSeg.rightLeg) : '',
+      });
+      setShowSegmentalFat(true);
+    }
     setDeviceLabel(a.deviceLabel);
     setSource('scan');
     setLowConfidence(a.confidence < 0.5);
@@ -194,14 +245,20 @@ export default function BodyReading() {
   };
 
   const uploadPdf = async () => {
-    if (uploading) return;
+    if (uploadStage === 'picking' || uploadStage === 'analyzing') return;
+    setUploadStage('picking');
+    setUploadError(null);
     const picked = await pickReportBase64().catch(() => null);
-    if (!picked) return;
-    if (picked.kind === 'unsupported') {
-      Alert.alert(t('bodyReading.unsupportedFile'));
+    if (!picked) {
+      setUploadStage('idle');
       return;
     }
-    setUploading(true);
+    if (picked.kind === 'unsupported') {
+      setUploadStage('error');
+      setUploadError(t('bodyReading.unsupportedFile'));
+      return;
+    }
+    setUploadStage('analyzing');
     try {
       const payload =
         picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64, imageMediaType: picked.mimeType };
@@ -209,15 +266,20 @@ export default function BodyReading() {
       useEntitlement.getState().spend();
       applyAnalysis(analysis);
       setPdfName(picked.name);
+      setUploadStage('idle');
     } catch (err) {
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
+        setUploadStage('idle');
         router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
         return;
       }
-      Alert.alert(t('common.error'));
-    } finally {
-      setUploading(false);
+      setUploadStage('error');
+      setUploadError(
+        err instanceof ApiError
+          ? t(err.code === 'invalid_request' ? 'bodyReading.errorInvalidFile' : 'bodyReading.errorAnalysisFailed')
+          : t('bodyReading.errorOffline'),
+      );
     }
   };
 
@@ -232,12 +294,21 @@ export default function BodyReading() {
       rightLeg: num(segmental.rightLeg),
     };
     const hasSeg = Object.values(seg).some((v) => v != null);
+    const fatSeg = {
+      leftArm: num(segmentalFat.leftArm),
+      rightArm: num(segmentalFat.rightArm),
+      trunk: num(segmentalFat.trunk),
+      leftLeg: num(segmentalFat.leftLeg),
+      rightLeg: num(segmentalFat.rightLeg),
+    };
+    const hasFatSeg = Object.values(fatSeg).some((v) => v != null);
     logBodyReading({
       kg: weightKg,
       at: isoFromDateInput(date),
       bodyFatPercent: num(bodyFat),
       skeletalMuscleMassKg: num(muscleMass),
       segmentalLeanMassKg: hasSeg ? seg : undefined,
+      segmentalFatMassKg: hasFatSeg ? fatSeg : undefined,
       source,
       reportLabel: deviceLabel,
     });
@@ -259,14 +330,17 @@ export default function BodyReading() {
             style={{ marginTop: Spacing.xs }}
           />
           {documentPickerAvailable && (
-            <Button
-              label={uploading ? t('bodyReading.uploading') : t('bodyReading.uploadPdf')}
-              variant="ghost"
-              icon="document-attach-outline"
-              loading={uploading}
-              onPress={uploadPdf}
-              style={{ marginTop: Spacing.xs }}
-            />
+            <>
+              <Button
+                label={t('bodyReading.uploadPdf')}
+                variant="ghost"
+                icon="document-attach-outline"
+                loading={uploadStage === 'picking' || uploadStage === 'analyzing'}
+                onPress={uploadPdf}
+                style={{ marginTop: Spacing.xs }}
+              />
+              {uploadStage !== 'idle' && <UploadProgress stage={uploadStage} error={uploadError} />}
+            </>
           )}
         </View>
       }
@@ -310,13 +384,21 @@ export default function BodyReading() {
         placeholder="YYYY-MM-DD"
       />
 
-      {zoneIntensity && (
+      {(zoneIntensity || fatZoneIntensity) && (
         <View style={[styles.trendCard, { backgroundColor: theme.card, alignItems: 'center' }, cardShadow(theme.shadow)]}>
           <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs, alignSelf: 'flex-start' }]}>
-            {t('bodyReading.composition')}
+            {activeMetric === 'fat' ? t('bodyReading.compositionFat') : t('bodyReading.composition')}
           </Text>
-          <BodyMap view={mapView} zoneIntensity={zoneIntensity} size={130} />
-          <View style={{ marginTop: Spacing.xs }}>
+          <BodyMap
+            view={mapView}
+            zoneIntensity={activeZoneIntensity ?? undefined}
+            zoneColor={activeMetric === 'fat' ? theme.fat : theme.warning}
+            size={130}
+          />
+          <View style={{ marginTop: Spacing.xs, alignItems: 'center', gap: Spacing.xs }}>
+            {zoneIntensity && fatZoneIntensity && (
+              <BodyMapMetricSwitch metric={activeMetric} onChange={setMetric} />
+            )}
             <BodyMapViewSwitch view={mapView} onChange={setMapView} />
           </View>
         </View>
@@ -415,6 +497,28 @@ export default function BodyReading() {
         </View>
       )}
 
+      <Pressable onPress={() => setShowSegmentalFat((v) => !v)} style={styles.segmentalToggle}>
+        <Ionicons name={showSegmentalFat ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
+        <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>
+          {t('bodyReading.segmentalFat')}
+        </Text>
+      </Pressable>
+      {showSegmentalFat && (
+        <View>
+          {(['leftArm', 'rightArm', 'trunk', 'leftLeg', 'rightLeg'] as const).map((key) => (
+            <Field
+              key={key}
+              label={t(`bodyReading.${key}`)}
+              value={segmentalFat[key]}
+              onChangeText={(v) => setSegmentalFat((s) => ({ ...s, [key]: normalizeDigits(v) }))}
+              keyboardType="decimal-pad"
+              maxLength={5}
+              suffix={t('progress.kg')}
+            />
+          ))}
+        </View>
+      )}
+
       {recent.length > 0 && (
         <>
           <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: Spacing.sm }]}>
@@ -449,6 +553,60 @@ export default function BodyReading() {
   );
 }
 
+/** Horizontal step row shown while an uploaded report is being read and
+ * analyzed, so the wait isn't just a spinner — and on failure, the actual
+ * reason instead of a generic alert. */
+function UploadProgress({
+  stage,
+  error,
+}: {
+  stage: 'picking' | 'analyzing' | 'error';
+  error: string | null;
+}) {
+  const theme = useTheme();
+  const { t } = useTranslation();
+  if (stage === 'error') {
+    return (
+      <View style={[styles.uploadProgress, { backgroundColor: theme.cardSubtle }]}>
+        <Ionicons name="alert-circle" size={16} color={theme.danger} />
+        <Text style={{ color: theme.danger, fontSize: 12, flex: 1 }}>{error}</Text>
+      </View>
+    );
+  }
+  const steps = [
+    { key: 'picking' as const, label: t('bodyReading.stepReading') },
+    { key: 'analyzing' as const, label: t('bodyReading.stepAnalyzing') },
+  ];
+  const activeIndex = steps.findIndex((s) => s.key === stage);
+  return (
+    <View style={[styles.uploadProgress, { backgroundColor: theme.cardSubtle }]}>
+      {steps.map((s, i) => (
+        <View key={s.key} style={{ flexDirection: 'row', alignItems: 'center', flex: i < steps.length - 1 ? 1 : undefined }}>
+          <View style={[styles.uploadDot, { backgroundColor: i <= activeIndex ? theme.primary : theme.border }]} />
+          <Text
+            style={{
+              fontSize: 12,
+              fontWeight: i === activeIndex ? '700' : '500',
+              color: i <= activeIndex ? theme.text : theme.textTertiary,
+              marginStart: 6,
+            }}
+          >
+            {s.label}
+          </Text>
+          {i < steps.length - 1 && (
+            <View
+              style={[
+                styles.uploadConnector,
+                { backgroundColor: i < activeIndex ? theme.primary : theme.border },
+              ]}
+            />
+          )}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   thumb: { width: 44, height: 44, borderRadius: Radius.sm },
@@ -457,4 +615,14 @@ const styles = StyleSheet.create({
   segmentalToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   historyCard: { borderRadius: Radius.md, overflow: 'hidden' },
   historyRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md },
+  uploadProgress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radius.md,
+    padding: Spacing.sm,
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  uploadDot: { width: 8, height: 8, borderRadius: 4 },
+  uploadConnector: { height: 2, flex: 1, marginHorizontal: 8 },
 });

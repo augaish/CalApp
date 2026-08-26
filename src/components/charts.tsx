@@ -121,6 +121,11 @@ export function TrendLine({
   const padTop = 20;
   const padBottom = 8;
   if (values.length < 2) return null;
+  // A raw computed value (BMI, a mass-as-percent-of-weight) can carry many
+  // decimal places; printed as-is it wraps across multiple lines inside the
+  // label's fixed 36px width, which reads as garbled overlapping digits.
+  // Whole numbers (a plain kg entry) print bare, everything else to 1 decimal.
+  const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
   const min = Math.min(...values);
   const max = Math.max(...values);
   const span = max - min || 1;
@@ -169,7 +174,7 @@ export function TrendLine({
               color: t.textSecondary,
             }}
           >
-            {p.v}
+            {fmt(p.v)}
           </Text>
         ))}
       </View>

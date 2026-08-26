@@ -6,7 +6,7 @@ import { Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } fr
 import { Button, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeText, isMockMode, QuotaError } from '@/lib/api';
+import { ApiError, analyzeText, isMockMode, QuotaError } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
@@ -37,7 +37,7 @@ export default function Describe() {
       // "Something went wrong" told the user nothing and left them retyping the
       // same description. A failed request and a rejected one need different
       // advice, so they get different messages.
-      const reachedServer = err instanceof Error && err.message.startsWith('API ');
+      const reachedServer = err instanceof ApiError;
       Alert.alert(
         t('describe.failedTitle'),
         reachedServer ? t('describe.failed') : t('describe.offline'),

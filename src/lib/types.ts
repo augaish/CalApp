@@ -85,6 +85,10 @@ export interface WeightEntry {
   bodyFatPercent?: number;
   skeletalMuscleMassKg?: number;
   segmentalLeanMassKg?: SegmentalLeanMass;
+  /** Same 5-zone shape as segmentalLeanMassKg, but fat mass — some reports
+   * (InBody's fuller printouts) break fat down by body part too, as a
+   * separate diagram from the lean-mass one. */
+  segmentalFatMassKg?: SegmentalLeanMass;
   source?: 'manual' | 'scan';
   /** Device/brand read off a scanned report, e.g. "InBody 270" — display only. */
   reportLabel?: string;
@@ -164,6 +168,7 @@ export interface BodyReadingAnalysis {
   bodyFatPercent?: number;
   skeletalMuscleMassKg?: number;
   segmentalLeanMassKg?: SegmentalLeanMass;
+  segmentalFatMassKg?: SegmentalLeanMass;
   confidence: number;
 }
 

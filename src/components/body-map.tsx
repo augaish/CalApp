@@ -207,3 +207,41 @@ export function BodyMapViewSwitch({
     </View>
   );
 }
+
+export type BodyMapMetric = 'muscle' | 'fat';
+
+/** Muscle/fat toggle — same pill styling as the front/back switch, for a
+ * reading that has both a segmental lean-mass AND a segmental fat-mass
+ * breakdown, so the same figure can show either. */
+export function BodyMapMetricSwitch({
+  metric,
+  onChange,
+}: {
+  metric: BodyMapMetric;
+  onChange: (metric: BodyMapMetric) => void;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', gap: Spacing.xs }}>
+      {(['muscle', 'fat'] as const).map((m) => (
+        <Text
+          key={m}
+          onPress={() => onChange(m)}
+          style={{
+            fontSize: 13,
+            fontWeight: '700',
+            paddingHorizontal: 12,
+            paddingVertical: 6,
+            borderRadius: 999,
+            overflow: 'hidden',
+            color: metric === m ? theme.onPrimary : theme.textSecondary,
+            backgroundColor: metric === m ? theme.primary : theme.cardSubtle,
+          }}
+        >
+          {m === 'muscle' ? t('progress.musclePercent') : t('bodyReading.bodyFat')}
+        </Text>
+      ))}
+    </View>
+  );
+}

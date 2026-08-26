@@ -231,6 +231,13 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
     "leftLeg": number | null,
     "rightLeg": number | null
   },
+  "segmentalFatMassKg": {
+    "leftArm": number | null,
+    "rightArm": number | null,
+    "trunk": number | null,
+    "leftLeg": number | null,
+    "rightLeg": number | null
+  },
   "confidence": number
 }
 
@@ -239,6 +246,7 @@ Rules:
 - "testDate" is the date the SCAN ITSELF was taken, exactly as printed on the report (a "Test Date", "Scan Date", or similar field) — never today's date, never a guess. Format as YYYY-MM-DD. Null if no date is printed anywhere on the report.
 - Convert lb to kg (divide by 2.205) if the report is in pounds; convert stone if present. Round to 1 decimal place.
 - "segmentalLeanMassKg" fields are only present on reports with a 5-part regional breakdown — most single-purpose scales won't have them, leave them all null in that case rather than splitting the total.
+- "segmentalFatMassKg" is separate from "segmentalLeanMassKg" — only some fuller reports print a dedicated per-body-part FAT breakdown (a distinct diagram/table from the lean-mass one, often labeled "fat analysis" or "fat distribution"). Leave it all null if the report doesn't have that specific breakdown, even when segmentalLeanMassKg is present.
 - "confidence" is 0-1, reflecting how clearly the numbers were legible — not how complete the report is. Lower it for a blurry photo, a partly-cropped image, or a garbled PDF text layer.
 - If this isn't a body-composition report at all, set every field to null and confidence to 0.
 
