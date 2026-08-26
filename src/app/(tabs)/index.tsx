@@ -645,7 +645,7 @@ function MetricRow({
   trend: MetricTrend;
 }) {
   const theme = useTheme();
-  const color = trend === 'good' ? theme.primary : trend === 'bad' ? theme.danger : theme.textTertiary;
+  const color = trend === 'good' ? theme.success : trend === 'bad' ? theme.danger : theme.warning;
   return (
     <View style={styles.metricRow}>
       <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1 }}>{label}</Text>

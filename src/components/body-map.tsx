@@ -36,6 +36,36 @@ const ZONE_GROUPS: Record<BodyZone, MuscleGroup[]> = {
   legs: ['legs', 'calves', 'glutes'],
 };
 
+/** Per-side keys a segmental reading is stored under — same shape as
+ * SegmentalLeanMass, reused here as the label overlay's key type. */
+export type BodySide = 'leftArm' | 'rightArm' | 'trunk' | 'leftLeg' | 'rightLeg';
+
+/**
+ * Roughly where each side's value sits on the figure, in the SVG's own
+ * 724x1448-per-view coordinate space (back view's paths already live in
+ * x=724..1448, per body-map-parts.ts). Read off the real path data's
+ * bounding areas, not eyeballed — a front-facing figure is mirrored like
+ * any anatomical diagram, so a screen-left position is the person's RIGHT
+ * side. Doesn't need to be pixel-exact: it's placing a small label near a
+ * limb, not clipping to it.
+ */
+const ZONE_LABEL_ANCHORS: Record<BodyMapView, Record<BodySide, { x: number; y: number }>> = {
+  front: {
+    rightArm: { x: 150, y: 460 },
+    leftArm: { x: 575, y: 460 },
+    trunk: { x: 362, y: 480 },
+    rightLeg: { x: 290, y: 820 },
+    leftLeg: { x: 420, y: 820 },
+  },
+  back: {
+    rightArm: { x: 935, y: 460 },
+    leftArm: { x: 1240, y: 460 },
+    trunk: { x: 1086, y: 480 },
+    rightLeg: { x: 1000, y: 700 },
+    leftLeg: { x: 1160, y: 700 },
+  },
+};
+
 /** Every drawable group, front first — used to build a front/back toggle. */
 export const BODY_MAP_GROUPS: { group: MuscleGroup; view: BodyMapView }[] = [
   ...FRONT_GROUPS.map((group) => ({ group, view: 'front' as const })),
@@ -105,6 +135,7 @@ export function BodyMap({
   secondaryMuscles,
   zoneIntensity,
   zoneColor,
+  zoneLabels,
   onSelect,
   size = 200,
 }: {
@@ -115,6 +146,10 @@ export function BodyMap({
   secondaryMuscles?: MuscleId[];
   zoneIntensity?: Partial<Record<BodyZone, number>>;
   zoneColor?: string;
+  /** Pre-formatted per-side values (e.g. "3.1kg") shown next to their real
+   * position on the figure — the actual numbers behind the zone coloring,
+   * not just a relative intensity. */
+  zoneLabels?: Partial<Record<BodySide, string>>;
   onSelect?: (group: MuscleGroup) => void;
   size?: number;
 }) {
@@ -170,6 +205,35 @@ export function BodyMap({
           );
         })}
       </Svg>
+      {zoneLabels && (
+        <View style={{ position: 'absolute', width: size, height }} pointerEvents="none">
+          {(Object.keys(zoneLabels) as BodySide[]).map((side) => {
+            const label = zoneLabels[side];
+            if (!label) return null;
+            const anchor = ZONE_LABEL_ANCHORS[view][side];
+            const vbXOffset = view === 'back' ? 724 : 0;
+            const px = ((anchor.x - vbXOffset) / 724) * size;
+            const py = (anchor.y / 1448) * height;
+            return (
+              <View key={side} style={{ position: 'absolute', left: px - 22, top: py - 8, width: 44, alignItems: 'center' }}>
+                <Text
+                  style={{
+                    fontSize: 9,
+                    fontWeight: '800',
+                    color: theme.text,
+                    backgroundColor: theme.card,
+                    paddingHorizontal: 4,
+                    borderRadius: 4,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }

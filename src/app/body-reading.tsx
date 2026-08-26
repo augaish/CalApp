@@ -14,6 +14,7 @@ import {
   type BodyMapView,
 } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
+import { DatePickerModal } from '@/components/date-picker';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -23,7 +24,7 @@ import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
-import { bmiFor, useAppStore } from '@/lib/store';
+import { bmiFor, bmiTrend, bodyFatTrend, type MetricTrend, muscleTrend, useAppStore, weightTrend } from '@/lib/store';
 import type { BodyReadingAnalysis } from '@/lib/types';
 
 /** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
@@ -110,6 +111,7 @@ export default function BodyReading() {
   const [pdfName, setPdfName] = useState<string | undefined>(undefined);
   const [uploadStage, setUploadStage] = useState<'idle' | 'picking' | 'analyzing' | 'error'>('idle');
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const recent = useMemo(() => weights.slice(0, 6), [weights]);
   const trendSeries = useMemo(() => [...weights].slice(0, 8).reverse(), [weights]);
@@ -128,6 +130,29 @@ export default function BodyReading() {
   );
   const muscleSeries = musclePoints.map((w) => (w.skeletalMuscleMassKg! / w.kg) * 100);
   const muscleLabels = musclePoints.map((w) => dateLabel(w.at));
+
+  // Each chart's line is colored by whether its latest move is trending the
+  // right way — green/amber/red, same read as the Overview card's arrows —
+  // rather than one flat brand color that says nothing about direction.
+  const trendColor = (trend: MetricTrend) =>
+    trend === 'good' ? theme.success : trend === 'bad' ? theme.danger : theme.warning;
+  const weightLineTrend: MetricTrend =
+    weights[1] && profile ? weightTrend(weights[0].kg - weights[1].kg, profile.goal) : 'neutral';
+  const bmiLineTrend: MetricTrend =
+    profile && trendSeries.length >= 2
+      ? bmiTrend(
+          bmiFor(trendSeries.at(-1)!.kg, profile.heightCm),
+          bmiFor(trendSeries.at(-1)!.kg, profile.heightCm) - bmiFor(trendSeries.at(-2)!.kg, profile.heightCm),
+        )
+      : 'neutral';
+  const bodyFatLineTrend: MetricTrend =
+    bodyFatPoints.length >= 2
+      ? bodyFatTrend(bodyFatPoints.at(-1)!.bodyFatPercent! - bodyFatPoints.at(-2)!.bodyFatPercent!)
+      : 'neutral';
+  const muscleLineTrend: MetricTrend =
+    musclePoints.length >= 2
+      ? muscleTrend(muscleSeries.at(-1)! - muscleSeries.at(-2)!)
+      : 'neutral';
 
   // Builds a chat-ready summary of the latest reading (with deltas vs the
   // one before it, when there is one) and hands it to the coach as an
@@ -208,6 +233,16 @@ export default function BodyReading() {
   // by default instead of an empty card.
   const activeMetric: BodyMapMetric = zoneIntensity == null && hasFatComposition ? 'fat' : metric;
   const activeZoneIntensity = activeMetric === 'fat' ? fatZoneIntensity : zoneIntensity;
+  const activeSeg = activeMetric === 'fat' ? compositionFatSeg : compositionSeg;
+  const zoneLabels = activeSeg
+    ? {
+        leftArm: activeSeg.leftArm != null ? `${activeSeg.leftArm.toFixed(1)}kg` : undefined,
+        rightArm: activeSeg.rightArm != null ? `${activeSeg.rightArm.toFixed(1)}kg` : undefined,
+        trunk: activeSeg.trunk != null ? `${activeSeg.trunk.toFixed(1)}kg` : undefined,
+        leftLeg: activeSeg.leftLeg != null ? `${activeSeg.leftLeg.toFixed(1)}kg` : undefined,
+        rightLeg: activeSeg.rightLeg != null ? `${activeSeg.rightLeg.toFixed(1)}kg` : undefined,
+      }
+    : undefined;
 
   // Fills the form from a freshly-analyzed report — used by the PDF upload
   // below (an in-place update, unlike the camera scan's route-param prefill
@@ -375,13 +410,20 @@ export default function BodyReading() {
         </Card>
       )}
 
-      <Field
-        label={t('bodyReading.date')}
-        value={date}
-        onChangeText={(v) => setDate(normalizeDigits(v))}
-        keyboardType="numbers-and-punctuation"
-        maxLength={10}
-        placeholder="YYYY-MM-DD"
+      <Pressable onPress={() => setShowDatePicker(true)}>
+        <Field
+          label={t('bodyReading.date')}
+          value={date}
+          editable={false}
+          placeholder="YYYY-MM-DD"
+        />
+      </Pressable>
+      <DatePickerModal
+        visible={showDatePicker}
+        value={new Date(isoFromDateInput(date))}
+        maxDate={new Date()}
+        onChange={(d) => setDate(ymd(d))}
+        onClose={() => setShowDatePicker(false)}
       />
 
       {(zoneIntensity || fatZoneIntensity) && (
@@ -393,6 +435,7 @@ export default function BodyReading() {
             view={mapView}
             zoneIntensity={activeZoneIntensity ?? undefined}
             zoneColor={activeMetric === 'fat' ? theme.fat : theme.warning}
+            zoneLabels={zoneLabels}
             size={130}
           />
           <View style={{ marginTop: Spacing.xs, alignItems: 'center', gap: Spacing.xs }}>
@@ -409,7 +452,7 @@ export default function BodyReading() {
           <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
             {t('bodyReading.trend')}
           </Text>
-          <TrendLine values={weightSeries} labels={weightLabels} color={theme.primary} width={width - Spacing.md * 4} />
+          <TrendLine values={weightSeries} labels={weightLabels} color={trendColor(weightLineTrend)} width={width - Spacing.md * 4} />
         </View>
       )}
 
@@ -418,7 +461,7 @@ export default function BodyReading() {
           <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
             {t('progress.bmi')}
           </Text>
-          <TrendLine values={bmiSeries} labels={weightLabels} color={theme.primary} width={width - Spacing.md * 4} />
+          <TrendLine values={bmiSeries} labels={weightLabels} color={trendColor(bmiLineTrend)} width={width - Spacing.md * 4} />
         </View>
       )}
 
@@ -427,7 +470,7 @@ export default function BodyReading() {
           <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
             {t('bodyReading.bodyFat')}
           </Text>
-          <TrendLine values={bodyFatSeries} labels={bodyFatLabels} color={theme.primary} width={width - Spacing.md * 4} />
+          <TrendLine values={bodyFatSeries} labels={bodyFatLabels} color={trendColor(bodyFatLineTrend)} width={width - Spacing.md * 4} />
         </View>
       )}
 
@@ -436,7 +479,7 @@ export default function BodyReading() {
           <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
             {t('progress.musclePercent')}
           </Text>
-          <TrendLine values={muscleSeries} labels={muscleLabels} color={theme.primary} width={width - Spacing.md * 4} />
+          <TrendLine values={muscleSeries} labels={muscleLabels} color={trendColor(muscleLineTrend)} width={width - Spacing.md * 4} />
         </View>
       )}
 
