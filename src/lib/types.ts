@@ -76,6 +76,19 @@ export interface SegmentalLeanMass {
   rightLeg?: number;
 }
 
+/** Where a body part's measured mass falls relative to the device's own
+ * reference range for it — as printed on the report (a marked bar or
+ * checkbox), never inferred from the raw kg value ourselves. */
+export type ZoneStatus = 'low' | 'normal' | 'high';
+
+export interface SegmentalStatus {
+  leftArm?: ZoneStatus;
+  rightArm?: ZoneStatus;
+  trunk?: ZoneStatus;
+  leftLeg?: ZoneStatus;
+  rightLeg?: ZoneStatus;
+}
+
 export interface WeightEntry {
   at: string;
   kg: number;
@@ -89,6 +102,11 @@ export interface WeightEntry {
    * (InBody's fuller printouts) break fat down by body part too, as a
    * separate diagram from the lean-mass one. */
   segmentalFatMassKg?: SegmentalLeanMass;
+  /** Only present when the report itself prints a below/normal/above
+   * banding per body part — most don't, so this is usually absent even
+   * when the kg values above are present. */
+  segmentalLeanMassStatus?: SegmentalStatus;
+  segmentalFatMassStatus?: SegmentalStatus;
   source?: 'manual' | 'scan';
   /** Device/brand read off a scanned report, e.g. "InBody 270" — display only. */
   reportLabel?: string;
@@ -169,6 +187,8 @@ export interface BodyReadingAnalysis {
   skeletalMuscleMassKg?: number;
   segmentalLeanMassKg?: SegmentalLeanMass;
   segmentalFatMassKg?: SegmentalLeanMass;
+  segmentalLeanMassStatus?: SegmentalStatus;
+  segmentalFatMassStatus?: SegmentalStatus;
   confidence: number;
 }
 

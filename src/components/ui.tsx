@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { normalizeDigits } from '@/lib/numbers';
+import type { MetricTrend } from '@/lib/store';
 
 /**
  * Screen shell. `footer` renders pinned to the bottom (thumb zone) above the
@@ -412,6 +413,34 @@ export function MealTypePicker({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/** One row in a compact body-stat readout — a label, its value, and an
+ * arrow colored by whether the change is trending the right way (not just
+ * which direction it moved). Shared by Overview's weight card and
+ * body-reading's own summary row so the two can't quietly drift apart. */
+export function MetricRow({
+  label,
+  value,
+  delta,
+  trend,
+}: {
+  label: string;
+  value: string;
+  delta?: number;
+  trend: MetricTrend;
+}) {
+  const theme = useTheme();
+  const color = trend === 'good' ? theme.success : trend === 'bad' ? theme.danger : theme.warning;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1 }}>{label}</Text>
+      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{value}</Text>
+      {delta != null && Math.abs(delta) >= 0.05 && (
+        <Ionicons name={delta > 0 ? 'caret-up' : 'caret-down'} size={11} color={color} style={{ marginStart: 3 }} />
+      )}
     </View>
   );
 }

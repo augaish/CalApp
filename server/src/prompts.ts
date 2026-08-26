@@ -238,6 +238,20 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
     "leftLeg": number | null,
     "rightLeg": number | null
   },
+  "segmentalLeanMassStatus": {
+    "leftArm": "low" | "normal" | "high" | null,
+    "rightArm": "low" | "normal" | "high" | null,
+    "trunk": "low" | "normal" | "high" | null,
+    "leftLeg": "low" | "normal" | "high" | null,
+    "rightLeg": "low" | "normal" | "high" | null
+  },
+  "segmentalFatMassStatus": {
+    "leftArm": "low" | "normal" | "high" | null,
+    "rightArm": "low" | "normal" | "high" | null,
+    "trunk": "low" | "normal" | "high" | null,
+    "leftLeg": "low" | "normal" | "high" | null,
+    "rightLeg": "low" | "normal" | "high" | null
+  },
   "confidence": number
 }
 
@@ -247,6 +261,7 @@ Rules:
 - Convert lb to kg (divide by 2.205) if the report is in pounds; convert stone if present. Round to 1 decimal place.
 - "segmentalLeanMassKg" fields are only present on reports with a 5-part regional breakdown — most single-purpose scales won't have them, leave them all null in that case rather than splitting the total.
 - "segmentalFatMassKg" is separate from "segmentalLeanMassKg" — only some fuller reports print a dedicated per-body-part FAT breakdown (a distinct diagram/table from the lean-mass one, often labeled "fat analysis" or "fat distribution"). Leave it all null if the report doesn't have that specific breakdown, even when segmentalLeanMassKg is present.
+- "segmentalLeanMassStatus"/"segmentalFatMassStatus" are the report's OWN printed under/normal/above classification for each body part — usually shown as a marked bar, shaded zone, or checkbox next to that part's row (e.g. "below" / "normal" / "over" or a local-language equivalent). Map it to exactly "low", "normal", or "high". Only set a field when the report explicitly marks that classification for that specific body part — never derive it yourself from the kg value. Leave null wherever the report doesn't show this.
 - "confidence" is 0-1, reflecting how clearly the numbers were legible — not how complete the report is. Lower it for a blurry photo, a partly-cropped image, or a garbled PDF text layer.
 - If this isn't a body-composition report at all, set every field to null and confidence to 0.
 

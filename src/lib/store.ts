@@ -1312,6 +1312,58 @@ export function muscleTrend(deltaPercent: number): MetricTrend {
   return trendFor(deltaPercent, 'up');
 }
 
+/** Weight/BMI/body-fat/muscle plus each one's delta and colored trend
+ * against `previous` — the same computation the Overview weight card and
+ * body-reading's own summary row both need, kept in one place so they can't
+ * quietly drift out of sync with each other. `previous` doesn't have to be
+ * literally adjacent in the weights array — the caller decides what
+ * "before this one" means (the prior saved entry, the one before a loaded
+ * historical reading, etc.). */
+export interface BodyStats {
+  weightKg: number;
+  bmi: number;
+  bodyFatPercent?: number;
+  musclePercent?: number;
+  weightDelta?: number;
+  bmiDelta?: number;
+  bodyFatDelta?: number;
+  muscleDelta?: number;
+  weightTrend: MetricTrend;
+  bmiTrend: MetricTrend;
+  bodyFatTrend: MetricTrend;
+  muscleTrend: MetricTrend;
+}
+
+export function bodyStatsFor(entry: WeightEntry, previous: WeightEntry | undefined, profile: Profile): BodyStats {
+  const bmi = bmiFor(entry.kg, profile.heightCm);
+  const previousBmi = previous ? bmiFor(previous.kg, profile.heightCm) : undefined;
+  const weightDelta = previous ? entry.kg - previous.kg : undefined;
+  const bmiDelta = previousBmi != null ? bmi - previousBmi : undefined;
+  const bodyFatDelta =
+    entry.bodyFatPercent != null && previous?.bodyFatPercent != null
+      ? entry.bodyFatPercent - previous.bodyFatPercent
+      : undefined;
+  const musclePercent = entry.skeletalMuscleMassKg != null ? (entry.skeletalMuscleMassKg / entry.kg) * 100 : undefined;
+  const previousMusclePercent =
+    previous?.skeletalMuscleMassKg != null && previous.kg ? (previous.skeletalMuscleMassKg / previous.kg) * 100 : undefined;
+  const muscleDelta =
+    musclePercent != null && previousMusclePercent != null ? musclePercent - previousMusclePercent : undefined;
+  return {
+    weightKg: entry.kg,
+    bmi,
+    bodyFatPercent: entry.bodyFatPercent,
+    musclePercent,
+    weightDelta,
+    bmiDelta,
+    bodyFatDelta,
+    muscleDelta,
+    weightTrend: weightDelta != null ? weightTrend(weightDelta, profile.goal) : 'neutral',
+    bmiTrend: bmiDelta != null ? bmiTrend(bmiDelta, profile.goal) : 'neutral',
+    bodyFatTrend: bodyFatDelta != null ? bodyFatTrend(bodyFatDelta) : 'neutral',
+    muscleTrend: muscleDelta != null ? muscleTrend(muscleDelta) : 'neutral',
+  };
+}
+
 /** Meal types already logged on `day`. */
 export function mealTypesLogged(meals: LoggedMeal[], day: Date): Set<MealType> {
   const set = new Set<MealType>();

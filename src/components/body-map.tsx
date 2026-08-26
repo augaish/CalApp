@@ -6,7 +6,7 @@ import { BACK_PARTS, FRONT_PARTS, type MusclePath } from '@/components/body-map-
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MUSCLE_COLORS, MUSCLE_ID_COLORS } from '@/lib/exercises';
-import type { MuscleGroup, MuscleId, SegmentalLeanMass } from '@/lib/types';
+import type { MuscleGroup, MuscleId, SegmentalLeanMass, SegmentalStatus, ZoneStatus } from '@/lib/types';
 
 /**
  * A real anatomical body diagram (see body-map-parts.ts for the path data's
@@ -126,6 +126,32 @@ export function zoneIntensityFromSegmental(
   return { arms: zones.arms / max, trunk: zones.trunk / max, legs: zones.legs / max };
 }
 
+/** Worst-of-both-sides: a zone with either side flagged "high" reads as
+ * high overall, then "low", then "normal" — so a single asymmetric flag
+ * still surfaces rather than getting averaged away. */
+function worseStatus(a: ZoneStatus | undefined, b: ZoneStatus | undefined): ZoneStatus | undefined {
+  if (a === 'high' || b === 'high') return 'high';
+  if (a === 'low' || b === 'low') return 'low';
+  return a ?? b;
+}
+
+/**
+ * Collapses the report's per-side (left/right) status into one status per
+ * drawn zone (arms/trunk/legs) — the figure colors a whole zone at once,
+ * same as zoneIntensityFromSegmental, so a side split isn't drawable without
+ * per-path left/right detection this doesn't have. The exact per-side value
+ * still shows in the numeric labels next to the figure; only the fill color
+ * is zone-level.
+ */
+export function zoneStatusFromSegmental(status: SegmentalStatus | undefined): Partial<Record<BodyZone, ZoneStatus>> | null {
+  if (!status) return null;
+  const arms = worseStatus(status.leftArm, status.rightArm);
+  const legs = worseStatus(status.leftLeg, status.rightLeg);
+  const trunk = status.trunk;
+  if (!arms && !trunk && !legs) return null;
+  return { arms, trunk, legs };
+}
+
 /**
  * Three ways to drive coloring, mutually exclusive (checked in this order):
  * - Muscle mode (`highlightedMuscles`/`secondaryMuscles`, MuscleId[]) — for
@@ -145,6 +171,7 @@ export function BodyMap({
   highlightedMuscles,
   secondaryMuscles,
   zoneIntensity,
+  zoneStatus,
   zoneColor,
   zoneLabels,
   onSelect,
@@ -156,6 +183,10 @@ export function BodyMap({
   highlightedMuscles?: MuscleId[];
   secondaryMuscles?: MuscleId[];
   zoneIntensity?: Partial<Record<BodyZone, number>>;
+  /** When present, takes over coloring from zoneIntensity — a definitive
+   * low/normal/high read off the report itself, shown at full opacity in a
+   * fixed green/amber/red rather than a single accent color's intensity. */
+  zoneStatus?: Partial<Record<BodyZone, ZoneStatus>>;
   zoneColor?: string;
   /** Pre-formatted per-side values (e.g. "3.1kg") shown next to their real
    * position on the figure — the actual numbers behind the zone coloring,
@@ -168,8 +199,9 @@ export function BodyMap({
   const parts: MusclePath[] = view === 'front' ? FRONT_PARTS : BACK_PARTS;
   const height = size * 2;
   const muscleMode = !!highlightedMuscles;
-  const zoneMode = !muscleMode && !!zoneIntensity;
+  const zoneMode = !muscleMode && !!(zoneIntensity || zoneStatus);
   const accent = zoneColor ?? theme.warning;
+  const statusColor: Record<ZoneStatus, string> = { normal: theme.success, low: theme.warning, high: theme.danger };
   const hasLabels = !!zoneLabels && Object.values(zoneLabels).some((v) => v != null);
 
   // Labels live outside the silhouette, in a margin added on both sides —
@@ -206,8 +238,12 @@ export function BodyMap({
             const zone = (Object.keys(ZONE_GROUPS) as BodyZone[]).find(
               (z) => part.group && ZONE_GROUPS[z].includes(part.group),
             );
-            const intensity = zone ? zoneIntensity![zone] : undefined;
-            if (intensity != null) {
+            const status = zone ? zoneStatus?.[zone] : undefined;
+            const intensity = zone ? zoneIntensity?.[zone] : undefined;
+            if (status) {
+              color = statusColor[status];
+              opacity = 1;
+            } else if (intensity != null) {
               color = accent;
               // Floor at 0.15 so a low-intensity zone still reads as "measured"
               // rather than disappearing into the neutral, unmeasured regions.
@@ -347,6 +383,31 @@ export function BodyMapMetricSwitch({
         >
           {m === 'muscle' ? t('progress.musclePercent') : t('bodyReading.bodyFat')}
         </Text>
+      ))}
+    </View>
+  );
+}
+
+/** Dot + label for each of the three zoneStatus colors — only meaningful
+ * (and only rendered by callers) when a reading actually carries the
+ * report's own printed status, since otherwise the figure isn't using
+ * these colors at all. */
+export function BodyMapStatusLegend() {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const items: { status: ZoneStatus; label: string }[] = [
+    { status: 'normal', label: t('bodyReading.statusNormal') },
+    { status: 'low', label: t('bodyReading.statusLow') },
+    { status: 'high', label: t('bodyReading.statusHigh') },
+  ];
+  const colors: Record<ZoneStatus, string> = { normal: theme.success, low: theme.warning, high: theme.danger };
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.md, flexWrap: 'wrap' }}>
+      {items.map((item) => (
+        <View key={item.status} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors[item.status] }} />
+          <Text style={{ fontSize: 11, color: theme.textSecondary }}>{item.label}</Text>
+        </View>
       ))}
     </View>
   );

@@ -563,6 +563,8 @@ async function mockBodyReading(language: Language): Promise<BodyReadingAnalysis>
     skeletalMuscleMassKg: 34.2,
     segmentalLeanMassKg: { leftArm: 3.1, rightArm: 3.2, trunk: 27.8, leftLeg: 9.4, rightLeg: 9.6 },
     segmentalFatMassKg: { leftArm: 0.9, rightArm: 0.9, trunk: 8.1, leftLeg: 1.8, rightLeg: 1.8 },
+    segmentalLeanMassStatus: { leftArm: 'normal', rightArm: 'normal', trunk: 'normal', leftLeg: 'low', rightLeg: 'low' },
+    segmentalFatMassStatus: { leftArm: 'normal', rightArm: 'normal', trunk: 'high', leftLeg: 'normal', rightLeg: 'normal' },
     confidence: 0.85,
   };
 }

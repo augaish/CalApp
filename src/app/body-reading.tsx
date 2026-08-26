@@ -8,14 +8,16 @@ import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from
 import {
   BodyMap,
   BodyMapMetricSwitch,
+  BodyMapStatusLegend,
   BodyMapViewSwitch,
   zoneIntensityFromSegmental,
+  zoneStatusFromSegmental,
   type BodyMapMetric,
   type BodyMapView,
 } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { DatePickerModal } from '@/components/date-picker';
-import { Button, Card, Field, Screen, Title } from '@/components/ui';
+import { Button, Card, Field, MetricRow, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
@@ -24,8 +26,17 @@ import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
-import { bmiFor, bmiTrend, bodyFatTrend, type MetricTrend, muscleTrend, useAppStore, weightTrend } from '@/lib/store';
-import type { BodyReadingAnalysis } from '@/lib/types';
+import {
+  bmiFor,
+  bmiTrend,
+  bodyFatTrend,
+  bodyStatsFor,
+  type MetricTrend,
+  muscleTrend,
+  useAppStore,
+  weightTrend,
+} from '@/lib/store';
+import type { BodyReadingAnalysis, SegmentalStatus, WeightEntry } from '@/lib/types';
 
 /** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
 function ymd(d: Date): string {
@@ -97,6 +108,11 @@ export default function BodyReading() {
     }),
   );
   const [showSegmentalFat, setShowSegmentalFat] = useState(hasScannedFatSeg);
+  // Purely descriptive — never user-edited, since we have no reference
+  // range to recompute it from ourselves. Only ever set from a report's own
+  // printed classification (a fresh scan, or loading a past saved reading).
+  const [segmentalStatus, setSegmentalStatus] = useState<SegmentalStatus | undefined>(scanned?.segmentalLeanMassStatus);
+  const [segmentalFatStatus, setSegmentalFatStatus] = useState<SegmentalStatus | undefined>(scanned?.segmentalFatMassStatus);
   const [mapView, setMapView] = useState<BodyMapView>('front');
   const [metric, setMetric] = useState<BodyMapMetric>('muscle');
   const [deviceLabel, setDeviceLabel] = useState(scanned?.deviceLabel);
@@ -244,6 +260,60 @@ export default function BodyReading() {
       }
     : undefined;
 
+  // Status follows whichever kg source is actually being shown — the report's
+  // own live/loaded status when the live numbers are what's on screen, else
+  // the same fallback entry's own status (so the two never mismatch).
+  const statusSource = Object.values(liveSeg).some((v) => v != null) ? segmentalStatus : latestSavedSeg?.segmentalLeanMassStatus;
+  const fatStatusSource = Object.values(liveFatSeg).some((v) => v != null) ? segmentalFatStatus : latestSavedFatSeg?.segmentalFatMassStatus;
+  const zoneStatus = zoneStatusFromSegmental(statusSource);
+  const fatZoneStatus = zoneStatusFromSegmental(fatStatusSource);
+  const activeZoneStatus = activeMetric === 'fat' ? fatZoneStatus : zoneStatus;
+
+  // Weight/BMI/fat/muscle for whatever's currently on screen — a fresh
+  // draft, or a past reading loaded via the date picker — against the
+  // closest saved entry strictly before it (not necessarily weights[1]. if
+  // we're viewing history rather than the latest).
+  const currentWeightNum = num(kg);
+  const currentTimestamp = isoFromDateInput(date);
+  const currentEntry: WeightEntry | undefined = currentWeightNum
+    ? { at: currentTimestamp, kg: currentWeightNum, bodyFatPercent: num(bodyFat), skeletalMuscleMassKg: num(muscleMass) }
+    : undefined;
+  const previousEntry = weights.find((w) => new Date(w.at).getTime() < new Date(currentTimestamp).getTime());
+  const stats = currentEntry && profile ? bodyStatsFor(currentEntry, previousEntry, profile) : undefined;
+
+  // Picking an existing date loads that day's saved reading into the whole
+  // form — the date picker doubles as a way to browse history, not just tag
+  // a new entry.
+  const loadReading = (entry: WeightEntry) => {
+    setKg(String(entry.kg));
+    setBodyFat(entry.bodyFatPercent != null ? String(entry.bodyFatPercent) : '');
+    setMuscleMass(entry.skeletalMuscleMassKg != null ? String(entry.skeletalMuscleMassKg) : '');
+    const seg = entry.segmentalLeanMassKg;
+    setSegmental({
+      leftArm: seg?.leftArm != null ? String(seg.leftArm) : '',
+      rightArm: seg?.rightArm != null ? String(seg.rightArm) : '',
+      trunk: seg?.trunk != null ? String(seg.trunk) : '',
+      leftLeg: seg?.leftLeg != null ? String(seg.leftLeg) : '',
+      rightLeg: seg?.rightLeg != null ? String(seg.rightLeg) : '',
+    });
+    setShowSegmental(!!seg && Object.values(seg).some((v) => v != null));
+    const fatSeg = entry.segmentalFatMassKg;
+    setSegmentalFat({
+      leftArm: fatSeg?.leftArm != null ? String(fatSeg.leftArm) : '',
+      rightArm: fatSeg?.rightArm != null ? String(fatSeg.rightArm) : '',
+      trunk: fatSeg?.trunk != null ? String(fatSeg.trunk) : '',
+      leftLeg: fatSeg?.leftLeg != null ? String(fatSeg.leftLeg) : '',
+      rightLeg: fatSeg?.rightLeg != null ? String(fatSeg.rightLeg) : '',
+    });
+    setShowSegmentalFat(!!fatSeg && Object.values(fatSeg).some((v) => v != null));
+    setSegmentalStatus(entry.segmentalLeanMassStatus);
+    setSegmentalFatStatus(entry.segmentalFatMassStatus);
+    setDeviceLabel(entry.reportLabel);
+    setSource(entry.source ?? 'manual');
+    setLowConfidence(false);
+    setPdfName(undefined);
+  };
+
   // Fills the form from a freshly-analyzed report — used by the PDF upload
   // below (an in-place update, unlike the camera scan's route-param prefill
   // above, since there's no navigation involved).
@@ -273,6 +343,8 @@ export default function BodyReading() {
       });
       setShowSegmentalFat(true);
     }
+    setSegmentalStatus(a.segmentalLeanMassStatus);
+    setSegmentalFatStatus(a.segmentalFatMassStatus);
     setDeviceLabel(a.deviceLabel);
     setSource('scan');
     setLowConfidence(a.confidence < 0.5);
@@ -344,6 +416,8 @@ export default function BodyReading() {
       skeletalMuscleMassKg: num(muscleMass),
       segmentalLeanMassKg: hasSeg ? seg : undefined,
       segmentalFatMassKg: hasFatSeg ? fatSeg : undefined,
+      segmentalLeanMassStatus: hasSeg ? segmentalStatus : undefined,
+      segmentalFatMassStatus: hasFatSeg ? segmentalFatStatus : undefined,
       source,
       reportLabel: deviceLabel,
     });
@@ -426,28 +500,68 @@ export default function BodyReading() {
         visible={showDatePicker}
         value={new Date(isoFromDateInput(date))}
         maxDate={new Date()}
-        onChange={(d) => setDate(ymd(d))}
+        onChange={(d) => {
+          const newDate = ymd(d);
+          setDate(newDate);
+          const existing = weights.find((w) => ymd(new Date(w.at)) === newDate);
+          if (existing) loadReading(existing);
+        }}
         onClose={() => setShowDatePicker(false)}
       />
 
-      {(zoneIntensity || fatZoneIntensity) && (
-        <View style={[styles.trendCard, { backgroundColor: theme.card, alignItems: 'center' }, cardShadow(theme.shadow)]}>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs, alignSelf: 'flex-start' }]}>
+      {(zoneIntensity || fatZoneIntensity || stats) && (
+        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
             {activeMetric === 'fat' ? t('bodyReading.compositionFat') : t('bodyReading.composition')}
           </Text>
-          <BodyMap
-            view={mapView}
-            zoneIntensity={activeZoneIntensity ?? undefined}
-            zoneColor={activeMetric === 'fat' ? theme.fat : theme.warning}
-            zoneLabels={zoneLabels}
-            size={130}
-          />
-          <View style={{ marginTop: Spacing.xs, alignItems: 'center', gap: Spacing.xs }}>
-            {zoneIntensity && fatZoneIntensity && (
-              <BodyMapMetricSwitch metric={activeMetric} onChange={setMetric} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+            {(zoneIntensity || fatZoneIntensity) && (
+              <BodyMap
+                view={mapView}
+                zoneIntensity={activeZoneIntensity ?? undefined}
+                zoneStatus={activeZoneStatus ?? undefined}
+                zoneColor={activeMetric === 'fat' ? theme.fat : theme.warning}
+                zoneLabels={zoneLabels}
+                size={100}
+              />
             )}
-            <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+            {stats && (
+              <View style={{ flex: 1, gap: 5 }}>
+                <MetricRow
+                  label={t('progress.weight')}
+                  value={`${stats.weightKg} ${t('progress.kg')}`}
+                  delta={stats.weightDelta}
+                  trend={stats.weightTrend}
+                />
+                <MetricRow label={t('progress.bmi')} value={stats.bmi.toFixed(1)} delta={stats.bmiDelta} trend={stats.bmiTrend} />
+                {stats.bodyFatPercent != null && (
+                  <MetricRow
+                    label={t('bodyReading.bodyFat')}
+                    value={`${stats.bodyFatPercent}%`}
+                    delta={stats.bodyFatDelta}
+                    trend={stats.bodyFatTrend}
+                  />
+                )}
+                {stats.musclePercent != null && (
+                  <MetricRow
+                    label={t('progress.musclePercent')}
+                    value={`${stats.musclePercent.toFixed(0)}%`}
+                    delta={stats.muscleDelta}
+                    trend={stats.muscleTrend}
+                  />
+                )}
+              </View>
+            )}
           </View>
+          {(zoneIntensity || fatZoneIntensity) && (
+            <View style={{ marginTop: Spacing.sm, alignItems: 'center', gap: Spacing.xs }}>
+              {zoneIntensity && fatZoneIntensity && (
+                <BodyMapMetricSwitch metric={activeMetric} onChange={setMetric} />
+              )}
+              <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+              {activeZoneStatus && <BodyMapStatusLegend />}
+            </View>
+          )}
         </View>
       )}
 
