@@ -22,7 +22,15 @@ import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
-import { bestSetIndex, historyFor, isSameDay, useAppStore, workoutFor } from '@/lib/store';
+import {
+  bestSetIndex,
+  dateKey,
+  historyFor,
+  isSameDay,
+  useAppStore,
+  whoopKcalForWorkout,
+  workoutFor,
+} from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
 type Tab = 'track' | 'history' | 'graph';
@@ -54,6 +62,7 @@ export default function ExerciseDetail() {
 
   const custom = useAppStore((s) => s.exercises);
   const workouts = useAppStore((s) => s.workouts);
+  const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const schedule = useAppStore((s) => s.schedule);
   const logSet = useAppStore((s) => s.logSet);
   const updateSet = useAppStore((s) => s.updateSet);
@@ -73,6 +82,14 @@ export default function ExerciseDetail() {
   );
   const today = exercise ? workoutFor(workouts, exercise.id, viewDay) : undefined;
   const todaySets = today?.sets ?? [];
+  const todayWhoopCalories = today
+    ? whoopKcalForWorkout(
+        today,
+        workouts.filter((w) => isSameDay(w.at, viewDay)),
+        whoopWorkoutsByDay[dateKey(viewDay)] ?? [],
+      )
+    : null;
+  const todayCalories = todayWhoopCalories ?? today?.caloriesBurned;
 
   // Opening a scheduled exercise that isn't logged yet pre-fills its sets from
   // your best record / plan, but marks them NOT trained (no calories) — so an
@@ -132,7 +149,7 @@ export default function ExerciseDetail() {
   const primary = () => {
     successHaptic();
     if (editingIndex !== null && today) {
-      updateSet(today.id, editingIndex, buildSet());
+      updateSet(today.id, editingIndex, buildSet(), timestampFor(viewDay));
       setEditingIndex(null);
       setNote('');
     } else {
@@ -301,7 +318,8 @@ export default function ExerciseDetail() {
           setNote={setNote}
           editing={editingIndex !== null}
           dayLabel={dayLabel}
-          caloriesBurned={today?.caloriesBurned}
+          caloriesBurned={todayCalories}
+          fromWhoop={todayWhoopCalories != null}
           sets={todaySets}
           editingIndex={editingIndex}
           onSelect={selectSet}
@@ -344,6 +362,7 @@ function TrackTab({
   dayLabel,
   sets,
   caloriesBurned,
+  fromWhoop,
   editingIndex,
   onSelect,
   onDelete,
@@ -362,8 +381,12 @@ function TrackTab({
   editing: boolean;
   dayLabel: string;
   sets: WorkoutSet[];
-  /** This exercise's own estimate for today, independent of the day-wide WHOOP total up top — WHOOP has no way to attribute its number to one exercise. */
+  /** This exercise's own calories for today — WHOOP's real number when a
+   * WHOOP-detected workout overlaps this session's logged time, else the
+   * set/rep formula estimate (see `fromWhoop`). */
   caloriesBurned?: number;
+  /** Whether `caloriesBurned` came from a matched WHOOP workout. */
+  fromWhoop?: boolean;
   editingIndex: number | null;
   onSelect: (s: WorkoutSet, i: number) => void;
   onDelete: (i: number) => void;
@@ -380,9 +403,13 @@ function TrackTab({
           <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>{dayLabel}</Text>
         </View>
         {!!caloriesBurned && (
-          <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
-            {caloriesBurned} {t('common.kcal')}
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {fromWhoop && <Ionicons name="watch-outline" size={12} color={theme.carbs} />}
+            <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
+              {caloriesBurned} {t('common.kcal')}
+              {fromWhoop ? ` · ${t('track.fromWhoop')}` : ''}
+            </Text>
+          </View>
         )}
       </View>
 

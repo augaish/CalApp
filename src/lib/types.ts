@@ -263,6 +263,11 @@ export interface WorkoutSet {
 export interface LoggedWorkout {
   id: string;
   at: string;
+  /** Last time a set was added/edited — with `at`, brackets the session's
+   * real time window for matching against a WHOOP-detected workout. Equal
+   * to `at` for a workout logged in one shot (e.g. the Training tab
+   * checkmark), later for one built up set-by-set on the Track tab. */
+  updatedAt?: string;
   exerciseId: string;
   /** Snapshot of the name at log time (survives exercise edits/deletes). */
   exerciseName: string;

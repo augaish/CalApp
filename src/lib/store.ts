@@ -121,7 +121,7 @@ interface AppState {
     set: WorkoutSet,
     at?: string,
   ) => void;
-  updateSet: (workoutId: string, index: number, patch: Partial<WorkoutSet>) => void;
+  updateSet: (workoutId: string, index: number, patch: Partial<WorkoutSet>, at?: string) => void;
   removeSet: (workoutId: string, index: number) => void;
   removeWorkout: (id: string) => void;
   /**
@@ -357,7 +357,7 @@ export const useAppStore = create<AppState>()(
             return {
               workouts: s.workouts.map((w) =>
                 w.id === existing.id
-                  ? { ...w, sets: withPR, caloriesBurned: burnForSets(withPR, bodyKg) }
+                  ? { ...w, sets: withPR, updatedAt: when, caloriesBurned: burnForSets(withPR, bodyKg) }
                   : w,
               ),
             };
@@ -368,6 +368,7 @@ export const useAppStore = create<AppState>()(
               {
                 id: id(),
                 at: when,
+                updatedAt: when,
                 exerciseId: exercise.id,
                 exerciseName: exercise.name,
                 type: exercise.type,
@@ -378,12 +379,12 @@ export const useAppStore = create<AppState>()(
             ],
           };
         }),
-      updateSet: (workoutId, index, patch) =>
+      updateSet: (workoutId, index, patch, at) =>
         set((s) => ({
           workouts: s.workouts.map((w) => {
             if (w.id !== workoutId) return w;
             const sets = w.sets.map((st, i) => (i === index ? { ...st, ...patch } : st));
-            return { ...w, sets: markPRs(sets, w.type) };
+            return { ...w, sets: markPRs(sets, w.type), updatedAt: at ?? w.updatedAt };
           }),
         })),
       removeSet: (workoutId, index) =>
@@ -660,6 +661,7 @@ export const useAppStore = create<AppState>()(
             {
               id: id(),
               at: stampFor(day),
+              updatedAt: stampFor(day),
               exerciseId: exercise.id,
               exerciseName: exercise.name,
               type: exercise.type,
@@ -980,6 +982,80 @@ export function actualBurnedForDay(
   const formula = burnedForDay(workouts, day);
   if (formula === 0) return 0;
   return Math.round(formula * whoopCalibrationFactor(workouts, whoopBurnByDay));
+}
+
+/** How far off a logged set's own timestamp a WHOOP-detected workout window
+ * is still allowed to start/end and count as "the same session" — a
+ * checkmark rarely lands exactly on WHOOP's own start/stop, and neither does
+ * the moment the last set of a Track-tab session gets logged. */
+const WHOOP_MATCH_BUFFER_MS = 20 * 60 * 1000;
+
+function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): boolean {
+  return aStart <= bEnd && bStart <= aEnd;
+}
+
+/**
+ * WHOOP's own measured calories for this one logged exercise, real
+ * heart-rate-based numbers instead of the set/rep formula — the per-session
+ * equivalent of what `actualBurnedForDay` already does for a whole day, using
+ * the individual WHOOP workout records `whoopWorkoutsByDay` already carries
+ * (start/end/kcal) rather than only their day-level sum.
+ *
+ * Two exercises logged back-to-back can both fall inside ONE WHOOP-detected
+ * workout (WHOOP sees one continuous gym session; Calgym logs bench press and
+ * rows as separate entries) — crediting that WHOOP session's full kcal to
+ * each would double-count it once both are added up, so a shared session's
+ * calories are split across every logged exercise that overlaps it, by their
+ * share of done sets. Returns null when nothing overlaps, so the caller can
+ * fall back to the formula estimate.
+ */
+export function whoopKcalForWorkout(
+  workout: LoggedWorkout,
+  sameDayWorkouts: LoggedWorkout[],
+  whoopWorkoutsForDay: WhoopDayWorkout[],
+): number | null {
+  if (whoopWorkoutsForDay.length === 0) return null;
+  const myStart = new Date(workout.at).getTime() - WHOOP_MATCH_BUFFER_MS;
+  const myEnd = new Date(workout.updatedAt ?? workout.at).getTime() + WHOOP_MATCH_BUFFER_MS;
+  const mySets = workout.sets.filter((st) => st.done).length;
+  if (mySets === 0) return null;
+
+  let total = 0;
+  let matched = false;
+  for (const ww of whoopWorkoutsForDay) {
+    const wStart = new Date(ww.start).getTime();
+    const wEnd = new Date(ww.end).getTime();
+    if (!overlaps(myStart, myEnd, wStart, wEnd)) continue;
+    const sharers = sameDayWorkouts.filter((w) => {
+      const s = new Date(w.at).getTime() - WHOOP_MATCH_BUFFER_MS;
+      const e = new Date(w.updatedAt ?? w.at).getTime() + WHOOP_MATCH_BUFFER_MS;
+      return overlaps(s, e, wStart, wEnd);
+    });
+    const totalSets = sharers.reduce((n, w) => n + w.sets.filter((st) => st.done).length, 0);
+    if (totalSets === 0) continue;
+    matched = true;
+    total += ww.kcal * (mySets / totalSets);
+  }
+  return matched ? Math.round(total) : null;
+}
+
+/**
+ * The number to actually show for one logged exercise: WHOOP's real measured
+ * calories when a matching WHOOP workout exists, else the stored set/rep
+ * formula estimate. Mirrors `actualBurnedForDay`'s "prefer WHOOP" shape at
+ * session granularity.
+ */
+export function actualBurnedForWorkout(
+  workout: LoggedWorkout,
+  sameDayWorkouts: LoggedWorkout[],
+  whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>,
+): number {
+  const whoop = whoopKcalForWorkout(
+    workout,
+    sameDayWorkouts,
+    whoopWorkoutsByDay[dateKey(new Date(workout.at))] ?? [],
+  );
+  return whoop ?? workout.caloriesBurned ?? 0;
 }
 
 /**

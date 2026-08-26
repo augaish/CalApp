@@ -314,6 +314,7 @@ export const en = {
     track: 'Track',
     history: 'History',
     graph: 'Graph',
+    fromWhoop: 'WHOOP',
     weight: 'Weight',
     reps: 'Reps',
     seconds: 'Seconds',

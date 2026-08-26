@@ -316,6 +316,7 @@ export const ar: TranslationSchema = {
     track: 'تسجيل',
     history: 'السجل',
     graph: 'الرسم',
+    fromWhoop: 'WHOOP',
     weight: 'الوزن',
     reps: 'التكرارات',
     seconds: 'الثواني',

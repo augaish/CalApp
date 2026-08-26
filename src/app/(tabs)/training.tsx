@@ -16,6 +16,7 @@ import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/e
 import { successHaptic } from '@/lib/feedback';
 import {
   actualBurnedForDay,
+  actualBurnedForWorkout,
   applyOrder,
   bestSetIndex,
   dateKey,
@@ -24,6 +25,7 @@ import {
   setScore,
   useAppStore,
   whoopCalibrationFactor,
+  whoopKcalForWorkout,
   workoutDays,
   workoutFor,
 } from '@/lib/store';
@@ -143,7 +145,8 @@ export default function Training() {
   // duplicated from another day, scanned in, or picked from the library. The
   // card has to show what was actually done, not only what was planned, or
   // those exercises exist in the data with nowhere to appear.
-  const loggedTodayCount = workouts.filter((w) => isSameDay(w.at, selected)).length;
+  const selectedDayWorkouts = workouts.filter((w) => isSameDay(w.at, selected));
+  const loggedTodayCount = selectedDayWorkouts.length;
   const unplannedIds = [
     ...new Set(
       workouts.filter((w) => isSameDay(w.at, selected)).map((w) => w.exerciseId),
@@ -485,6 +488,9 @@ export default function Training() {
                 undefined,
               );
               const maxLabel = best ? bestSetLabel(best, best.type, kg) : '';
+              const wTodayCalories = wToday
+                ? actualBurnedForWorkout(wToday, selectedDayWorkouts, whoopWorkoutsByDay)
+                : undefined;
               return (
                 <View key={exId} style={styles.planItem}>
                   <View style={styles.planRow}>
@@ -521,9 +527,9 @@ export default function Training() {
                           </Text>
                         ) : null}
                       </View>
-                      {!!wToday?.caloriesBurned && (
+                      {!!wTodayCalories && (
                         <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12, marginEnd: 6 }}>
-                          {wToday.caloriesBurned} {t('common.kcal')}
+                          {wTodayCalories} {t('common.kcal')}
                         </Text>
                       )}
                       <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
@@ -689,7 +695,10 @@ export default function Training() {
         </View>
       ) : (
         groups.map((g) => {
-          const dayBurn = g.items.reduce((s, w) => s + (w.caloriesBurned ?? 0), 0);
+          const dayBurn = g.items.reduce(
+            (s, w) => s + actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay),
+            0,
+          );
           const open = !!openDays[g.key];
           return (
             <Card key={g.key}>
@@ -720,6 +729,8 @@ export default function Training() {
                 g.items.map((w) => {
                   const ex = findExercise(w.exerciseId, custom);
                   const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
+                  const wCalories = actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay);
+                  const wFromWhoop = whoopKcalForWorkout(w, g.items, whoopWorkoutsByDay[g.key] ?? []) != null;
                   return (
                     <View key={w.id} style={styles.workoutRow}>
                       <Pressable
@@ -741,10 +752,13 @@ export default function Training() {
                             {summarize(w, t('training.sets'), t('training.top'), kg)}
                           </Text>
                         </View>
-                        {!!w.caloriesBurned && (
-                          <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12 }}>
-                            {w.caloriesBurned} {t('common.kcal')}
-                          </Text>
+                        {!!wCalories && (
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                            {wFromWhoop && <Ionicons name="watch-outline" size={11} color={theme.carbs} />}
+                            <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12 }}>
+                              {wCalories} {t('common.kcal')}
+                            </Text>
+                          </View>
                         )}
                       </Pressable>
                       <Pressable
