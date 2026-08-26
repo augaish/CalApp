@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { Text, View } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Line, Path } from 'react-native-svg';
 
 import { BACK_PARTS, FRONT_PARTS, type MusclePath } from '@/components/body-map-parts';
 import { Spacing } from '@/constants/theme';
@@ -41,18 +41,17 @@ const ZONE_GROUPS: Record<BodyZone, MuscleGroup[]> = {
 export type BodySide = 'leftArm' | 'rightArm' | 'trunk' | 'leftLeg' | 'rightLeg';
 
 /**
- * Roughly where each side's value sits on the figure, in the SVG's own
- * 724x1448-per-view coordinate space (back view's paths already live in
- * x=724..1448, per body-map-parts.ts). Read off the real path data's
- * bounding areas, not eyeballed — a front-facing figure is mirrored like
- * any anatomical diagram, so a screen-left position is the person's RIGHT
- * side. Doesn't need to be pixel-exact: it's placing a small label near a
- * limb, not clipping to it.
+ * Roughly where each side's value actually sits on the figure — a leader
+ * line's anatomical end, in the SVG's own 724x1448-per-view coordinate
+ * space (back view's paths already live in x=724..1448, per
+ * body-map-parts.ts). Read off the real path data's bounding areas, not
+ * eyeballed — a front-facing figure is mirrored like any anatomical
+ * diagram, so a screen-left position is the person's RIGHT side.
  */
-const ZONE_LABEL_ANCHORS: Record<BodyMapView, Record<BodySide, { x: number; y: number }>> = {
+const ZONE_TARGETS: Record<BodyMapView, Record<BodySide, { x: number; y: number }>> = {
   front: {
-    rightArm: { x: 150, y: 460 },
-    leftArm: { x: 575, y: 460 },
+    rightArm: { x: 205, y: 420 },
+    leftArm: { x: 520, y: 420 },
     trunk: { x: 362, y: 480 },
     rightLeg: { x: 290, y: 820 },
     leftLeg: { x: 420, y: 820 },
@@ -61,9 +60,21 @@ const ZONE_LABEL_ANCHORS: Record<BodyMapView, Record<BodySide, { x: number; y: n
     rightArm: { x: 935, y: 460 },
     leftArm: { x: 1240, y: 460 },
     trunk: { x: 1086, y: 480 },
-    rightLeg: { x: 1000, y: 700 },
-    leftLeg: { x: 1160, y: 700 },
+    rightLeg: { x: 1000, y: 750 },
+    leftLeg: { x: 1160, y: 750 },
   },
+};
+
+/** Where each label itself sits, OUTSIDE the silhouette in the margin added
+ * on either side — a tidy top/middle/bottom row per side rather than
+ * hugging each target's exact height, so labels never crowd each other
+ * regardless of how close two targets are. Same rows for front and back. */
+const ZONE_LABEL_SLOTS: Record<BodySide, { side: 'left' | 'right'; y: number }> = {
+  rightArm: { side: 'left', y: 380 },
+  trunk: { side: 'left', y: 600 },
+  rightLeg: { side: 'left', y: 900 },
+  leftArm: { side: 'right', y: 380 },
+  leftLeg: { side: 'right', y: 900 },
 };
 
 /** Every drawable group, front first — used to build a front/back toggle. */
@@ -155,15 +166,31 @@ export function BodyMap({
 }) {
   const theme = useTheme();
   const parts: MusclePath[] = view === 'front' ? FRONT_PARTS : BACK_PARTS;
-  const viewBox = view === 'front' ? '0 0 724 1448' : '724 0 724 1448';
   const height = size * 2;
   const muscleMode = !!highlightedMuscles;
   const zoneMode = !muscleMode && !!zoneIntensity;
   const accent = zoneColor ?? theme.warning;
+  const hasLabels = !!zoneLabels && Object.values(zoneLabels).some((v) => v != null);
+
+  // Labels live outside the silhouette, in a margin added on both sides —
+  // widening the viewBox by the same margin (converted to its own units)
+  // keeps the body paths' real coordinates untouched while opening up room
+  // for a leader line to actually clear the figure instead of overlapping it.
+  const scale = size / 724;
+  const MARGIN = 54;
+  const marginVB = MARGIN / scale;
+  const originX = view === 'front' ? 0 : 724;
+  const outerWidth = hasLabels ? size + MARGIN * 2 : size;
+  const viewBox = hasLabels
+    ? `${originX - marginVB} 0 ${724 + marginVB * 2} 1448`
+    : view === 'front'
+      ? '0 0 724 1448'
+      : '724 0 724 1448';
+  const toPx = (vbX: number) => (vbX - originX) * scale + (hasLabels ? MARGIN : 0);
 
   return (
-    <View style={{ width: size, height, alignItems: 'center' }}>
-      <Svg width={size} height={height} viewBox={viewBox}>
+    <View style={{ width: outerWidth, height, alignItems: 'center' }}>
+      <Svg width={outerWidth} height={height} viewBox={viewBox}>
         {parts.map((part, i) => {
           let color = theme.cardSubtle;
           let opacity = 1;
@@ -204,31 +231,46 @@ export function BodyMap({
             />
           );
         })}
-      </Svg>
-      {zoneLabels && (
-        <View style={{ position: 'absolute', width: size, height }} pointerEvents="none">
-          {(Object.keys(zoneLabels) as BodySide[]).map((side) => {
-            const label = zoneLabels[side];
-            if (!label) return null;
-            const anchor = ZONE_LABEL_ANCHORS[view][side];
-            const vbXOffset = view === 'back' ? 724 : 0;
-            const px = ((anchor.x - vbXOffset) / 724) * size;
-            const py = (anchor.y / 1448) * height;
+        {hasLabels &&
+          (Object.keys(zoneLabels!) as BodySide[]).map((side) => {
+            if (!zoneLabels![side]) return null;
+            const target = ZONE_TARGETS[view][side];
+            const slot = ZONE_LABEL_SLOTS[side];
+            const lineEndX = slot.side === 'left' ? originX - marginVB * 0.5 : originX + 724 + marginVB * 0.5;
             return (
-              <View key={side} style={{ position: 'absolute', left: px - 22, top: py - 8, width: 44, alignItems: 'center' }}>
-                <Text
-                  style={{
-                    fontSize: 9,
-                    fontWeight: '800',
-                    color: theme.text,
-                    backgroundColor: theme.card,
-                    paddingHorizontal: 4,
-                    borderRadius: 4,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {label}
-                </Text>
+              <Line
+                key={side}
+                x1={target.x}
+                y1={target.y}
+                x2={lineEndX}
+                y2={slot.y}
+                stroke={theme.textTertiary}
+                strokeWidth={1.5}
+              />
+            );
+          })}
+      </Svg>
+      {hasLabels && (
+        <View style={{ position: 'absolute', width: outerWidth, height }} pointerEvents="none">
+          {(Object.keys(zoneLabels!) as BodySide[]).map((side) => {
+            const label = zoneLabels![side];
+            if (!label) return null;
+            const slot = ZONE_LABEL_SLOTS[side];
+            const lineEndX = slot.side === 'left' ? originX - marginVB * 0.5 : originX + 724 + marginVB * 0.5;
+            const px = toPx(lineEndX);
+            const py = (slot.y / 1448) * height;
+            return (
+              <View
+                key={side}
+                style={{
+                  position: 'absolute',
+                  left: slot.side === 'left' ? px - MARGIN : px,
+                  top: py - 8,
+                  width: MARGIN,
+                  alignItems: slot.side === 'left' ? 'flex-end' : 'flex-start',
+                }}
+              >
+                <Text style={{ fontSize: 10, fontWeight: '800', color: theme.text }}>{label}</Text>
               </View>
             );
           })}

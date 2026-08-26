@@ -156,7 +156,7 @@ export default function Overview() {
   const muscleDelta =
     musclePercent != null && previousMusclePercent != null ? musclePercent - previousMusclePercent : undefined;
   const weightTr: MetricTrend = weightDelta != null ? weightTrend(weightDelta, profile.goal) : 'neutral';
-  const bmiTr: MetricTrend = bmi != null && bmiDelta != null ? bmiTrend(bmi, bmiDelta) : 'neutral';
+  const bmiTr: MetricTrend = bmiDelta != null ? bmiTrend(bmiDelta, profile.goal) : 'neutral';
   const fatTr: MetricTrend = fatDelta != null ? bodyFatTrend(fatDelta) : 'neutral';
   const muscleTr: MetricTrend = muscleDelta != null ? muscleTrend(muscleDelta) : 'neutral';
 

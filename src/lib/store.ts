@@ -758,7 +758,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 2,
+      version: 3,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -826,10 +826,23 @@ export const useAppStore = create<AppState>()(
  * `{ equipmentName, sets:number, reps:string, weightLiftedKg }` becomes a
  * per-set LoggedWorkout, and each distinct name gets a custom Exercise so it
  * still appears in the library. Nobody loses history.
+ *
+ * v2 → v3: `weights` wasn't always inserted in sorted order (logWeight/
+ * logBodyReading used to blind-prepend), so anyone with data older than
+ * that fix can have entries genuinely out of order — every reader in the
+ * app treats index 0 as "the latest reading", so a one-time sort here
+ * straightens out whatever the old insert order left behind.
  */
 function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
   const state = persisted as Record<string, unknown>;
+
+  if (version < 3 && Array.isArray(state.weights)) {
+    state.weights = [...(state.weights as { at: string }[])].sort(
+      (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+    );
+  }
+
   if (version >= 2) return state;
 
   const oldWorkouts = Array.isArray(state.workouts) ? state.workouts : [];
@@ -1282,14 +1295,11 @@ export function weightTrend(deltaKg: number, goal: Goal): MetricTrend {
   return trendFor(deltaKg, goal === 'lose' ? 'down' : 'up');
 }
 
-/** BMI's "good" direction depends on where it currently sits relative to
- * the normal range (18.5–24.9), not on the user's weight goal — moving
- * toward that band is good from either side; already inside it, small
- * moves either way don't get colored. */
-export function bmiTrend(bmi: number, deltaBmi: number): MetricTrend {
-  if (bmi > 24.9) return trendFor(deltaBmi, 'down');
-  if (bmi < 18.5) return trendFor(deltaBmi, 'up');
-  return 'neutral';
+/** BMI is a direct function of weight (kg / height²), so it follows the
+ * same goal-based direction weight itself does — losing wants it down,
+ * gaining wants it up, maintaining has no "good" direction either way. */
+export function bmiTrend(deltaBmi: number, goal: Goal): MetricTrend {
+  return weightTrend(deltaBmi, goal);
 }
 
 /** Body fat: down is always the improving direction. */

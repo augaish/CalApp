@@ -141,8 +141,8 @@ export default function BodyReading() {
   const bmiLineTrend: MetricTrend =
     profile && trendSeries.length >= 2
       ? bmiTrend(
-          bmiFor(trendSeries.at(-1)!.kg, profile.heightCm),
           bmiFor(trendSeries.at(-1)!.kg, profile.heightCm) - bmiFor(trendSeries.at(-2)!.kg, profile.heightCm),
+          profile.goal,
         )
       : 'neutral';
   const bodyFatLineTrend: MetricTrend =
@@ -410,14 +410,18 @@ export default function BodyReading() {
         </Card>
       )}
 
-      <Pressable onPress={() => setShowDatePicker(true)}>
+      <View>
         <Field
           label={t('bodyReading.date')}
           value={date}
           editable={false}
           placeholder="YYYY-MM-DD"
         />
-      </Pressable>
+        {/* A non-editable TextInput can still swallow the tap itself on some
+            platforms rather than letting it bubble to a wrapping Pressable —
+            an overlay guarantees the tap is actually caught. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowDatePicker(true)} />
+      </View>
       <DatePickerModal
         visible={showDatePicker}
         value={new Date(isoFromDateInput(date))}
