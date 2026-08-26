@@ -173,8 +173,12 @@ export function TrendLine({
           </Text>
         ))}
       </View>
-      {/* Day axis */}
-      <View style={{ flexDirection: 'row', width, marginTop: 2 }}>
+      {/* Day axis — children are all position:absolute for x-alignment against
+          the points above, which means this row has no intrinsic height of
+          its own; without an explicit one it collapses to 0 and whatever
+          renders next (another chart, on a screen with several) overlaps
+          these labels instead of appearing below them. */}
+      <View style={{ flexDirection: 'row', width, height: 14, marginTop: 2 }}>
         {labels.map((l, i) => (
           <Text
             key={i}

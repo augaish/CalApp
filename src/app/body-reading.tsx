@@ -197,9 +197,14 @@ export default function BodyReading() {
     if (uploading) return;
     const picked = await pickReportBase64().catch(() => null);
     if (!picked) return;
+    if (picked.kind === 'unsupported') {
+      Alert.alert(t('bodyReading.unsupportedFile'));
+      return;
+    }
     setUploading(true);
     try {
-      const payload = picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64 };
+      const payload =
+        picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64, imageMediaType: picked.mimeType };
       const analysis = await analyzeBodyReading(payload, language);
       useEntitlement.getState().spend();
       applyAnalysis(analysis);

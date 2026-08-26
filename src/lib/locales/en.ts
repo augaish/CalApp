@@ -640,6 +640,7 @@ export const en = {
     rescan: 'Rescan',
     uploadPdf: 'Upload a report file',
     uploading: 'Reading your PDF…',
+    unsupportedFile: "That file's format isn't supported — try a JPEG or PNG image, or a PDF.",
     scannedBadge: 'Filled in from your scan — check the numbers before saving',
     deviceLabel: 'Detected: {{device}}',
     lowConfidence: 'Some numbers were hard to read — please double check before saving.',

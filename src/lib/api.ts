@@ -324,9 +324,12 @@ export async function analyzeEquipment(
 }
 
 /** A photo (existing camera scan) or a PDF export (InBody etc. commonly save
- * as one) — either way, the same structured reading comes back. */
+ * as one) — either way, the same structured reading comes back. A camera/
+ * gallery photo is always downscaled to JPEG first (see photo.ts), but a
+ * file picked from Files/iCloud Drive keeps its real format, so that path
+ * must say what it actually is. */
 export async function analyzeBodyReading(
-  payload: { image: string } | { pdf: string },
+  payload: { image: string; imageMediaType?: string } | { pdf: string },
   language: Language,
 ): Promise<BodyReadingAnalysis> {
   if (isMockMode) return mockBodyReading(language);

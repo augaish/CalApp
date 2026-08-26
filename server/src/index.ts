@@ -433,7 +433,12 @@ async function analyzeMealImage(
   return toMealAnalysis(replyText(response));
 }
 
-async function analyze(image: string, prompt: string, model: string = MODEL): Promise<unknown> {
+async function analyze(
+  image: string,
+  prompt: string,
+  model: string = MODEL,
+  mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg',
+): Promise<unknown> {
   const response = await anthropic.messages.create({
     model,
     max_tokens: 2000,
@@ -443,7 +448,7 @@ async function analyze(image: string, prompt: string, model: string = MODEL): Pr
         content: [
           {
             type: 'image',
-            source: { type: 'base64', media_type: 'image/jpeg', data: image },
+            source: { type: 'base64', media_type: mediaType, data: image },
           },
           { type: 'text', text: prompt },
         ],
@@ -554,20 +559,31 @@ app.post('/api/analyze-equipment', async (c) => {
 
 interface BodyReadingBody {
   image?: string;
+  imageMediaType?: string;
   pdf?: string;
   language?: string;
 }
+
+const SUPPORTED_IMAGE_MEDIA_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+type SupportedImageMediaType = 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
 
 /** Like `parseBody`, but also accepts a PDF export (InBody etc. print/save as
  * PDF far more often than a clean single photo) — kept separate from the
  * shared image-only `parseBody` since no other route needs this. */
 function parseBodyReadingBody(
   body: BodyReadingBody,
-): ({ image: string } | { pdf: string }) & { language: Language } | null {
+): (({ image: string; mediaType: SupportedImageMediaType } | { pdf: string }) & { language: Language }) | null {
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
   const image = body.image?.replace(/^data:image\/\w+;base64,/, '');
+  // The camera/gallery path always sends JPEG (see photo.ts); a file picked
+  // from Files/iCloud Drive keeps its real format and says so explicitly.
+  // Anything outside Claude's supported set is rejected here rather than
+  // sent on to get an opaque failure back.
+  const mediaType = SUPPORTED_IMAGE_MEDIA_TYPES.has(body.imageMediaType ?? '')
+    ? (body.imageMediaType as SupportedImageMediaType)
+    : 'image/jpeg';
   if (image && image.length >= 100 && image.length <= 10 * 1024 * 1024) {
-    return { image, language };
+    return { image, mediaType, language };
   }
   const pdf = body.pdf?.replace(/^data:application\/pdf;base64,/, '');
   // Anthropic's own cap is far higher (32 MB / 100 pages) — a scan report is
@@ -589,7 +605,9 @@ app.post('/api/analyze-body-reading', async (c) => {
   try {
     const prompt = bodyReadingPrompt(parsed.language);
     const result =
-      'pdf' in parsed ? await analyzeDocument(parsed.pdf, prompt) : await analyze(parsed.image, prompt);
+      'pdf' in parsed
+        ? await analyzeDocument(parsed.pdf, prompt)
+        : await analyze(parsed.image, prompt, MODEL, parsed.mediaType);
     return c.json(result);
   } catch (err) {
     console.error('analyze-body-reading failed:', err);

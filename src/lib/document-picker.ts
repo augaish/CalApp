@@ -17,8 +17,16 @@ export const documentPickerAvailable = requireOptionalNativeModule('ExpoDocument
  * already has around this, since that module's own availability isn't
  * checked here.
  */
+/** Claude's vision API only accepts these image formats — unlike the camera/
+ * gallery path (always re-encoded to JPEG by photo.ts), a file picked here
+ * keeps whatever format it was saved in. */
+const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
 export async function pickReportBase64(): Promise<
-  { name: string; base64: string; kind: 'pdf' | 'image' } | null
+  | { name: string; base64: string; kind: 'pdf' }
+  | { name: string; base64: string; kind: 'image'; mimeType: string }
+  | { name: string; kind: 'unsupported'; mimeType: string }
+  | null
 > {
   if (!documentPickerAvailable) return null;
   const DocumentPicker = await import('expo-document-picker');
@@ -28,8 +36,16 @@ export async function pickReportBase64(): Promise<
   });
   const asset = result.canceled ? undefined : result.assets?.[0];
   if (!asset) return null;
+  if (asset.mimeType === 'application/pdf') {
+    const FileSystem = await import('expo-file-system/legacy');
+    const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
+    return { name: asset.name, base64, kind: 'pdf' };
+  }
+  const mimeType = asset.mimeType ?? '';
+  if (!SUPPORTED_IMAGE_TYPES.has(mimeType)) {
+    return { name: asset.name, kind: 'unsupported', mimeType };
+  }
   const FileSystem = await import('expo-file-system/legacy');
   const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
-  const kind = asset.mimeType === 'application/pdf' ? 'pdf' : 'image';
-  return { name: asset.name, base64, kind };
+  return { name: asset.name, base64, kind: 'image', mimeType };
 }

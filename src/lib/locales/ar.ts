@@ -638,6 +638,7 @@ export const ar: TranslationSchema = {
     rescan: 'إعادة التصوير',
     uploadPdf: 'رفع ملف التقرير',
     uploading: 'جارٍ قراءة ملف PDF…',
+    unsupportedFile: 'صيغة هذا الملف غير مدعومة — جرّب صورة بصيغة JPEG أو PNG، أو ملف PDF.',
     scannedBadge: 'تم تعبئتها من المسح — راجع الأرقام قبل الحفظ',
     deviceLabel: 'تم اكتشاف: {{device}}',
     lowConfidence: 'بعض الأرقام كانت صعبة القراءة — يرجى مراجعتها قبل الحفظ.',
