@@ -207,20 +207,20 @@ Respond with ONLY valid JSON, no markdown fences:
 - If there is no gym equipment, set name to "" and confidence 0.`;
 }
 
-/** Text-only: infer an exercise's muscle group, measure type and how-to. */
 /**
- * Reads a photo of a body-composition report (InBody, Tanita, DEXA, a smart
- * scale's screen, etc.) and transcribes whatever numbers are printed on it —
- * this is OCR/extraction, never a visual estimate of the person in the
- * photo. If the photo isn't a report of this kind, everything comes back
+ * Reads a body-composition report — a photo (InBody, Tanita, DEXA, a smart
+ * scale's screen) or a multi-page PDF export — and transcribes whatever
+ * numbers are printed on it. This is OCR/extraction, never a visual estimate
+ * of the person. If it isn't a report of this kind, everything comes back
  * null/0 confidence rather than a guess.
  */
 export function bodyReadingPrompt(language: Language): string {
-  return `Read this photo of a body-composition scan report (examples: InBody, Tanita, Omron, DEXA, or a smart scale's on-screen result). Transcribe ONLY the numbers actually printed or displayed in the image. Never estimate, infer, or guess a value that isn't shown — if a field is not printed on the report, its value is null.
+  return `Read this body-composition scan report — a photo, or a multi-page PDF export (examples: InBody, Tanita, Omron, DEXA, or a smart scale's own result). If it's a PDF, check every page: a summary may be on page 1 with the segmental breakdown on a later page. Transcribe ONLY the numbers actually printed or displayed. Never estimate, infer, or guess a value that isn't shown — if a field is not printed on the report, its value is null.
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 {
   "deviceLabel": string | null,
+  "testDate": string | null,
   "weightKg": number | null,
   "bodyFatPercent": number | null,
   "skeletalMuscleMassKg": number | null,
@@ -236,14 +236,16 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 
 Rules:
 - "deviceLabel" is the machine/brand name printed on the report (e.g. "InBody 270"), in ${LANGUAGE_NAME[language]} if it has a local name, else as printed.
+- "testDate" is the date the SCAN ITSELF was taken, exactly as printed on the report (a "Test Date", "Scan Date", or similar field) — never today's date, never a guess. Format as YYYY-MM-DD. Null if no date is printed anywhere on the report.
 - Convert lb to kg (divide by 2.205) if the report is in pounds; convert stone if present. Round to 1 decimal place.
 - "segmentalLeanMassKg" fields are only present on reports with a 5-part regional breakdown — most single-purpose scales won't have them, leave them all null in that case rather than splitting the total.
-- "confidence" is 0-1, reflecting how clearly the numbers were legible — not how complete the report is. Lower it for a blurry or partly-cropped photo.
-- If the photo is not a body-composition report at all, set every numeric field to null and confidence to 0.
+- "confidence" is 0-1, reflecting how clearly the numbers were legible — not how complete the report is. Lower it for a blurry photo, a partly-cropped image, or a garbled PDF text layer.
+- If this isn't a body-composition report at all, set every field to null and confidence to 0.
 
 ${JSON_RULES}`;
 }
 
+/** Text-only: infer an exercise's muscle group, measure type and how-to. */
 export function exerciseInfoPrompt(language: Language, name: string): string {
   return `You are a certified personal trainer. A user is adding this exercise to their log: "${name.replace(/"/g, "'")}".
 

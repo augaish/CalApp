@@ -674,11 +674,22 @@ export const useAppStore = create<AppState>()(
       },
       logWater: (ml, at) =>
         set((s) => ({ water: [{ at: at ?? new Date().toISOString(), ml }, ...s.water] })),
+      // Sorted on insert (not just prepended) because a reading's `at` is not
+      // always "now" — a past day's Overview entry, and especially an
+      // imported historical report, can land anywhere in the timeline. Every
+      // other reader of `weights` (trend charts, "most recent reading",
+      // Overview's day list) assumes index 0 is the newest.
       logWeight: (kg, at) =>
-        set((s) => ({ weights: [{ at: at ?? new Date().toISOString(), kg }, ...s.weights] })),
+        set((s) => ({
+          weights: [{ at: at ?? new Date().toISOString(), kg }, ...s.weights].sort(
+            (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+          ),
+        })),
       logBodyReading: (entry) =>
         set((s) => ({
-          weights: [{ ...entry, at: entry.at ?? new Date().toISOString() }, ...s.weights],
+          weights: [{ ...entry, at: entry.at ?? new Date().toISOString() }, ...s.weights].sort(
+            (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
+          ),
         })),
       setActiveProgram: (activeProgram) => set({ activeProgram }),
       setRemindMeals: (on) => set({ remindMeals: on }),

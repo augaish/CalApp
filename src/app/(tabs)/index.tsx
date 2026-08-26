@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BodyMap, BodyMapViewSwitch, zoneIntensityFromSegmental, type BodyMapView } from '@/components/body-map';
 import { TrendLine, WeekBars } from '@/components/charts';
 import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
 import { Ring } from '@/components/ring';
@@ -75,6 +76,7 @@ export default function Overview() {
   const setDay = useViewDay((s) => s.setDay);
   const shift = useViewDay((s) => s.shift);
   const [kg, setKg] = useState('');
+  const [mapView, setMapView] = useState<BodyMapView>('front');
 
   // Coach-tour hooks must run before the early return below (rules of hooks).
   const ringRef = useRef<View>(null);
@@ -127,6 +129,11 @@ export default function Overview() {
   const weightLabels = recentWeights.map((w) =>
     new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
   );
+  // The most recent reading that actually has a segmental breakdown — most
+  // manual weigh-ins won't, only a scanned/imported report does, so this is
+  // often null and the body map below simply doesn't render.
+  const latestSegmental = weights.find((w) => w.segmentalLeanMassKg && zoneIntensityFromSegmental(w.segmentalLeanMassKg));
+  const zoneIntensity = zoneIntensityFromSegmental(latestSegmental?.segmentalLeanMassKg);
 
   // First-run activation checklist — derived from real data, auto-hides once complete.
   const checklist = [
@@ -511,6 +518,17 @@ export default function Overview() {
               </Text>
             </Pressable>
           </View>
+          {zoneIntensity && (
+            <View style={styles.compositionRow}>
+              <BodyMap view={mapView} zoneIntensity={zoneIntensity} size={72} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 6 }}>
+                  {t('bodyReading.composition')}
+                </Text>
+                <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+              </View>
+            </View>
+          )}
           {weightSeries.length >= 2 ? (
             <TrendLine
               values={weightSeries}
@@ -679,6 +697,7 @@ const styles = StyleSheet.create({
   halfValue: { fontSize: 20, fontWeight: '800' },
   halfTarget: { fontSize: 12, fontWeight: '600' },
   weightHead: { flexDirection: 'row', alignItems: 'center' },
+  compositionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.sm },
   weightRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm },
   weightBtn: { minWidth: 54, marginBottom: Spacing.md },
 });

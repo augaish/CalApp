@@ -454,6 +454,28 @@ async function analyze(image: string, prompt: string, model: string = MODEL): Pr
   return extractJson(replyText(response));
 }
 
+/** Same as `analyze`, for a PDF document instead of an image (e.g. an InBody export). */
+async function analyzeDocument(pdf: string, prompt: string, model: string = MODEL): Promise<unknown> {
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: 2000,
+    messages: [
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: pdf },
+          },
+          { type: 'text', text: prompt },
+        ],
+      },
+    ],
+  });
+
+  return extractJson(replyText(response));
+}
+
 /** Text-only completion (no image) — used for cacheable equipment details. */
 async function textCall(prompt: string, maxTokens = 1500): Promise<unknown> {
   const response = await anthropic.messages.create({
@@ -530,8 +552,34 @@ app.post('/api/analyze-equipment', async (c) => {
   }
 });
 
+interface BodyReadingBody {
+  image?: string;
+  pdf?: string;
+  language?: string;
+}
+
+/** Like `parseBody`, but also accepts a PDF export (InBody etc. print/save as
+ * PDF far more often than a clean single photo) — kept separate from the
+ * shared image-only `parseBody` since no other route needs this. */
+function parseBodyReadingBody(
+  body: BodyReadingBody,
+): ({ image: string } | { pdf: string }) & { language: Language } | null {
+  const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const image = body.image?.replace(/^data:image\/\w+;base64,/, '');
+  if (image && image.length >= 100 && image.length <= 10 * 1024 * 1024) {
+    return { image, language };
+  }
+  const pdf = body.pdf?.replace(/^data:application\/pdf;base64,/, '');
+  // Anthropic's own cap is far higher (32 MB / 100 pages) — a scan report is
+  // a page or two, so this stays generous without accepting something absurd.
+  if (pdf && pdf.length >= 100 && pdf.length <= 20 * 1024 * 1024) {
+    return { pdf, language };
+  }
+  return null;
+}
+
 app.post('/api/analyze-body-reading', async (c) => {
-  const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
+  const parsed = parseBodyReadingBody(await c.req.json<BodyReadingBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
   const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'bodyReading');
@@ -539,7 +587,9 @@ app.post('/api/analyze-body-reading', async (c) => {
   const claim = await reserve(ref, access, 'bodyReading');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
-    const result = await analyze(parsed.image, bodyReadingPrompt(parsed.language));
+    const prompt = bodyReadingPrompt(parsed.language);
+    const result =
+      'pdf' in parsed ? await analyzeDocument(parsed.pdf, prompt) : await analyze(parsed.image, prompt);
     return c.json(result);
   } catch (err) {
     console.error('analyze-body-reading failed:', err);

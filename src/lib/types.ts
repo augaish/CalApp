@@ -157,6 +157,9 @@ export interface EquipmentAnalysis {
  */
 export interface BodyReadingAnalysis {
   deviceLabel?: string;
+  /** The date the SCAN was taken, as printed on the report — YYYY-MM-DD. Not
+   * today's date; only set when the report actually prints one. */
+  testDate?: string;
   weightKg?: number;
   bodyFatPercent?: number;
   skeletalMuscleMassKg?: number;

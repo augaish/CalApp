@@ -323,12 +323,14 @@ export async function analyzeEquipment(
   return post<EquipmentAnalysis>('/api/analyze-equipment', { image: imageBase64, language });
 }
 
+/** A photo (existing camera scan) or a PDF export (InBody etc. commonly save
+ * as one) — either way, the same structured reading comes back. */
 export async function analyzeBodyReading(
-  imageBase64: string,
+  payload: { image: string } | { pdf: string },
   language: Language,
 ): Promise<BodyReadingAnalysis> {
   if (isMockMode) return mockBodyReading(language);
-  return post<BodyReadingAnalysis>('/api/analyze-body-reading', { image: imageBase64, language });
+  return post<BodyReadingAnalysis>('/api/analyze-body-reading', { ...payload, language });
 }
 
 export interface ExerciseInfo {
@@ -539,6 +541,7 @@ async function mockBodyReading(language: Language): Promise<BodyReadingAnalysis>
   await delay(1500);
   return {
     deviceLabel: language === 'ar' ? 'InBody 270 (تجريبي)' : 'InBody 270 (demo)',
+    testDate: '2026-06-15',
     weightKg: 78.4,
     bodyFatPercent: 19.5,
     skeletalMuscleMassKg: 34.2,

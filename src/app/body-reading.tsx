@@ -3,17 +3,36 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import { BodyMap, BodyMapViewSwitch, zoneIntensityFromSegmental, type BodyMapView } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { analyzeBodyReading, FeatureLockedError, QuotaError } from '@/lib/api';
+import { documentPickerAvailable, pickPdfBase64 } from '@/lib/document-picker';
+import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
+import type { BodyReadingAnalysis } from '@/lib/types';
+
+/** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** A YYYY-MM-DD string → an ISO timestamp at local noon (a report gives a
+ * date, never a time, and noon avoids any timezone rounding into "yesterday"
+ * or "tomorrow" when displayed). Falls back to right now if unparseable. */
+function isoFromDateInput(v: string): string {
+  const m = v.trim().match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (!m) return new Date().toISOString();
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
+  return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
 
 /** Manual entry and scan-review in one screen: a scan just pre-fills these
  * same editable fields rather than jumping to a separate confirm screen —
@@ -27,6 +46,7 @@ export default function BodyReading() {
   const { width } = useWindowDimensions();
   const locale = i18n.language === 'ar' ? 'ar-SA' : 'en-US';
 
+  const language = useAppStore((s) => s.language) ?? 'en';
   const weights = useAppStore((s) => s.weights);
   const logBodyReading = useAppStore((s) => s.logBodyReading);
   const bodyReading = usePending((s) => s.bodyReading);
@@ -57,9 +77,17 @@ export default function BodyReading() {
   );
   const [showSegmental, setShowSegmental] = useState(hasScannedSeg);
   const [mapView, setMapView] = useState<BodyMapView>('front');
-  const deviceLabel = scanned?.deviceLabel;
-  const source: 'manual' | 'scan' = scanned ? 'scan' : 'manual';
-  const lowConfidence = scanned != null && scanned.confidence < 0.5;
+  const [deviceLabel, setDeviceLabel] = useState(scanned?.deviceLabel);
+  const [source, setSource] = useState<'manual' | 'scan'>(scanned ? 'scan' : 'manual');
+  const [lowConfidence, setLowConfidence] = useState(scanned != null && scanned.confidence < 0.5);
+  // Defaults to today; a fresh scan can override it with the date actually
+  // printed on the report, and it stays freely editable either way — the
+  // whole point of importing an old PDF is that it isn't today's reading.
+  const [date, setDate] = useState(scanned?.testDate ?? ymd(new Date()));
+  // Set only when a PDF (not the camera) produced the current fields, so the
+  // confirmation card can show a document icon instead of a photo thumbnail.
+  const [pdfName, setPdfName] = useState<string | undefined>(undefined);
+  const [uploading, setUploading] = useState(false);
 
   const recent = useMemo(() => weights.slice(0, 6), [weights]);
   const trendSeries = useMemo(() => [...weights].slice(0, 8).reverse(), [weights]);
@@ -88,6 +116,52 @@ export default function BodyReading() {
   const compositionSeg = Object.values(liveSeg).some((v) => v != null) ? liveSeg : latestSavedSeg?.segmentalLeanMassKg;
   const zoneIntensity = zoneIntensityFromSegmental(compositionSeg);
 
+  // Fills the form from a freshly-analyzed report — used by the PDF upload
+  // below (an in-place update, unlike the camera scan's route-param prefill
+  // above, since there's no navigation involved).
+  const applyAnalysis = (a: BodyReadingAnalysis) => {
+    if (a.weightKg != null) setKg(String(a.weightKg));
+    if (a.bodyFatPercent != null) setBodyFat(String(a.bodyFatPercent));
+    if (a.skeletalMuscleMassKg != null) setMuscleMass(String(a.skeletalMuscleMassKg));
+    const seg = a.segmentalLeanMassKg;
+    if (seg && Object.values(seg).some((v) => v != null)) {
+      setSegmental({
+        leftArm: seg.leftArm != null ? String(seg.leftArm) : '',
+        rightArm: seg.rightArm != null ? String(seg.rightArm) : '',
+        trunk: seg.trunk != null ? String(seg.trunk) : '',
+        leftLeg: seg.leftLeg != null ? String(seg.leftLeg) : '',
+        rightLeg: seg.rightLeg != null ? String(seg.rightLeg) : '',
+      });
+      setShowSegmental(true);
+    }
+    setDeviceLabel(a.deviceLabel);
+    setSource('scan');
+    setLowConfidence(a.confidence < 0.5);
+    if (a.testDate) setDate(a.testDate);
+  };
+
+  const uploadPdf = async () => {
+    if (uploading) return;
+    const picked = await pickPdfBase64().catch(() => null);
+    if (!picked) return;
+    setUploading(true);
+    try {
+      const analysis = await analyzeBodyReading({ pdf: picked.base64 }, language);
+      useEntitlement.getState().spend();
+      applyAnalysis(analysis);
+      setPdfName(picked.name);
+    } catch (err) {
+      if (err instanceof QuotaError || err instanceof FeatureLockedError) {
+        useEntitlement.getState().refresh();
+        router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        return;
+      }
+      Alert.alert(t('common.error'));
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const save = () => {
     const weightKg = num(kg);
     if (!weightKg) return;
@@ -101,6 +175,7 @@ export default function BodyReading() {
     const hasSeg = Object.values(seg).some((v) => v != null);
     logBodyReading({
       kg: weightKg,
+      at: isoFromDateInput(date),
       bodyFatPercent: num(bodyFat),
       skeletalMuscleMassKg: num(muscleMass),
       segmentalLeanMassKg: hasSeg ? seg : undefined,
@@ -124,6 +199,16 @@ export default function BodyReading() {
             onPress={() => router.push('/scan?mode=body')}
             style={{ marginTop: Spacing.xs }}
           />
+          {documentPickerAvailable && (
+            <Button
+              label={uploading ? t('bodyReading.uploading') : t('bodyReading.uploadPdf')}
+              variant="ghost"
+              icon="document-attach-outline"
+              loading={uploading}
+              onPress={uploadPdf}
+              style={{ marginTop: Spacing.xs }}
+            />
+          )}
         </View>
       }
     >
@@ -139,9 +224,13 @@ export default function BodyReading() {
 
       {source === 'scan' && (
         <Card style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md }}>
-          {photoUri && (
+          {photoUri ? (
             <Image source={{ uri: photoUri }} style={styles.thumb} contentFit="cover" />
-          )}
+          ) : pdfName ? (
+            <View style={[styles.thumb, styles.pdfThumb, { backgroundColor: theme.cardSubtle }]}>
+              <Ionicons name="document-text-outline" size={22} color={theme.textSecondary} />
+            </View>
+          ) : null}
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
               {deviceLabel ? t('bodyReading.deviceLabel', { device: deviceLabel }) : t('bodyReading.scannedBadge')}
@@ -152,6 +241,15 @@ export default function BodyReading() {
           </View>
         </Card>
       )}
+
+      <Field
+        label={t('bodyReading.date')}
+        value={date}
+        onChangeText={(v) => setDate(normalizeDigits(v))}
+        keyboardType="numbers-and-punctuation"
+        maxLength={10}
+        placeholder="YYYY-MM-DD"
+      />
 
       {zoneIntensity && (
         <View style={[styles.trendCard, { backgroundColor: theme.card, alignItems: 'center' }, cardShadow(theme.shadow)]}>
@@ -258,6 +356,7 @@ export default function BodyReading() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   thumb: { width: 44, height: 44, borderRadius: Radius.sm },
+  pdfThumb: { alignItems: 'center', justifyContent: 'center' },
   trendCard: { borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.md },
   segmentalToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   historyCard: { borderRadius: Radius.md, overflow: 'hidden' },

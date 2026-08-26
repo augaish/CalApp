@@ -99,7 +99,7 @@ export default function Scan() {
       setEquipment(analysis, saved.uri);
       router.replace('/gym-result');
     } else if (isBody) {
-      const analysis = await analyzeBodyReading(saved.base64, language);
+      const analysis = await analyzeBodyReading({ image: saved.base64 }, language);
       useEntitlement.getState().spend();
       setBodyReading(analysis, saved.uri);
       router.replace('/body-reading?fromScan=1');
