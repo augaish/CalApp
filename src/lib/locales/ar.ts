@@ -459,6 +459,8 @@ export const ar: TranslationSchema = {
     weight: 'الوزن',
     logWeight: 'تسجيل الوزن',
     kg: 'كغ',
+    bmi: 'مؤشر كتلة الجسم',
+    musclePercent: 'العضلات',
     noWeights: 'سجّل وزنك لمتابعة التغير.',
     fullReading: 'القراءة الكاملة',
     workouts: 'التمارين',
@@ -653,6 +655,9 @@ export const ar: TranslationSchema = {
     trend: 'المسار',
     composition: 'أين تتركز كتلتك العضلية',
     recent: 'القراءات الأخيرة',
+    askCoach: 'اسأل المدرب عن هذا',
+    coachPromptIntro: 'هذه آخر قراءة لجسمي — ساعدني في فهمها وتعديل خطتي:',
+    coachPromptQuestion: 'على ماذا يجب أن أركز للوصول إلى هدفي، وكيف يجب أن يغيّر هذا خطتي؟',
   },
   program: {
     title: 'برنامج بالذكاء الاصطناعي',

@@ -7,6 +7,7 @@ import type {
   DailyTargets,
   Exercise,
   FoodItem,
+  Goal,
   Language,
   LoggedMeal,
   LoggedWorkout,
@@ -1255,6 +1256,50 @@ export function programProgress(program: Program): {
   const weekNumber = Math.min(program.durationWeeks, Math.floor(daysElapsed / 7) + 1);
   const pct = totalDays > 0 ? Math.min(100, (daysElapsed / totalDays) * 100) : 0;
   return { daysElapsed, totalDays, daysLeft, weekNumber, pct };
+}
+
+/** Body-mass index for a weight/height pair (kg, cm). */
+export function bmiFor(kg: number, heightCm: number): number {
+  const m = heightCm / 100;
+  return kg / (m * m);
+}
+
+export type MetricTrend = 'good' | 'bad' | 'neutral';
+
+/** Colors a change in some direction as good/bad/neutral, given which
+ * direction ('up' or 'down') counts as improvement. Small noise below
+ * `threshold` reads as neutral rather than flip-flopping on tiny deltas. */
+function trendFor(delta: number, goodDirection: 'up' | 'down', threshold = 0.05): MetricTrend {
+  if (Math.abs(delta) < threshold) return 'neutral';
+  const wentUp = delta > 0;
+  return (goodDirection === 'up') === wentUp ? 'good' : 'bad';
+}
+
+/** Weight trend depends on the user's goal: losing wants it down, gaining
+ * wants it up, and maintaining has no "good" direction — just neutral. */
+export function weightTrend(deltaKg: number, goal: Goal): MetricTrend {
+  if (goal === 'maintain') return 'neutral';
+  return trendFor(deltaKg, goal === 'lose' ? 'down' : 'up');
+}
+
+/** BMI's "good" direction depends on where it currently sits relative to
+ * the normal range (18.5–24.9), not on the user's weight goal — moving
+ * toward that band is good from either side; already inside it, small
+ * moves either way don't get colored. */
+export function bmiTrend(bmi: number, deltaBmi: number): MetricTrend {
+  if (bmi > 24.9) return trendFor(deltaBmi, 'down');
+  if (bmi < 18.5) return trendFor(deltaBmi, 'up');
+  return 'neutral';
+}
+
+/** Body fat: down is always the improving direction. */
+export function bodyFatTrend(deltaPercent: number): MetricTrend {
+  return trendFor(deltaPercent, 'down');
+}
+
+/** Muscle mass share of body weight: up is always the improving direction. */
+export function muscleTrend(deltaPercent: number): MetricTrend {
+  return trendFor(deltaPercent, 'up');
 }
 
 /** Meal types already logged on `day`. */

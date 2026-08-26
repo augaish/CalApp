@@ -16,7 +16,7 @@ import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
-import { useAppStore } from '@/lib/store';
+import { bmiFor, useAppStore } from '@/lib/store';
 import type { BodyReadingAnalysis } from '@/lib/types';
 
 /** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
@@ -47,6 +47,7 @@ export default function BodyReading() {
   const locale = i18n.language === 'ar' ? 'ar-SA' : 'en-US';
 
   const language = useAppStore((s) => s.language) ?? 'en';
+  const profile = useAppStore((s) => s.profile);
   const weights = useAppStore((s) => s.weights);
   const logBodyReading = useAppStore((s) => s.logBodyReading);
   const bodyReading = usePending((s) => s.bodyReading);
@@ -95,6 +96,58 @@ export default function BodyReading() {
   const weightLabels = trendSeries.map((w) =>
     new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
   );
+  const dateLabel = (at: string) => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' });
+  const bmiSeries = profile ? trendSeries.map((w) => bmiFor(w.kg, profile.heightCm)) : [];
+  const bodyFatPoints = useMemo(() => [...weights].filter((w) => w.bodyFatPercent != null).slice(0, 8).reverse(), [weights]);
+  const bodyFatSeries = bodyFatPoints.map((w) => w.bodyFatPercent!);
+  const bodyFatLabels = bodyFatPoints.map((w) => dateLabel(w.at));
+  const musclePoints = useMemo(
+    () => [...weights].filter((w) => w.skeletalMuscleMassKg != null && w.kg > 0).slice(0, 8).reverse(),
+    [weights],
+  );
+  const muscleSeries = musclePoints.map((w) => (w.skeletalMuscleMassKg! / w.kg) * 100);
+  const muscleLabels = musclePoints.map((w) => dateLabel(w.at));
+
+  // Builds a chat-ready summary of the latest reading (with deltas vs the
+  // one before it, when there is one) and hands it to the coach as an
+  // opening question — the coach already gets the bare latest numbers with
+  // every message (see coach-context.ts), but the trend deltas here aren't
+  // part of that, and reading them out loud in the chat gives the user
+  // something concrete to follow along with.
+  const askCoach = () => {
+    const latest = weights[0];
+    if (!latest) return;
+    const previous = weights[1];
+    const delta = (value: number | undefined, decimals = 1) => {
+      if (value == null || Math.abs(value) < 0.05) return '';
+      return ` (${value > 0 ? '↑' : '↓'}${Math.abs(value).toFixed(decimals)})`;
+    };
+    const lines = [
+      `${t('progress.weight')}: ${latest.kg} ${t('progress.kg')}${delta(previous ? latest.kg - previous.kg : undefined)}`,
+    ];
+    if (profile) {
+      const bmiNow = bmiFor(latest.kg, profile.heightCm);
+      const bmiPrev = previous ? bmiFor(previous.kg, profile.heightCm) : undefined;
+      lines.push(`${t('progress.bmi')}: ${bmiNow.toFixed(1)}${delta(bmiPrev != null ? bmiNow - bmiPrev : undefined)}`);
+    }
+    if (latest.bodyFatPercent != null) {
+      const prevFat = previous?.bodyFatPercent;
+      lines.push(
+        `${t('bodyReading.bodyFat')}: ${latest.bodyFatPercent}%${delta(prevFat != null ? latest.bodyFatPercent - prevFat : undefined)}`,
+      );
+    }
+    if (latest.skeletalMuscleMassKg != null) {
+      const musclePct = (latest.skeletalMuscleMassKg / latest.kg) * 100;
+      const prevMusclePct =
+        previous?.skeletalMuscleMassKg != null && previous.kg ? (previous.skeletalMuscleMassKg / previous.kg) * 100 : undefined;
+      lines.push(
+        `${t('progress.musclePercent')}: ${musclePct.toFixed(0)}%${delta(prevMusclePct != null ? musclePct - prevMusclePct : undefined)}`,
+      );
+    }
+    if (profile) lines.push(`${t('onboarding.goalTitle')} ${t(`onboarding.goals.${profile.goal}`)}`);
+    const message = `${t('bodyReading.coachPromptIntro')}\n\n${lines.join('\n')}\n\n${t('bodyReading.coachPromptQuestion')}`;
+    router.push(`/coach?prompt=${encodeURIComponent(message)}`);
+  };
 
   const num = (v: string) => {
     const n = Number(normalizeDigits(v));
@@ -271,6 +324,43 @@ export default function BodyReading() {
           </Text>
           <TrendLine values={weightSeries} labels={weightLabels} color={theme.primary} width={width - Spacing.md * 4} />
         </View>
+      )}
+
+      {bmiSeries.length >= 2 && (
+        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+            {t('progress.bmi')}
+          </Text>
+          <TrendLine values={bmiSeries} labels={weightLabels} color={theme.primary} width={width - Spacing.md * 4} />
+        </View>
+      )}
+
+      {bodyFatSeries.length >= 2 && (
+        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+            {t('bodyReading.bodyFat')}
+          </Text>
+          <TrendLine values={bodyFatSeries} labels={bodyFatLabels} color={theme.primary} width={width - Spacing.md * 4} />
+        </View>
+      )}
+
+      {muscleSeries.length >= 2 && (
+        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+            {t('progress.musclePercent')}
+          </Text>
+          <TrendLine values={muscleSeries} labels={muscleLabels} color={theme.primary} width={width - Spacing.md * 4} />
+        </View>
+      )}
+
+      {weights.length > 0 && (
+        <Button
+          label={t('bodyReading.askCoach')}
+          variant="ghost"
+          icon="sparkles-outline"
+          onPress={askCoach}
+          style={{ marginBottom: Spacing.md }}
+        />
       )}
 
       <Field

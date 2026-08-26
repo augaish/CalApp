@@ -15,8 +15,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BodyMap, BodyMapViewSwitch, zoneIntensityFromSegmental, type BodyMapView } from '@/components/body-map';
-import { TrendLine, WeekBars } from '@/components/charts';
+import { BodyMap, zoneIntensityFromSegmental } from '@/components/body-map';
+import { WeekBars } from '@/components/charts';
 import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
 import { Ring } from '@/components/ring';
 import { SponsorCard } from '@/components/sponsor-card';
@@ -28,13 +28,19 @@ import { timestampFor, useViewDay } from '@/lib/day';
 import { normalizeDigits } from '@/lib/numbers';
 import {
   actualBurnedForDay,
+  bmiFor,
+  bmiTrend,
+  bodyFatTrend,
   isSameDay,
+  type MetricTrend,
+  muscleTrend,
   programProgress,
   streakDays,
   totalsForDay,
   useAppStore,
   waterForDay,
   waterTargetMl,
+  weightTrend,
 } from '@/lib/store';
 
 /** Seven days ending on (and including) the given day. */
@@ -76,7 +82,6 @@ export default function Overview() {
   const setDay = useViewDay((s) => s.setDay);
   const shift = useViewDay((s) => s.shift);
   const [kg, setKg] = useState('');
-  const [mapView, setMapView] = useState<BodyMapView>('front');
 
   // Coach-tour hooks must run before the early return below (rules of hooks).
   const ringRef = useRef<View>(null);
@@ -123,17 +128,37 @@ export default function Overview() {
   const days = thisWeek.some((d) => isSameDay(d.toISOString(), selected)) ? thisWeek : sevenDaysEnding(selected);
   const chartLabels = days.map((d) => d.toLocaleDateString(locale, { weekday: 'narrow' }));
   const calValues = days.map((d) => Math.round(totalsForDay(meals, d).calories));
-  // Last 8 weight entries oldest→newest, with short date labels for the x-axis.
-  const recentWeights = [...weights].slice(0, 8).reverse();
-  const weightSeries = recentWeights.map((w) => w.kg);
-  const weightLabels = recentWeights.map((w) =>
-    new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
-  );
   // The most recent reading that actually has a segmental breakdown — most
   // manual weigh-ins won't, only a scanned/imported report does, so this is
-  // often null and the body map below simply doesn't render.
+  // often null and the body map falls back to a plain silhouette.
   const latestSegmental = weights.find((w) => w.segmentalLeanMassKg && zoneIntensityFromSegmental(w.segmentalLeanMassKg));
   const zoneIntensity = zoneIntensityFromSegmental(latestSegmental?.segmentalLeanMassKg);
+
+  // Latest reading vs the one before it — drives the compact metric row's
+  // up/down arrows. Muscle is shown as a % of body weight since that's what's
+  // actually comparable across readings (the stored field is an absolute kg).
+  const latestWeight = weights[0];
+  const previousWeight = weights[1];
+  const bmi = latestWeight ? bmiFor(latestWeight.kg, profile.heightCm) : undefined;
+  const previousBmi = previousWeight ? bmiFor(previousWeight.kg, profile.heightCm) : undefined;
+  const weightDelta = previousWeight ? latestWeight.kg - previousWeight.kg : undefined;
+  const bmiDelta = bmi != null && previousBmi != null ? bmi - previousBmi : undefined;
+  const fatDelta =
+    latestWeight?.bodyFatPercent != null && previousWeight?.bodyFatPercent != null
+      ? latestWeight.bodyFatPercent - previousWeight.bodyFatPercent
+      : undefined;
+  const musclePercent =
+    latestWeight?.skeletalMuscleMassKg != null ? (latestWeight.skeletalMuscleMassKg / latestWeight.kg) * 100 : undefined;
+  const previousMusclePercent =
+    previousWeight?.skeletalMuscleMassKg != null && previousWeight.kg
+      ? (previousWeight.skeletalMuscleMassKg / previousWeight.kg) * 100
+      : undefined;
+  const muscleDelta =
+    musclePercent != null && previousMusclePercent != null ? musclePercent - previousMusclePercent : undefined;
+  const weightTr: MetricTrend = weightDelta != null ? weightTrend(weightDelta, profile.goal) : 'neutral';
+  const bmiTr: MetricTrend = bmi != null && bmiDelta != null ? bmiTrend(bmi, bmiDelta) : 'neutral';
+  const fatTr: MetricTrend = fatDelta != null ? bodyFatTrend(fatDelta) : 'neutral';
+  const muscleTr: MetricTrend = muscleDelta != null ? muscleTrend(muscleDelta) : 'neutral';
 
   // First-run activation checklist — derived from real data, auto-hides once complete.
   const checklist = [
@@ -518,24 +543,36 @@ export default function Overview() {
               </Text>
             </Pressable>
           </View>
-          {zoneIntensity && (
-            <View style={styles.compositionRow}>
-              <BodyMap view={mapView} zoneIntensity={zoneIntensity} size={72} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 6 }}>
-                  {t('bodyReading.composition')}
-                </Text>
-                <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+          {latestWeight ? (
+            <Pressable
+              onPress={() => router.push('/body-reading')}
+              style={({ pressed }) => [styles.compositionRow, pressed && { opacity: 0.85 }]}
+            >
+              <BodyMap view="front" zoneIntensity={zoneIntensity ?? undefined} size={80} />
+              <View style={{ flex: 1, gap: 5 }}>
+                <MetricRow label={t('progress.weight')} value={`${latestWeight.kg} ${t('progress.kg')}`} delta={weightDelta} trend={weightTr} />
+                {bmi != null && (
+                  <MetricRow label={t('progress.bmi')} value={bmi.toFixed(1)} delta={bmiDelta} trend={bmiTr} />
+                )}
+                {latestWeight.bodyFatPercent != null && (
+                  <MetricRow
+                    label={t('bodyReading.bodyFat')}
+                    value={`${latestWeight.bodyFatPercent}%`}
+                    delta={fatDelta}
+                    trend={fatTr}
+                  />
+                )}
+                {musclePercent != null && (
+                  <MetricRow
+                    label={t('progress.musclePercent')}
+                    value={`${musclePercent.toFixed(0)}%`}
+                    delta={muscleDelta}
+                    trend={muscleTr}
+                  />
+                )}
               </View>
-            </View>
-          )}
-          {weightSeries.length >= 2 ? (
-            <TrendLine
-              values={weightSeries}
-              labels={weightLabels}
-              color={theme.primary}
-              width={width - Spacing.md * 4}
-            />
+              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+            </Pressable>
           ) : (
             <Text style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
               {t('progress.noWeights')}
@@ -589,6 +626,33 @@ function MacroCol({
       <View style={[styles.macroTrack, { backgroundColor: theme.border }]}>
         <View style={[styles.macroFill, { backgroundColor: letterColor, width: `${pct * 100}%` }]} />
       </View>
+    </View>
+  );
+}
+
+/** One row in the compact Weight-card readout — a label, its value, and an
+ * arrow colored by whether the change is trending the right way (not just
+ * which direction it moved). */
+function MetricRow({
+  label,
+  value,
+  delta,
+  trend,
+}: {
+  label: string;
+  value: string;
+  delta?: number;
+  trend: MetricTrend;
+}) {
+  const theme = useTheme();
+  const color = trend === 'good' ? theme.primary : trend === 'bad' ? theme.danger : theme.textTertiary;
+  return (
+    <View style={styles.metricRow}>
+      <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1 }}>{label}</Text>
+      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{value}</Text>
+      {delta != null && Math.abs(delta) >= 0.05 && (
+        <Ionicons name={delta > 0 ? 'caret-up' : 'caret-down'} size={11} color={color} style={{ marginStart: 3 }} />
+      )}
     </View>
   );
 }
@@ -697,7 +761,8 @@ const styles = StyleSheet.create({
   halfValue: { fontSize: 20, fontWeight: '800' },
   halfTarget: { fontSize: 12, fontWeight: '600' },
   weightHead: { flexDirection: 'row', alignItems: 'center' },
-  compositionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.sm },
+  compositionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md },
+  metricRow: { flexDirection: 'row', alignItems: 'center' },
   weightRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm },
   weightBtn: { minWidth: 54, marginBottom: Spacing.md },
 });

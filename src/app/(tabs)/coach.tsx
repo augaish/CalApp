@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
@@ -32,6 +32,7 @@ export default function Coach() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
+  const { prompt: openingPrompt } = useLocalSearchParams<{ prompt?: string }>();
   const insets = useSafeAreaInsets();
   const language = useAppStore((s) => s.language) ?? 'en';
   const locale = language === 'ar' ? 'ar' : 'en';
@@ -54,8 +55,8 @@ export default function Coach() {
   const [appliedPlans, setAppliedPlans] = useState<Set<number>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
 
-  const send = async () => {
-    const content = input.trim();
+  const send = async (override?: string) => {
+    const content = (override ?? input).trim();
     if (!content || busy) return;
     if (!coachUnlocked) {
       router.push('/upgrade?reason=coach');
@@ -63,7 +64,7 @@ export default function Coach() {
     }
     const next: ChatMessage[] = [...messages, { role: 'user', content }];
     setMessages(next);
-    setInput('');
+    if (override == null) setInput('');
     setBusy(true);
     try {
       const { reply, schedulePlan } = await coachChat(next, language, await buildCoachContext(language));
@@ -87,6 +88,17 @@ export default function Coach() {
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
     }
   };
+
+  // A deep-link opening prompt (e.g. from the body-reading screen's "Ask
+  // coach" button) arrives as a route param and is sent once, automatically,
+  // on arrival — the user already composed their question by tapping that
+  // button, so making them retype or re-tap it here would be redundant.
+  useEffect(() => {
+    if (!openingPrompt) return;
+    const id = setTimeout(() => send(openingPrompt), 0);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * Add a proposed plan to the weekly schedule. Exercise names are resolved
@@ -200,7 +212,7 @@ export default function Coach() {
             maxLength={1000}
           />
           <Pressable
-            onPress={send}
+            onPress={() => send()}
             disabled={!input.trim() || busy}
             style={({ pressed }) => [
               styles.sendBtn,

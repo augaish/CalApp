@@ -460,6 +460,8 @@ export const en = {
     weight: 'Weight',
     logWeight: 'Log weight',
     kg: 'kg',
+    bmi: 'BMI',
+    musclePercent: 'Muscle',
     noWeights: 'Log your weight to see your trend.',
     fullReading: 'Full reading',
     workouts: 'Workouts',
@@ -655,6 +657,9 @@ export const en = {
     trend: 'Trend',
     composition: 'Where your lean mass sits',
     recent: 'Recent readings',
+    askCoach: 'Ask coach about this',
+    coachPromptIntro: "Here's my latest body reading — help me understand it and adjust my plan:",
+    coachPromptQuestion: 'What should I focus on to get there, and how should this change my plan?',
   },
   program: {
     title: 'AI program',
