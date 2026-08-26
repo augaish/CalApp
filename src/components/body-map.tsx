@@ -200,7 +200,11 @@ export function BodyMap({
   const height = size * 2;
   const muscleMode = !!highlightedMuscles;
   const zoneMode = !muscleMode && !!(zoneIntensity || zoneStatus);
-  const accent = zoneColor ?? theme.warning;
+  // Plain relative-concentration shading (no printed status to color by)
+  // defaults to the brand color, not warning/amber — amber is reserved for
+  // an actual "low" status read off the report, and using it here too made
+  // every unstatused reading look like it was flagging a problem.
+  const accent = zoneColor ?? theme.primary;
   const statusColor: Record<ZoneStatus, string> = { normal: theme.success, low: theme.warning, high: theme.danger };
   const hasLabels = !!zoneLabels && Object.values(zoneLabels).some((v) => v != null);
 
@@ -385,6 +389,19 @@ export function BodyMapMetricSwitch({
         </Text>
       ))}
     </View>
+  );
+}
+
+/** Explains the plain relative-concentration shading shown when a reading
+ * has no printed low/normal/high status to color by — pairs with
+ * BodyMapStatusLegend, shown instead of it rather than alongside it. */
+export function BodyMapIntensityHint() {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  return (
+    <Text style={{ fontSize: 11, color: theme.textTertiary, textAlign: 'center' }}>
+      {t('bodyReading.intensityHint')}
+    </Text>
   );
 }
 

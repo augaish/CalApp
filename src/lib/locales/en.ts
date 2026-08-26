@@ -666,6 +666,7 @@ export const en = {
     statusNormal: 'Normal',
     statusLow: 'Below normal',
     statusHigh: 'Above normal',
+    intensityHint: "This report doesn't print a normal/low/high status, so shading just shows relative concentration.",
     recent: 'Recent readings',
     askCoach: 'Ask coach about this',
     coachPromptIntro: "Here's my latest body reading — help me understand it and adjust my plan:",

@@ -664,6 +664,7 @@ export const ar: TranslationSchema = {
     statusNormal: 'طبيعي',
     statusLow: 'أقل من الطبيعي',
     statusHigh: 'أعلى من الطبيعي',
+    intensityHint: 'لا يعرض هذا التقرير تصنيف طبيعي/منخفض/مرتفع، لذا يوضح التظليل التركّز النسبي فقط.',
     recent: 'القراءات الأخيرة',
     askCoach: 'اسأل المدرب عن هذا',
     coachPromptIntro: 'هذه آخر قراءة لجسمي — ساعدني في فهمها وتعديل خطتي:',

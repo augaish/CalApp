@@ -7,6 +7,7 @@ import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from
 
 import {
   BodyMap,
+  BodyMapIntensityHint,
   BodyMapMetricSwitch,
   BodyMapStatusLegend,
   BodyMapViewSwitch,
@@ -17,7 +18,7 @@ import {
 } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { DatePickerModal } from '@/components/date-picker';
-import { Button, Card, Field, MetricRow, Screen, Title } from '@/components/ui';
+import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
@@ -51,6 +52,36 @@ function isoFromDateInput(v: string): string {
   if (!m) return new Date().toISOString();
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 12, 0, 0);
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+}
+
+/** A single centered fat%/muscle% readout under the composition map — not
+ * MetricRow's label-left/value-right list layout, which reads like a copy
+ * of Overview's compact card rather than this page's own detail view. */
+function CompositionStat({
+  label,
+  value,
+  delta,
+  trend,
+  theme,
+}: {
+  label: string;
+  value: string;
+  delta?: number;
+  trend: MetricTrend;
+  theme: ReturnType<typeof useTheme>;
+}) {
+  const color = trend === 'good' ? theme.success : trend === 'bad' ? theme.danger : theme.warning;
+  return (
+    <View style={{ alignItems: 'center' }}>
+      <Text style={{ fontSize: 11, color: theme.textSecondary }}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+        <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text }}>{value}</Text>
+        {delta != null && Math.abs(delta) > 0.01 && (
+          <Ionicons name={delta > 0 ? 'caret-up' : 'caret-down'} size={12} color={color} />
+        )}
+      </View>
+    </View>
+  );
 }
 
 /** Manual entry and scan-review in one screen: a scan just pre-fills these
@@ -130,19 +161,27 @@ export default function BodyReading() {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   const recent = useMemo(() => weights.slice(0, 6), [weights]);
-  const trendSeries = useMemo(() => [...weights].slice(0, 8).reverse(), [weights]);
+  // Trend charts are "as of" whatever date is currently loaded on the form
+  // — scrubbing to a past date via the date picker should visibly change
+  // what the charts show, same as the composition map above already does.
+  const asOfTime = useMemo(() => new Date(isoFromDateInput(date)).getTime(), [date]);
+  const visibleWeights = useMemo(() => weights.filter((w) => new Date(w.at).getTime() <= asOfTime), [weights, asOfTime]);
+  const trendSeries = useMemo(() => [...visibleWeights].slice(0, 8).reverse(), [visibleWeights]);
   const weightSeries = trendSeries.map((w) => w.kg);
   const weightLabels = trendSeries.map((w) =>
     new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
   );
   const dateLabel = (at: string) => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' });
   const bmiSeries = profile ? trendSeries.map((w) => bmiFor(w.kg, profile.heightCm)) : [];
-  const bodyFatPoints = useMemo(() => [...weights].filter((w) => w.bodyFatPercent != null).slice(0, 8).reverse(), [weights]);
+  const bodyFatPoints = useMemo(
+    () => [...visibleWeights].filter((w) => w.bodyFatPercent != null).slice(0, 8).reverse(),
+    [visibleWeights],
+  );
   const bodyFatSeries = bodyFatPoints.map((w) => w.bodyFatPercent!);
   const bodyFatLabels = bodyFatPoints.map((w) => dateLabel(w.at));
   const musclePoints = useMemo(
-    () => [...weights].filter((w) => w.skeletalMuscleMassKg != null && w.kg > 0).slice(0, 8).reverse(),
-    [weights],
+    () => [...visibleWeights].filter((w) => w.skeletalMuscleMassKg != null && w.kg > 0).slice(0, 8).reverse(),
+    [visibleWeights],
   );
   const muscleSeries = musclePoints.map((w) => (w.skeletalMuscleMassKg! / w.kg) * 100);
   const muscleLabels = musclePoints.map((w) => dateLabel(w.at));
@@ -507,59 +546,60 @@ export default function BodyReading() {
         onClose={() => setShowDatePicker(false)}
       />
 
-      {(zoneIntensity || fatZoneIntensity || stats) && (
+      {(zoneIntensity || fatZoneIntensity) && (
         <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
+          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.sm, textAlign: 'center' }]}>
             {activeMetric === 'fat' ? t('bodyReading.compositionFat') : t('bodyReading.composition')}
           </Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.md }}>
-            {(zoneIntensity || fatZoneIntensity) && (
-              <BodyMap
-                view={mapView}
-                zoneIntensity={activeZoneIntensity ?? undefined}
-                zoneStatus={activeZoneStatus ?? undefined}
-                zoneColor={activeMetric === 'fat' ? theme.fat : theme.warning}
-                zoneLabels={zoneLabels}
-                size={100}
-              />
-            )}
-            {stats && (
-              <View style={{ flex: 1, gap: 5 }}>
-                <MetricRow
-                  label={t('progress.weight')}
-                  value={`${stats.weightKg} ${t('progress.kg')}`}
-                  delta={stats.weightDelta}
-                  trend={stats.weightTrend}
+          {stats && (stats.bodyFatPercent != null || stats.musclePercent != null) && (
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.xl, marginBottom: Spacing.sm }}>
+              {stats.bodyFatPercent != null && (
+                <CompositionStat
+                  label={t('bodyReading.bodyFat')}
+                  value={`${stats.bodyFatPercent}%`}
+                  delta={stats.bodyFatDelta}
+                  trend={stats.bodyFatTrend}
+                  theme={theme}
                 />
-                <MetricRow label={t('progress.bmi')} value={stats.bmi.toFixed(1)} delta={stats.bmiDelta} trend={stats.bmiTrend} />
-                {stats.bodyFatPercent != null && (
-                  <MetricRow
-                    label={t('bodyReading.bodyFat')}
-                    value={`${stats.bodyFatPercent}%`}
-                    delta={stats.bodyFatDelta}
-                    trend={stats.bodyFatTrend}
-                  />
-                )}
-                {stats.musclePercent != null && (
-                  <MetricRow
-                    label={t('progress.musclePercent')}
-                    value={`${stats.musclePercent.toFixed(0)}%`}
-                    delta={stats.muscleDelta}
-                    trend={stats.muscleTrend}
-                  />
-                )}
-              </View>
-            )}
-          </View>
-          {(zoneIntensity || fatZoneIntensity) && (
-            <View style={{ marginTop: Spacing.sm, alignItems: 'center', gap: Spacing.xs }}>
-              {zoneIntensity && fatZoneIntensity && (
-                <BodyMapMetricSwitch metric={activeMetric} onChange={setMetric} />
               )}
-              <BodyMapViewSwitch view={mapView} onChange={setMapView} />
-              {activeZoneStatus && <BodyMapStatusLegend />}
+              {stats.musclePercent != null && (
+                <CompositionStat
+                  label={t('progress.musclePercent')}
+                  value={`${stats.musclePercent.toFixed(0)}%`}
+                  delta={stats.muscleDelta}
+                  trend={stats.muscleTrend}
+                  theme={theme}
+                />
+              )}
             </View>
           )}
+          <View style={{ alignItems: 'center' }}>
+            <BodyMap
+              view={mapView}
+              zoneIntensity={activeZoneIntensity ?? undefined}
+              zoneStatus={activeZoneStatus ?? undefined}
+              zoneColor={activeMetric === 'fat' ? theme.fat : theme.primary}
+              zoneLabels={zoneLabels}
+              size={150}
+            />
+          </View>
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: Spacing.lg,
+              marginTop: Spacing.sm,
+            }}
+          >
+            {zoneIntensity && fatZoneIntensity && (
+              <BodyMapMetricSwitch metric={activeMetric} onChange={setMetric} />
+            )}
+            <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+          </View>
+          <View style={{ marginTop: Spacing.sm }}>
+            {activeZoneStatus ? <BodyMapStatusLegend /> : <BodyMapIntensityHint />}
+          </View>
         </View>
       )}
 

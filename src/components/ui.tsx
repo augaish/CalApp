@@ -438,7 +438,7 @@ export function MetricRow({
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1 }}>{label}</Text>
       <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{value}</Text>
-      {delta != null && Math.abs(delta) >= 0.05 && (
+      {delta != null && Math.abs(delta) > 0.01 && (
         <Ionicons name={delta > 0 ? 'caret-up' : 'caret-down'} size={11} color={color} style={{ marginStart: 3 }} />
       )}
     </View>
