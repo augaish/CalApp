@@ -23,7 +23,7 @@ export async function pickPdfBase64(): Promise<{ name: string; base64: string } 
   });
   const asset = result.canceled ? undefined : result.assets?.[0];
   if (!asset) return null;
-  const { File } = await import('expo-file-system');
-  const base64 = await new File(asset.uri).base64();
+  const FileSystem = await import('expo-file-system/legacy');
+  const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' });
   return { name: asset.name, base64 };
 }
