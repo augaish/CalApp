@@ -636,7 +636,7 @@ export const en = {
     subtitle: 'Type in your numbers, or scan a report from InBody, Tanita, a smart scale, or a similar machine.',
     scanReport: 'Scan a report',
     rescan: 'Rescan',
-    uploadPdf: 'Upload a PDF report',
+    uploadPdf: 'Upload a report file',
     uploading: 'Reading your PDF…',
     scannedBadge: 'Filled in from your scan — check the numbers before saving',
     deviceLabel: 'Detected: {{device}}',

@@ -11,7 +11,7 @@ import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeBodyReading, FeatureLockedError, QuotaError } from '@/lib/api';
-import { documentPickerAvailable, pickPdfBase64 } from '@/lib/document-picker';
+import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
@@ -142,11 +142,12 @@ export default function BodyReading() {
 
   const uploadPdf = async () => {
     if (uploading) return;
-    const picked = await pickPdfBase64().catch(() => null);
+    const picked = await pickReportBase64().catch(() => null);
     if (!picked) return;
     setUploading(true);
     try {
-      const analysis = await analyzeBodyReading({ pdf: picked.base64 }, language);
+      const payload = picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64 };
+      const analysis = await analyzeBodyReading(payload, language);
       useEntitlement.getState().spend();
       applyAnalysis(analysis);
       setPdfName(picked.name);

@@ -634,7 +634,7 @@ export const ar: TranslationSchema = {
     subtitle: 'أدخل أرقامك يدوياً، أو صوّر تقريراً من InBody أو Tanita أو ميزان ذكي أو جهاز مشابه.',
     scanReport: 'صوّر تقريراً',
     rescan: 'إعادة التصوير',
-    uploadPdf: 'رفع تقرير PDF',
+    uploadPdf: 'رفع ملف التقرير',
     uploading: 'جارٍ قراءة ملف PDF…',
     scannedBadge: 'تم تعبئتها من المسح — راجع الأرقام قبل الحفظ',
     deviceLabel: 'تم اكتشاف: {{device}}',
