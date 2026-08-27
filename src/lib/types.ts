@@ -43,6 +43,10 @@ export interface FoodItem {
   basePer100?: { calories: number; proteinG: number; carbsG: number; fatG: number };
   /** Grams eaten — drives scaling when `basePer100` is present. */
   gramsEaten?: number;
+  /** The ¼/½/1/1½/2 portion chip chosen against the AI's own base estimate
+   * (non-barcode items only) — persisted so reopening a saved meal can show
+   * which chip was actually picked instead of always defaulting to "1". */
+  portionMultiplier?: number;
 }
 
 export interface MealAnalysis {

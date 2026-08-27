@@ -44,6 +44,7 @@ import {
   sanitizeSchedulePlan,
   toMealAnalysis,
   type CoachSchedulePlan,
+  type FoodItem,
   type MealAnalysis,
 } from './parse.js';
 import {
@@ -67,6 +68,7 @@ import {
   identifyEquipmentPrompt,
   mealPrompt,
   programPrompt,
+  refineMealPrompt,
   textMealPrompt,
   type Language,
 } from './prompts.js';
@@ -651,6 +653,63 @@ app.post('/api/analyze-text', async (c) => {
     // The text is logged (trimmed) because the failures worth fixing here are
     // all about what the user wrote, and they are invisible otherwise.
     console.error(`analyze-text failed for "${text.slice(0, 120)}":`, err);
+    await release(ref, 'describe');
+    return c.json({ error: 'analysis_failed' }, 502);
+  }
+});
+
+/** Loose validation for the client's current on-screen items — the model
+ * revalidates its own output through toMealAnalysis regardless, so this only
+ * needs to guard against garbage, not fully re-derive the FoodItem shape. */
+function parseRefineItems(raw: unknown): FoodItem[] {
+  if (!Array.isArray(raw)) return [];
+  const items: FoodItem[] = [];
+  for (const entry of raw) {
+    const it = entry as Record<string, unknown>;
+    if (typeof it?.name !== 'string' || !it.name.trim()) continue;
+    items.push({
+      name: it.name,
+      portion: typeof it.portion === 'string' ? it.portion : '1',
+      calories: Number(it.calories) || 0,
+      proteinG: Number(it.proteinG) || 0,
+      carbsG: Number(it.carbsG) || 0,
+      fatG: Number(it.fatG) || 0,
+    });
+  }
+  return items;
+}
+
+app.post('/api/refine-meal', async (c) => {
+  const body = await c.req
+    .json<{ items?: unknown; message?: string; language?: string }>()
+    .catch(() => ({}) as never);
+  const message = (body.message ?? '').trim().slice(0, 500);
+  const items = parseRefineItems(body.items);
+  if (message.length < 2 || items.length === 0) return c.json({ error: 'invalid_request' }, 400);
+  const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const ref = (await callerRef(c))!;
+  const access = await checkAccess(ref, 'describe');
+  const claim = await reserve(ref, access, 'describe');
+  if (!claim.ok) return c.json(quotaError(access), 402);
+  try {
+    const request = {
+      model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
+      max_tokens: 3000,
+      messages: [{ role: 'user' as const, content: refineMealPrompt(language, items, message) }],
+    };
+    let response;
+    try {
+      response = await anthropic.messages.create({ ...request, tools: [WEB_SEARCH_TOOL] });
+    } catch (err) {
+      // Web search is an org-level Console setting; a disabled account must
+      // still get a corrected estimate, just without a restaurant lookup.
+      if (!isWebSearchDisabled(err)) throw err;
+      console.warn('web search unavailable, retrying refine-meal without it');
+      response = await anthropic.messages.create(request);
+    }
+    return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
+  } catch (err) {
+    console.error(`refine-meal failed for "${message.slice(0, 120)}":`, err);
     await release(ref, 'describe');
     return c.json({ error: 'analysis_failed' }, 502);
   }

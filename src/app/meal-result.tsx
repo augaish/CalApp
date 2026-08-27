@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
+import { RefineBox } from '@/components/refine-box';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -15,7 +16,7 @@ import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
 import { mealTypeForNow, useAppStore } from '@/lib/store';
-import type { FoodItem, MealType } from '@/lib/types';
+import type { FoodItem, MealAnalysis, MealType } from '@/lib/types';
 
 /** A meal item plus a portion multiplier used to scale AI-estimated macros. */
 type Row = FoodItem & {
@@ -80,6 +81,7 @@ export default function MealResult() {
         return {
           ...item,
           _mult: mult,
+          portionMultiplier: mult,
           calories: Math.round(item._base.calories * mult),
           proteinG: Math.round(item._base.proteinG * mult),
           carbsG: Math.round(item._base.carbsG * mult),
@@ -109,6 +111,22 @@ export default function MealResult() {
     );
   };
 
+  // A refine correction returns the whole item list fresh — re-snapshot it
+  // the same way the initial AI result was, so portion chips work on it too.
+  const applyRefine = (result: MealAnalysis) => {
+    setItems(
+      result.items.map((it) =>
+        it.basePer100
+          ? { ...it }
+          : {
+              ...it,
+              _mult: 1,
+              _base: { calories: it.calories, proteinG: it.proteinG, carbsG: it.carbsG, fatG: it.fatG },
+            },
+      ),
+    );
+  };
+
   const total = items.reduce((sum, i) => sum + i.calories, 0);
 
   // Note: pending data is NOT cleared on close — clearing re-renders this
@@ -129,6 +147,7 @@ export default function MealResult() {
       carbsG: it.carbsG,
       fatG: it.fatG,
       ...(it.basePer100 ? { basePer100: it.basePer100, gramsEaten: it.gramsEaten } : {}),
+      ...(it._mult != null ? { portionMultiplier: it._mult } : {}),
     }));
     logMeal(clean, photoUri ?? undefined, mealType, timestampFor(viewDay));
     successHaptic();
@@ -301,6 +320,8 @@ export default function MealResult() {
         </Card>
         </Swipeable>
       ))}
+
+      {items.length > 0 && <RefineBox items={items} onResult={applyRefine} />}
 
       <Text style={[styles.disclaimer, { color: theme.textTertiary }]}>
         {t('common.aiDisclaimer')}

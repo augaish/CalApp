@@ -559,6 +559,11 @@ export const en = {
     grantPermission: 'Allow camera',
     mockBadge: 'Demo mode — no AI server configured',
   },
+  refine: {
+    placeholder: "Tell the AI what's wrong, e.g. \"it's boneless\" or \"no rice\"",
+    error: "Couldn't apply that — try again.",
+    offline: 'No connection — check your internet and try again.',
+  },
   mealResult: {
     title: 'Meal detected',
     totalCalories: 'Total calories',

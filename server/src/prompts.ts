@@ -1,3 +1,5 @@
+import type { FoodItem } from './parse.js';
+
 export type Language = 'en' | 'ar';
 
 const LANGUAGE_NAME: Record<Language, string> = {
@@ -103,6 +105,64 @@ Rules:
 - "notes" (in ${LANGUAGE_NAME[language]}) MUST state the portion size and key assumptions you used so the user can verify them, e.g. "Assumed ~1.5 cups rice cooked in ghee + 250 g chicken". Keep it under 200 characters.
 - "confidence" is 0-1.
 - If the text is not about food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.`;
+}
+
+/**
+ * A follow-up correction on a meal already estimated — from a fresh scan/
+ * description on screen, or reopening an already-logged meal. Takes the
+ * CURRENT best-known items (whatever the user is looking at right now, not
+ * the original photo) and one message describing what's wrong, and returns
+ * the whole corrected item list. No image is re-sent: a correction is
+ * almost always a fact the user is stating directly ("it's boneless", "no
+ * rice", "actually 300g"), not something that needs a second look at a
+ * photo, and skipping that keeps every correction fast and cheap.
+ */
+export function refineMealPrompt(language: Language, items: FoodItem[], message: string): string {
+  const current = items.map((it) => ({
+    name: it.name,
+    portion: it.portion,
+    calories: it.calories,
+    proteinG: it.proteinG,
+    carbsG: it.carbsG,
+    fatG: it.fatG,
+  }));
+  return `You are a meticulous nutrition analyst with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes.
+
+Here is the CURRENT best estimate for a meal, already shown to the user:
+${JSON.stringify(current)}
+
+The user just replied with this correction: "${message.replace(/"/g, "'")}"
+
+Apply ONLY what they actually said, and leave everything else in the current estimate as it is:
+- A fact about an existing item ("it's boneless", "no skin", "grilled not fried", "actually 300g", "it's from a specific place") corrects THAT item's portion/macros — recompute its calories/macros for the corrected reality, don't just tweak a number blindly.
+- "I also had X" or "add X" appends a new item, estimated the same way a fresh description would be.
+- "remove the X" or "I didn't have the rice" deletes that item entirely.
+- If the correction is genuinely ambiguous about which item it targets (more than one plausible match), apply it to the item it most obviously describes rather than asking back — this is a one-shot correction, not a conversation.
+
+${REALISM_BLOCK(language)}
+
+RESTAURANT AND BRANDED-PRODUCT ACCURACY:
+- If the correction names a specific restaurant, chain, or packaged product — international (e.g. "McDonald's Big Mac meal", "Starbucks grande latte") OR regional Gulf/Levant chains (e.g. "كودو", "الطازج", "البيك", "هرفي", "مام نورة", or their English names Kudu, Al Tazaj, Al Baik, Herfy, Mama Noura) — use the web_search tool BEFORE re-estimating that item — check the brand's own published nutrition info, or a reputable database (nutritionix, myfitnesspal, fatsecret). 1-3 searches is normally enough; if two sources disagree, prefer the brand's own listing.
+- When you have official nutrition for the exact item, use THOSE figures instead of the general realism guidance above, and say what you used in "notes".
+
+Respond with ONLY valid JSON, no markdown fences, matching exactly this schema — the FULL corrected item list, not just what changed:
+{
+  "items": [
+    { "name": string, "calories": number, "proteinG": number, "carbsG": number, "fatG": number, "portion": string }
+  ],
+  "confidence": number,
+  "notes": string
+}
+
+${JSON_RULES}
+
+Rules:
+- "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
+- "portion" MUST include an approximate weight in grams, e.g. "1 plate (~500 g)".
+- The user may write amounts in Arabic-Indic digits (٧٠٠ = 700, ٣ = 3). Read them.
+- "notes" (in ${LANGUAGE_NAME[language]}) MUST state what you changed and why, e.g. "Removed the rice as requested; recalculated chicken as boneless (~180 kcal/100g)". Keep it under 200 characters.
+- "confidence" is 0-1.
+- If nothing about the correction makes sense as a food edit, return the current items unchanged and explain why in "notes".`;
 }
 
 /**

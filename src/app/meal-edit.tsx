@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { RefineBox } from '@/components/refine-box';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -13,7 +14,7 @@ import { successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
-import type { FoodItem, MealType } from '@/lib/types';
+import type { FoodItem, MealAnalysis, MealType } from '@/lib/types';
 
 const PORTIONS: { m: number; label: string }[] = [
   { m: 0.25, label: '¼' },
@@ -57,7 +58,7 @@ export default function MealEdit() {
   const [day, setDay] = useState<Date>(() => (meal ? new Date(meal.at) : new Date()));
   // Baseline macros captured at open (treated as the ×1 portion), so portion
   // scaling works on any saved record — not just freshly-scanned ones.
-  const [baseSnap] = useState(() =>
+  const [baseSnap, setBaseSnap] = useState(() =>
     (meal ? meal.items : []).map((i) => ({
       calories: i.calories,
       proteinG: i.proteinG,
@@ -65,7 +66,7 @@ export default function MealEdit() {
       fatG: i.fatG,
     })),
   );
-  const [mults, setMults] = useState<number[]>(() => (meal ? meal.items.map(() => 1) : []));
+  const [mults, setMults] = useState<number[]>(() => (meal ? meal.items.map((i) => i.portionMultiplier ?? 1) : []));
   const [sharing, setSharing] = useState(false);
 
   if (!meal) {
@@ -86,6 +87,7 @@ export default function MealEdit() {
         // Editing a macro by hand breaks the auto-scale link.
         if ('calories' in patch || 'proteinG' in patch || 'carbsG' in patch || 'fatG' in patch) {
           delete next.basePer100;
+          delete next.portionMultiplier;
         }
         return next;
       }),
@@ -102,6 +104,7 @@ export default function MealEdit() {
         i === index
           ? {
               ...item,
+              portionMultiplier: m,
               calories: Math.round(b.calories * m),
               proteinG: Math.round(b.proteinG * m),
               carbsG: Math.round(b.carbsG * m),
@@ -181,6 +184,21 @@ export default function MealEdit() {
   const duplicateTo = (target: Date) => {
     duplicateMeal(meal.id, stampDay(target, meal.at), mealType);
     finish(target, t('mealEdit.duplicated'));
+  };
+
+  // A refine correction returns the whole item list fresh — it becomes the
+  // new ×1 baseline for portion scaling, same as reopening a different meal.
+  const applyRefine = (result: MealAnalysis) => {
+    setItems(result.items.map((it) => ({ ...it })));
+    setBaseSnap(
+      result.items.map((it) => ({
+        calories: it.calories,
+        proteinG: it.proteinG,
+        carbsG: it.carbsG,
+        fatG: it.fatG,
+      })),
+    );
+    setMults(result.items.map(() => 1));
   };
 
   const total = items.reduce((sum, i) => sum + i.calories, 0);
@@ -353,6 +371,8 @@ export default function MealEdit() {
           </View>
         </Card>
       ))}
+
+      {items.length > 0 && <RefineBox items={items} onResult={applyRefine} />}
     </Screen>
   );
 }

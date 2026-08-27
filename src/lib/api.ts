@@ -397,6 +397,39 @@ export async function analyzeText(text: string, language: Language): Promise<Mea
   return post<MealAnalysis>('/api/analyze-text', { text, language });
 }
 
+/** A follow-up correction on a meal already on screen — fresh scan/
+ * description, or an already-logged meal being reopened. No photo is
+ * re-sent; the current items plus the correction message are enough. */
+export async function refineMeal(
+  items: FoodItem[],
+  message: string,
+  language: Language,
+): Promise<MealAnalysis> {
+  if (isMockMode) {
+    await delay(900);
+    return {
+      items,
+      confidence: 0.8,
+      notes:
+        language === 'ar'
+          ? `نتيجة تجريبية — اربط الخادم لتطبيق التعديل: "${message}"`
+          : `Demo result — connect the server to apply: "${message}"`,
+    };
+  }
+  return post<MealAnalysis>('/api/refine-meal', {
+    items: items.map((it) => ({
+      name: it.name,
+      portion: it.portion,
+      calories: it.calories,
+      proteinG: it.proteinG,
+      carbsG: it.carbsG,
+      fatG: it.fatG,
+    })),
+    message,
+    language,
+  });
+}
+
 export interface CoachReply {
   reply: string;
   /** Present when the coach proposed a weekly schedule the user can add. */
