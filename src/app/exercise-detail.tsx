@@ -51,14 +51,37 @@ function sessionMetric(w: LoggedWorkout): number {
   return Math.round(best);
 }
 
+/**
+ * Tapping a different exercise from Training pushes this same route with a
+ * new `id` — the navigator (Android especially) can reuse the already-
+ * mounted screen instead of remounting it, which would leave every `useState`
+ * below seeded from whichever exercise was viewed *before* this one instead
+ * of the exercise actually being shown. Keying the real screen by the
+ * exercise's own id (below) forces a genuine remount on every switch, which
+ * is the React-recommended way to reset a whole component's state when its
+ * subject changes — see https://react.dev/learn/you-might-not-need-an-effect.
+ */
 export default function ExerciseDetail() {
+  const router = useRouter();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const custom = useAppStore((s) => s.exercises);
+  const exercise = id ? findExercise(id, custom) : undefined;
+
+  useEffect(() => {
+    if (!exercise && router.canGoBack()) router.back();
+  }, [exercise, router]);
+
+  if (!exercise) return null;
+  return <ExerciseDetailScreen key={exercise.id} exerciseId={exercise.id} />;
+}
+
+function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const lang = i18n.language === 'ar' ? 'ar' : 'en';
   const locale = lang;
   const { width } = useWindowDimensions();
-  const { id } = useLocalSearchParams<{ id?: string }>();
 
   const custom = useAppStore((s) => s.exercises);
   const workouts = useAppStore((s) => s.workouts);
@@ -70,11 +93,7 @@ export default function ExerciseDetail() {
   const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const viewDay = useViewDay((s) => s.day);
 
-  const exercise = id ? findExercise(id, custom) : undefined;
-
-  useEffect(() => {
-    if (!exercise && router.canGoBack()) router.back();
-  }, [exercise, router]);
+  const exercise = findExercise(exerciseId, custom);
 
   const history = useMemo(
     () => (exercise ? historyFor(workouts, exercise.id) : []),
