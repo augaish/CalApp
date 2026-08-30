@@ -1114,10 +1114,16 @@ app.get('/api/whoop/day-burn', async (c) => {
     return c.json({ totalKcal: null, workouts: [] });
   }
   const token = await getValidAccessToken(ref);
-  if (!token) return c.json({ totalKcal: null, workouts: [] });
+  if (!token) return c.json({ totalKcal: null, workouts: [], connected: false });
   try {
     const workouts = await fetchWorkoutsInRange(token, start, end);
     const scored = workouts.filter((w) => w.kilojoule != null);
+    // A workout WHOOP has recorded but not yet scored (kilojoule still null)
+    // is real evidence something happened today even though it can't be
+    // counted yet — surfaced so the client can say "still scoring" instead
+    // of the vague, indistinguishable "nothing found" silence a plain
+    // totalKcal: null leaves behind.
+    const pending = workouts.length > scored.length;
     const totalKcal = scored.length
       ? Math.round(scored.reduce((sum, w) => sum + kilojoulesToKcal(w.kilojoule!), 0))
       : null;
@@ -1131,10 +1137,12 @@ app.get('/api/whoop/day-burn', async (c) => {
         strain: w.strain,
         avgHeartRate: w.avgHeartRate,
       })),
+      connected: true,
+      pending,
     });
   } catch (err) {
     console.error('whoop day-burn failed:', err);
-    return c.json({ totalKcal: null, workouts: [] });
+    return c.json({ totalKcal: null, workouts: [], connected: true });
   }
 });
 

@@ -185,6 +185,15 @@ export default function Training() {
   const kg = t('progress.kg');
   const min = t('track.min');
 
+  // Diagnostic state from the last day-burn fetch — not persisted, since
+  // it's only meaningful for right-now's "today" check, not history: lets
+  // the subtitle actually say why there's no WHOOP number yet (never
+  // connected / token expired vs. WHOOP recorded something but hasn't
+  // scored it vs. genuinely nothing today) instead of one vague fallback
+  // label covering all three.
+  const [whoopConnected, setWhoopConnected] = useState<boolean | null>(null);
+  const [whoopPending, setWhoopPending] = useState(false);
+
   // Pull WHOOP's real number for today whenever this screen is looking at
   // today — on focus (covers both "just reopened this tab" and "WHOOP
   // finished scoring a workout after I already left the gym", since scoring
@@ -200,12 +209,16 @@ export default function Training() {
     const end = new Date(selected);
     end.setHours(23, 59, 59, 999);
     let alive = true;
-    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(({ totalKcal, workouts: w }) => {
-      if (!alive) return;
-      setWhoopDayBurn(selected, totalKcal);
-      setWhoopDayWorkouts(selected, w);
-      setWhoopLastFetchedAt(new Date().toISOString());
-    });
+    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
+      ({ totalKcal, workouts: w, connected, pending }) => {
+        if (!alive) return;
+        setWhoopDayBurn(selected, totalKcal);
+        setWhoopDayWorkouts(selected, w);
+        setWhoopLastFetchedAt(new Date().toISOString());
+        setWhoopConnected(connected ?? null);
+        setWhoopPending(!!pending);
+      },
+    );
     return () => {
       alive = false;
     };
@@ -406,10 +419,21 @@ export default function Training() {
               {t('training.burned')} ·{' '}
               {whoopDayTotal != null
                 ? t('training.fromWhoop')
-                : whoopCalibrated
-                  ? t('training.adjustedFromWhoop')
-                  : t('training.estimated')}
+                : selectedIsToday && whoopConnected === false
+                  ? t('training.whoopNotConnected')
+                  : selectedIsToday && whoopPending
+                    ? t('training.whoopPending')
+                    : whoopCalibrated
+                      ? t('training.adjustedFromWhoop')
+                      : t('training.estimated')}
             </Text>
+            {selectedIsToday && whoopConnected === false && (
+              <Pressable onPress={() => router.push('/profile')} hitSlop={8}>
+                <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+                  {t('training.whoopReconnect')}
+                </Text>
+              </Pressable>
+            )}
             {selectedIsToday && whoopLastFetchedAt && (
               <Pressable onPress={refreshWhoopToday} hitSlop={8} style={styles.syncRow}>
                 <Ionicons name="refresh" size={11} color={theme.textTertiary} />

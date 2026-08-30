@@ -252,6 +252,14 @@ export async function disconnectWhoop(): Promise<boolean> {
 export interface WhoopDayBurn {
   totalKcal: number | null;
   workouts: WhoopDayWorkout[];
+  /** False when there's no usable WHOOP connection at all (never connected,
+   * or the token/refresh failed) — undefined for a network/parse failure,
+   * where connection state is simply unknown. */
+  connected?: boolean;
+  /** True when WHOOP has recorded a workout in this window but hasn't
+   * finished scoring it yet, so its calories aren't countable — distinct
+   * from a day with nothing recorded at all. */
+  pending?: boolean;
 }
 
 /**
