@@ -53,7 +53,6 @@ export const en = {
       gain: 'Build muscle',
       gainDesc: 'Lean muscle gain',
       gainPace: 'Gain {{pace}} kg/week',
-      capped: 'Capped to a safe range for your body',
     },
     resultsTitle: 'Your daily plan',
     resultsSubtitle: 'Based on your body and goal. You can change this anytime.',

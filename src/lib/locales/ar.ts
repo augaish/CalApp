@@ -55,7 +55,6 @@ export const ar: TranslationSchema = {
       gain: 'بناء العضلات',
       gainDesc: 'زيادة عضلية صافية',
       gainPace: 'زيادة {{pace}} كغ أسبوعياً',
-      capped: 'تم ضبطه لنطاق آمن لجسمك',
     },
     resultsTitle: 'خطتك اليومية',
     resultsSubtitle: 'بناءً على جسمك وهدفك. يمكنك تغييرها في أي وقت.',

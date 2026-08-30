@@ -20,13 +20,16 @@ const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
  * targets they always did. */
 export const DEFAULT_PACE: Record<Goal, number> = { lose: 0.5, maintain: 0, gain: 0.25 };
 
-/** The pace choices offered on the goal step, in the order they're shown. */
+/** The pace choices offered on the goal step, in the order they're shown —
+ * symmetric both directions, matching calculator.net's own layout. */
 export const LOSE_PACES = [0.25, 0.5, 1] as const;
-export const GAIN_PACES = [0.25] as const;
+export const GAIN_PACES = [0.25, 0.5, 1] as const;
 
-/** ~1 kg of body fat ≈ 7700 kcal — the standard estimate behind "a 500
- * kcal/day deficit loses ~0.5 kg/week" style guidance. */
-const KCAL_PER_KG = 7700;
+/** ~1 kg of body weight ≈ 7000 kcal — calculator.net's own conversion
+ * (verified from its published results: a 500 kcal/day deficit is shown
+ * against exactly a 0.5 kg/week pace, 500*7/0.5 = 7000), not the ~7700
+ * kcal/kg "pure fat" figure some other calculators use. */
+const KCAL_PER_KG = 7000;
 
 /** Age in whole years from a birth date, computed fresh every time instead
  * of stored — so it's never wrong no matter how long someone's had the app. */
@@ -52,16 +55,15 @@ export function tdee(p: Profile): number {
 }
 
 /**
- * Daily calorie adjustment for a given pace — never more than a 25% swing
- * off maintenance, regardless of how aggressive the requested pace is, so a
- * 1 kg/week pace on a low-TDEE person can't compute an unsafe deficit. Same
- * clamp both directions, so a fast bulk gets the same sanity check.
+ * Daily calorie adjustment for a given pace — the same linear math
+ * calculator.net uses (no additional safety clamp beyond `dailyTargets`'s
+ * own 1200 kcal absolute floor), so our numbers match theirs exactly at
+ * every pace, aggressive ones included.
  */
-export function calorieAdjustment(maintenanceCalories: number, goal: Goal, paceKgPerWeek: number): number {
+export function calorieAdjustment(goal: Goal, paceKgPerWeek: number): number {
   if (goal === 'maintain' || paceKgPerWeek <= 0) return 0;
-  const raw = (paceKgPerWeek * KCAL_PER_KG) / 7;
-  const capped = Math.min(raw, maintenanceCalories * 0.25);
-  return goal === 'lose' ? -capped : capped;
+  const adjustment = (paceKgPerWeek * KCAL_PER_KG) / 7;
+  return goal === 'lose' ? -adjustment : adjustment;
 }
 
 /**
@@ -86,7 +88,7 @@ export function carbsForCalories(calories: number, proteinG: number, fatG: numbe
 export function dailyTargets(p: Profile): DailyTargets {
   const maintenance = tdee(p);
   const pace = p.paceKgPerWeek ?? DEFAULT_PACE[p.goal];
-  const calories = Math.max(1200, Math.round(maintenance + calorieAdjustment(maintenance, p.goal, pace)));
+  const calories = Math.max(1200, Math.round(maintenance + calorieAdjustment(p.goal, pace)));
   const proteinG = Math.round(p.weightKg * (p.goal === 'lose' ? 2.0 : 1.6));
   const fatG = Math.round((calories * 0.3) / 9);
   const carbsG = carbsForCalories(calories, proteinG, fatG);
@@ -97,10 +99,6 @@ export interface GoalScenario {
   goal: Goal;
   paceKgPerWeek: number;
   calories: number;
-  /** True when the requested pace's deficit/surplus hit the 25%-of-maintenance
-   * safety clamp, so the UI can say so instead of implying the exact pace
-   * asked for is what will actually happen. */
-  capped: boolean;
 }
 
 /**
@@ -112,16 +110,11 @@ export interface GoalScenario {
  */
 export function goalScenarios(base: Profile): GoalScenario[] {
   const maintenance = tdee(base);
-  const scenario = (goal: Goal, paceKgPerWeek: number): GoalScenario => {
-    const adjustment = calorieAdjustment(maintenance, goal, paceKgPerWeek);
-    const raw = goal === 'maintain' ? 0 : (paceKgPerWeek * KCAL_PER_KG) / 7;
-    return {
-      goal,
-      paceKgPerWeek,
-      calories: Math.max(1200, Math.round(maintenance + adjustment)),
-      capped: Math.abs(adjustment) < raw - 1,
-    };
-  };
+  const scenario = (goal: Goal, paceKgPerWeek: number): GoalScenario => ({
+    goal,
+    paceKgPerWeek,
+    calories: Math.max(1200, Math.round(maintenance + calorieAdjustment(goal, paceKgPerWeek))),
+  });
   return [
     ...LOSE_PACES.map((pace) => scenario('lose', pace)),
     scenario('maintain', 0),

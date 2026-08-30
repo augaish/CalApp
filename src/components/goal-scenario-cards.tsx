@@ -62,11 +62,6 @@ export function GoalScenarioCards({
               <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
                 {scenarioLabel(s, t)}
               </Text>
-              {s.capped && (
-                <Text style={{ color: theme.textTertiary, fontSize: 11.5, marginTop: 2 }}>
-                  {t('onboarding.goals.capped')}
-                </Text>
-              )}
             </View>
             <Text style={{ color: selected ? theme.primary : theme.textSecondary, fontWeight: '800', fontSize: 16 }}>
               {s.calories}

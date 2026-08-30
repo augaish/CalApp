@@ -766,7 +766,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 6,
+      version: 7,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -863,6 +863,13 @@ export const useAppStore = create<AppState>()(
  * the old table until the next unrelated profile edit — recomputing it here
  * makes the fix take effect immediately for anyone who already has a
  * profile, the same way v4's caloriesBurned fix did for workouts.
+ *
+ * v6 → v7: the lose/gain calorie math itself was corrected to match
+ * calculator.net exactly — 7000 kcal per kg (not ~7700), and the 25%-of-
+ * maintenance safety clamp on aggressive paces was removed, so a 1 kg/week
+ * pace now shows the same uncapped number calculator.net does. Same
+ * reasoning as v6: recompute the cached `targets` now instead of leaving it
+ * stale until the next profile edit.
  */
 function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
@@ -891,6 +898,10 @@ function migrateStore(persisted: unknown, version: number): unknown {
   }
 
   if (version < 6 && state.profile && typeof state.profile === 'object') {
+    state.targets = dailyTargets(state.profile as Profile);
+  }
+
+  if (version < 7 && state.profile && typeof state.profile === 'object') {
     state.targets = dailyTargets(state.profile as Profile);
   }
 
