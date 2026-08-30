@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -26,12 +26,18 @@ export default function EditProfile() {
   const router = useRouter();
   const profile = useAppStore((s) => s.profile);
   const setProfile = useAppStore((s) => s.setProfile);
+  // Arriving from the target-update nudge (a weight was just logged that
+  // differs from the profile's own) hands the new weight off here instead
+  // of applying it silently — this screen is where it's actually reviewed
+  // and confirmed, goal cards and all, not a value that just changes out
+  // from under you.
+  const { weightKg: weightKgParam } = useLocalSearchParams<{ weightKg?: string }>();
 
   const [sex, setSex] = useState<Sex>(profile?.sex ?? 'male');
   const [birthDate, setBirthDate] = useState(profile?.birthDate ?? '');
   const [showBirthDatePicker, setShowBirthDatePicker] = useState(false);
   const [height, setHeight] = useState(String(profile?.heightCm ?? ''));
-  const [weight, setWeight] = useState(String(profile?.weightKg ?? ''));
+  const [weight, setWeight] = useState(weightKgParam ?? String(profile?.weightKg ?? ''));
   const [activity, setActivity] = useState<ActivityLevel>(profile?.activityLevel ?? 'moderate');
   const [goal, setGoal] = useState<Goal>(profile?.goal ?? 'lose');
   const [paceKgPerWeek, setPaceKgPerWeek] = useState(profile?.paceKgPerWeek ?? DEFAULT_PACE[profile?.goal ?? 'lose']);

@@ -73,7 +73,6 @@ export default function Overview() {
   const tourSeen = useAppStore((s) => s.tourSeen);
   const setTourSeen = useAppStore((s) => s.setTourSeen);
   const logWeight = useAppStore((s) => s.logWeight);
-  const setProfile = useAppStore((s) => s.setProfile);
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
   // Starts already-flagged when there's a mismatch coming INTO this mount —
   // not only one created by logging a weight during this visit (see
@@ -604,8 +603,9 @@ export default function Overview() {
         profile={profile}
         newWeightKg={pendingWeightKg ?? profile.weightKg}
         onUpdate={() => {
-          setProfile({ ...profile, weightKg: pendingWeightKg! });
+          const w = pendingWeightKg;
           setPendingWeightKg(null);
+          router.push(`/edit-profile?weightKg=${w}`);
         }}
         onDismiss={() => setPendingWeightKg(null)}
       />

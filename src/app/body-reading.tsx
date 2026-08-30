@@ -100,7 +100,6 @@ export default function BodyReading() {
 
   const language = useAppStore((s) => s.language) ?? 'en';
   const profile = useAppStore((s) => s.profile);
-  const setProfile = useAppStore((s) => s.setProfile);
   const weights = useAppStore((s) => s.weights);
   const logBodyReading = useAppStore((s) => s.logBodyReading);
   const [pendingWeightKg, setPendingWeightKg] = useState<number | null>(null);
@@ -767,9 +766,9 @@ export default function BodyReading() {
           profile={profile}
           newWeightKg={pendingWeightKg ?? profile.weightKg}
           onUpdate={() => {
-            setProfile({ ...profile, weightKg: pendingWeightKg! });
+            const w = pendingWeightKg;
             setPendingWeightKg(null);
-            router.back();
+            router.push(`/edit-profile?weightKg=${w}`);
           }}
           onDismiss={() => {
             setPendingWeightKg(null);
