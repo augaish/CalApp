@@ -36,6 +36,13 @@ import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
  * waiting on the slower 60-day backfill's daily retry. */
 const RECENT_WHOOP_DAYS = 3;
 
+/** How many follow-up checks a just-logged workout gets, and how far apart
+ * — a budget for catching WHOOP finishing scoring without waiting on the
+ * user to reopen the tab. 6 × 45s ≈ 4.5 minutes of coverage past whenever
+ * something was last checked off, comfortably past typical scoring lag. */
+const WHOOP_POLL_ATTEMPTS = 6;
+const WHOOP_POLL_INTERVAL_MS = 45_000;
+
 /** Weekday name in the active locale (Jan 7 2024 was a Sunday). */
 function weekdayLabel(i: number, locale: string): string {
   return new Date(2024, 0, 7 + i).toLocaleDateString(locale, { weekday: 'long' });
@@ -238,6 +245,49 @@ export default function Training() {
   }, [loggedTodayCount]);
 
   useFocusEffect(refreshWhoopRecent);
+
+  // After logging something today, WHOOP's own scoring can lag the workout
+  // ending by a few minutes — poll a handful of times instead of leaving
+  // the number stuck until this tab happens to be reopened. Runs in the
+  // background even if you switch tabs (a plain effect, not useFocusEffect
+  // — the whole point is not requiring the screen stay open), and stops
+  // itself the moment WHOOP gives a definitive answer: either a real
+  // number, or confirmation nothing's pending, rather than polling for the
+  // full budget regardless.
+  useEffect(() => {
+    if (!selectedIsToday || loggedTodayCount === 0) return;
+    let alive = true;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const poll = () => {
+      if (!alive) return;
+      const today = new Date();
+      const start = new Date(today);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(today);
+      end.setHours(23, 59, 59, 999);
+      fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
+        ({ totalKcal, workouts: w, connected, pending }) => {
+          if (!alive) return;
+          setWhoopDayBurn(today, totalKcal);
+          setWhoopDayWorkouts(today, w);
+          setWhoopLastFetchedAt(new Date().toISOString());
+          setWhoopConnected(connected ?? null);
+          setWhoopPending(!!pending);
+          attempt += 1;
+          if (pending && attempt < WHOOP_POLL_ATTEMPTS) {
+            timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
+          }
+        },
+      );
+    };
+    timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
+    return () => {
+      alive = false;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loggedTodayCount, selectedIsToday]);
 
   // One-time (then daily-refreshed) backfill: someone connecting WHOOP after
   // months of using it shouldn't start the burn calibration from nothing.

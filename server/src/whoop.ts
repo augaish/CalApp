@@ -103,6 +103,16 @@ export async function refreshWhoopToken(refreshToken: string): Promise<WhoopToke
   return parseTokenResponse(res);
 }
 
+// One in-flight refresh per ref, shared by every concurrent caller instead
+// of each firing its own request to WHOOP's token endpoint — the day-burn
+// endpoint alone can now be called 3x at once (see training.tsx's recent-
+// days refresh), and if WHOOP rotates the refresh token on use (invalidating
+// the old one the moment the first request redeems it), every other
+// concurrent call still holding that now-dead refresh token would fail with
+// no way to recover short of a full reconnect. Deduping the request removes
+// that race entirely, whether or not WHOOP actually rotates.
+const refreshInFlight = new Map<string, Promise<string | null>>();
+
 /**
  * A usable access token for `ref`, refreshing and persisting a new one first
  * if the stored one is at or near expiry. Returns null when there's no WHOOP
@@ -118,14 +128,22 @@ export async function getValidAccessToken(ref: string): Promise<string | null> {
   // refresh with. The access token is expired, so this really is a dead end;
   // the user will need to reconnect from the app.
   if (!conn.refreshToken) return null;
-  try {
-    const refreshed = await refreshWhoopToken(conn.refreshToken);
-    await setWhoopConnection(ref, refreshed);
-    return refreshed.accessToken;
-  } catch (err) {
-    console.error('whoop token refresh failed:', err);
-    return null;
-  }
+  const inFlight = refreshInFlight.get(ref);
+  if (inFlight) return inFlight;
+  const attempt = (async () => {
+    try {
+      const refreshed = await refreshWhoopToken(conn.refreshToken!);
+      await setWhoopConnection(ref, refreshed);
+      return refreshed.accessToken;
+    } catch (err) {
+      console.error('whoop token refresh failed:', err);
+      return null;
+    } finally {
+      refreshInFlight.delete(ref);
+    }
+  })();
+  refreshInFlight.set(ref, attempt);
+  return attempt;
 }
 
 async function whoopGet<T>(accessToken: string, path: string): Promise<T | null> {
