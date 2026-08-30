@@ -312,9 +312,30 @@ export function Stepper({
   const [text, setText] = React.useState('');
   const display = editing ? text : fmt(value);
 
+  // What WE last told the parent `value` was, so an external change to it
+  // (e.g. tapping a different set to edit, while this field is still mid-type)
+  // can be told apart from `value` simply catching up to our own onChange —
+  // only the former should interrupt an in-progress edit. Without this, a
+  // focused field kept showing whatever was last hand-typed even after the
+  // parent moved on to editing a completely different set.
+  const lastEmitted = React.useRef(value);
+  React.useEffect(() => {
+    if (value !== lastEmitted.current) {
+      lastEmitted.current = value;
+      setEditing(false);
+      setText(fmt(value));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const emit = (n: number) => {
+    lastEmitted.current = n;
+    onChange(n);
+  };
+
   const bump = (delta: number) => {
     const next = clamp(Number((value + delta).toFixed(3)));
-    onChange(next);
+    emit(next);
     setText(fmt(next));
   };
 
@@ -344,13 +365,13 @@ export function Stepper({
             onBlur={() => {
               setEditing(false);
               const n = decimals > 0 ? parseFloat(text) : parseInt(text, 10);
-              onChange(Number.isFinite(n) ? clamp(n) : 0);
+              emit(Number.isFinite(n) ? clamp(n) : 0);
             }}
             onChangeText={(txt) => {
               const cleaned = normalizeDigits(txt).replace(decimals > 0 ? /[^0-9.]/g : /[^0-9]/g, '');
               setText(cleaned);
               const n = decimals > 0 ? parseFloat(cleaned) : parseInt(cleaned, 10);
-              if (Number.isFinite(n)) onChange(clamp(n));
+              if (Number.isFinite(n)) emit(clamp(n));
             }}
             keyboardType={decimals > 0 ? 'decimal-pad' : 'number-pad'}
             selectTextOnFocus

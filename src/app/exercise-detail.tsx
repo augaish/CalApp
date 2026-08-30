@@ -198,6 +198,12 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
     if (editingIndex === index) cancelEdit();
   };
 
+  const deleteComment = (index: number) => {
+    if (!today) return;
+    updateSet(today.id, index, { comment: undefined }, timestampFor(viewDay));
+    if (editingIndex === index) setNote('');
+  };
+
   const dayLabel = isSameDay(new Date().toISOString(), viewDay)
     ? t('track.today')
     : viewDay.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' });
@@ -343,6 +349,7 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
           editingIndex={editingIndex}
           onSelect={selectSet}
           onDelete={deleteSet}
+          onDeleteComment={deleteComment}
         />
       )}
 
@@ -385,6 +392,7 @@ function TrackTab({
   editingIndex,
   onSelect,
   onDelete,
+  onDeleteComment,
 }: {
   type: ExerciseType;
   weight: number;
@@ -409,6 +417,7 @@ function TrackTab({
   editingIndex: number | null;
   onSelect: (s: WorkoutSet, i: number) => void;
   onDelete: (i: number) => void;
+  onDeleteComment: (i: number) => void;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -506,9 +515,17 @@ function TrackTab({
                     {isBest && <Ionicons name="trophy" size={14} color={theme.carbs} />}
                   </View>
                   {s.comment ? (
-                    <Text style={{ color: theme.textTertiary, fontSize: 12 }} numberOfLines={1}>
-                      {s.comment}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text
+                        style={{ color: theme.textTertiary, fontSize: 12, flexShrink: 1 }}
+                        numberOfLines={1}
+                      >
+                        {s.comment}
+                      </Text>
+                      <Pressable onPress={() => onDeleteComment(i)} hitSlop={8}>
+                        <Ionicons name="trash-outline" size={13} color={theme.textTertiary} />
+                      </Pressable>
+                    </View>
                   ) : null}
                 </View>
                 <Pressable onPress={() => onDelete(i)} hitSlop={8} style={{ padding: 4 }}>
