@@ -549,6 +549,7 @@ export const en = {
     mealHint: 'Center the plate in the frame',
     gymHint: 'Capture the whole machine',
     bodyHint: 'Capture the full result screen or printout',
+    bodyHintQr: "Capture the full result screen or printout, or point at the machine's QR code",
     gallery: 'Upload',
     analyzing: 'Analyzing…',
     analyzingMeal: 'Identifying your food…',
@@ -690,6 +691,15 @@ export const en = {
     askCoach: 'Ask coach about this',
     coachPromptIntro: "Here's my latest body reading — help me understand it and adjust my plan:",
     coachPromptQuestion: 'What should I focus on to get there, and how should this change my plan?',
+  },
+  inbodyWeb: {
+    title: 'InBody results',
+    hint: 'Wait for your results to finish loading, then capture them.',
+    capture: 'Use this reading',
+    reload: 'Reload',
+    unavailableTitle: 'Not in this version yet',
+    unavailable:
+      "Reading results pages from a QR code needs the next app update. For now, open the QR code's link yourself, screenshot the results, and upload that screenshot as a report file.",
   },
   program: {
     title: 'AI program',

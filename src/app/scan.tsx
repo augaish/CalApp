@@ -30,6 +30,7 @@ import {
 } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
+import { webviewAvailable } from '@/lib/native-modules';
 import { photoPickerAvailable, pickPhoto, prepareImage } from '@/lib/photo';
 import { useAppStore } from '@/lib/store';
 
@@ -58,6 +59,20 @@ export default function Scan() {
   const [shot, setShot] = useState<string | null>(null);
   const { width } = useWindowDimensions();
   const frameSize = Math.round(width * 0.78);
+
+  // An InBody machine's QR code doesn't carry readable numbers itself — it
+  // links to InBody's own results page. Rather than guess at their
+  // undocumented data format, hand the link to inbody-web, which renders
+  // that page in-app and captures it through the same AI-vision pipeline
+  // already trusted for a photographed printout. Only wired up when
+  // react-native-webview is actually linked in this binary (see
+  // native-modules.ts) — otherwise this never fires and the camera just
+  // behaves like plain photo capture, same as before.
+  const onBodyQr = (data: string) => {
+    if (analyzing || !/inbody\.com/i.test(data)) return;
+    setAnalyzing(true);
+    router.replace(`/inbody-web?url=${encodeURIComponent(data)}`);
+  };
 
   const onBarcode = async (data: string) => {
     if (analyzing) return;
@@ -204,9 +219,17 @@ export default function Scan() {
         barcodeScannerSettings={
           isBarcode
             ? { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'] }
-            : undefined
+            : isBody && webviewAvailable
+              ? { barcodeTypes: ['qr'] }
+              : undefined
         }
-        onBarcodeScanned={isBarcode ? ({ data }) => onBarcode(data) : undefined}
+        onBarcodeScanned={
+          isBarcode
+            ? ({ data }) => onBarcode(data)
+            : isBody && webviewAvailable
+              ? ({ data }) => onBodyQr(data)
+              : undefined
+        }
       />
 
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm }]}>
@@ -225,7 +248,9 @@ export default function Scan() {
           {isGym
             ? t('scan.gymHint')
             : isBody
-              ? t('scan.bodyHint')
+              ? webviewAvailable
+                ? t('scan.bodyHintQr')
+                : t('scan.bodyHint')
               : isBarcode
                 ? t('barcode.hint')
                 : t('scan.mealHint')}
