@@ -7,7 +7,8 @@ export type ActivityLevel =
   | 'light'
   | 'moderate'
   | 'active'
-  | 'very_active';
+  | 'very_active'
+  | 'extra_active';
 
 export type Goal = 'lose' | 'maintain' | 'gain';
 

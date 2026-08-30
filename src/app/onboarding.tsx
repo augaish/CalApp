@@ -30,6 +30,7 @@ const ACTIVITY_LEVELS: { key: ActivityLevel; emoji: string }[] = [
   { key: 'moderate', emoji: '🏃' },
   { key: 'active', emoji: '💪' },
   { key: 'very_active', emoji: '🔥' },
+  { key: 'extra_active', emoji: '⚡' },
 ];
 
 export default function Onboarding() {

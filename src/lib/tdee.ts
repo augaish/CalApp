@@ -1,11 +1,18 @@
 import type { ActivityLevel, DailyTargets, Goal, Profile, Sex } from './types';
 
+/** Calculator.net's own 6-tier BMR->TDEE activity table — verified against
+ * its published example (BMR 1717 -> 2060/2361/2515/2661/2962/3262 kcal for
+ * these six multipliers in order) and cross-checked against a second source
+ * reproducing the same six factors. Not the older, coarser 5-tier Harris-
+ * Benedict scale some calculators still use — this one's "Moderate" (1.465)
+ * and "Active" (1.55) sit between where a 5-tier scale would put them. */
 const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
   sedentary: 1.2,
   light: 1.375,
-  moderate: 1.55,
-  active: 1.725,
-  very_active: 1.9,
+  moderate: 1.465,
+  active: 1.55,
+  very_active: 1.725,
+  extra_active: 1.9,
 };
 
 /** Default pace (kg/week) when a profile doesn't have its own — keeps older

@@ -766,7 +766,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 5,
+      version: 6,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -854,6 +854,15 @@ export const useAppStore = create<AppState>()(
  * this backs out an approximate one (Jan 1 of the matching birth year) —
  * accurate to within a year, good enough to keep targets working until the
  * user is prompted to confirm their real birth date.
+ *
+ * v5 → v6: the activity-level multiplier table was corrected to
+ * calculator.net's actual verified 6-tier values (a new "extra_active" tier
+ * added, and moderate/active/very_active's multipliers shifted down to make
+ * room for it — see tdee.ts). `targets` is a cached snapshot, not derived
+ * live, so it would otherwise keep showing calorie numbers computed under
+ * the old table until the next unrelated profile edit — recomputing it here
+ * makes the fix take effect immediately for anyone who already has a
+ * profile, the same way v4's caloriesBurned fix did for workouts.
  */
 function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
@@ -879,6 +888,10 @@ function migrateStore(persisted: unknown, version: number): unknown {
       p.birthDate = `${new Date().getFullYear() - p.age}-01-01`;
     }
     delete p.age;
+  }
+
+  if (version < 6 && state.profile && typeof state.profile === 'object') {
+    state.targets = dailyTargets(state.profile as Profile);
   }
 
   if (version >= 2) return state;

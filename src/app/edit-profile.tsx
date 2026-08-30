@@ -13,7 +13,7 @@ import { useAppStore } from '@/lib/store';
 import { ageFrom, DEFAULT_PACE } from '@/lib/tdee';
 import type { ActivityLevel, Goal, Sex } from '@/lib/types';
 
-const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'active', 'very_active'];
+const ACTIVITY_LEVELS: ActivityLevel[] = ['sedentary', 'light', 'moderate', 'active', 'very_active', 'extra_active'];
 
 /** A YYYY-MM-DD string, local time. */
 function ymd(d: Date): string {
