@@ -79,6 +79,10 @@ interface AppState {
   whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>;
   /** When the one-time history backfill last actually found data — null means try again on next visit. */
   whoopBackfilledAt: string | null;
+  /** When today's WHOOP burn was last fetched (regardless of what it
+   * returned) — shown next to the burn card so a stale-looking number is
+   * visibly stale, not silently wrong. */
+  whoopLastFetchedAt: string | null;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -195,6 +199,7 @@ interface AppState {
   /** Set (or, with [], clear) the individual WHOOP workouts a day is made of. */
   setWhoopDayWorkouts: (day: Date, workouts: WhoopDayWorkout[]) => void;
   setWhoopBackfilledAt: (iso: string | null) => void;
+  setWhoopLastFetchedAt: (iso: string | null) => void;
   logWater: (ml: number, at?: string) => void;
   logWeight: (kg: number, at?: string) => void;
   /** A fuller reading (manual or scanned) — same log as logWeight, with the
@@ -273,6 +278,7 @@ export const useAppStore = create<AppState>()(
       whoopBurnByDay: {},
       whoopWorkoutsByDay: {},
       whoopBackfilledAt: null,
+      whoopLastFetchedAt: null,
       workouts: [],
       water: [],
       weights: [],
@@ -538,6 +544,7 @@ export const useAppStore = create<AppState>()(
           return { whoopWorkoutsByDay: { ...s.whoopWorkoutsByDay, [key]: workouts } };
         }),
       setWhoopBackfilledAt: (iso) => set({ whoopBackfilledAt: iso }),
+      setWhoopLastFetchedAt: (iso) => set({ whoopLastFetchedAt: iso }),
       reorderSchedule: (weekday, exerciseIds) =>
         set((s) => {
           const cur = s.schedule[weekday];
@@ -749,6 +756,7 @@ export const useAppStore = create<AppState>()(
           whoopBurnByDay: {},
           whoopWorkoutsByDay: {},
           whoopBackfilledAt: null,
+          whoopLastFetchedAt: null,
           language: null,
           profile: null,
           targets: null,
@@ -790,6 +798,7 @@ export const useAppStore = create<AppState>()(
         whoopBurnByDay,
         whoopWorkoutsByDay,
         whoopBackfilledAt,
+        whoopLastFetchedAt,
         workouts,
         water,
         weights,
@@ -817,6 +826,7 @@ export const useAppStore = create<AppState>()(
         whoopBurnByDay,
         whoopWorkoutsByDay,
         whoopBackfilledAt,
+        whoopLastFetchedAt,
         workouts,
         water,
         weights,
@@ -1134,20 +1144,25 @@ export function whoopKcalForWorkout(
 /**
  * The number to actually show for one logged exercise: WHOOP's real measured
  * calories when a matching WHOOP workout exists, else the stored set/rep
- * formula estimate. Mirrors `actualBurnedForDay`'s "prefer WHOOP" shape at
- * session granularity.
+ * formula estimate — corrected by the same `calibration` factor
+ * `actualBurnedForDay` applies to its own formula fallback, so a day's total
+ * and the rows it's made of never disagree just because the day-level number
+ * is calibrated and the row-level one wasn't. Mirrors `actualBurnedForDay`'s
+ * "prefer WHOOP" shape at session granularity.
  */
 export function actualBurnedForWorkout(
   workout: LoggedWorkout,
   sameDayWorkouts: LoggedWorkout[],
   whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>,
+  calibration = 1,
 ): number {
   const whoop = whoopKcalForWorkout(
     workout,
     sameDayWorkouts,
     whoopWorkoutsByDay[dateKey(new Date(workout.at))] ?? [],
   );
-  return whoop ?? workout.caloriesBurned ?? 0;
+  if (whoop != null) return whoop;
+  return Math.round((workout.caloriesBurned ?? 0) * calibration);
 }
 
 /**

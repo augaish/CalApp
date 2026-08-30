@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
 import { useAnimatedRef } from 'react-native-reanimated';
@@ -45,6 +45,18 @@ function toMin(seconds: number | undefined): number {
 function formatSportName(sportName: string): string {
   const spaced = sportName.replace(/_/g, ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/** How long ago the WHOOP burn card's numbers were actually fetched — so a
+ * stale-looking number (WHOOP still scoring, or just no new fetch since you
+ * last opened this tab) reads as stale instead of silently wrong. */
+function syncedAgoLabel(iso: string, t: (key: string, options?: Record<string, unknown>) => string): string {
+  const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (minutes < 1) return t('training.syncedJustNow');
+  if (minutes < 60) return t('training.syncedMinutesAgo', { count: minutes });
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return t('training.syncedHoursAgo', { count: hours });
+  return t('training.syncedDaysAgo', { count: Math.floor(hours / 24) });
 }
 
 /**
@@ -121,6 +133,8 @@ export default function Training() {
   const setWhoopDayWorkouts = useAppStore((s) => s.setWhoopDayWorkouts);
   const whoopBackfilledAt = useAppStore((s) => s.whoopBackfilledAt);
   const setWhoopBackfilledAt = useAppStore((s) => s.setWhoopBackfilledAt);
+  const whoopLastFetchedAt = useAppStore((s) => s.whoopLastFetchedAt);
+  const setWhoopLastFetchedAt = useAppStore((s) => s.setWhoopLastFetchedAt);
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const copyDayTo = useAppStore((s) => s.copyDayTo);
@@ -161,15 +175,25 @@ export default function Training() {
   const burned = actualBurnedForDay(workouts, whoopBurnByDay, selected);
   const whoopDayTotal = whoopBurnByDay[dateKey(selected)] ?? null;
   const whoopWorkouts = whoopWorkoutsByDay[dateKey(selected)] ?? [];
-  const whoopCalibrated = whoopDayTotal == null && whoopCalibrationFactor(workouts, whoopBurnByDay) !== 1;
+  // The same factor `actualBurnedForDay` used above for the day total, fed
+  // into every per-exercise formula fallback below too — otherwise the day
+  // card shows a WHOOP-calibrated number while the rows under it silently
+  // fall back to the uncalibrated formula, and the two can never add up.
+  const calibration = whoopCalibrationFactor(workouts, whoopBurnByDay);
+  const whoopCalibrated = whoopDayTotal == null && calibration !== 1;
   const groups = workoutDays(workouts, selected);
   const kg = t('progress.kg');
   const min = t('track.min');
 
   // Pull WHOOP's real number for today whenever this screen is looking at
-  // today — covers both "just checked something off" and "WHOOP finished
-  // syncing a couple minutes after I left the gym and reopened the app".
-  useEffect(() => {
+  // today — on focus (covers both "just reopened this tab" and "WHOOP
+  // finished scoring a workout after I already left the gym", since scoring
+  // can lag the workout ending by a while) and whenever loggedTodayCount
+  // changes while already focused (covers "just checked something off").
+  // useFocusEffect reruns for both: on every focus, and — because it wraps
+  // the callback in the same way a plain effect would — whenever this
+  // callback's own dependencies change while the screen is already focused.
+  const refreshWhoopToday = useCallback(() => {
     if (!selectedIsToday) return;
     const start = new Date(selected);
     start.setHours(0, 0, 0, 0);
@@ -180,12 +204,15 @@ export default function Training() {
       if (!alive) return;
       setWhoopDayBurn(selected, totalKcal);
       setWhoopDayWorkouts(selected, w);
+      setWhoopLastFetchedAt(new Date().toISOString());
     });
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIsToday, loggedTodayCount]);
+  }, [selectedIsToday, selected, loggedTodayCount]);
+
+  useFocusEffect(refreshWhoopToday);
 
   // One-time (then daily-refreshed) backfill: someone connecting WHOOP after
   // months of using it shouldn't start the burn calibration from nothing.
@@ -383,6 +410,14 @@ export default function Training() {
                   ? t('training.adjustedFromWhoop')
                   : t('training.estimated')}
             </Text>
+            {selectedIsToday && whoopLastFetchedAt && (
+              <Pressable onPress={refreshWhoopToday} hitSlop={8} style={styles.syncRow}>
+                <Ionicons name="refresh" size={11} color={theme.textTertiary} />
+                <Text style={{ color: theme.textTertiary, fontSize: 11 }}>
+                  {t('training.lastSynced', { time: syncedAgoLabel(whoopLastFetchedAt, t) })}
+                </Text>
+              </Pressable>
+            )}
           </View>
         </View>
         {whoopWorkouts.length > 0 && (
@@ -489,7 +524,7 @@ export default function Training() {
               );
               const maxLabel = best ? bestSetLabel(best, best.type, kg) : '';
               const wTodayCalories = wToday
-                ? actualBurnedForWorkout(wToday, selectedDayWorkouts, whoopWorkoutsByDay)
+                ? actualBurnedForWorkout(wToday, selectedDayWorkouts, whoopWorkoutsByDay, calibration)
                 : undefined;
               return (
                 <View key={exId} style={styles.planItem}>
@@ -696,7 +731,7 @@ export default function Training() {
       ) : (
         groups.map((g) => {
           const dayBurn = g.items.reduce(
-            (s, w) => s + actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay),
+            (s, w) => s + actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay, calibration),
             0,
           );
           const open = !!openDays[g.key];
@@ -729,7 +764,7 @@ export default function Training() {
                 g.items.map((w) => {
                   const ex = findExercise(w.exerciseId, custom);
                   const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
-                  const wCalories = actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay);
+                  const wCalories = actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay, calibration);
                   const wFromWhoop = whoopKcalForWorkout(w, g.items, whoopWorkoutsByDay[g.key] ?? []) != null;
                   return (
                     <View key={w.id} style={styles.workoutRow}>
@@ -819,6 +854,7 @@ const styles = StyleSheet.create({
   arrow: { padding: 4 },
   dayLabel: { fontSize: 15, fontWeight: '700', minWidth: 60, textAlign: 'center' },
   burnCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  syncRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   burnIcon: {
     width: 48,
     height: 48,
