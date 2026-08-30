@@ -31,6 +31,11 @@ import {
 } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
+/** How many trailing days (including today) get a live WHOOP refetch on
+ * every Training tab focus, to catch up on WHOOP's own scoring lag without
+ * waiting on the slower 60-day backfill's daily retry. */
+const RECENT_WHOOP_DAYS = 3;
+
 /** Weekday name in the active locale (Jan 7 2024 was a Sunday). */
 function weekdayLabel(i: number, locale: string): string {
   return new Date(2024, 0, 7 + i).toLocaleDateString(locale, { weekday: 'long' });
@@ -194,38 +199,45 @@ export default function Training() {
   const [whoopConnected, setWhoopConnected] = useState<boolean | null>(null);
   const [whoopPending, setWhoopPending] = useState(false);
 
-  // Pull WHOOP's real number for today whenever this screen is looking at
-  // today — on focus (covers both "just reopened this tab" and "WHOOP
-  // finished scoring a workout after I already left the gym", since scoring
-  // can lag the workout ending by a while) and whenever loggedTodayCount
-  // changes while already focused (covers "just checked something off").
-  // useFocusEffect reruns for both: on every focus, and — because it wraps
-  // the callback in the same way a plain effect would — whenever this
-  // callback's own dependencies change while the screen is already focused.
-  const refreshWhoopToday = useCallback(() => {
-    if (!selectedIsToday) return;
-    const start = new Date(selected);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(selected);
-    end.setHours(23, 59, 59, 999);
+  // Pull WHOOP's real numbers for the last few days whenever this screen
+  // gains focus — not just "today", and not gated by which day is currently
+  // selected. This is about catching up on WHOOP's own scoring lag (a
+  // workout can take a while after it ends before WHOOP finishes scoring
+  // it), which has nothing to do with what's on screen right now: a workout
+  // logged yesterday that was still unscored when the one-time 60-day
+  // backfill (below) first ran would otherwise stay stuck on the formula
+  // estimate for up to 24h — the backfill's own retry cadence — since it
+  // only re-runs that seldom. Refreshing the last few days on every focus
+  // closes that gap without waiting on the backfill's slower schedule.
+  const refreshWhoopRecent = useCallback(() => {
     let alive = true;
-    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
-      ({ totalKcal, workouts: w, connected, pending }) => {
-        if (!alive) return;
-        setWhoopDayBurn(selected, totalKcal);
-        setWhoopDayWorkouts(selected, w);
-        setWhoopLastFetchedAt(new Date().toISOString());
-        setWhoopConnected(connected ?? null);
-        setWhoopPending(!!pending);
-      },
-    );
+    for (let i = 0; i < RECENT_WHOOP_DAYS; i++) {
+      const day = new Date();
+      day.setDate(day.getDate() - i);
+      const start = new Date(day);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(day);
+      end.setHours(23, 59, 59, 999);
+      fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
+        ({ totalKcal, workouts: w, connected, pending }) => {
+          if (!alive) return;
+          setWhoopDayBurn(day, totalKcal);
+          setWhoopDayWorkouts(day, w);
+          if (i === 0) {
+            setWhoopLastFetchedAt(new Date().toISOString());
+            setWhoopConnected(connected ?? null);
+            setWhoopPending(!!pending);
+          }
+        },
+      );
+    }
     return () => {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedIsToday, selected, loggedTodayCount]);
+  }, [loggedTodayCount]);
 
-  useFocusEffect(refreshWhoopToday);
+  useFocusEffect(refreshWhoopRecent);
 
   // One-time (then daily-refreshed) backfill: someone connecting WHOOP after
   // months of using it shouldn't start the burn calibration from nothing.
@@ -435,7 +447,7 @@ export default function Training() {
               </Pressable>
             )}
             {selectedIsToday && whoopLastFetchedAt && (
-              <Pressable onPress={refreshWhoopToday} hitSlop={8} style={styles.syncRow}>
+              <Pressable onPress={refreshWhoopRecent} hitSlop={8} style={styles.syncRow}>
                 <Ionicons name="refresh" size={11} color={theme.textTertiary} />
                 <Text style={{ color: theme.textTertiary, fontSize: 11 }}>
                   {t('training.lastSynced', { time: syncedAgoLabel(whoopLastFetchedAt, t) })}
