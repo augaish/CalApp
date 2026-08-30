@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import {
   BodyMap,
@@ -102,6 +102,7 @@ export default function BodyReading() {
   const profile = useAppStore((s) => s.profile);
   const weights = useAppStore((s) => s.weights);
   const logBodyReading = useAppStore((s) => s.logBodyReading);
+  const deleteWeight = useAppStore((s) => s.deleteWeight);
   const [pendingWeightKg, setPendingWeightKg] = useState<number | null>(null);
   const bodyReading = usePending((s) => s.bodyReading);
   const photoUri = usePending((s) => s.photoUri);
@@ -430,6 +431,12 @@ export default function BodyReading() {
     }
   };
 
+  const confirmDeleteReading = (at: string) =>
+    Alert.alert(t('bodyReading.deleteReadingConfirm'), undefined, [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('common.delete'), style: 'destructive', onPress: () => deleteWeight(at) },
+    ]);
+
   const save = () => {
     const weightKg = num(kg);
     if (!weightKg) return;
@@ -754,6 +761,13 @@ export default function BodyReading() {
                     {w.bodyFatPercent}%
                   </Text>
                 )}
+                <Pressable
+                  onPress={() => confirmDeleteReading(w.at)}
+                  hitSlop={10}
+                  style={{ marginStart: Spacing.sm }}
+                >
+                  <Ionicons name="trash-outline" size={16} color={theme.textTertiary} />
+                </Pressable>
               </View>
             ))}
           </View>

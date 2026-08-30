@@ -200,6 +200,10 @@ interface AppState {
   /** A fuller reading (manual or scanned) — same log as logWeight, with the
    * optional body-fat/segmental fields a quick Overview weigh-in never sets. */
   logBodyReading: (entry: Omit<WeightEntry, 'at'> & { at?: string }) => void;
+  /** Removes one weight/body-reading entry (matched by its `at` timestamp,
+   * the only thing that uniquely identifies it) — the whole record, body
+   * composition fields included, not just the kg number. */
+  deleteWeight: (at: string) => void;
   /** Accept, replace, or end (pass null) the active AI-designed program.
    * Committing its targets/schedule is a separate step (setTargets /
    * applyCoachSchedule) so a program is just data here, same as any other
@@ -700,6 +704,7 @@ export const useAppStore = create<AppState>()(
             (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
           ),
         })),
+      deleteWeight: (at) => set((s) => ({ weights: s.weights.filter((w) => w.at !== at) })),
       setActiveProgram: (activeProgram) => set({ activeProgram }),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
