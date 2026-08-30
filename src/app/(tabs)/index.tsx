@@ -20,12 +20,14 @@ import { WeekBars } from '@/components/charts';
 import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
 import { Ring } from '@/components/ring';
 import { SponsorCard } from '@/components/sponsor-card';
+import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Button, Field, MetricRow } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchWhoopDayBurn } from '@/lib/api';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { normalizeDigits } from '@/lib/numbers';
+import { targetsNeedUpdate } from '@/lib/tdee';
 import {
   actualBurnedForDay,
   isSameDay,
@@ -71,7 +73,9 @@ export default function Overview() {
   const tourSeen = useAppStore((s) => s.tourSeen);
   const setTourSeen = useAppStore((s) => s.setTourSeen);
   const logWeight = useAppStore((s) => s.logWeight);
+  const setProfile = useAppStore((s) => s.setProfile);
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
+  const [pendingWeightKg, setPendingWeightKg] = useState<number | null>(null);
 
   const selected = useViewDay((s) => s.day);
   const setDay = useViewDay((s) => s.setDay);
@@ -189,6 +193,7 @@ export default function Overview() {
     }
     logWeight(value, timestampFor(selected));
     setKg('');
+    if (targetsNeedUpdate(profile, value)) setPendingWeightKg(value);
   };
 
   return (
@@ -584,6 +589,17 @@ export default function Overview() {
       {tourSteps && (
         <CoachTour steps={tourSteps} index={tourIndex} onNext={advanceTour} onSkip={endTour} />
       )}
+
+      <TargetUpdateModal
+        visible={pendingWeightKg != null}
+        profile={profile}
+        newWeightKg={pendingWeightKg ?? profile.weightKg}
+        onUpdate={() => {
+          setProfile({ ...profile, weightKg: pendingWeightKg! });
+          setPendingWeightKg(null);
+        }}
+        onDismiss={() => setPendingWeightKg(null)}
+      />
     </View>
   );
 }

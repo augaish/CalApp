@@ -766,7 +766,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 4,
+      version: 5,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -847,6 +847,13 @@ export const useAppStore = create<AppState>()(
  * calories at all. Recomputing every workout's burn from its own sets here
  * fixes whatever that left behind; new edits are already fixed at the
  * source.
+ *
+ * v4 → v5: `profile.age` (a number, frozen at whatever it was when entered)
+ * is replaced by `profile.birthDate`, computed fresh every time so it never
+ * goes stale. A real birth date isn't recoverable from a stored age, so
+ * this backs out an approximate one (Jan 1 of the matching birth year) —
+ * accurate to within a year, good enough to keep targets working until the
+ * user is prompted to confirm their real birth date.
  */
 function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
@@ -864,6 +871,14 @@ function migrateStore(persisted: unknown, version: number): unknown {
       ...w,
       caloriesBurned: burnForSets(w.sets, bodyKg),
     }));
+  }
+
+  if (version < 5 && state.profile && typeof state.profile === 'object') {
+    const p = state.profile as Record<string, unknown>;
+    if (typeof p.age === 'number' && typeof p.birthDate !== 'string') {
+      p.birthDate = `${new Date().getFullYear() - p.age}-01-01`;
+    }
+    delete p.age;
   }
 
   if (version >= 2) return state;

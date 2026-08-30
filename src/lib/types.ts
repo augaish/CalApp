@@ -13,11 +13,17 @@ export type Goal = 'lose' | 'maintain' | 'gain';
 
 export interface Profile {
   sex: Sex;
-  age: number;
+  /** YYYY-MM-DD — age is computed from this, never stored, so it never goes
+   * stale as time passes. */
+  birthDate: string;
   heightCm: number;
   weightKg: number;
   activityLevel: ActivityLevel;
   goal: Goal;
+  /** How fast to lose/gain, in kg/week — meaningless (and unused) when
+   * `goal` is 'maintain'. Defaults to a sensible pace per goal when unset,
+   * so older saved profiles keep working without this field. */
+  paceKgPerWeek?: number;
 }
 
 export interface DailyTargets {

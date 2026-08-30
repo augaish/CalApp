@@ -1,5 +1,6 @@
 import { fetchWhoopSummary } from './api';
 import { exerciseName, findExercise } from './exercises';
+import { ageFrom } from './tdee';
 import {
   actualBurnedForDay,
   streakDays,
@@ -130,7 +131,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
     profile: s.profile
       ? {
           sex: s.profile.sex,
-          age: s.profile.age,
+          age: ageFrom(s.profile.birthDate),
           heightCm: s.profile.heightCm,
           weightKg: s.profile.weightKg,
           goal: s.profile.goal,

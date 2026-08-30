@@ -18,6 +18,7 @@ import {
 } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { DatePickerModal } from '@/components/date-picker';
+import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,6 +28,7 @@ import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
+import { targetsNeedUpdate } from '@/lib/tdee';
 import {
   bmiFor,
   bmiTrend,
@@ -98,8 +100,10 @@ export default function BodyReading() {
 
   const language = useAppStore((s) => s.language) ?? 'en';
   const profile = useAppStore((s) => s.profile);
+  const setProfile = useAppStore((s) => s.setProfile);
   const weights = useAppStore((s) => s.weights);
   const logBodyReading = useAppStore((s) => s.logBodyReading);
+  const [pendingWeightKg, setPendingWeightKg] = useState<number | null>(null);
   const bodyReading = usePending((s) => s.bodyReading);
   const photoUri = usePending((s) => s.photoUri);
   const clearPending = usePending((s) => s.clear);
@@ -460,7 +464,15 @@ export default function BodyReading() {
     });
     clearPending();
     successHaptic();
-    router.back();
+    // A weight change big enough to matter gets a chance to update the
+    // calorie goal before leaving — the same window Overview's quick
+    // weigh-in shows, blocking the back-navigation until it's handled so it
+    // isn't shown on a screen that's already gone.
+    if (profile && targetsNeedUpdate(profile, weightKg)) {
+      setPendingWeightKg(weightKg);
+    } else {
+      router.back();
+    }
   };
 
   return (
@@ -747,6 +759,23 @@ export default function BodyReading() {
             ))}
           </View>
         </>
+      )}
+
+      {profile && (
+        <TargetUpdateModal
+          visible={pendingWeightKg != null}
+          profile={profile}
+          newWeightKg={pendingWeightKg ?? profile.weightKg}
+          onUpdate={() => {
+            setProfile({ ...profile, weightKg: pendingWeightKg! });
+            setPendingWeightKg(null);
+            router.back();
+          }}
+          onDismiss={() => {
+            setPendingWeightKg(null);
+            router.back();
+          }}
+        />
       )}
     </Screen>
   );

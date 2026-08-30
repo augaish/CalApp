@@ -2,16 +2,23 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { DatePickerModal } from '@/components/date-picker';
+import { GoalScenarioCards } from '@/components/goal-scenario-cards';
 import { Button, Card, Field, OptionRow, Screen, StepDots, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
-import { dailyTargets } from '@/lib/tdee';
+import { ageFrom, dailyTargets, DEFAULT_PACE } from '@/lib/tdee';
 import type { ActivityLevel, Goal, Language, Profile, Sex } from '@/lib/types';
+
+/** A YYYY-MM-DD string, local time. */
+function ymd(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
 type Step = 'language' | 'about' | 'activity' | 'goal' | 'results';
 
@@ -25,12 +32,6 @@ const ACTIVITY_LEVELS: { key: ActivityLevel; emoji: string }[] = [
   { key: 'very_active', emoji: '🔥' },
 ];
 
-const GOALS: { key: Goal; emoji: string }[] = [
-  { key: 'lose', emoji: '📉' },
-  { key: 'maintain', emoji: '⚖️' },
-  { key: 'gain', emoji: '💪' },
-];
-
 export default function Onboarding() {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -40,11 +41,13 @@ export default function Onboarding() {
 
   const [step, setStep] = useState<Step>(storedLanguage ? 'about' : 'language');
   const [sex, setSex] = useState<Sex>('male');
-  const [age, setAge] = useState('');
+  const [birthDate, setBirthDate] = useState('');
+  const [showBirthDatePicker, setShowBirthDatePicker] = useState(false);
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
   const [activity, setActivity] = useState<ActivityLevel>('moderate');
   const [goal, setGoal] = useState<Goal>('lose');
+  const [paceKgPerWeek, setPaceKgPerWeek] = useState(DEFAULT_PACE.lose);
 
   const chooseLanguage = async (lang: Language) => {
     setLanguage(lang);
@@ -62,13 +65,13 @@ export default function Onboarding() {
   };
 
   const parsedProfile = (): Profile | null => {
-    const a = parseInt(age, 10);
     const h = parseFloat(height);
     const w = parseFloat(weight);
-    if (!a || a < 10 || a > 100 || !h || h < 100 || h > 250 || !w || w < 30 || w > 300) {
+    const a = birthDate ? ageFrom(birthDate) : 0;
+    if (!birthDate || a < 10 || a > 100 || !h || h < 100 || h > 250 || !w || w < 30 || w > 300) {
       return null;
     }
-    return { sex, age: a, heightCm: h, weightKg: w, activityLevel: activity, goal };
+    return { sex, birthDate, heightCm: h, weightKg: w, activityLevel: activity, goal, paceKgPerWeek };
   };
 
   const submitAbout = () => {
@@ -137,9 +140,27 @@ export default function Onboarding() {
             <OptionRow emoji="👩" label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
           </View>
         </View>
-        <Field label={t('onboarding.age')} value={age} onChangeText={(v) => setAge(normalizeDigits(v))} keyboardType="number-pad" maxLength={3} />
+        <View>
+          <Field
+            label={t('onboarding.birthDate')}
+            value={birthDate}
+            editable={false}
+            placeholder="YYYY-MM-DD"
+          />
+          {/* A non-editable TextInput can still swallow the tap itself on some
+              platforms rather than letting it bubble to a wrapping Pressable —
+              an overlay guarantees the tap is actually caught. */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowBirthDatePicker(true)} />
+        </View>
         <Field label={t('onboarding.height')} value={height} onChangeText={(v) => setHeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
         <Field label={t('onboarding.weight')} value={weight} onChangeText={(v) => setWeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="kg" />
+        <DatePickerModal
+          visible={showBirthDatePicker}
+          value={birthDate ? new Date(birthDate) : new Date(new Date().setFullYear(new Date().getFullYear() - 25))}
+          maxDate={new Date()}
+          onChange={(d) => setBirthDate(ymd(d))}
+          onClose={() => setShowBirthDatePicker(false)}
+        />
       </Screen>
     );
   }
@@ -182,16 +203,18 @@ export default function Onboarding() {
       >
         {dots}
         <Title>{t('onboarding.goalTitle')}</Title>
-        {GOALS.map(({ key, emoji }) => (
-          <OptionRow
-            key={key}
-            emoji={emoji}
-            label={t(`onboarding.goals.${key}`)}
-            description={t(`onboarding.goals.${key}Desc`)}
-            selected={goal === key}
-            onPress={() => setGoal(key)}
+        <Subtitle>{t('onboarding.goalSubtitle')}</Subtitle>
+        {preview && (
+          <GoalScenarioCards
+            profile={preview}
+            goal={goal}
+            paceKgPerWeek={paceKgPerWeek}
+            onSelect={(g, pace) => {
+              setGoal(g);
+              setPaceKgPerWeek(pace);
+            }}
           />
-        ))}
+        )}
       </Screen>
     );
   }
