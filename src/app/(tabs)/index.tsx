@@ -75,7 +75,16 @@ export default function Overview() {
   const logWeight = useAppStore((s) => s.logWeight);
   const setProfile = useAppStore((s) => s.setProfile);
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
-  const [pendingWeightKg, setPendingWeightKg] = useState<number | null>(null);
+  // Starts already-flagged when there's a mismatch coming INTO this mount —
+  // not only one created by logging a weight during this visit (see
+  // submitWeight below, and body-reading's own save) — so profile.weightKg
+  // drifting stale from an earlier session still gets caught once you're
+  // back, instead of silently staying wrong until the next fresh log.
+  const [pendingWeightKg, setPendingWeightKg] = useState<number | null>(() => {
+    if (!profile || weights.length === 0) return null;
+    const latest = weights[0];
+    return targetsNeedUpdate(profile, latest.kg) ? latest.kg : null;
+  });
 
   const selected = useViewDay((s) => s.day);
   const setDay = useViewDay((s) => s.setDay);
