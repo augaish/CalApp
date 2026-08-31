@@ -1053,7 +1053,15 @@ export function whoopCalibrationFactor(
   dayCount = 30,
 ): number {
   const ratios: number[] = [];
-  for (let i = 0; i < dayCount; i++) {
+  // Starts at 1, not 0 — today is deliberately excluded. Its own WHOOP
+  // number is still actively arriving (a live refresh or the post-training
+  // poll can flip it between a real value and null several times before
+  // WHOOP finishes scoring), and folding a day that's still changing into
+  // this average made the factor itself flicker — every calibrated
+  // exercise on screen visibly jumping between two different kcal values
+  // as background polling completed, with nothing about the workout
+  // actually changing. Only settled (yesterday-or-older) days go in.
+  for (let i = 1; i <= dayCount; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
     const whoopKcal = whoopBurnByDay[dateKey(d)];
