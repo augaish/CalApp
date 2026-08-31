@@ -16,10 +16,10 @@ import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/e
 import { successHaptic } from '@/lib/feedback';
 import {
   actualBurnedForDay,
-  actualBurnedForWorkout,
   applyOrder,
   bestSetIndex,
   dateKey,
+  dayBurnAllocation,
   historyFor,
   isSameDay,
   setScore,
@@ -193,6 +193,15 @@ export default function Training() {
   // fall back to the uncalibrated formula, and the two can never add up.
   const calibration = whoopCalibrationFactor(workouts, whoopBurnByDay);
   const whoopCalibrated = whoopDayTotal == null && calibration !== 1;
+  // Guarantees the "Today's workout" rows can never sum to more than
+  // whoopDayTotal itself — see dayBurnAllocation.
+  const selectedDayAllocation = dayBurnAllocation(
+    workouts,
+    selected,
+    whoopBurnByDay,
+    whoopWorkoutsByDay,
+    calibration,
+  );
   const groups = workoutDays(workouts, selected);
   const kg = t('progress.kg');
   const min = t('track.min');
@@ -614,9 +623,7 @@ export default function Training() {
                 undefined,
               );
               const maxLabel = best ? bestSetLabel(best, best.type, kg) : '';
-              const wTodayCalories = wToday
-                ? actualBurnedForWorkout(wToday, selectedDayWorkouts, whoopWorkoutsByDay, calibration)
-                : undefined;
+              const wTodayCalories = wToday ? selectedDayAllocation.get(wToday.id) : undefined;
               return (
                 <View key={exId} style={styles.planItem}>
                   <View style={styles.planRow}>
@@ -821,10 +828,8 @@ export default function Training() {
         </View>
       ) : (
         groups.map((g) => {
-          const dayBurn = g.items.reduce(
-            (s, w) => s + actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay, calibration),
-            0,
-          );
+          const dayAllocation = dayBurnAllocation(workouts, g.date, whoopBurnByDay, whoopWorkoutsByDay, calibration);
+          const dayBurn = g.items.reduce((s, w) => s + (dayAllocation.get(w.id) ?? 0), 0);
           const open = !!openDays[g.key];
           return (
             <Card key={g.key}>
@@ -855,7 +860,7 @@ export default function Training() {
                 g.items.map((w) => {
                   const ex = findExercise(w.exerciseId, custom);
                   const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
-                  const wCalories = actualBurnedForWorkout(w, g.items, whoopWorkoutsByDay, calibration);
+                  const wCalories = dayAllocation.get(w.id) ?? 0;
                   const wFromWhoop = whoopKcalForWorkout(w, g.items, whoopWorkoutsByDay[g.key] ?? []) != null;
                   return (
                     <View key={w.id} style={styles.workoutRow}>

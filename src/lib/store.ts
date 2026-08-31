@@ -1312,6 +1312,36 @@ export function actualBurnedForWorkout(
 }
 
 /**
+ * Every workout's calorie contribution for one day, with a hard ceiling:
+ * when WHOOP reported a real total for that day, the sum across every
+ * workout here never exceeds it. Without this, an exercise that narrowly
+ * missed matching a WHOOP session (its own logged timestamps landing just
+ * outside WHOOP_MATCH_BUFFER_MS) would fall back to its own separate
+ * formula estimate and add that ON TOP of a day that WHOOP already fully
+ * accounted for — the rows visibly summing to more than what WHOOP itself
+ * measured for the exact same session. When the raw total would overshoot,
+ * every workout is scaled down by the same factor, so relative shares
+ * between exercises stay the same and only the absolute total is capped.
+ */
+export function dayBurnAllocation(
+  workouts: LoggedWorkout[],
+  day: Date,
+  whoopBurnByDay: Record<string, number>,
+  whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>,
+  calibration = 1,
+): Map<string, number> {
+  const dayWorkouts = workouts.filter((w) => isSameDay(w.at, day));
+  const raw = new Map(
+    dayWorkouts.map((w) => [w.id, actualBurnedForWorkout(w, dayWorkouts, whoopWorkoutsByDay, calibration)]),
+  );
+  const whoopTotal = whoopBurnByDay[dateKey(day)];
+  const rawSum = [...raw.values()].reduce((sum, kcal) => sum + kcal, 0);
+  if (whoopTotal == null || rawSum <= whoopTotal || rawSum === 0) return raw;
+  const scale = whoopTotal / rawSum;
+  return new Map([...raw].map(([id, kcal]) => [id, Math.round(kcal * scale)]));
+}
+
+/**
  * Apply an ordering override to a set of ids.
  *
  * Ids the override does not mention are appended in their original order, and

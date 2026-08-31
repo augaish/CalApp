@@ -25,9 +25,11 @@ import { lightHaptic, successHaptic } from '@/lib/feedback';
 import {
   bestSetIndex,
   dateKey,
+  dayBurnAllocation,
   historyFor,
   isSameDay,
   useAppStore,
+  whoopCalibrationFactor,
   whoopKcalForWorkout,
   workoutFor,
 } from '@/lib/store';
@@ -85,6 +87,7 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
 
   const custom = useAppStore((s) => s.exercises);
   const workouts = useAppStore((s) => s.workouts);
+  const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const schedule = useAppStore((s) => s.schedule);
   const logSet = useAppStore((s) => s.logSet);
@@ -101,14 +104,25 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
   );
   const today = exercise ? workoutFor(workouts, exercise.id, viewDay) : undefined;
   const todaySets = today?.sets ?? [];
-  const todayWhoopCalories = today
+  // Same calibration + day-level cap the Training tab's rows use (see
+  // dayBurnAllocation) — otherwise this exercise could show a different
+  // number here than it does in the list it was tapped from.
+  const todayCalories = today
+    ? dayBurnAllocation(
+        workouts,
+        viewDay,
+        whoopBurnByDay,
+        whoopWorkoutsByDay,
+        whoopCalibrationFactor(workouts, whoopBurnByDay),
+      ).get(today.id)
+    : undefined;
+  const todayFromWhoop = today
     ? whoopKcalForWorkout(
         today,
         workouts.filter((w) => isSameDay(w.at, viewDay)),
         whoopWorkoutsByDay[dateKey(viewDay)] ?? [],
-      )
-    : null;
-  const todayCalories = todayWhoopCalories ?? today?.caloriesBurned;
+      ) != null
+    : false;
 
   // Opening a scheduled exercise that isn't logged yet pre-fills its sets from
   // your best record / plan, but marks them NOT trained (no calories) — so an
@@ -348,7 +362,7 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
           editing={editingIndex !== null}
           dayLabel={dayLabel}
           caloriesBurned={todayCalories}
-          fromWhoop={todayWhoopCalories != null}
+          fromWhoop={todayFromWhoop}
           sets={todaySets}
           editingIndex={editingIndex}
           onSelect={selectSet}
