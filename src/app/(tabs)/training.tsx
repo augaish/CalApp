@@ -416,7 +416,12 @@ export default function Training() {
     }
     const ex = findExercise(exId, custom);
     markExerciseDone(
-      { id: exId, name: ex ? exerciseName(ex, lang) : exId, type: ex?.type ?? 'weight_reps' },
+      {
+        id: exId,
+        name: ex ? exerciseName(ex, lang) : exId,
+        type: ex?.type ?? 'weight_reps',
+        category: ex?.category,
+      },
       selected,
     );
     successHaptic();

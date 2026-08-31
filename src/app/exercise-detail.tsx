@@ -122,7 +122,7 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
     const planned = day.plans?.[exercise.id];
     if (!hasHistory && !(planned && planned.length > 0)) return;
     markExerciseDone(
-      { id: exercise.id, name: exerciseName(exercise, lang), type: exercise.type },
+      { id: exercise.id, name: exerciseName(exercise, lang), type: exercise.type, category: exercise.category },
       viewDay,
       false,
     );
@@ -172,7 +172,11 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
       setEditingIndex(null);
       setNote('');
     } else {
-      logSet({ id: exercise.id, name: exerciseName(exercise, lang), type }, buildSet(), timestampFor(viewDay));
+      logSet(
+        { id: exercise.id, name: exerciseName(exercise, lang), type, category: exercise.category },
+        buildSet(),
+        timestampFor(viewDay),
+      );
       useCelebrate.getState().celebrate(t('celebrate.setLogged'));
     }
   };

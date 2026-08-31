@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { findExercise } from './exercises';
 import { dailyTargets } from './tdee';
 import type {
   DailyTargets,
@@ -12,6 +13,7 @@ import type {
   LoggedMeal,
   LoggedWorkout,
   MealType,
+  MuscleGroup,
   PlannedSet,
   Profile,
   Program,
@@ -122,7 +124,7 @@ interface AppState {
   removeExercise: (id: string) => void;
   /** Append a set to the (exercise, day) workout, creating it if needed. */
   logSet: (
-    exercise: { id: string; name: string; type: LoggedWorkout['type'] },
+    exercise: { id: string; name: string; type: LoggedWorkout['type']; category?: MuscleGroup },
     set: WorkoutSet,
     at?: string,
   ) => void;
@@ -189,7 +191,7 @@ interface AppState {
    * set. No-op if it's already logged that day.
    */
   markExerciseDone: (
-    exercise: { id: string; name: string; type: LoggedWorkout['type'] },
+    exercise: { id: string; name: string; type: LoggedWorkout['type']; category?: MuscleGroup },
     day: Date,
     /** false seeds the record but leaves it not-trained (no burn). */
     trained?: boolean,
@@ -368,7 +370,17 @@ export const useAppStore = create<AppState>()(
             return {
               workouts: s.workouts.map((w) =>
                 w.id === existing.id
-                  ? { ...w, sets: withPR, updatedAt: when, caloriesBurned: burnForSets(withPR, bodyKg) }
+                  ? {
+                      ...w,
+                      sets: withPR,
+                      updatedAt: when,
+                      caloriesBurned: burnForSets(
+                        withPR,
+                        bodyKg,
+                        exercise.category,
+                        elapsedMinutes(existing.at, when),
+                      ),
+                    }
                   : w,
               ),
             };
@@ -384,7 +396,7 @@ export const useAppStore = create<AppState>()(
                 exerciseName: exercise.name,
                 type: exercise.type,
                 sets,
-                caloriesBurned: burnForSets(sets, bodyKg),
+                caloriesBurned: burnForSets(sets, bodyKg, exercise.category),
               },
               ...s.workouts,
             ],
@@ -397,11 +409,13 @@ export const useAppStore = create<AppState>()(
             workouts: s.workouts.map((w) => {
               if (w.id !== workoutId) return w;
               const sets = w.sets.map((st, i) => (i === index ? { ...st, ...patch } : st));
+              const updatedAt = at ?? w.updatedAt;
+              const category = findExercise(w.exerciseId, s.exercises)?.category;
               return {
                 ...w,
                 sets: markPRs(sets, w.type),
-                updatedAt: at ?? w.updatedAt,
-                caloriesBurned: burnForSets(sets, bodyKg),
+                updatedAt,
+                caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, updatedAt)),
               };
             }),
           };
@@ -417,10 +431,11 @@ export const useAppStore = create<AppState>()(
             }
             const sets = w.sets.filter((_, i) => i !== index);
             if (sets.length === 0) continue; // drop the empty workout
+            const category = findExercise(w.exerciseId, s.exercises)?.category;
             workouts.push({
               ...w,
               sets: markPRs(sets, w.type),
-              caloriesBurned: burnForSets(sets, bodyKg),
+              caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt)),
             });
           }
           return { workouts };
@@ -434,10 +449,11 @@ export const useAppStore = create<AppState>()(
             workouts: s.workouts.map((w) => {
               if (w.id !== workoutId) return w;
               const sets = w.sets.map((st) => ({ ...st, done: trained }));
+              const category = findExercise(w.exerciseId, s.exercises)?.category;
               return {
                 ...w,
                 sets,
-                caloriesBurned: burnForSets(sets, bodyKg),
+                caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt)),
               };
             }),
           };
@@ -686,7 +702,7 @@ export const useAppStore = create<AppState>()(
               exerciseName: exercise.name,
               type: exercise.type,
               sets,
-              caloriesBurned: trained ? workoutBurn(sets.length, bodyKg) : 0,
+              caloriesBurned: trained ? workoutBurn(sets.length, bodyKg, exercise.category) : 0,
             },
             ...s.workouts,
           ],
@@ -779,7 +795,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 7,
+      version: 8,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -885,6 +901,15 @@ export const useAppStore = create<AppState>()(
  * pace now shows the same uncapped number calculator.net does. Same
  * reasoning as v6: recompute the cached `targets` now instead of leaving it
  * stale until the next profile edit.
+ *
+ * v7 → v8: `workoutBurn` used a flat MET 5.0 and a flat 2-minutes-per-set
+ * assumption for every exercise, so a heavy compound lift and a light
+ * isolation move with the same set count always showed identical calories
+ * — and WHOOP's real per-session total, split across overlapping exercises
+ * by that same flat estimate, inherited the same flatness. Now MET varies
+ * by muscle group and real elapsed time is used when it's known. Same
+ * reasoning as v3 → v4: recompute every workout's cached `caloriesBurned`
+ * now instead of only new ones going forward.
  */
 function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
@@ -918,6 +943,18 @@ function migrateStore(persisted: unknown, version: number): unknown {
 
   if (version < 7 && state.profile && typeof state.profile === 'object') {
     state.targets = dailyTargets(state.profile as Profile);
+  }
+
+  if (version < 8 && Array.isArray(state.workouts)) {
+    const bodyKg = (state.profile as { weightKg?: number } | null | undefined)?.weightKg ?? 75;
+    const custom: Exercise[] = Array.isArray(state.exercises) ? (state.exercises as Exercise[]) : [];
+    state.workouts = (state.workouts as LoggedWorkout[]).map((w) => {
+      const category = findExercise(w.exerciseId, custom)?.category;
+      return {
+        ...w,
+        caloriesBurned: burnForSets(w.sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt)),
+      };
+    });
   }
 
   if (version >= 2) return state;
@@ -1010,13 +1047,66 @@ export function waterTargetMl(weightKg: number): number {
 }
 
 /**
- * Rough strength-training burn: MET 5.0 for ~2 minutes (work + rest) per set →
- * kcal = MET × 3.5 × kg / 200 × minutes. Replaced by real data once a wearable
- * is connected.
+ * Rough resistance-training MET by muscle group. A flat MET 5.0 for every
+ * exercise made a heavy compound lift and a light isolation move come out
+ * identical whenever they had the same set count — exercise-physiology
+ * comparisons of resistance exercises (e.g. leg press vs. biceps curl at
+ * matched effort) consistently find large-muscle/compound movements cost
+ * meaningfully more per minute than small isolation work. Still a broad
+ * approximation, not a lab measurement — MET 5.0 (general vigorous
+ * resistance training) stays the baseline this scales from.
  */
-export function workoutBurn(setCount: number, bodyKg: number): number {
+const MET_BY_CATEGORY: Record<MuscleGroup, number> = {
+  legs: 6.0,
+  glutes: 6.0,
+  back: 6.0,
+  fullBody: 6.5,
+  chest: 5.5,
+  shoulders: 5.5,
+  core: 5.0,
+  cardio: 7.0,
+  biceps: 4.0,
+  triceps: 4.0,
+  calves: 4.0,
+  forearms: 3.5,
+};
+
+/** Minutes assumed per done set (work + rest) when there's no real logged
+ * timing to fall back on — e.g. a Training-tab checkmark logs a whole
+ * session in one shot, with nothing to measure elapsed time from. */
+const DEFAULT_MINUTES_PER_SET = 2;
+
+/** A measured elapsed time outside this range is more likely a stale or
+ * unrelated timestamp (a set edited long after the fact) than real
+ * training time, so it's not trusted over the per-set default. */
+const MIN_TRUSTED_MINUTES = 0.5;
+const MAX_TRUSTED_MINUTES = 90;
+
+/** Real elapsed time between a workout's first and last logged set, when
+ * both are known and look plausible — undefined otherwise, so the caller
+ * falls back to the flat per-set assumption. */
+export function elapsedMinutes(atIso: string, updatedAtIso?: string): number | undefined {
+  if (!updatedAtIso) return undefined;
+  const minutes = (new Date(updatedAtIso).getTime() - new Date(atIso).getTime()) / 60_000;
+  return minutes >= MIN_TRUSTED_MINUTES && minutes <= MAX_TRUSTED_MINUTES ? minutes : undefined;
+}
+
+/**
+ * Strength-training burn: kcal = MET × 3.5 × kg / 200 × minutes, where MET
+ * comes from the exercise's muscle group and minutes is real elapsed time
+ * when it's available and trustworthy, else the flat 2-min-per-set
+ * assumption. Replaced by real data once a wearable is connected.
+ */
+export function workoutBurn(
+  setCount: number,
+  bodyKg: number,
+  category: MuscleGroup = 'core',
+  minutes?: number,
+): number {
   if (setCount <= 0) return 0;
-  return Math.round(((5 * 3.5 * bodyKg) / 200) * 2 * setCount);
+  const met = MET_BY_CATEGORY[category] ?? 5.0;
+  const trustedMinutes = minutes ?? DEFAULT_MINUTES_PER_SET * setCount;
+  return Math.round(((met * 3.5 * bodyKg) / 200) * trustedMinutes);
 }
 
 /**
@@ -1027,8 +1117,13 @@ export function workoutBurn(setCount: number, bodyKg: number): number {
  * the burn from the length of the list and quietly credited work nobody had
  * claimed to do. Reading the flag makes the two paths agree.
  */
-export function burnForSets(sets: WorkoutSet[], bodyKg: number): number {
-  return workoutBurn(sets.filter((s) => s.done).length, bodyKg);
+export function burnForSets(
+  sets: WorkoutSet[],
+  bodyKg: number,
+  category: MuscleGroup = 'core',
+  minutes?: number,
+): number {
+  return workoutBurn(sets.filter((s) => s.done).length, bodyKg, category, minutes);
 }
 
 export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
@@ -1115,9 +1210,12 @@ function overlaps(aStart: number, aEnd: number, bStart: number, bEnd: number): b
  * workout (WHOOP sees one continuous gym session; Calgym logs bench press and
  * rows as separate entries) — crediting that WHOOP session's full kcal to
  * each would double-count it once both are added up, so a shared session's
- * calories are split across every logged exercise that overlaps it, by their
- * share of done sets. Returns null when nothing overlaps, so the caller can
- * fall back to the formula estimate.
+ * calories are split across every logged exercise that overlaps it. The
+ * split is weighted by each exercise's own formula estimate (category MET ×
+ * elapsed time), not raw set count — a leg-press set and a wrist-curl set
+ * don't cost the same, so they shouldn't claim equal shares of WHOOP's real
+ * total just because they're both "one set". Returns null when nothing
+ * overlaps, so the caller can fall back to the formula estimate outright.
  */
 export function whoopKcalForWorkout(
   workout: LoggedWorkout,
@@ -1127,8 +1225,8 @@ export function whoopKcalForWorkout(
   if (whoopWorkoutsForDay.length === 0) return null;
   const myStart = new Date(workout.at).getTime() - WHOOP_MATCH_BUFFER_MS;
   const myEnd = new Date(workout.updatedAt ?? workout.at).getTime() + WHOOP_MATCH_BUFFER_MS;
-  const mySets = workout.sets.filter((st) => st.done).length;
-  if (mySets === 0) return null;
+  const myWeight = workout.caloriesBurned ?? 0;
+  if (myWeight <= 0) return null;
 
   let total = 0;
   let matched = false;
@@ -1141,10 +1239,10 @@ export function whoopKcalForWorkout(
       const e = new Date(w.updatedAt ?? w.at).getTime() + WHOOP_MATCH_BUFFER_MS;
       return overlaps(s, e, wStart, wEnd);
     });
-    const totalSets = sharers.reduce((n, w) => n + w.sets.filter((st) => st.done).length, 0);
-    if (totalSets === 0) continue;
+    const totalWeight = sharers.reduce((n, w) => n + (w.caloriesBurned ?? 0), 0);
+    if (totalWeight === 0) continue;
     matched = true;
-    total += ww.kcal * (mySets / totalSets);
+    total += ww.kcal * (myWeight / totalWeight);
   }
   return matched ? Math.round(total) : null;
 }
