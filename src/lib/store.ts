@@ -795,7 +795,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 8,
+      version: 9,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -910,6 +910,13 @@ export const useAppStore = create<AppState>()(
  * by muscle group and real elapsed time is used when it's known. Same
  * reasoning as v3 → v4: recompute every workout's cached `caloriesBurned`
  * now instead of only new ones going forward.
+ *
+ * v8 → v9: the real-elapsed-time credit v7 → v8 introduced had no ceiling
+ * — a long gap between a workout's first and last logged set (a pause, an
+ * interruption, a late edit) was taken completely at face value, letting a
+ * couple of sets with an hour between them outweigh a whole heavy session.
+ * Now capped per set. Same reasoning as v7 → v8: recompute again so the
+ * uncapped numbers don't linger.
  */
 function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
@@ -946,6 +953,25 @@ function migrateStore(persisted: unknown, version: number): unknown {
   }
 
   if (version < 8 && Array.isArray(state.workouts)) {
+    const bodyKg = (state.profile as { weightKg?: number } | null | undefined)?.weightKg ?? 75;
+    const custom: Exercise[] = Array.isArray(state.exercises) ? (state.exercises as Exercise[]) : [];
+    state.workouts = (state.workouts as LoggedWorkout[]).map((w) => {
+      const category = findExercise(w.exerciseId, custom)?.category;
+      return {
+        ...w,
+        caloriesBurned: burnForSets(w.sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt)),
+      };
+    });
+  }
+
+  // v8 → v9: the real-elapsed-time credit v7→v8 introduced had no ceiling —
+  // a long gap between a workout's first and last logged set (a pause, an
+  // interruption, a set edited long after the fact) got taken completely at
+  // face value, so a handful of sets with an hour-long gap between them
+  // could outweigh a whole heavy session. Now capped per set (see
+  // MAX_MINUTES_PER_SET). Recomputing again so v8's uncapped numbers don't
+  // linger until the next unrelated edit touches each workout.
+  if (version < 9 && Array.isArray(state.workouts)) {
     const bodyKg = (state.profile as { weightKg?: number } | null | undefined)?.weightKg ?? 75;
     const custom: Exercise[] = Array.isArray(state.exercises) ? (state.exercises as Exercise[]) : [];
     state.workouts = (state.workouts as LoggedWorkout[]).map((w) => {
@@ -1073,29 +1099,40 @@ const MET_BY_CATEGORY: Record<MuscleGroup, number> = {
 
 /** Minutes assumed per done set (work + rest) when there's no real logged
  * timing to fall back on — e.g. a Training-tab checkmark logs a whole
- * session in one shot, with nothing to measure elapsed time from. */
+ * session in one shot, with nothing to measure elapsed time from. Also the
+ * per-set ceiling real elapsed time gets capped to, below. */
 const DEFAULT_MINUTES_PER_SET = 2;
 
-/** A measured elapsed time outside this range is more likely a stale or
- * unrelated timestamp (a set edited long after the fact) than real
- * training time, so it's not trusted over the per-set default. */
+/** A per-set ceiling on how much real elapsed time gets credited, and the
+ * floor below which it's not trusted at all. A gap between the first and
+ * last logged set that's small is probably noise (a timestamp rounding, an
+ * instant double-tap); one that's large for how few sets there were is more
+ * likely a pause, an interruption, or a set edited long after the fact than
+ * genuinely continuous training — capping per set (rather than rejecting
+ * the whole reading past one flat ceiling) means a real 20-minute gap on 2
+ * sets gets reined in the same way a real 20-minute gap on 10 sets doesn't
+ * need to be, instead of either trusting an implausible number outright or
+ * throwing away a plausible one.  */
 const MIN_TRUSTED_MINUTES = 0.5;
-const MAX_TRUSTED_MINUTES = 90;
+const MAX_MINUTES_PER_SET = 5;
 
 /** Real elapsed time between a workout's first and last logged set, when
- * both are known and look plausible — undefined otherwise, so the caller
- * falls back to the flat per-set assumption. */
+ * both are known and long enough to be worth trusting over the flat
+ * per-set assumption — undefined otherwise. Not capped here; workoutBurn
+ * applies the per-set ceiling once it knows the set count. */
 export function elapsedMinutes(atIso: string, updatedAtIso?: string): number | undefined {
   if (!updatedAtIso) return undefined;
   const minutes = (new Date(updatedAtIso).getTime() - new Date(atIso).getTime()) / 60_000;
-  return minutes >= MIN_TRUSTED_MINUTES && minutes <= MAX_TRUSTED_MINUTES ? minutes : undefined;
+  return minutes >= MIN_TRUSTED_MINUTES ? minutes : undefined;
 }
 
 /**
  * Strength-training burn: kcal = MET × 3.5 × kg / 200 × minutes, where MET
  * comes from the exercise's muscle group and minutes is real elapsed time
- * when it's available and trustworthy, else the flat 2-min-per-set
- * assumption. Replaced by real data once a wearable is connected.
+ * when it's available (capped to MAX_MINUTES_PER_SET × setCount, so a long
+ * pause or interruption can't blow the estimate up), else the flat
+ * 2-min-per-set assumption. Replaced by real data once a wearable is
+ * connected.
  */
 export function workoutBurn(
   setCount: number,
@@ -1105,7 +1142,10 @@ export function workoutBurn(
 ): number {
   if (setCount <= 0) return 0;
   const met = MET_BY_CATEGORY[category] ?? 5.0;
-  const trustedMinutes = minutes ?? DEFAULT_MINUTES_PER_SET * setCount;
+  const trustedMinutes =
+    minutes != null
+      ? Math.min(minutes, MAX_MINUTES_PER_SET * setCount)
+      : DEFAULT_MINUTES_PER_SET * setCount;
   return Math.round(((met * 3.5 * bodyKg) / 200) * trustedMinutes);
 }
 
