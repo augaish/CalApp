@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { serve } from '@hono/node-server';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
@@ -38,6 +38,7 @@ import {
 import {
   citationDomains,
   extractJson,
+  isInsufficientCreditError,
   isWebSearchDisabled,
   replyText,
   sanitizeProgram,
@@ -493,6 +494,20 @@ async function textCall(prompt: string, maxTokens = 1500): Promise<unknown> {
   return extractJson(replyText(response));
 }
 
+/**
+ * The response an AI route's catch block should send. Every one of these
+ * routes used to map any thrown error — a genuine glitch, a malformed
+ * reply, or the Anthropic account simply being out of credit — to the same
+ * generic `fallbackCode`, which reads as "try again" (transient) even when
+ * the real issue is "add credit" (won't fix itself no matter how many times
+ * the user retries).
+ */
+function aiFailure(c: Context, err: unknown, fallbackCode: string) {
+  return isInsufficientCreditError(err)
+    ? c.json({ error: 'ai_credits_exhausted' }, 503)
+    : c.json({ error: fallbackCode }, 502);
+}
+
 app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
@@ -507,7 +522,7 @@ app.post('/api/analyze-meal', async (c) => {
   } catch (err) {
     console.error('analyze-meal failed:', err);
     await release(ref, 'meal');
-    return c.json({ error: 'analysis_failed' }, 502);
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 
@@ -555,7 +570,7 @@ app.post('/api/analyze-equipment', async (c) => {
   } catch (err) {
     console.error('analyze-equipment failed:', err);
     await release(ref, 'equipment');
-    return c.json({ error: 'analysis_failed' }, 502);
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 
@@ -614,7 +629,7 @@ app.post('/api/analyze-body-reading', async (c) => {
   } catch (err) {
     console.error('analyze-body-reading failed:', err);
     await release(ref, 'bodyReading');
-    return c.json({ error: 'analysis_failed' }, 502);
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 
@@ -654,7 +669,7 @@ app.post('/api/analyze-text', async (c) => {
     // all about what the user wrote, and they are invisible otherwise.
     console.error(`analyze-text failed for "${text.slice(0, 120)}":`, err);
     await release(ref, 'describe');
-    return c.json({ error: 'analysis_failed' }, 502);
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 
@@ -711,7 +726,7 @@ app.post('/api/refine-meal', async (c) => {
   } catch (err) {
     console.error(`refine-meal failed for "${message.slice(0, 120)}":`, err);
     await release(ref, 'describe');
-    return c.json({ error: 'analysis_failed' }, 502);
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 
@@ -731,7 +746,7 @@ app.post('/api/analyze-exercise', async (c) => {
   } catch (err) {
     console.error('analyze-exercise failed:', err);
     await release(ref, 'exercise');
-    return c.json({ error: 'analysis_failed' }, 502);
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 
@@ -799,7 +814,7 @@ app.post('/api/coach', async (c) => {
   } catch (err) {
     console.error('coach failed:', err);
     await release(ref, 'coach');
-    return c.json({ error: 'coach_failed' }, 502);
+    return aiFailure(c, err, 'coach_failed');
   }
 });
 
@@ -839,7 +854,7 @@ app.post('/api/generate-program', async (c) => {
   } catch (err) {
     console.error('generate-program failed:', err);
     await release(ref, 'program');
-    return c.json({ error: 'analysis_failed' }, 502);
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 

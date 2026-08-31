@@ -15,6 +15,9 @@ export const en = {
     loading: 'Loading…',
     error: 'Something went wrong. Please try again.',
     aiDisclaimer: 'AI estimates can be inaccurate. Values are guidance, not medical advice.',
+    aiCreditsExhaustedTitle: 'AI credits are out',
+    aiCreditsExhausted:
+      "The AI account has run out of credit, so this can't be read right now. This isn't something retrying will fix — it needs more credit added on the Anthropic side.",
   },
   onboarding: {
     welcomeTitle: 'Welcome to Calgym',

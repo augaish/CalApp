@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
+import { ApiError, coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
 import { resolveCoachSchedule } from '@/lib/coach-schedule';
 import { buildCoachContext } from '@/lib/coach-context';
 import { useCelebrate } from '@/lib/celebrate';
@@ -82,7 +82,11 @@ export default function Coach() {
         router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
         return;
       }
-      setMessages([...next, { role: 'assistant', content: t('common.error') }]);
+      const message =
+        err instanceof ApiError && err.code === 'ai_credits_exhausted'
+          ? t('common.aiCreditsExhausted')
+          : t('common.error');
+      setMessages([...next, { role: 'assistant', content: message }]);
     } finally {
       setBusy(false);
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);

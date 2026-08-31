@@ -17,6 +17,9 @@ export const ar: TranslationSchema = {
     loading: 'جارٍ التحميل…',
     error: 'حدث خطأ ما. حاول مرة أخرى.',
     aiDisclaimer: 'تقديرات الذكاء الاصطناعي قد تكون غير دقيقة. القيم إرشادية وليست نصيحة طبية.',
+    aiCreditsExhaustedTitle: 'رصيد الذكاء الاصطناعي نفد',
+    aiCreditsExhausted:
+      'نفد رصيد حساب الذكاء الاصطناعي، لذا لا يمكن قراءة هذا الآن. إعادة المحاولة لن تحل المشكلة — يحتاج الأمر إلى إضافة رصيد من جهة Anthropic.',
   },
   onboarding: {
     welcomeTitle: 'أهلاً بك في كالجيم',

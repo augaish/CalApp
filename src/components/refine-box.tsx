@@ -48,6 +48,8 @@ export function RefineBox({
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+      } else if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
+        setError(t('common.aiCreditsExhausted'));
       } else if (err instanceof ApiError) {
         setError(t('refine.error'));
       } else {

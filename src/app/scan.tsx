@@ -23,6 +23,7 @@ import {
   analyzeBodyReading,
   analyzeEquipment,
   analyzeMeal,
+  ApiError,
   FeatureLockedError,
   isMockMode,
   lookupBarcode,
@@ -149,6 +150,11 @@ export default function Scan() {
     } catch (err) {
       if (err instanceof QuotaError) return onLocked('quota');
       if (err instanceof FeatureLockedError) return onLocked('equipment');
+      if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
+        Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
+        reset();
+        return;
+      }
       Alert.alert(t('common.error'));
       reset();
     }
@@ -170,6 +176,11 @@ export default function Scan() {
     } catch (err) {
       if (err instanceof QuotaError) return onLocked('quota');
       if (err instanceof FeatureLockedError) return onLocked('equipment');
+      if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
+        Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
+        reset();
+        return;
+      }
       Alert.alert(t('common.error'));
       reset();
     }

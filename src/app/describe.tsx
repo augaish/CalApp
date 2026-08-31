@@ -34,6 +34,11 @@ export default function Describe() {
         router.replace('/upgrade?reason=quota');
         return;
       }
+      if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
+        Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
+        setBusy(false);
+        return;
+      }
       // "Something went wrong" told the user nothing and left them retyping the
       // same description. A failed request and a rejected one need different
       // advice, so they get different messages.

@@ -8,7 +8,7 @@ import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card'
 import { Button, Card, MacroTile, Screen, Title } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { FeatureLockedError, generateProgram, isMockMode, QuotaError } from '@/lib/api';
+import { ApiError, FeatureLockedError, generateProgram, isMockMode, QuotaError } from '@/lib/api';
 import { buildCoachContext } from '@/lib/coach-context';
 import { resolveCoachSchedule } from '@/lib/coach-schedule';
 import { useEntitlement } from '@/lib/entitlement';
@@ -59,7 +59,11 @@ export default function ProgramScreen() {
         router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
         return;
       }
-      Alert.alert(t('common.error'));
+      if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
+        Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
+      } else {
+        Alert.alert(t('common.error'));
+      }
     } finally {
       setBusy(false);
     }

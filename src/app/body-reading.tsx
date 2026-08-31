@@ -425,7 +425,13 @@ export default function BodyReading() {
       setUploadStage('error');
       setUploadError(
         err instanceof ApiError
-          ? t(err.code === 'invalid_request' ? 'bodyReading.errorInvalidFile' : 'bodyReading.errorAnalysisFailed')
+          ? t(
+              err.code === 'invalid_request'
+                ? 'bodyReading.errorInvalidFile'
+                : err.code === 'ai_credits_exhausted'
+                  ? 'common.aiCreditsExhausted'
+                  : 'bodyReading.errorAnalysisFailed',
+            )
           : t('bodyReading.errorOffline'),
       );
     }

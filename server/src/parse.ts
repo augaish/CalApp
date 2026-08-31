@@ -64,6 +64,13 @@ export function isWebSearchDisabled(err: unknown): boolean {
   return err instanceof Anthropic.APIError && err.status === 400 && /web search/i.test(err.message);
 }
 
+/** True when the Anthropic account is out of credit — every AI route used
+ * to map this to the same generic "analysis failed" as a transient glitch,
+ * which reads as "try again" when the real fix is "add credit". */
+export function isInsufficientCreditError(err: unknown): boolean {
+  return err instanceof Anthropic.APIError && err.status === 400 && /credit balance/i.test(err.message);
+}
+
 /** Arabic-Indic (٠-٩) and Extended/Persian (۰-۹) digits → ASCII. */
 export function asciiDigits(text: string): string {
   return text.replace(/[٠-٩۰-۹]/g, (d) => {
