@@ -1,5 +1,6 @@
 import pg from 'pg';
 
+import { HISTORICAL_COST_FALLBACK_USD, HISTORICAL_COST_PER_ACTION_USD } from './pricing.js';
 import type { Language } from './prompts.js';
 
 /**
@@ -703,17 +704,28 @@ export interface AdminRow {
   /** Estimated USD cost of those tokens — see pricing.ts. */
   costUsd: number;
   /**
-   * All-time action count across every period this account has ever used,
-   * not just the current month — real token/cost tracking only started once
-   * usage_counters gained its input_tokens/output_tokens/cost_usd columns,
-   * so anything before that has no tokens recorded even though the actions
-   * themselves happened. The admin page turns this into a rough count-based
-   * estimate for those, labeled "historical" so it's never confused with
-   * the real, tracked cost above.
+   * All-time rough cost estimate (USD) across every period this account has
+   * ever used, weighted per action kind — see HISTORICAL_COST_PER_ACTION_USD
+   * in pricing.ts. Real token/cost tracking only started once usage_counters
+   * gained its input_tokens/output_tokens/cost_usd columns, so anything
+   * before that has no tokens recorded even though the actions themselves
+   * happened; this is a guess for those, labeled "historical" on the admin
+   * page so it's never confused with the real, tracked cost above.
    */
-  allTimeUsed: number;
+  histCostUsd: number;
   createdAt: string;
   lastSeenAt: string;
+}
+
+/** `CASE c.kind WHEN ... THEN ... ELSE ... END` built from
+ * HISTORICAL_COST_PER_ACTION_USD so the admin table's historical-cost SQL
+ * and pricing.ts can never drift apart. Kind names are our own Feature
+ * union, never user input, so this string-built SQL is safe. */
+function historicalCostCaseSql(): string {
+  const cases = Object.entries(HISTORICAL_COST_PER_ACTION_USD)
+    .map(([kind, usd]) => `WHEN '${kind}' THEN ${usd}`)
+    .join(' ');
+  return `CASE c.kind ${cases} ELSE ${HISTORICAL_COST_FALLBACK_USD} END`;
 }
 
 /**
@@ -735,8 +747,8 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
                       WHERE c.ref = u.ref AND c.period = $1), 0)::bigint AS tokens,
             COALESCE((SELECT SUM(c.cost_usd) FROM usage_counters c
                       WHERE c.ref = u.ref AND c.period = $1), 0)::numeric AS cost_usd,
-            COALESCE((SELECT SUM(c.count) FROM usage_counters c
-                      WHERE c.ref = u.ref), 0)::int AS all_time_used
+            COALESCE((SELECT SUM(c.count * (${historicalCostCaseSql()})) FROM usage_counters c
+                      WHERE c.ref = u.ref), 0)::numeric AS hist_cost_usd
        FROM app_users u
       ORDER BY u.last_seen_at DESC
       LIMIT $2`,
@@ -753,7 +765,7 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
     used: r.used,
     tokens: Number(r.tokens),
     costUsd: Number(r.cost_usd),
-    allTimeUsed: r.all_time_used,
+    histCostUsd: Number(r.hist_cost_usd),
     createdAt: new Date(r.created_at).toISOString(),
     lastSeenAt: new Date(r.last_seen_at).toISOString(),
   }));
