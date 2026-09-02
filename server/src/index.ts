@@ -26,6 +26,7 @@ import {
   listUsers,
   markBillingEventApplied,
   readShareLink,
+  recordTokens,
   resolveRef,
   saveWhoopOAuthState,
   setCachedEquipment,
@@ -60,6 +61,7 @@ import {
   kilojoulesToKcal,
   whoopConfigured,
 } from './whoop.js';
+import { estimateCostUsd } from './pricing.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
   bodyReadingPrompt,
@@ -412,10 +414,33 @@ function parseBody(body: AnalyzeBody): { image: string; language: Language } | n
   return { image, language };
 }
 
+/** Who to bill a model call's real token usage against, and under which
+ * usage-counter kind — passed through the shared call helpers below so the
+ * admin dashboard's per-user cost estimate reflects an actual API response
+ * rather than a flat per-action guess. */
+interface Track {
+  ref: string;
+  kind: string;
+}
+
+/** Adds one response's real input/output tokens and their estimated USD
+ * cost onto the caller's usage-counter row. Best-effort: a lost cost figure
+ * must never fail the request that already succeeded. */
+async function trackUsage(track: Track, model: string, response: Anthropic.Message): Promise<void> {
+  try {
+    const { input_tokens, output_tokens } = response.usage;
+    const cost = estimateCostUsd(model, input_tokens, output_tokens);
+    await recordTokens(track.ref, track.kind, input_tokens, output_tokens, cost);
+  } catch (err) {
+    console.error('trackUsage failed:', err);
+  }
+}
+
 async function analyzeMealImage(
   image: string,
   prompt: string,
   model: string = MODEL,
+  track?: Track,
 ): Promise<MealAnalysis> {
   const response = await anthropic.messages.create({
     model,
@@ -433,6 +458,7 @@ async function analyzeMealImage(
       },
     ],
   });
+  if (track) await trackUsage(track, model, response);
 
   return toMealAnalysis(replyText(response));
 }
@@ -442,6 +468,7 @@ async function analyze(
   prompt: string,
   model: string = MODEL,
   mediaType: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp' = 'image/jpeg',
+  track?: Track,
 ): Promise<unknown> {
   const response = await anthropic.messages.create({
     model,
@@ -459,12 +486,13 @@ async function analyze(
       },
     ],
   });
+  if (track) await trackUsage(track, model, response);
 
   return extractJson(replyText(response));
 }
 
 /** Same as `analyze`, for a PDF document instead of an image (e.g. an InBody export). */
-async function analyzeDocument(pdf: string, prompt: string, model: string = MODEL): Promise<unknown> {
+async function analyzeDocument(pdf: string, prompt: string, model: string = MODEL, track?: Track): Promise<unknown> {
   const response = await anthropic.messages.create({
     model,
     max_tokens: 2000,
@@ -481,17 +509,19 @@ async function analyzeDocument(pdf: string, prompt: string, model: string = MODE
       },
     ],
   });
+  if (track) await trackUsage(track, model, response);
 
   return extractJson(replyText(response));
 }
 
 /** Text-only completion (no image) — used for cacheable equipment details. */
-async function textCall(prompt: string, maxTokens = 1500): Promise<unknown> {
+async function textCall(prompt: string, maxTokens = 1500, track?: Track): Promise<unknown> {
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   });
+  if (track) await trackUsage(track, MODEL, response);
   return extractJson(replyText(response));
 }
 
@@ -518,7 +548,7 @@ app.post('/api/analyze-meal', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const model = access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL;
-    const result = await analyzeMealImage(parsed.image, mealPrompt(parsed.language), model);
+    const result = await analyzeMealImage(parsed.image, mealPrompt(parsed.language), model, { ref, kind: 'meal' });
     return c.json(result);
   } catch (err) {
     console.error('analyze-meal failed:', err);
@@ -537,7 +567,13 @@ app.post('/api/analyze-equipment', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     // Step 1: cheap vision call to identify the machine.
-    const id = (await analyze(parsed.image, identifyEquipmentPrompt(parsed.language))) as {
+    const id = (await analyze(
+      parsed.image,
+      identifyEquipmentPrompt(parsed.language),
+      undefined,
+      undefined,
+      { ref, kind: 'equipment' },
+    )) as {
       name?: string;
       confidence?: number;
     };
@@ -565,7 +601,7 @@ app.post('/api/analyze-equipment', async (c) => {
     }
 
     // Step 3: cache miss — generate details (text only, no image) and store.
-    const details = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500);
+    const details = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500, { ref, kind: 'equipment' });
     await setCachedEquipment(key, parsed.language, details);
     return c.json(details);
   } catch (err) {
@@ -622,10 +658,11 @@ app.post('/api/analyze-body-reading', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const prompt = bodyReadingPrompt(parsed.language);
+    const track = { ref, kind: 'bodyReading' };
     const result =
       'pdf' in parsed
-        ? await analyzeDocument(parsed.pdf, prompt)
-        : await analyze(parsed.image, prompt, MODEL, parsed.mediaType);
+        ? await analyzeDocument(parsed.pdf, prompt, MODEL, track)
+        : await analyze(parsed.image, prompt, MODEL, parsed.mediaType, track);
     return c.json(result);
   } catch (err) {
     console.error('analyze-body-reading failed:', err);
@@ -664,6 +701,7 @@ app.post('/api/analyze-text', async (c) => {
       console.warn('web search unavailable, retrying analyze-text without it');
       response = await anthropic.messages.create(request);
     }
+    await trackUsage({ ref, kind: 'describe' }, request.model, response);
     return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
   } catch (err) {
     // The text is logged (trimmed) because the failures worth fixing here are
@@ -723,6 +761,7 @@ app.post('/api/refine-meal', async (c) => {
       console.warn('web search unavailable, retrying refine-meal without it');
       response = await anthropic.messages.create(request);
     }
+    await trackUsage({ ref, kind: 'describe' }, request.model, response);
     return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
   } catch (err) {
     console.error(`refine-meal failed for "${message.slice(0, 120)}":`, err);
@@ -742,7 +781,7 @@ app.post('/api/analyze-exercise', async (c) => {
   const claim = await reserve(ref, access, 'exercise');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
-    const result = await textCall(exerciseInfoPrompt(language, name), 600);
+    const result = await textCall(exerciseInfoPrompt(language, name), 600, { ref, kind: 'exercise' });
     return c.json(result);
   } catch (err) {
     console.error('analyze-exercise failed:', err);
@@ -804,6 +843,7 @@ app.post('/api/coach', async (c) => {
       messages,
       tools: [SCHEDULE_TOOL],
     });
+    await trackUsage({ ref, kind: 'coach' }, MODEL, response);
     const reply = replyText(response);
     const toolUse = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_weekly_schedule',
@@ -859,6 +899,7 @@ app.post('/api/coach-attachment', async (c) => {
         },
       ],
     });
+    await trackUsage({ ref, kind: 'coach' }, MODEL, response);
     return c.json({ summary: replyText(response).trim() });
   } catch (err) {
     console.error('coach-attachment failed:', err);
@@ -891,6 +932,7 @@ app.post('/api/generate-program', async (c) => {
       tools: [PROGRAM_TOOL],
       tool_choice: { type: 'tool', name: 'propose_program' },
     });
+    await trackUsage({ ref, kind: 'program' }, MODEL, response);
     const toolUse = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_program',
     );

@@ -55,6 +55,12 @@ export async function initDb(): Promise<void> {
       PRIMARY KEY (ref, period, kind)
     );
   `);
+  // Real token counts and their estimated USD cost (see pricing.ts), summed
+  // onto the same row `reserve()` already creates — added after the fact via
+  // ALTER so an existing deployment's counters keep their count history.
+  await pool.query(`ALTER TABLE usage_counters ADD COLUMN IF NOT EXISTS input_tokens BIGINT NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE usage_counters ADD COLUMN IF NOT EXISTS output_tokens BIGINT NOT NULL DEFAULT 0`);
+  await pool.query(`ALTER TABLE usage_counters ADD COLUMN IF NOT EXISTS cost_usd NUMERIC(12,6) NOT NULL DEFAULT 0`);
   // Small key/value store for runtime settings the admin page edits (plan
   // limits, the rented sponsor slot, …) so changes need no redeploy.
   await pool.query(`
@@ -470,6 +476,35 @@ export async function recordUsage(ref: string, kind: string): Promise<number> {
 }
 
 /**
+ * Add one model call's real token counts and estimated cost onto the row
+ * `reserve()`/`recordUsage` already created for this (ref, period, kind) —
+ * an UPDATE, not an upsert, since every metered AI route reserves before it
+ * ever calls the model. Never throws: a lost cost figure should not fail
+ * the user's actual request.
+ */
+export async function recordTokens(
+  ref: string,
+  kind: string,
+  inputTokens: number,
+  outputTokens: number,
+  costUsd: number,
+): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `UPDATE usage_counters
+          SET input_tokens = input_tokens + $4,
+              output_tokens = output_tokens + $5,
+              cost_usd = cost_usd + $6
+        WHERE ref = $1 AND period = $2 AND kind = $3`,
+      [ref, currentPeriod(), kind, inputTokens, outputTokens, costUsd],
+    );
+  } catch (err) {
+    console.error('recordTokens failed:', err);
+  }
+}
+
+/**
  * Erase everything we hold for a caller: their account row, every usage
  * counter, and any id aliases pointing at them. Required by the app stores'
  * account-deletion rules.
@@ -663,6 +698,10 @@ export interface AdminRow {
   planUntil: string | null;
   note: string | null;
   used: number;
+  /** Real input+output tokens across every AI call this period. */
+  tokens: number;
+  /** Estimated USD cost of those tokens — see pricing.ts. */
+  costUsd: number;
   createdAt: string;
   lastSeenAt: string;
 }
@@ -681,7 +720,11 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
   const res = await pool.query(
     `SELECT u.ref, u.email, u.device, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
             COALESCE((SELECT SUM(c.count) FROM usage_counters c
-                      WHERE c.ref = u.ref AND c.period = $1), 0)::int AS used
+                      WHERE c.ref = u.ref AND c.period = $1), 0)::int AS used,
+            COALESCE((SELECT SUM(c.input_tokens + c.output_tokens) FROM usage_counters c
+                      WHERE c.ref = u.ref AND c.period = $1), 0)::bigint AS tokens,
+            COALESCE((SELECT SUM(c.cost_usd) FROM usage_counters c
+                      WHERE c.ref = u.ref AND c.period = $1), 0)::numeric AS cost_usd
        FROM app_users u
       ORDER BY u.last_seen_at DESC
       LIMIT $2`,
@@ -696,6 +739,8 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
     planUntil: r.plan_until ? new Date(r.plan_until).toISOString() : null,
     note: r.note,
     used: r.used,
+    tokens: Number(r.tokens),
+    costUsd: Number(r.cost_usd),
     createdAt: new Date(r.created_at).toISOString(),
     lastSeenAt: new Date(r.last_seen_at).toISOString(),
   }));
@@ -706,10 +751,14 @@ export interface AdminStats {
   proUsers: number;
   activeThisMonth: number;
   actionsThisMonth: number;
+  /** Estimated USD cost of every AI call this period, across all users. */
+  costUsdThisMonth: number;
 }
 
 export async function adminStats(): Promise<AdminStats> {
-  if (!pool) return { totalUsers: 0, proUsers: 0, activeThisMonth: 0, actionsThisMonth: 0 };
+  if (!pool) {
+    return { totalUsers: 0, proUsers: 0, activeThisMonth: 0, actionsThisMonth: 0, costUsdThisMonth: 0 };
+  }
   const period = currentPeriod();
   const res = await pool.query(
     `SELECT
@@ -717,7 +766,8 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT COUNT(*)::int FROM app_users
          WHERE plan = 'pro' AND (plan_until IS NULL OR plan_until > now())) AS pro_users,
        (SELECT COUNT(DISTINCT ref)::int FROM usage_counters WHERE period = $1) AS active_month,
-       (SELECT COALESCE(SUM(count), 0)::int FROM usage_counters WHERE period = $1) AS actions_month`,
+       (SELECT COALESCE(SUM(count), 0)::int FROM usage_counters WHERE period = $1) AS actions_month,
+       (SELECT COALESCE(SUM(cost_usd), 0)::numeric FROM usage_counters WHERE period = $1) AS cost_month`,
     [period],
   );
   const r = res.rows[0];
@@ -726,6 +776,7 @@ export async function adminStats(): Promise<AdminStats> {
     proUsers: r.pro_users,
     activeThisMonth: r.active_month,
     actionsThisMonth: r.actions_month,
+    costUsdThisMonth: Number(r.cost_month),
   };
 }
 

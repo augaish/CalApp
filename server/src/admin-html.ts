@@ -118,7 +118,7 @@ export const ADMIN_HTML = `<!doctype html>
       <div class="err hide" id="rowerr"></div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Ref</th><th>Email</th><th>Device</th><th>Plan</th><th>Source</th><th>Used</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
+          <thead><tr><th>Ref</th><th>Email</th><th>Device</th><th>Plan</th><th>Source</th><th>Used</th><th>Tokens</th><th>Cost (SAR)</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -127,8 +127,10 @@ export const ADMIN_HTML = `<!doctype html>
 </div>
 
 <script>
-  // Pricing assumptions used only for the on-screen estimates.
-  var PRICE_SAR = 13, STORE_CUT = 0.15, COST_PER_ACTION_SAR = 0.014;
+  // Pricing/conversion assumptions used only for the on-screen estimates —
+  // the actual AI cost figures come from the server (real token counts ×
+  // per-model list pricing, see pricing.ts); this just converts its USD to SAR.
+  var PRICE_SAR = 13, STORE_CUT = 0.15, USD_TO_SAR = 3.75;
   var data = null;
   function tok() { return document.getElementById('token').value || sessionStorage.getItem('ct') || ''; }
   function api(path, body) {
@@ -156,7 +158,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('s_mrr').textContent =
       Math.round(s.proUsers * PRICE_SAR * (1 - STORE_CUT));
     document.getElementById('s_cost').textContent =
-      Math.round(s.actionsThisMonth * COST_PER_ACTION_SAR);
+      (s.costUsdThisMonth * USD_TO_SAR).toFixed(2);
     document.getElementById('lim_free').value = data.limits.free;
     document.getElementById('lim_pro').value = data.limits.pro;
     document.getElementById('lim_proplus').value = data.limits.proPlus;
@@ -188,12 +190,19 @@ export const ADMIN_HTML = `<!doctype html>
         '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + u.plan + '</span></td>' +
         '<td class="muted">' + esc(u.planSource) + '</td>' +
         '<td>' + u.used + '</td>' +
+        '<td class="muted">' + fmtTokens(u.tokens) + '</td>' +
+        '<td class="muted">' + (u.costUsd * USD_TO_SAR).toFixed(3) + '</td>' +
         '<td class="muted">' + esc(u.note || '') + '</td>' +
         '<td class="muted">' + new Date(u.lastSeenAt).toLocaleDateString() + '</td>' +
         '<td><button class="ghost" onclick="pick(\\'' + esc(u.ref) + '\\')">Select</button></td>' +
         '</tr>';
     });
-    document.getElementById('rows').innerHTML = html || '<tr><td colspan="9" class="muted">No users yet.</td></tr>';
+    document.getElementById('rows').innerHTML = html || '<tr><td colspan="11" class="muted">No users yet.</td></tr>';
+  }
+  function fmtTokens(n) {
+    if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+    return String(n);
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
