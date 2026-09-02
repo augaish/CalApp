@@ -493,6 +493,22 @@ export const en = {
     lockedBody: 'Upgrade to keep asking about your meals, macros and training.',
     mockReply:
       'Demo mode: connect the AI server to chat with your real coach. Meanwhile: protein at every meal, water before coffee, and never skip leg day. 😉',
+    newConversation: 'New conversation',
+    newConversationConfirm:
+      "Start a new conversation? Your coach still remembers what you've taught it — this only clears the chat.",
+    memoryTitle: 'Coach memory',
+    memorySubtitle: 'Documents your coach remembers and weighs in every conversation.',
+    memoryEmpty:
+      "Nothing yet — attach a training program, meal plan, or body-composition report from the coach chat and it'll show up here.",
+    memoryAddedOn: 'Added {{date}}',
+    memoryDeleteConfirm: 'Forget "{{name}}"? The coach will no longer refer to it.',
+    attachReading: 'Reading your file…',
+    attachAdded: "Got it — I'll remember {{name}} from now on.",
+    attachUnsupported: "That file type isn't supported — try a photo or PDF.",
+    attachLimitTitle: 'Memory is full',
+    attachLimitBody: 'Your coach already remembers {{count}} documents. Remove one in Coach memory before adding another.',
+    attachErrorInvalidFile: "Couldn't read that file clearly. Try a clearer photo or PDF.",
+    attachErrorFailed: "Couldn't read that file. Try again.",
     schedulePlan: {
       fallbackIntro: "Here's a plan for you:",
       cardTitle: 'Suggested weekly schedule',

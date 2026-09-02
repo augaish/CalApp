@@ -5,6 +5,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { findExercise } from './exercises';
 import { dailyTargets } from './tdee';
 import type {
+  ChatMessage,
+  CoachReferenceDoc,
   DailyTargets,
   Exercise,
   FoodItem,
@@ -101,6 +103,15 @@ interface AppState {
   checklistDismissed: boolean;
   /** Spotlight coach-mark tour has been seen/skipped. */
   tourSeen: boolean;
+  /** One ongoing coach conversation — persisted so leaving the tab or
+   * restarting the app doesn't lose it, the way it used to. */
+  coachMessages: ChatMessage[];
+  /** Indices into coachMessages whose proposed schedule plan has already
+   * been added to the weekly schedule — a plain array, not a Set, since a
+   * Set doesn't survive JSON persistence. */
+  coachAppliedPlans: number[];
+  /** Documents the user has taught the coach — see CoachReferenceDoc. */
+  coachReferenceDocs: CoachReferenceDoc[];
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -225,6 +236,13 @@ interface AppState {
   setTourSeen: () => void;
   /** Re-arm the coach-mark tour (from Profile → Replay tour). */
   replayTour: () => void;
+  setCoachMessages: (messages: ChatMessage[]) => void;
+  markCoachPlanApplied: (index: number) => void;
+  /** Discards the current conversation — a fresh start, not a soft reset. */
+  resetCoachChat: () => void;
+  /** Adds a reference doc, evicting the oldest once at MAX_COACH_REFERENCE_DOCS. */
+  addCoachReferenceDoc: (doc: Omit<CoachReferenceDoc, 'id' | 'addedAt'>) => void;
+  removeCoachReferenceDoc: (docId: string) => void;
   setHydrated: () => void;
   /** Create the install id on first launch; returns the existing one after. */
   ensureInstallId: () => string;
@@ -262,6 +280,12 @@ function id(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** How many documents the coach can remember at once — each is just a
+ * short summary, not the raw file, so this is about keeping what it
+ * recalls focused and manageable to review, not storage size. Adding past
+ * this evicts the oldest. */
+export const MAX_COACH_REFERENCE_DOCS = 5;
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -292,6 +316,9 @@ export const useAppStore = create<AppState>()(
       tutorialSeen: false,
       checklistDismissed: false,
       tourSeen: false,
+      coachMessages: [],
+      coachAppliedPlans: [],
+      coachReferenceDocs: [],
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -737,6 +764,22 @@ export const useAppStore = create<AppState>()(
       dismissChecklist: () => set({ checklistDismissed: true }),
       setTourSeen: () => set({ tourSeen: true }),
       replayTour: () => set({ tourSeen: false }),
+      setCoachMessages: (messages) => set({ coachMessages: messages }),
+      markCoachPlanApplied: (index) =>
+        set((s) => ({ coachAppliedPlans: [...s.coachAppliedPlans, index] })),
+      resetCoachChat: () => set({ coachMessages: [], coachAppliedPlans: [] }),
+      addCoachReferenceDoc: (doc) =>
+        set((s) => {
+          const next = [
+            ...s.coachReferenceDocs,
+            { ...doc, id: id(), addedAt: new Date().toISOString() },
+          ];
+          return { coachReferenceDocs: next.slice(-MAX_COACH_REFERENCE_DOCS) };
+        }),
+      removeCoachReferenceDoc: (docId) =>
+        set((s) => ({
+          coachReferenceDocs: s.coachReferenceDocs.filter((d) => d.id !== docId),
+        })),
       setHydrated: () => set({ hydrated: true }),
       ensureInstallId: () => {
         const existing = get().installId;
@@ -791,6 +834,9 @@ export const useAppStore = create<AppState>()(
           tutorialSeen: false,
           checklistDismissed: false,
           tourSeen: false,
+          coachMessages: [],
+          coachAppliedPlans: [],
+          coachReferenceDocs: [],
         }),
     }),
     {
@@ -826,6 +872,9 @@ export const useAppStore = create<AppState>()(
         tutorialSeen,
         checklistDismissed,
         tourSeen,
+        coachMessages,
+        coachAppliedPlans,
+        coachReferenceDocs,
       }) => ({
         account,
         language,
@@ -854,6 +903,9 @@ export const useAppStore = create<AppState>()(
         tutorialSeen,
         checklistDismissed,
         tourSeen,
+        coachMessages,
+        coachAppliedPlans,
+        coachReferenceDocs,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },

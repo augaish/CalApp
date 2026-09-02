@@ -56,6 +56,9 @@ export interface CoachContext {
     bodyFatPercent?: number;
     skeletalMuscleMassKg?: number;
   };
+  /** Summaries of documents the user has taught the coach (training
+   * programs, meal plans, body-composition reports) — see CoachReferenceDoc. */
+  referenceDocs?: { name: string; summary: string }[];
 }
 
 function ymd(d: Date): string {
@@ -164,5 +167,8 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
     workoutStreakDays: workoutStreakDays(s.workouts),
     whoop,
     latestBodyReading,
+    referenceDocs: s.coachReferenceDocs.length
+      ? s.coachReferenceDocs.map((d) => ({ name: d.name, summary: d.summary }))
+      : undefined,
   };
 }

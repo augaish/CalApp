@@ -63,6 +63,7 @@ import {
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
   bodyReadingPrompt,
+  coachAttachmentSummaryPrompt,
   coachSystemPrompt,
   equipmentDetailsPrompt,
   exerciseInfoPrompt,
@@ -815,6 +816,54 @@ app.post('/api/coach', async (c) => {
     console.error('coach failed:', err);
     await release(ref, 'coach');
     return aiFailure(c, err, 'coach_failed');
+  }
+});
+
+interface CoachAttachmentBody {
+  image?: string;
+  imageMediaType?: string;
+  pdf?: string;
+  language?: string;
+}
+
+/** Reads an uploaded document (photo or PDF) and turns it into the compact
+ * reference summary the coach carries into future conversations — reuses
+ * the same access/quota ration as `/api/coach` since it's the same coach
+ * feature, not a separate billable action. */
+app.post('/api/coach-attachment', async (c) => {
+  const parsed = parseBodyReadingBody(await c.req.json<CoachAttachmentBody>().catch(() => ({})));
+  if (!parsed) return c.json({ error: 'invalid_request' }, 400);
+  const ref = (await callerRef(c))!;
+  const access = await checkAccess(ref, 'coach');
+  if (!access.spec.coach) return c.json(featureLocked(access), 403);
+  const claim = await reserve(ref, access, 'coach');
+  if (!claim.ok) {
+    return claim.reason === 'cap'
+      ? c.json(featureLocked(access), 403)
+      : c.json(quotaError(access), 402);
+  }
+  try {
+    const prompt = coachAttachmentSummaryPrompt(parsed.language);
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 600,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            'pdf' in parsed
+              ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: parsed.pdf } }
+              : { type: 'image', source: { type: 'base64', media_type: parsed.mediaType, data: parsed.image } },
+            { type: 'text', text: prompt },
+          ],
+        },
+      ],
+    });
+    return c.json({ summary: replyText(response).trim() });
+  } catch (err) {
+    console.error('coach-attachment failed:', err);
+    await release(ref, 'coach');
+    return aiFailure(c, err, 'analysis_failed');
   }
 });
 

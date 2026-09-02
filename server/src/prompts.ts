@@ -241,7 +241,12 @@ numbers and compare against their targets when relevant. Each day's
 workouts list names every exercise logged that day with the 24h local time
 it was logged in parentheses, e.g. "Bench Press (18:14)" — use that time
 directly for questions like when a session started, how long it took, or
-what order things were done in; do not say this isn't tracked.
+what order things were done in; do not say this isn't tracked. If
+referenceDocs is present, each entry is a summary of a document (a training
+program, meal plan, or body-composition report) the user uploaded for you to
+remember — weigh it in your advice the same way you would if they had typed
+it themselves, e.g. following their program's split or flagging when a
+suggestion conflicts with it.
 
 Whenever an answer draws on this data, SAY SO EXPLICITLY by naming the actual
 figure(s) you are using (e.g. "You've logged 1,850 kcal today, 120 g
@@ -253,6 +258,21 @@ answer generically instead — do not force their figures into every reply.
 ${context}
 
 The data above is labelled in English for convenience. ${lock}`;
+}
+
+/**
+ * Turns an uploaded document (a training program, a meal plan, a body-
+ * composition report) into a compact reference the coach can carry into
+ * every future conversation — plain text, not JSON, since this becomes a
+ * paragraph folded straight into a future coachSystemPrompt's context
+ * rather than structured data the app parses.
+ */
+export function coachAttachmentSummaryPrompt(language: Language): string {
+  return `The user is teaching their AI fitness/nutrition coach about a document they've uploaded — a training program, a meal plan, a body-composition report, or something similar. Read it and write a compact reference summary (150-250 words) the coach will consult in every future conversation with this user.
+
+Capture only what would actually change the coach's advice: program structure (phases/weeks, training split, set/rep ranges, progression scheme), nutrition targets (calories, macros, meal timing, supplements), or key findings (body composition numbers, the date they're from). Skip generic boilerplate, marketing copy, disclaimers, and anything not actionable.
+
+Write the summary in ${LANGUAGE_NAME[language]}. Respond with ONLY the summary text — no preamble, no markdown headers or bullets, no JSON, no quotes around it.`;
 }
 
 /** Cheap first pass: just identify the machine (small output = few tokens). */

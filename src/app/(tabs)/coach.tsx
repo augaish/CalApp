@@ -19,13 +19,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
+import {
+  analyzeCoachAttachment,
+  ApiError,
+  coachChat,
+  FeatureLockedError,
+  isMockMode,
+  QuotaError,
+} from '@/lib/api';
 import { resolveCoachSchedule } from '@/lib/coach-schedule';
 import { buildCoachContext } from '@/lib/coach-context';
 import { useCelebrate } from '@/lib/celebrate';
+import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { successHaptic } from '@/lib/feedback';
 import { useEntitlement } from '@/lib/entitlement';
-import { useAppStore } from '@/lib/store';
+import { MAX_COACH_REFERENCE_DOCS, useAppStore } from '@/lib/store';
 import type { ChatMessage, CoachSchedulePlan } from '@/lib/types';
 
 export default function Coach() {
@@ -46,13 +54,22 @@ export default function Coach() {
   const coachUsed = useEntitlement((s) => s.features?.coachUsed ?? 0);
   const coachLeft = typeof coachCap === 'number' ? Math.max(0, coachCap - coachUsed) : null;
 
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [busy, setBusy] = useState(false);
+  // Persisted so leaving the tab or restarting the app doesn't lose the
+  // conversation — see store.ts's coachMessages.
+  const messages = useAppStore((s) => s.coachMessages);
+  const setMessages = useAppStore((s) => s.setCoachMessages);
+  const resetCoachChat = useAppStore((s) => s.resetCoachChat);
   // Which assistant messages' proposed plan has already been added, so the
   // card can switch to a disabled "Added" state and a second tap can't
-  // duplicate the exercises on the schedule.
-  const [appliedPlans, setAppliedPlans] = useState<Set<number>>(new Set());
+  // duplicate the exercises on the schedule. A plain array (not a Set) since
+  // it's persisted alongside the messages.
+  const appliedPlans = useAppStore((s) => s.coachAppliedPlans);
+  const markCoachPlanApplied = useAppStore((s) => s.markCoachPlanApplied);
+  const referenceDocs = useAppStore((s) => s.coachReferenceDocs);
+  const addCoachReferenceDoc = useAppStore((s) => s.addCoachReferenceDoc);
+  const [input, setInput] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [attachStage, setAttachStage] = useState<'idle' | 'picking' | 'reading'>('idle');
   const scrollRef = useRef<ScrollView>(null);
 
   const send = async (override?: string) => {
@@ -117,7 +134,7 @@ export default function Coach() {
       applyCoachScheduleAction({ newExercises: resolved.newExercises, days: resolved.days });
       successHaptic();
       useCelebrate.getState().celebrate(t('coach.schedulePlan.added'));
-      setAppliedPlans((prev) => new Set(prev).add(index));
+      markCoachPlanApplied(index);
     };
     if (resolved.overlapWeekdays.length === 0) {
       commit();
@@ -134,6 +151,68 @@ export default function Coach() {
     );
   };
 
+  const confirmNewConversation = () => {
+    if (messages.length === 0) return;
+    Alert.alert(t('coach.newConversation'), t('coach.newConversationConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('coach.newConversation'), style: 'destructive', onPress: resetCoachChat },
+    ]);
+  };
+
+  // Reads an uploaded document (photo or PDF) and turns it into a reference
+  // summary the coach keeps for every future conversation — a separate
+  // "teach" action from the chat itself, dropping a confirmation bubble into
+  // the transcript rather than a normal coach reply.
+  const attachDocument = async () => {
+    if (attachStage === 'picking' || attachStage === 'reading') return;
+    if (referenceDocs.length >= MAX_COACH_REFERENCE_DOCS) {
+      Alert.alert(t('coach.attachLimitTitle'), t('coach.attachLimitBody', { count: MAX_COACH_REFERENCE_DOCS }));
+      return;
+    }
+    setAttachStage('picking');
+    const picked = await pickReportBase64().catch(() => null);
+    if (!picked) {
+      setAttachStage('idle');
+      return;
+    }
+    if (picked.kind === 'unsupported') {
+      setMessages([...messages, { role: 'assistant', content: t('coach.attachUnsupported') }]);
+      setAttachStage('idle');
+      return;
+    }
+    setAttachStage('reading');
+    try {
+      const payload =
+        picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64, imageMediaType: picked.mimeType };
+      const { summary } = await analyzeCoachAttachment(payload, language);
+      useEntitlement.getState().spend('coach');
+      addCoachReferenceDoc({ name: picked.name, summary: isMockMode ? t('coach.mockReply') : summary });
+      setMessages([...messages, { role: 'assistant', content: t('coach.attachAdded', { name: picked.name }) }]);
+      setAttachStage('idle');
+    } catch (err) {
+      if (err instanceof QuotaError || err instanceof FeatureLockedError) {
+        useEntitlement.getState().refresh();
+        setAttachStage('idle');
+        router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        return;
+      }
+      const message =
+        err instanceof ApiError
+          ? t(
+              err.code === 'invalid_request'
+                ? 'coach.attachErrorInvalidFile'
+                : err.code === 'ai_credits_exhausted'
+                  ? 'common.aiCreditsExhausted'
+                  : 'coach.attachErrorFailed',
+            )
+          : t('coach.attachErrorFailed');
+      setMessages([...messages, { role: 'assistant', content: message }]);
+      setAttachStage('idle');
+    } finally {
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: theme.background }}
@@ -143,7 +222,17 @@ export default function Coach() {
       <View style={{ flex: 1, paddingTop: insets.top + Spacing.md }}>
         <View style={styles.titleRow}>
           <Ionicons name="sparkles" size={22} color={theme.primary} />
-          <Text style={[Type.title, { color: theme.text }]}>{t('coach.title')}</Text>
+          <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('coach.title')}</Text>
+          <Pressable onPress={() => router.push('/coach-memory')} hitSlop={10} style={{ marginEnd: Spacing.md }}>
+            <Ionicons name="bookmark-outline" size={21} color={theme.textSecondary} />
+          </Pressable>
+          <Pressable onPress={confirmNewConversation} hitSlop={10} disabled={messages.length === 0}>
+            <Ionicons
+              name="create-outline"
+              size={22}
+              color={messages.length === 0 ? theme.textTertiary : theme.textSecondary}
+            />
+          </Pressable>
         </View>
         <ScrollView
           ref={scrollRef}
@@ -184,15 +273,19 @@ export default function Coach() {
                 <SchedulePlanCard
                   plan={m.schedulePlan}
                   locale={locale}
-                  added={appliedPlans.has(i)}
+                  added={appliedPlans.includes(i)}
                   onAdd={() => applySchedulePlan(m.schedulePlan!, i)}
                 />
               )}
             </View>
           ))}
-          {busy && (
+          {(busy || attachStage === 'picking' || attachStage === 'reading') && (
             <View style={[styles.bubble, styles.assistant, { backgroundColor: theme.card }]}>
-              <ActivityIndicator color={theme.primary} />
+              {attachStage === 'reading' ? (
+                <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('coach.attachReading')}</Text>
+              ) : (
+                <ActivityIndicator color={theme.primary} />
+              )}
             </View>
           )}
         </ScrollView>
@@ -206,6 +299,16 @@ export default function Coach() {
             },
           ]}
         >
+          {documentPickerAvailable && (
+            <Pressable
+              onPress={attachDocument}
+              disabled={attachStage === 'picking' || attachStage === 'reading'}
+              hitSlop={8}
+              style={styles.attachBtn}
+            >
+              <Ionicons name="attach" size={22} color={theme.textSecondary} />
+            </Pressable>
+          )}
           <TextInput
             value={input}
             onChangeText={setInput}
@@ -295,6 +398,12 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachBtn: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },

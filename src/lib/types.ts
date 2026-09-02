@@ -130,6 +130,18 @@ export interface ChatMessage {
   schedulePlan?: CoachSchedulePlan;
 }
 
+/** A document (a training program, a meal plan, a body-composition report)
+ * the user has taught the coach — a compact AI-written summary of it, not
+ * the raw file, fed into every future coach conversation so the coach can
+ * weigh it in ongoing advice instead of only answering about it once. */
+export interface CoachReferenceDoc {
+  id: string;
+  /** Original filename, shown in the management list. */
+  name: string;
+  summary: string;
+  addedAt: string;
+}
+
 /** One exercise inside a day the coach proposed — sets and reps only, no weight
  * (the coach has no way to know what the user can lift). */
 export interface CoachScheduleExercise {

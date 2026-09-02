@@ -444,6 +444,20 @@ export interface CoachReply {
   schedulePlan?: CoachSchedulePlan;
 }
 
+/** Reads an uploaded document (photo or PDF) and turns it into a compact
+ * reference summary the coach will consult in every future conversation —
+ * same request shape as analyzeBodyReading, different endpoint/return. */
+export async function analyzeCoachAttachment(
+  payload: { image: string; imageMediaType?: string } | { pdf: string },
+  language: Language,
+): Promise<{ summary: string }> {
+  if (isMockMode) {
+    await delay(900);
+    return { summary: '' };
+  }
+  return post<{ summary: string }>('/api/coach-attachment', { ...payload, language });
+}
+
 export async function coachChat(
   messages: ChatMessage[],
   language: Language,
