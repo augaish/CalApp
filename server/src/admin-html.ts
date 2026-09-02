@@ -116,9 +116,10 @@ export const ADMIN_HTML = `<!doctype html>
     <div class="card">
       <b>Users</b>
       <div class="err hide" id="rowerr"></div>
+      <div class="sub" style="margin:4px 0 10px">"Tokens"/"Cost" are real, tracked from 9/2/2026 onward. "Historical" is a rough count × avg-cost guess for all-time usage before that — for a sense of scale only, not real data.</div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Ref</th><th>Email</th><th>Device</th><th>Plan</th><th>Source</th><th>Used</th><th>Tokens</th><th>Cost (SAR)</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
+          <thead><tr><th>Ref</th><th>Email</th><th>Device</th><th>Plan</th><th>Source</th><th>Used</th><th>Tokens</th><th>Cost (SAR)</th><th>Historical (est. SAR)</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
           <tbody id="rows"></tbody>
         </table>
       </div>
@@ -130,7 +131,11 @@ export const ADMIN_HTML = `<!doctype html>
   // Pricing/conversion assumptions used only for the on-screen estimates —
   // the actual AI cost figures come from the server (real token counts ×
   // per-model list pricing, see pricing.ts); this just converts its USD to SAR.
-  var PRICE_SAR = 13, STORE_CUT = 0.15, USD_TO_SAR = 3.75;
+  // HIST_COST_PER_ACTION_USD is a rough blended average (roughly what a
+  // Haiku-tier action actually costs) used ONLY for the "Historical" column
+  // below — real per-request tokens weren't recorded before cost tracking
+  // shipped, so that count-based figure is a guess, never real data.
+  var PRICE_SAR = 13, STORE_CUT = 0.15, USD_TO_SAR = 3.75, HIST_COST_PER_ACTION_USD = 0.004;
   var data = null;
   function tok() { return document.getElementById('token').value || sessionStorage.getItem('ct') || ''; }
   function api(path, body) {
@@ -192,12 +197,13 @@ export const ADMIN_HTML = `<!doctype html>
         '<td>' + u.used + '</td>' +
         '<td class="muted">' + fmtTokens(u.tokens) + '</td>' +
         '<td class="muted">' + (u.costUsd * USD_TO_SAR).toFixed(3) + '</td>' +
+        '<td class="muted">' + (u.allTimeUsed * HIST_COST_PER_ACTION_USD * USD_TO_SAR).toFixed(2) + '</td>' +
         '<td class="muted">' + esc(u.note || '') + '</td>' +
         '<td class="muted">' + new Date(u.lastSeenAt).toLocaleDateString() + '</td>' +
         '<td><button class="ghost" onclick="pick(\\'' + esc(u.ref) + '\\')">Select</button></td>' +
         '</tr>';
     });
-    document.getElementById('rows').innerHTML = html || '<tr><td colspan="11" class="muted">No users yet.</td></tr>';
+    document.getElementById('rows').innerHTML = html || '<tr><td colspan="12" class="muted">No users yet.</td></tr>';
   }
   function fmtTokens(n) {
     if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';

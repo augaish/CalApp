@@ -702,6 +702,16 @@ export interface AdminRow {
   tokens: number;
   /** Estimated USD cost of those tokens — see pricing.ts. */
   costUsd: number;
+  /**
+   * All-time action count across every period this account has ever used,
+   * not just the current month — real token/cost tracking only started once
+   * usage_counters gained its input_tokens/output_tokens/cost_usd columns,
+   * so anything before that has no tokens recorded even though the actions
+   * themselves happened. The admin page turns this into a rough count-based
+   * estimate for those, labeled "historical" so it's never confused with
+   * the real, tracked cost above.
+   */
+  allTimeUsed: number;
   createdAt: string;
   lastSeenAt: string;
 }
@@ -724,7 +734,9 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
             COALESCE((SELECT SUM(c.input_tokens + c.output_tokens) FROM usage_counters c
                       WHERE c.ref = u.ref AND c.period = $1), 0)::bigint AS tokens,
             COALESCE((SELECT SUM(c.cost_usd) FROM usage_counters c
-                      WHERE c.ref = u.ref AND c.period = $1), 0)::numeric AS cost_usd
+                      WHERE c.ref = u.ref AND c.period = $1), 0)::numeric AS cost_usd,
+            COALESCE((SELECT SUM(c.count) FROM usage_counters c
+                      WHERE c.ref = u.ref), 0)::int AS all_time_used
        FROM app_users u
       ORDER BY u.last_seen_at DESC
       LIMIT $2`,
@@ -741,6 +753,7 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
     used: r.used,
     tokens: Number(r.tokens),
     costUsd: Number(r.cost_usd),
+    allTimeUsed: r.all_time_used,
     createdAt: new Date(r.created_at).toISOString(),
     lastSeenAt: new Date(r.last_seen_at).toISOString(),
   }));
