@@ -113,7 +113,7 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
         viewDay,
         whoopBurnByDay,
         whoopWorkoutsByDay,
-        whoopCalibrationFactor(workouts, whoopBurnByDay),
+        whoopCalibrationFactor(workouts, whoopWorkoutsByDay),
       ).get(today.id)
     : undefined;
   const todayFromWhoop = today

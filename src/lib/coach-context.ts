@@ -62,6 +62,14 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** 24h local time, deliberately not locale-formatted — this is data for the
+ * model to read and quote back, not UI text, so a fixed HH:MM keeps it
+ * unambiguous regardless of the user's language. */
+function hhmm(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
 /** Build the snapshot for the last `dayCount` days (today first). */
 export async function buildCoachContext(lang: Language, dayCount = 7): Promise<CoachContext> {
   const s = useAppStore.getState();
@@ -71,6 +79,10 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
     const d = new Date();
     d.setDate(d.getDate() - i);
     const totals = totalsForDay(s.meals, d);
+    // Each entry carries when it was logged (e.g. "Bench Press (18:14)") —
+    // the coach used to get bare exercise names with no way to answer "when
+    // did I start training today", even though the timestamp exists on
+    // every logged workout; it just wasn't in what gets sent.
     const names = s.workouts
       .filter((w) => {
         const wd = new Date(w.at);
@@ -82,7 +94,8 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
       })
       .map((w) => {
         const ex = findExercise(w.exerciseId, s.exercises);
-        return ex ? exerciseName(ex, lang) : w.exerciseName;
+        const name = ex ? exerciseName(ex, lang) : w.exerciseName;
+        return `${name} (${hhmm(w.at)})`;
       });
     days.push({
       date: ymd(d),
@@ -90,7 +103,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
       proteinG: Math.round(totals.proteinG),
       carbsG: Math.round(totals.carbsG),
       fatG: Math.round(totals.fatG),
-      burned: actualBurnedForDay(s.workouts, s.whoopBurnByDay, d),
+      burned: actualBurnedForDay(s.workouts, s.whoopBurnByDay, s.whoopWorkoutsByDay, d),
       waterMl: waterForDay(s.water, d),
       workouts: names.slice(0, 8),
     });

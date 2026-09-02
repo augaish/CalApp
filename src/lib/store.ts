@@ -1175,40 +1175,61 @@ export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
 
 /**
  * How much higher or lower a connected WHOOP's real burn tends to run
- * compared to the set/rep formula, learned from the days both exist for —
+ * compared to the set/rep formula, learned from actual matched SESSIONS —
  * this is what lets a day with NO WHOOP coverage still benefit from history
- * instead of falling back to the same generic formula forever. 1 (no
- * adjustment) until there are at least 2 usable days to learn from, and
- * clamped to 0.5–2× so one outlier day (a WHOOP workout landing on a day
- * with almost nothing logged in Calgym) can't produce a wild multiplier.
+ * instead of falling back to the same generic formula forever.
+ *
+ * Deliberately session-matched, not day-total: comparing WHOOP's whole-day
+ * number against only-the-gym-sets the formula knows about is comparing two
+ * different things whenever WHOOP also recorded a walk, other cardio, or
+ * anything else outside a logged Calgym exercise — inflating the learned
+ * ratio for reasons that have nothing to do with how accurate the gym-set
+ * formula actually is (a day-total comparison that once pushed this factor
+ * to its clamp ceiling and produced an 813 kcal estimate for a session
+ * WHOOP itself measured at under 200). Only pairing a WHOOP-recorded
+ * workout against the Calgym sets that actually overlap it — the same
+ * matching whoopKcalForWorkout already does per exercise — keeps the
+ * comparison apples-to-apples.
+ *
+ * 1 (no adjustment) until there are at least 2 usable sessions to learn
+ * from, and clamped to 0.6–1.6× (tighter than before, now that the ratios
+ * feeding it are trustworthy) so one outlier can't still produce a wild
+ * multiplier.
  */
 export function whoopCalibrationFactor(
   workouts: LoggedWorkout[],
-  whoopBurnByDay: Record<string, number>,
+  whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>,
   dayCount = 30,
 ): number {
   const ratios: number[] = [];
-  // Starts at 1, not 0 — today is deliberately excluded. Its own WHOOP
-  // number is still actively arriving (a live refresh or the post-training
-  // poll can flip it between a real value and null several times before
-  // WHOOP finishes scoring), and folding a day that's still changing into
-  // this average made the factor itself flicker — every calibrated
-  // exercise on screen visibly jumping between two different kcal values
-  // as background polling completed, with nothing about the workout
-  // actually changing. Only settled (yesterday-or-older) days go in.
+  // Starts at 1, not 0 — today is deliberately excluded. Its own WHOOP data
+  // is still actively arriving (a live refresh or the post-training poll
+  // can flip it several times before WHOOP finishes scoring), and folding a
+  // day that's still changing into this average made the factor itself
+  // flicker. Only settled (yesterday-or-older) days go in.
   for (let i = 1; i <= dayCount; i++) {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    const whoopKcal = whoopBurnByDay[dateKey(d)];
-    if (whoopKcal == null) continue;
-    const formulaKcal = burnedForDay(workouts, d);
-    // Too little logged that day for the ratio to mean anything.
-    if (formulaKcal < 50) continue;
-    ratios.push(whoopKcal / formulaKcal);
+    const dayWorkouts = workouts.filter((w) => isSameDay(w.at, d));
+    if (dayWorkouts.length === 0) continue;
+    const whoopForDay = whoopWorkoutsByDay[dateKey(d)] ?? [];
+    for (const ww of whoopForDay) {
+      const wStart = new Date(ww.start).getTime();
+      const wEnd = new Date(ww.end).getTime();
+      const overlapping = dayWorkouts.filter((w) => {
+        const s = new Date(w.at).getTime() - WHOOP_MATCH_BUFFER_MS;
+        const e = new Date(w.updatedAt ?? w.at).getTime() + WHOOP_MATCH_BUFFER_MS;
+        return overlaps(s, e, wStart, wEnd);
+      });
+      const formulaSum = overlapping.reduce((sum, w) => sum + (w.caloriesBurned ?? 0), 0);
+      // Too little logged for this specific session for the ratio to mean anything.
+      if (formulaSum < 30) continue;
+      ratios.push(ww.kcal / formulaSum);
+    }
   }
   if (ratios.length < 2) return 1;
   const avg = ratios.reduce((a, b) => a + b, 0) / ratios.length;
-  return Math.min(2, Math.max(0.5, avg));
+  return Math.min(1.6, Math.max(0.6, avg));
 }
 
 /**
@@ -1220,13 +1241,14 @@ export function whoopCalibrationFactor(
 export function actualBurnedForDay(
   workouts: LoggedWorkout[],
   whoopBurnByDay: Record<string, number>,
+  whoopWorkoutsByDay: Record<string, WhoopDayWorkout[]>,
   day: Date,
 ): number {
   const whoopKcal = whoopBurnByDay[dateKey(day)];
   if (whoopKcal != null) return whoopKcal;
   const formula = burnedForDay(workouts, day);
   if (formula === 0) return 0;
-  return Math.round(formula * whoopCalibrationFactor(workouts, whoopBurnByDay));
+  return Math.round(formula * whoopCalibrationFactor(workouts, whoopWorkoutsByDay));
 }
 
 /** How far off a logged set's own timestamp a WHOOP-detected workout window

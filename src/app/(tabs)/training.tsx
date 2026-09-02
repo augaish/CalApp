@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
 import { useAnimatedRef } from 'react-native-reanimated';
@@ -184,14 +184,14 @@ export default function Training() {
   );
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
-  const burned = actualBurnedForDay(workouts, whoopBurnByDay, selected);
+  const burned = actualBurnedForDay(workouts, whoopBurnByDay, whoopWorkoutsByDay, selected);
   const whoopDayTotal = whoopBurnByDay[dateKey(selected)] ?? null;
   const whoopWorkouts = whoopWorkoutsByDay[dateKey(selected)] ?? [];
   // The same factor `actualBurnedForDay` used above for the day total, fed
   // into every per-exercise formula fallback below too — otherwise the day
   // card shows a WHOOP-calibrated number while the rows under it silently
   // fall back to the uncalibrated formula, and the two can never add up.
-  const calibration = whoopCalibrationFactor(workouts, whoopBurnByDay);
+  const calibration = whoopCalibrationFactor(workouts, whoopWorkoutsByDay);
   const whoopCalibrated = whoopDayTotal == null && calibration !== 1;
   // Guarantees the "Today's workout" rows can never sum to more than
   // whoopDayTotal itself — see dayBurnAllocation.
@@ -215,18 +215,33 @@ export default function Training() {
   const [whoopConnected, setWhoopConnected] = useState<boolean | null>(null);
   const [whoopPending, setWhoopPending] = useState(false);
 
-  // Pull WHOOP's real numbers for the last few days whenever this screen
-  // gains focus — not just "today", and not gated by which day is currently
-  // selected. This is about catching up on WHOOP's own scoring lag (a
-  // workout can take a while after it ends before WHOOP finishes scoring
-  // it), which has nothing to do with what's on screen right now: a workout
-  // logged yesterday that was still unscored when the one-time 60-day
-  // backfill (below) first ran would otherwise stay stuck on the formula
-  // estimate for up to 24h — the backfill's own retry cadence — since it
-  // only re-runs that seldom. Refreshing the last few days on every focus
-  // closes that gap without waiting on the backfill's slower schedule.
-  const refreshWhoopRecent = useCallback(() => {
-    let alive = true;
+  // Every WHOOP fetch this screen issues — on focus, after logging
+  // something, and the post-training poll below — goes through this one
+  // function, tagged with a monotonically increasing generation number.
+  // Requests can resolve out of order (a slow focus-refresh finishing after
+  // a faster poll tick that was issued later), and applying whichever one
+  // happens to land LAST used to let a stale response overwrite a newer,
+  // correct one — the connected/pending state (and therefore the "WHOOP
+  // isn't connected" message) would flicker between a real result and a
+  // stale one for no reason a person watching the screen could see. Only
+  // the response from the most RECENTLY ISSUED request is ever applied.
+  const whoopRequestGen = useRef(0);
+
+  // Pull WHOOP's real numbers for the last few days — not just "today", and
+  // not gated by which day is currently selected. This is about catching up
+  // on WHOOP's own scoring lag (a workout can take a while after it ends
+  // before WHOOP finishes scoring it), which has nothing to do with what's
+  // on screen right now: a workout logged yesterday that was still unscored
+  // when the one-time 60-day backfill (below) first ran would otherwise
+  // stay stuck on the formula estimate for up to 24h — the backfill's own
+  // retry cadence — since it only re-runs that seldom. Refreshing the last
+  // few days closes that gap without waiting on the backfill's slower
+  // schedule. Returns whether today is still pending scoring, so the poller
+  // below knows whether to keep checking.
+  const refreshWhoopRecent = useCallback((): Promise<boolean> => {
+    const gen = ++whoopRequestGen.current;
+    const fetches: Promise<void>[] = [];
+    let todayPending = false;
     for (let i = 0; i < RECENT_WHOOP_DAYS; i++) {
       const day = new Date();
       day.setDate(day.getDate() - i);
@@ -234,26 +249,31 @@ export default function Training() {
       start.setHours(0, 0, 0, 0);
       const end = new Date(day);
       end.setHours(23, 59, 59, 999);
-      fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
-        ({ totalKcal, workouts: w, connected, pending }) => {
-          if (!alive) return;
-          setWhoopDayBurn(day, totalKcal);
-          setWhoopDayWorkouts(day, w);
-          if (i === 0) {
-            setWhoopLastFetchedAt(new Date().toISOString());
-            setWhoopConnected(connected ?? null);
-            setWhoopPending(!!pending);
-          }
-        },
+      fetches.push(
+        fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
+          ({ totalKcal, workouts: w, connected, pending }) => {
+            if (gen !== whoopRequestGen.current) return; // superseded by a newer request
+            setWhoopDayBurn(day, totalKcal);
+            setWhoopDayWorkouts(day, w);
+            if (i === 0) {
+              setWhoopLastFetchedAt(new Date().toISOString());
+              setWhoopConnected(connected ?? null);
+              setWhoopPending(!!pending);
+              todayPending = !!pending;
+            }
+          },
+        ),
       );
     }
-    return () => {
-      alive = false;
-    };
+    return Promise.all(fetches).then(() => todayPending);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loggedTodayCount]);
 
-  useFocusEffect(refreshWhoopRecent);
+  useFocusEffect(
+    useCallback(() => {
+      refreshWhoopRecent();
+    }, [refreshWhoopRecent]),
+  );
 
   // After logging something today, WHOOP's own scoring can lag the workout
   // ending by a few minutes — poll a handful of times instead of leaving
@@ -262,41 +282,29 @@ export default function Training() {
   // — the whole point is not requiring the screen stay open), and stops
   // itself the moment WHOOP gives a definitive answer: either a real
   // number, or confirmation nothing's pending, rather than polling for the
-  // full budget regardless.
+  // full budget regardless. Reuses refreshWhoopRecent for every check, so
+  // it shares the same generation guard instead of racing it.
   useEffect(() => {
     if (!selectedIsToday || loggedTodayCount === 0) return;
-    let alive = true;
+    let cancelled = false;
     let attempt = 0;
     let timer: ReturnType<typeof setTimeout>;
     const poll = () => {
-      if (!alive) return;
-      const today = new Date();
-      const start = new Date(today);
-      start.setHours(0, 0, 0, 0);
-      const end = new Date(today);
-      end.setHours(23, 59, 59, 999);
-      fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
-        ({ totalKcal, workouts: w, connected, pending }) => {
-          if (!alive) return;
-          setWhoopDayBurn(today, totalKcal);
-          setWhoopDayWorkouts(today, w);
-          setWhoopLastFetchedAt(new Date().toISOString());
-          setWhoopConnected(connected ?? null);
-          setWhoopPending(!!pending);
-          attempt += 1;
-          if (pending && attempt < WHOOP_POLL_ATTEMPTS) {
-            timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
-          }
-        },
-      );
+      if (cancelled) return;
+      refreshWhoopRecent().then((stillPending) => {
+        if (cancelled) return;
+        attempt += 1;
+        if (stillPending && attempt < WHOOP_POLL_ATTEMPTS) {
+          timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
+        }
+      });
     };
     timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
     return () => {
-      alive = false;
+      cancelled = true;
       clearTimeout(timer);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loggedTodayCount, selectedIsToday]);
+  }, [loggedTodayCount, selectedIsToday, refreshWhoopRecent]);
 
   // One-time (then daily-refreshed) backfill: someone connecting WHOOP after
   // months of using it shouldn't start the burn calibration from nothing.

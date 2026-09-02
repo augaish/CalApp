@@ -65,6 +65,7 @@ export default function Overview() {
   const water = useAppStore((s) => s.water);
   const workouts = useAppStore((s) => s.workouts);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
+  const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const weights = useAppStore((s) => s.weights);
   const activeProgram = useAppStore((s) => s.activeProgram);
   const schedule = useAppStore((s) => s.schedule);
@@ -122,7 +123,7 @@ export default function Overview() {
   const over = remaining < 0;
   const waterMl = waterForDay(water, selected);
   const waterTarget = waterTargetMl(profile.weightKg);
-  const burned = actualBurnedForDay(workouts, whoopBurnByDay, selected);
+  const burned = actualBurnedForDay(workouts, whoopBurnByDay, whoopWorkoutsByDay, selected);
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const streak = streakDays(meals);
   const programGlance = activeProgram ? programProgress(activeProgram) : null;

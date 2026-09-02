@@ -122,8 +122,13 @@ const refreshInFlight = new Map<string, Promise<string | null>>();
 export async function getValidAccessToken(ref: string): Promise<string | null> {
   const conn = await getWhoopConnection(ref);
   if (!conn) return null;
-  // A minute of slack so a token doesn't expire mid-request.
-  if (new Date(conn.expiresAt).getTime() > Date.now() + 60_000) return conn.accessToken;
+  // 5 minutes of slack, not 1 — this app now checks WHOOP frequently
+  // (recent-days refresh on every Training tab focus, a post-training poll,
+  // a daily backfill), so a tight margin meant a token sitting right at the
+  // edge could be refreshed by one call, then treated as still-expiring by
+  // another that read it moments earlier, more often than a single slower
+  // caller ever would.
+  if (new Date(conn.expiresAt).getTime() > Date.now() + 5 * 60_000) return conn.accessToken;
   // No refresh_token on file (WHOOP doesn't always reissue one) — nothing to
   // refresh with. The access token is expired, so this really is a dead end;
   // the user will need to reconnect from the app.
