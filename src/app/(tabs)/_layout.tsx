@@ -24,6 +24,9 @@ export default function TabLayout() {
   const mealCount = useAppStore((s) => s.meals.length);
   const workoutCount = useAppStore((s) => s.workouts.length);
   const waterCount = useAppStore((s) => s.water.length);
+  // Fasting's own alert is one-off (see reminders.ts), so starting/ending it
+  // needs the same resync the others get — the fast's id changes on both.
+  const activeFastId = useAppStore((s) => s.activeFast?.id);
 
   // First launch: request permission once and schedule everything. If denied,
   // reflect the reminder toggles as off. Users manage them in Profile after.
@@ -53,7 +56,7 @@ export default function TabLayout() {
       if (st === 'active') void syncReminders();
     });
     return () => sub.remove();
-  }, [remindersInitialized, mealCount, workoutCount, waterCount]);
+  }, [remindersInitialized, mealCount, workoutCount, waterCount, activeFastId]);
 
   return (
     <Tabs

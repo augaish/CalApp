@@ -5,13 +5,33 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Card, Screen } from '@/components/ui';
-import { Spacing, Type } from '@/constants/theme';
+import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useViewDay } from '@/lib/day';
 import { shareMeals } from '@/lib/meal-share';
 import { usePending } from '@/lib/pending';
 import { isSameDay, mealCalories, totalsForDay, useAppStore } from '@/lib/store';
-import type { LoggedMeal, MealType } from '@/lib/types';
+import type { FastingSession, LoggedMeal, MealType } from '@/lib/types';
+
+/** Xh Ym — same coarse-duration format the fasting screen itself uses. */
+function formatHoursMinutes(ms: number): string {
+  const totalMin = Math.max(0, Math.round(ms / 60000));
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return `${h}h ${m}m`;
+}
+
+/** The fasting card's one-line status — a plain function (not inlined in
+ * JSX) since it reads the current time, which the React Compiler's purity
+ * check only allows outside the component's own render body. */
+function fastingCardLabel(
+  activeFast: FastingSession | null,
+  t: (key: string, options?: Record<string, unknown>) => string,
+): string {
+  if (!activeFast) return t('fasting.cardStart');
+  const remainingMs = activeFast.targetHours * 3600000 - (Date.now() - new Date(activeFast.startedAt).getTime());
+  return remainingMs <= 0 ? t('fasting.goalReached') : `${formatHoursMinutes(remainingMs)} ${t('fasting.cardRemaining')}`;
+}
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -25,6 +45,7 @@ export default function Food() {
   const targets = useAppStore((s) => s.targets);
   const removeMeal = useAppStore((s) => s.removeMeal);
   const updateMeal = useAppStore((s) => s.updateMeal);
+  const activeFast = useAppStore((s) => s.activeFast);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
@@ -103,6 +124,17 @@ export default function Food() {
           </Pressable>
         </View>
       </View>
+
+      <Pressable
+        onPress={() => router.push('/fasting')}
+        style={[styles.fastingCard, { backgroundColor: theme.cardSubtle }]}
+      >
+        <Ionicons name="timer-outline" size={20} color={theme.primary} />
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }}>
+          {fastingCardLabel(activeFast, t)}
+        </Text>
+        <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+      </Pressable>
 
       <Text style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
         {t('home.eaten')}:{' '}
@@ -195,6 +227,14 @@ export default function Food() {
 }
 
 const styles = StyleSheet.create({
+  fastingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',

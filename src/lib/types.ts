@@ -100,6 +100,20 @@ export interface SegmentalStatus {
   rightLeg?: ZoneStatus;
 }
 
+/** Tape-measure circumferences (cm) — a separate axis from the scale/scan
+ * data above (weight, body fat %, segmental lean/fat mass), since a tape
+ * measurement is taken independently and not every reading has both. */
+export interface BodyMeasurements {
+  waist?: number;
+  chest?: number;
+  hips?: number;
+  neck?: number;
+  leftArm?: number;
+  rightArm?: number;
+  leftThigh?: number;
+  rightThigh?: number;
+}
+
 export interface WeightEntry {
   at: string;
   kg: number;
@@ -108,6 +122,9 @@ export interface WeightEntry {
    * rest. */
   bodyFatPercent?: number;
   skeletalMuscleMassKg?: number;
+  /** Tape-measure circumferences taken alongside this reading — manual only,
+   * never filled by a machine scan (no report prints these). */
+  measurementsCm?: BodyMeasurements;
   segmentalLeanMassKg?: SegmentalLeanMass;
   /** Same 5-zone shape as segmentalLeanMassKg, but fat mass — some reports
    * (InBody's fuller printouts) break fat down by body part too, as a
@@ -128,6 +145,24 @@ export interface ChatMessage {
   content: string;
   /** A proposed weekly schedule, rendered as a card the user can add with one tap. */
   schedulePlan?: CoachSchedulePlan;
+}
+
+/** A named fasting window — 'custom' pairs with a user-chosen targetHours
+ * rather than one of the fixed presets. The first of what's meant to grow
+ * into a general "diet program" concept (keto/low-carb etc. later, each its
+ * own type) — kept minimal for now since fasting is the only one that ships. */
+export type FastingProtocol = '16:8' | '18:6' | '20:4' | 'omad' | 'custom';
+
+export interface FastingSession {
+  id: string;
+  startedAt: string;
+  /** Hours until the eating window opens — fixed by `protocol` for a preset,
+   * chosen freely for 'custom'. */
+  targetHours: number;
+  protocol: FastingProtocol;
+  /** Set once the fast is ended — an active session has neither this nor a
+   * place in fastingHistory, see store.ts's activeFast/fastingHistory. */
+  endedAt?: string;
 }
 
 /** A document (a training program, a meal plan, a body-composition report)

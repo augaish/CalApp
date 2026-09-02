@@ -166,6 +166,24 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
     }
   }
 
+  // Fasting — a one-off alert for whenever the active fast's eating window
+  // opens, same as the other conditional `once()` calls: recomputed from
+  // scratch every sync, so starting/ending/cancelling a fast just naturally
+  // reschedules or drops it next time this runs.
+  if (anyOn && s.activeFast) {
+    const targetAt = new Date(new Date(s.activeFast.startedAt).getTime() + s.activeFast.targetHours * 3600000);
+    if (targetAt.getTime() > Date.now()) {
+      await mod.scheduleNotificationAsync({
+        identifier: 'rem-fast-end',
+        content: {
+          title: i18n.t('reminders.fastEndTitle'),
+          body: i18n.t('reminders.fastEndBody'),
+        },
+        trigger: { type: mod.SchedulableTriggerInputTypes.DATE, date: targetAt },
+      });
+    }
+  }
+
   // Program milestones — a new week starting, or the whole program finishing
   // — each only true on the exact day the boundary is crossed, so this fires
   // once per milestone with no extra "already sent" bookkeeping.

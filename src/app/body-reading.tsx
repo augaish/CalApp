@@ -39,7 +39,29 @@ import {
   useAppStore,
   weightTrend,
 } from '@/lib/store';
-import type { BodyReadingAnalysis, SegmentalStatus, WeightEntry } from '@/lib/types';
+import type { BodyMeasurements, BodyReadingAnalysis, SegmentalStatus, WeightEntry } from '@/lib/types';
+
+type DimensionKey = keyof BodyMeasurements;
+const DIMENSION_KEYS: DimensionKey[] = [
+  'waist',
+  'chest',
+  'hips',
+  'neck',
+  'leftArm',
+  'rightArm',
+  'leftThigh',
+  'rightThigh',
+];
+const EMPTY_DIMENSIONS: Record<DimensionKey, string> = {
+  waist: '',
+  chest: '',
+  hips: '',
+  neck: '',
+  leftArm: '',
+  rightArm: '',
+  leftThigh: '',
+  rightThigh: '',
+};
 
 /** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
 function ymd(d: Date): string {
@@ -143,6 +165,11 @@ export default function BodyReading() {
     }),
   );
   const [showSegmentalFat, setShowSegmentalFat] = useState(hasScannedFatSeg);
+  // Tape-measure circumferences — manual only, never filled by a scan (no
+  // report prints these), so this always starts blank unless a past entry
+  // with dimensions is loaded via the date picker below.
+  const [dimensions, setDimensions] = useState<Record<DimensionKey, string>>(EMPTY_DIMENSIONS);
+  const [showDimensions, setShowDimensions] = useState(false);
   // Purely descriptive — never user-edited, since we have no reference
   // range to recompute it from ourselves. Only ever set from a report's own
   // printed classification (a fresh scan, or loading a past saved reading).
@@ -349,6 +376,12 @@ export default function BodyReading() {
     setShowSegmentalFat(!!fatSeg && Object.values(fatSeg).some((v) => v != null));
     setSegmentalStatus(entry.segmentalLeanMassStatus);
     setSegmentalFatStatus(entry.segmentalFatMassStatus);
+    const dim = entry.measurementsCm;
+    setDimensions({
+      ...EMPTY_DIMENSIONS,
+      ...Object.fromEntries(DIMENSION_KEYS.map((k) => [k, dim?.[k] != null ? String(dim[k]) : ''])),
+    });
+    setShowDimensions(!!dim && Object.values(dim).some((v) => v != null));
     setDeviceLabel(entry.reportLabel);
     setSource(entry.source ?? 'manual');
     setLowConfidence(false);
@@ -462,11 +495,14 @@ export default function BodyReading() {
       rightLeg: num(segmentalFat.rightLeg),
     };
     const hasFatSeg = Object.values(fatSeg).some((v) => v != null);
+    const dim = Object.fromEntries(DIMENSION_KEYS.map((k) => [k, num(dimensions[k])])) as BodyMeasurements;
+    const hasDim = Object.values(dim).some((v) => v != null);
     logBodyReading({
       kg: weightKg,
       at: isoFromDateInput(date),
       bodyFatPercent: num(bodyFat),
       skeletalMuscleMassKg: num(muscleMass),
+      measurementsCm: hasDim ? dim : undefined,
       segmentalLeanMassKg: hasSeg ? seg : undefined,
       segmentalFatMassKg: hasFatSeg ? fatSeg : undefined,
       segmentalLeanMassStatus: hasSeg ? segmentalStatus : undefined,
@@ -737,6 +773,28 @@ export default function BodyReading() {
               keyboardType="decimal-pad"
               maxLength={5}
               suffix={t('progress.kg')}
+            />
+          ))}
+        </View>
+      )}
+
+      <Pressable onPress={() => setShowDimensions((v) => !v)} style={styles.segmentalToggle}>
+        <Ionicons name={showDimensions ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
+        <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>
+          {t('bodyReading.dimensions')}
+        </Text>
+      </Pressable>
+      {showDimensions && (
+        <View>
+          {DIMENSION_KEYS.map((key) => (
+            <Field
+              key={key}
+              label={t(`bodyReading.${key}`)}
+              value={dimensions[key]}
+              onChangeText={(v) => setDimensions((s) => ({ ...s, [key]: normalizeDigits(v) }))}
+              keyboardType="decimal-pad"
+              maxLength={5}
+              suffix="cm"
             />
           ))}
         </View>

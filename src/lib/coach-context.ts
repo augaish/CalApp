@@ -3,13 +3,14 @@ import { exerciseName, findExercise } from './exercises';
 import { ageFrom } from './tdee';
 import {
   actualBurnedForDay,
+  fastingStreakDays,
   streakDays,
   totalsForDay,
   useAppStore,
   waterForDay,
   workoutStreakDays,
 } from './store';
-import type { Language } from './types';
+import type { BodyMeasurements, Language } from './types';
 
 /**
  * Compact snapshot of the user's own data, sent with each coach message so it
@@ -55,6 +56,14 @@ export interface CoachContext {
     weightKg: number;
     bodyFatPercent?: number;
     skeletalMuscleMassKg?: number;
+    /** Tape-measure circumferences (cm), when the reading has any. */
+    measurementsCm?: BodyMeasurements;
+  };
+  /** Only present once the user has ever used the fasting timer. */
+  fasting?: {
+    /** The fast running right now, if any. */
+    active?: { protocol: string; startedAt: string; targetHours: number };
+    streakDays: number;
   };
   /** Summaries of documents the user has taught the coach (training
    * programs, meal plans, body-composition reports) — see CoachReferenceDoc. */
@@ -134,12 +143,23 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
   // Overview screen logs — a plain kg entry adds nothing a program needs.
   const latest = s.weights[0];
   const latestBodyReading =
-    latest && (latest.bodyFatPercent != null || latest.skeletalMuscleMassKg != null)
+    latest && (latest.bodyFatPercent != null || latest.skeletalMuscleMassKg != null || latest.measurementsCm)
       ? {
           daysAgo: Math.max(0, Math.round((Date.now() - new Date(latest.at).getTime()) / 86400000)),
           weightKg: latest.kg,
           bodyFatPercent: latest.bodyFatPercent,
           skeletalMuscleMassKg: latest.skeletalMuscleMassKg,
+          measurementsCm: latest.measurementsCm,
+        }
+      : undefined;
+
+  const fasting: CoachContext['fasting'] =
+    s.activeFast || s.fastingHistory.length > 0
+      ? {
+          active: s.activeFast
+            ? { protocol: s.activeFast.protocol, startedAt: s.activeFast.startedAt, targetHours: s.activeFast.targetHours }
+            : undefined,
+          streakDays: fastingStreakDays(s.fastingHistory),
         }
       : undefined;
 
@@ -167,6 +187,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
     workoutStreakDays: workoutStreakDays(s.workouts),
     whoop,
     latestBodyReading,
+    fasting,
     referenceDocs: s.coachReferenceDocs.length
       ? s.coachReferenceDocs.map((d) => ({ name: d.name, summary: d.summary }))
       : undefined,

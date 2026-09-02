@@ -9,6 +9,8 @@ import type {
   CoachReferenceDoc,
   DailyTargets,
   Exercise,
+  FastingProtocol,
+  FastingSession,
   FoodItem,
   Goal,
   Language,
@@ -112,6 +114,10 @@ interface AppState {
   coachAppliedPlans: number[];
   /** Documents the user has taught the coach — see CoachReferenceDoc. */
   coachReferenceDocs: CoachReferenceDoc[];
+  /** The fast currently running, if any — cleared once ended or cancelled. */
+  activeFast: FastingSession | null;
+  /** Completed fasts, most recent first. */
+  fastingHistory: FastingSession[];
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -243,6 +249,16 @@ interface AppState {
   /** Adds a reference doc, evicting the oldest once at MAX_COACH_REFERENCE_DOCS. */
   addCoachReferenceDoc: (doc: Omit<CoachReferenceDoc, 'id' | 'addedAt'>) => void;
   removeCoachReferenceDoc: (docId: string) => void;
+  /** Begins a new fast — replaces any already-active one (the UI should
+   * never offer starting a second while one is running, but this stays a
+   * plain overwrite rather than a no-op so it can't get stuck). */
+  startFast: (protocol: FastingProtocol, targetHours: number) => void;
+  /** Ends the active fast and files it in fastingHistory. No-op if none is running. */
+  endFast: () => void;
+  /** Discards the active fast without recording it in history — for
+   * "started by mistake", distinct from ending one early on purpose. */
+  cancelFast: () => void;
+  deleteFastingSession: (id: string) => void;
   setHydrated: () => void;
   /** Create the install id on first launch; returns the existing one after. */
   ensureInstallId: () => string;
@@ -286,6 +302,15 @@ function id(): string {
  * this evicts the oldest. */
 export const MAX_COACH_REFERENCE_DOCS = 5;
 
+/** Fixed fasting windows the timer offers as one-tap presets — 'custom' asks
+ * for its own hour count instead of reading from here. */
+export const FASTING_PROTOCOL_HOURS: Record<Exclude<FastingProtocol, 'custom'>, number> = {
+  '16:8': 16,
+  '18:6': 18,
+  '20:4': 20,
+  omad: 23,
+};
+
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
@@ -319,6 +344,8 @@ export const useAppStore = create<AppState>()(
       coachMessages: [],
       coachAppliedPlans: [],
       coachReferenceDocs: [],
+      activeFast: null,
+      fastingHistory: [],
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -780,6 +807,23 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           coachReferenceDocs: s.coachReferenceDocs.filter((d) => d.id !== docId),
         })),
+      startFast: (protocol, targetHours) =>
+        set({ activeFast: { id: id(), startedAt: new Date().toISOString(), protocol, targetHours } }),
+      endFast: () =>
+        set((s) =>
+          s.activeFast
+            ? {
+                activeFast: null,
+                fastingHistory: [
+                  { ...s.activeFast, endedAt: new Date().toISOString() },
+                  ...s.fastingHistory,
+                ],
+              }
+            : {},
+        ),
+      cancelFast: () => set({ activeFast: null }),
+      deleteFastingSession: (sessionId) =>
+        set((s) => ({ fastingHistory: s.fastingHistory.filter((f) => f.id !== sessionId) })),
       setHydrated: () => set({ hydrated: true }),
       ensureInstallId: () => {
         const existing = get().installId;
@@ -837,6 +881,8 @@ export const useAppStore = create<AppState>()(
           coachMessages: [],
           coachAppliedPlans: [],
           coachReferenceDocs: [],
+          activeFast: null,
+          fastingHistory: [],
         }),
     }),
     {
@@ -875,6 +921,8 @@ export const useAppStore = create<AppState>()(
         coachMessages,
         coachAppliedPlans,
         coachReferenceDocs,
+        activeFast,
+        fastingHistory,
       }) => ({
         account,
         language,
@@ -906,6 +954,8 @@ export const useAppStore = create<AppState>()(
         coachMessages,
         coachAppliedPlans,
         coachReferenceDocs,
+        activeFast,
+        fastingHistory,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
@@ -1578,6 +1628,28 @@ export function workoutStreakDays(workouts: LoggedWorkout[]): number {
   if (!workouts.some((w) => isSameDay(w.at, day))) day.setDate(day.getDate() - 1);
   for (;;) {
     if (workouts.some((w) => isSameDay(w.at, day))) {
+      streak += 1;
+      day.setDate(day.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+  return streak;
+}
+
+/**
+ * Consecutive days with at least one completed fast, counted by the day it
+ * ended — same "ending today counts, otherwise ending yesterday" shape as
+ * streakDays/workoutStreakDays above, so a streak doesn't drop to 0 the
+ * instant the calendar rolls over.
+ */
+export function fastingStreakDays(history: FastingSession[]): number {
+  const ended = history.filter((f) => f.endedAt);
+  let streak = 0;
+  const day = new Date();
+  if (!ended.some((f) => isSameDay(f.endedAt!, day))) day.setDate(day.getDate() - 1);
+  for (;;) {
+    if (ended.some((f) => isSameDay(f.endedAt!, day))) {
       streak += 1;
       day.setDate(day.getDate() - 1);
     } else {
