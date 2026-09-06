@@ -358,7 +358,12 @@ export default function Training() {
     return ex ? exerciseName(ex, lang) : w.exerciseName;
   };
 
-  const openExercise = (id: string) => router.push(`/exercise-detail?id=${encodeURIComponent(id)}`);
+  // Tapping a History row should land on that read-only past-sessions list
+  // (each one frozen at log time), not the "Track" tab — which always edits
+  // *today's* sets regardless of which day's row was tapped, and looked like
+  // history had changed simply because today's edit was visible there too.
+  const openExercise = (id: string, tab?: 'history') =>
+    router.push(`/exercise-detail?id=${encodeURIComponent(id)}${tab ? `&tab=${tab}` : ''}`);
 
   const confirmDeleteWorkout = (id: string) =>
     Alert.alert(t('training.deleteWorkoutConfirm'), undefined, [
@@ -873,7 +878,7 @@ export default function Training() {
                   return (
                     <View key={w.id} style={styles.workoutRow}>
                       <Pressable
-                        onPress={() => openExercise(w.exerciseId)}
+                        onPress={() => openExercise(w.exerciseId, 'history')}
                         style={({ pressed }) => [styles.workoutTap, pressed && { opacity: 0.6 }]}
                       >
                         <View style={[styles.workoutIcon, { backgroundColor: accent + '22' }]}>

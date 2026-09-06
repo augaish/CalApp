@@ -65,7 +65,7 @@ function sessionMetric(w: LoggedWorkout): number {
  */
 export default function ExerciseDetail() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, tab } = useLocalSearchParams<{ id?: string; tab?: string }>();
   const custom = useAppStore((s) => s.exercises);
   const exercise = id ? findExercise(id, custom) : undefined;
 
@@ -74,10 +74,16 @@ export default function ExerciseDetail() {
   }, [exercise, router]);
 
   if (!exercise) return null;
-  return <ExerciseDetailScreen key={exercise.id} exerciseId={exercise.id} />;
+  return (
+    <ExerciseDetailScreen
+      key={exercise.id}
+      exerciseId={exercise.id}
+      initialTab={tab === 'history' ? 'history' : 'track'}
+    />
+  );
 }
 
-function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
+function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; initialTab: Tab }) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
@@ -151,7 +157,7 @@ function ExerciseDetailScreen({ exerciseId }: { exerciseId: string }) {
   const lastSet = recent?.sets[recent.sets.length - 1];
   const repsSeed = exercise && (exercise.type === 'weight_reps' || exercise.type === 'bodyweight_reps') ? 10 : 0;
 
-  const [tab, setTab] = useState<Tab>('track');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [weight, setWeight] = useState(lastSet?.weightKg ?? 0);
   const [reps, setReps] = useState(lastSet?.reps ?? repsSeed);
   const [seconds, setSeconds] = useState(lastSet?.seconds ?? 0);
