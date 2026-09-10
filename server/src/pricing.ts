@@ -8,10 +8,13 @@ const PRICING: { match: RegExp; inputPer1M: number; outputPer1M: number }[] = [
   { match: /opus/i, inputPer1M: 5, outputPer1M: 25 },
   { match: /sonnet/i, inputPer1M: 3, outputPer1M: 15 },
   { match: /haiku/i, inputPer1M: 1, outputPer1M: 5 },
-  // Off-peak list price as of the Sep 2026 V4.1 release (deepseek.ts) — DeepSeek
-  // also runs cheaper peak/off-peak and cache-hit tiers this doesn't model,
-  // same simplification as not modeling Claude's prompt caching above.
-  { match: /deepseek/i, inputPer1M: 0.22, outputPer1M: 0.66 },
+  // Off-peak, cache-miss list price per DeepSeek's Sep 10 2026 Flash repricing
+  // (effective 12:00 Beijing time that day). DeepSeek also runs a much
+  // cheaper cache-hit input tier ($0.003/1M vs $0.15/1M here) and doubles
+  // both peak-hour, neither of which this models — same simplification as
+  // not modeling Claude's prompt caching above. Using the cache-miss rate
+  // keeps this a conservative (not-too-low) estimate.
+  { match: /deepseek/i, inputPer1M: 0.15, outputPer1M: 0.6 },
 ];
 
 // An unrecognized model id (e.g. ANTHROPIC_MODEL overridden to something new)
