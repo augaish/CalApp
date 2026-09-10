@@ -62,6 +62,7 @@ import {
   getValidAccessToken,
   kilojoulesToKcal,
   whoopConfigured,
+  WhoopAuthError,
 } from './whoop.js';
 import { estimateCostUsd } from './pricing.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
@@ -1323,6 +1324,46 @@ app.post('/api/whoop/disconnect', async (c) => {
 });
 
 /**
+ * Runs one WHOOP data fetch with a single self-heal retry: if the cached
+ * access token turns out to be dead — WHOOP returns a 401 even though our
+ * own bookkeeping thought it still had time left (revoked from WHOOP's
+ * side, or simply expired earlier than reported) — force a fresh refresh
+ * and retry exactly once before giving up. This is what actually avoids
+ * "reconnect every time": most of the time the stored refresh_token is
+ * still good and this recovers silently. Only when even a forced refresh
+ * can't produce a working token does it delete the stored connection, so
+ * the next status check truthfully says disconnected instead of a green
+ * check that silently does nothing — that combination (never self-healing,
+ * never reporting the real state) was the actual gap behind reported
+ * reconnect loops.
+ */
+async function withWhoopRetry<T>(
+  ref: string,
+  token: string,
+  run: (token: string) => Promise<T>,
+): Promise<T | null> {
+  try {
+    return await run(token);
+  } catch (err) {
+    if (!(err instanceof WhoopAuthError)) throw err;
+    console.warn(`whoop token rejected for ${ref}, forcing refresh`);
+    const fresh = await getValidAccessToken(ref, true);
+    if (!fresh) {
+      await deleteWhoopConnection(ref);
+      return null;
+    }
+    try {
+      return await run(fresh);
+    } catch (err2) {
+      if (!(err2 instanceof WhoopAuthError)) throw err2;
+      console.warn(`whoop token still rejected for ${ref} after refresh — disconnecting`);
+      await deleteWhoopConnection(ref);
+      return null;
+    }
+  }
+}
+
+/**
  * The actual burn for a day, straight from WHOOP's heart-rate-based workout
  * data, instead of Calgym's set/rep formula estimate. `start`/`end` are the
  * caller's local day boundaries — Calgym has no session concept (exercises
@@ -1340,7 +1381,8 @@ app.get('/api/whoop/day-burn', async (c) => {
   const token = await getValidAccessToken(ref);
   if (!token) return c.json({ totalKcal: null, workouts: [], connected: false });
   try {
-    const workouts = await fetchWorkoutsInRange(token, start, end);
+    const workouts = await withWhoopRetry(ref, token, (t) => fetchWorkoutsInRange(t, start, end));
+    if (workouts == null) return c.json({ totalKcal: null, workouts: [], connected: false });
     const scored = workouts.filter((w) => w.kilojoule != null);
     // A workout WHOOP has recorded but not yet scored (kilojoule still null)
     // is real evidence something happened today even though it can't be
@@ -1384,7 +1426,8 @@ app.get('/api/whoop/history', async (c) => {
   const token = await getValidAccessToken(ref);
   if (!token) return c.json({ workouts: [] });
   try {
-    const history = await fetchWorkoutHistory(token, days);
+    const history = await withWhoopRetry(ref, token, (t) => fetchWorkoutHistory(t, days));
+    if (history == null) return c.json({ workouts: [] });
     const scored = history.filter((w) => w.kilojoule != null);
     return c.json({
       workouts: scored.map((w) => ({
@@ -1415,9 +1458,9 @@ app.get('/api/whoop/summary', async (c) => {
   const token = await getValidAccessToken(ref);
   if (!token) return c.json({ connected: false });
   const [recovery, sleep, todayStrain] = await Promise.all([
-    fetchLatestRecovery(token).catch(() => null),
-    fetchLatestSleep(token).catch(() => null),
-    fetchTodayStrain(token).catch(() => null),
+    withWhoopRetry(ref, token, fetchLatestRecovery).catch(() => null),
+    withWhoopRetry(ref, token, fetchLatestSleep).catch(() => null),
+    withWhoopRetry(ref, token, fetchTodayStrain).catch(() => null),
   ]);
   return c.json({
     connected: true,

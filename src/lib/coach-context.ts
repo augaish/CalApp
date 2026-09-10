@@ -74,12 +74,19 @@ function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** 24h local time, deliberately not locale-formatted — this is data for the
- * model to read and quote back, not UI text, so a fixed HH:MM keeps it
- * unambiguous regardless of the user's language. */
-function hhmm(iso: string): string {
+/**
+ * 24h local time with seconds, deliberately not locale-formatted — this is
+ * data for the model to read and quote back, not UI text, so a fixed
+ * HH:MM:SS keeps it unambiguous regardless of the user's language. Seconds
+ * matter here: checking off several planned exercises in quick succession
+ * (the common case for a pre-planned day) logs each one a few seconds
+ * apart, all within the same minute — HH:MM alone made every one of them
+ * look identical to the coach, with no way to answer "which was logged
+ * last" beyond guessing from list order.
+ */
+function hhmmss(iso: string): string {
   const d = new Date(iso);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
 }
 
 /** Build the snapshot for the last `dayCount` days (today first). */
@@ -107,7 +114,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
       .map((w) => {
         const ex = findExercise(w.exerciseId, s.exercises);
         const name = ex ? exerciseName(ex, lang) : w.exerciseName;
-        return `${name} (${hhmm(w.at)})`;
+        return `${name} (${hhmmss(w.at)})`;
       });
     days.push({
       date: ymd(d),

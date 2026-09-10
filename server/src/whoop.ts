@@ -118,8 +118,15 @@ const refreshInFlight = new Map<string, Promise<string | null>>();
  * if the stored one is at or near expiry. Returns null when there's no WHOOP
  * connection at all — every caller treats that as "nothing to add", not an
  * error, since WHOOP is optional.
+ *
+ * `force` skips the expiry check and refreshes regardless of what our own
+ * bookkeeping believes — for the one case that matters: WHOOP already
+ * rejected the cached token (a 401, see WhoopAuthError) even though our
+ * clock says it still has time left. Without this, that gap was
+ * unrecoverable short of the user fully reconnecting, which is the "why do
+ * I have to reconnect WHOOP constantly" complaint this exists to close.
  */
-export async function getValidAccessToken(ref: string): Promise<string | null> {
+export async function getValidAccessToken(ref: string, force = false): Promise<string | null> {
   const conn = await getWhoopConnection(ref);
   if (!conn) return null;
   // 5 minutes of slack, not 1 — this app now checks WHOOP frequently
@@ -128,7 +135,7 @@ export async function getValidAccessToken(ref: string): Promise<string | null> {
   // edge could be refreshed by one call, then treated as still-expiring by
   // another that read it moments earlier, more often than a single slower
   // caller ever would.
-  if (new Date(conn.expiresAt).getTime() > Date.now() + 5 * 60_000) return conn.accessToken;
+  if (!force && new Date(conn.expiresAt).getTime() > Date.now() + 5 * 60_000) return conn.accessToken;
   // No refresh_token on file (WHOOP doesn't always reissue one) — nothing to
   // refresh with. The access token is expired, so this really is a dead end;
   // the user will need to reconnect from the app.
@@ -151,10 +158,26 @@ export async function getValidAccessToken(ref: string): Promise<string | null> {
   return attempt;
 }
 
+/**
+ * Thrown when WHOOP rejects the access token outright (401) — a much
+ * stronger signal than "no data came back" that the connection itself is
+ * dead (revoked from WHOOP's side, or simply expired despite our own
+ * bookkeeping saying otherwise), not that the request just happened to be
+ * empty. Every route that fetches WHOOP data catches this specifically and
+ * deletes the stale connection, so the next "am I connected" check tells
+ * the truth instead of reporting connected while every real call silently
+ * fails — this was the actual gap behind reported reconnect loops: nothing
+ * ever detected a token WHOOP had already invalidated.
+ */
+export class WhoopAuthError extends Error {}
+
 async function whoopGet<T>(accessToken: string, path: string): Promise<T | null> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
+  if (res.status === 401) {
+    throw new WhoopAuthError(`WHOOP rejected the access token for ${path}`);
+  }
   if (!res.ok) {
     console.error(`whoop GET ${path} failed:`, res.status, await res.text().catch(() => ''));
     return null;
