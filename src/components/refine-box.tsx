@@ -1,14 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, FeatureLockedError, QuotaError, refineMeal } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { scrollInputIntoView } from '@/lib/scroll-to-input';
 import type { FoodItem, MealAnalysis } from '@/lib/types';
 
 /**
@@ -21,13 +30,20 @@ import type { FoodItem, MealAnalysis } from '@/lib/types';
 export function RefineBox({
   items,
   onResult,
+  scrollRef,
 }: {
   items: FoodItem[];
   onResult: (analysis: MealAnalysis) => void;
+  /** The page's own Screen scrollRef — this box sits at the very bottom of
+   * the scrollable content on both screens that use it, so once the
+   * keyboard opens it needs to be scrolled up to meet it explicitly (see
+   * scroll-to-input.ts for why RN's automatic version doesn't reach it). */
+  scrollRef?: React.RefObject<ScrollView | null>;
 }) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
+  const inputRef = useRef<TextInput>(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -66,6 +82,7 @@ export function RefineBox({
     <View style={styles.wrap}>
       <View style={[styles.row, { backgroundColor: theme.cardSubtle, borderColor: theme.border }]}>
         <TextInput
+          ref={inputRef}
           value={message}
           onChangeText={(v) => {
             setMessage(v);
@@ -77,6 +94,7 @@ export function RefineBox({
           editable={!loading}
           returnKeyType="send"
           onSubmitEditing={send}
+          onFocus={() => scrollRef && scrollInputIntoView(scrollRef, inputRef)}
           multiline
         />
         <Pressable onPress={send} disabled={!canSend} hitSlop={8} style={styles.sendBtn}>

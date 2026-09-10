@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Linking,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -22,6 +23,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
 import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { scrollInputIntoView } from '@/lib/scroll-to-input';
 import {
   bestSetIndex,
   dateKey,
@@ -164,6 +166,8 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   const [distance, setDistance] = useState(lastSet?.distanceM ?? 0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [note, setNote] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
+  const noteInputRef = useRef<TextInput>(null);
   const initialMapView =
     exercise?.primaryMuscles?.length
       ? viewForMuscles(exercise.primaryMuscles)
@@ -234,6 +238,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
 
   return (
     <Screen
+      scrollRef={scrollRef}
       footer={
         tab === 'track' ? (
           <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
@@ -374,6 +379,8 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
           onSelect={selectSet}
           onDelete={deleteSet}
           onDeleteComment={deleteComment}
+          scrollRef={scrollRef}
+          noteInputRef={noteInputRef}
         />
       )}
 
@@ -417,6 +424,8 @@ function TrackTab({
   onSelect,
   onDelete,
   onDeleteComment,
+  scrollRef,
+  noteInputRef,
 }: {
   type: ExerciseType;
   weight: number;
@@ -432,6 +441,12 @@ function TrackTab({
   editing: boolean;
   dayLabel: string;
   sets: WorkoutSet[];
+  /** Screen's own scroller and this field's ref — used to scroll the note
+   * field into view above the keyboard, since RN's automatic version
+   * doesn't reach it once a KeyboardAvoidingView is in the ancestry (see
+   * scroll-to-input.ts). */
+  scrollRef: React.RefObject<ScrollView | null>;
+  noteInputRef: React.RefObject<TextInput | null>;
   /** This exercise's own calories for today — WHOOP's real number when a
    * WHOOP-detected workout overlaps this session's logged time, else the
    * set/rep formula estimate (see `fromWhoop`). */
@@ -498,12 +513,14 @@ function TrackTab({
           <View style={[styles.noteWrap, { borderColor: theme.border, backgroundColor: theme.background }]}>
             <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.textTertiary} />
             <TextInput
+              ref={noteInputRef}
               value={note}
               onChangeText={setNote}
               placeholder={t('track.notePlaceholder')}
               placeholderTextColor={theme.textTertiary}
               style={{ flex: 1, color: theme.text, fontSize: 14, padding: 0 }}
               maxLength={120}
+              onFocus={() => scrollInputIntoView(scrollRef, noteInputRef)}
             />
           </View>
         )}

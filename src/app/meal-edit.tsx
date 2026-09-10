@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { RefineBox } from '@/components/refine-box';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
@@ -52,6 +52,7 @@ export default function MealEdit() {
   const removeMeal = useAppStore((s) => s.removeMeal);
   const duplicateMeal = useAppStore((s) => s.duplicateMeal);
   const setViewDay = useViewDay((s) => s.setDay);
+  const scrollRef = useRef<ScrollView>(null);
 
   const [items, setItems] = useState<FoodItem[]>(() => (meal ? meal.items.map((i) => ({ ...i })) : []));
   const [mealType, setMealType] = useState<MealType>(meal?.mealType ?? 'snack');
@@ -218,6 +219,7 @@ export default function MealEdit() {
 
   return (
     <Screen
+      scrollRef={scrollRef}
       footer={
         <View>
           <View style={[styles.totalBar, { backgroundColor: theme.cardSubtle }]}>
@@ -372,7 +374,7 @@ export default function MealEdit() {
         </Card>
       ))}
 
-      {items.length > 0 && <RefineBox items={items} onResult={applyRefine} />}
+      {items.length > 0 && <RefineBox items={items} onResult={applyRefine} scrollRef={scrollRef} />}
     </Screen>
   );
 }

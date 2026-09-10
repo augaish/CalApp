@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
 import { RefineBox } from '@/components/refine-box';
@@ -40,6 +40,7 @@ export default function MealResult() {
   const photoUri = usePending((s) => s.photoUri);
   const logMeal = useAppStore((s) => s.logMeal);
   const viewDay = useViewDay((s) => s.day);
+  const scrollRef = useRef<ScrollView>(null);
 
   // Snapshot base macros for AI (non-barcode) items so a portion multiplier can
   // scale them; barcode items scale from their per-100g values instead.
@@ -157,6 +158,7 @@ export default function MealResult() {
 
   return (
     <Screen
+      scrollRef={scrollRef}
       footer={
         <View>
           <View style={[styles.totalBar, { backgroundColor: theme.cardSubtle }]}>
@@ -321,7 +323,7 @@ export default function MealResult() {
         </Swipeable>
       ))}
 
-      {items.length > 0 && <RefineBox items={items} onResult={applyRefine} />}
+      {items.length > 0 && <RefineBox items={items} onResult={applyRefine} scrollRef={scrollRef} />}
 
       <Text style={[styles.disclaimer, { color: theme.textTertiary }]}>
         {t('common.aiDisclaimer')}
