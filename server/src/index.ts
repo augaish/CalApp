@@ -64,6 +64,7 @@ import {
   whoopConfigured,
   WhoopAuthError,
 } from './whoop.js';
+import { deepseekConfigured, deepseekTextCall } from './deepseek.js';
 import { estimateCostUsd } from './pricing.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
@@ -426,14 +427,19 @@ interface Track {
   kind: string;
 }
 
-/** Adds one response's real input/output tokens and their estimated USD
- * cost onto the caller's usage-counter row. Best-effort: a lost cost figure
- * must never fail the request that already succeeded. */
-async function trackUsage(track: Track, model: string, response: Anthropic.Message): Promise<void> {
+/** Adds one call's real input/output tokens and their estimated USD cost
+ * onto the caller's usage-counter row. Takes plain token counts rather than
+ * an Anthropic.Message so any provider's response can report through the
+ * same path (see the DeepSeek pilot on /api/analyze-exercise). Best-effort:
+ * a lost cost figure must never fail the request that already succeeded. */
+async function trackUsage(
+  track: Track,
+  model: string,
+  usage: { input_tokens: number; output_tokens: number },
+): Promise<void> {
   try {
-    const { input_tokens, output_tokens } = response.usage;
-    const cost = estimateCostUsd(model, input_tokens, output_tokens);
-    await recordTokens(track.ref, track.kind, input_tokens, output_tokens, cost);
+    const cost = estimateCostUsd(model, usage.input_tokens, usage.output_tokens);
+    await recordTokens(track.ref, track.kind, usage.input_tokens, usage.output_tokens, cost);
   } catch (err) {
     console.error('trackUsage failed:', err);
   }
@@ -461,7 +467,7 @@ async function analyzeMealImage(
       },
     ],
   });
-  if (track) await trackUsage(track, model, response);
+  if (track) await trackUsage(track, model, response.usage);
 
   return toMealAnalysis(replyText(response));
 }
@@ -489,7 +495,7 @@ async function analyze(
       },
     ],
   });
-  if (track) await trackUsage(track, model, response);
+  if (track) await trackUsage(track, model, response.usage);
 
   return extractJson(replyText(response));
 }
@@ -512,7 +518,7 @@ async function analyzeDocument(pdf: string, prompt: string, model: string = MODE
       },
     ],
   });
-  if (track) await trackUsage(track, model, response);
+  if (track) await trackUsage(track, model, response.usage);
 
   return extractJson(replyText(response));
 }
@@ -524,7 +530,7 @@ async function textCall(prompt: string, maxTokens = 1500, track?: Track): Promis
     max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   });
-  if (track) await trackUsage(track, MODEL, response);
+  if (track) await trackUsage(track, MODEL, response.usage);
   return extractJson(replyText(response));
 }
 
@@ -820,7 +826,7 @@ app.post('/api/analyze-text', async (c) => {
       console.warn('web search unavailable, retrying analyze-text without it');
       response = await anthropic.messages.create(request);
     }
-    await trackUsage({ ref, kind: 'describe' }, request.model, response);
+    await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
     return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
   } catch (err) {
     // The text is logged (trimmed) because the failures worth fixing here are
@@ -880,7 +886,7 @@ app.post('/api/refine-meal', async (c) => {
       console.warn('web search unavailable, retrying refine-meal without it');
       response = await anthropic.messages.create(request);
     }
-    await trackUsage({ ref, kind: 'describe' }, request.model, response);
+    await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
     return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
   } catch (err) {
     console.error(`refine-meal failed for "${message.slice(0, 120)}":`, err);
@@ -900,7 +906,23 @@ app.post('/api/analyze-exercise', async (c) => {
   const claim = await reserve(ref, access, 'exercise');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
-    const result = await textCall(exerciseInfoPrompt(language, name), 600, { ref, kind: 'exercise' });
+    const prompt = exerciseInfoPrompt(language, name);
+    // Cost pilot: try the cheaper DeepSeek route first when configured, since
+    // this is a plain text-in/text-out call with no vision or tool use. Any
+    // DeepSeek-side failure falls back silently to the existing Claude path.
+    if (deepseekConfigured()) {
+      try {
+        const ds = await deepseekTextCall(prompt, 600);
+        await trackUsage({ ref, kind: 'exercise' }, ds.model, {
+          input_tokens: ds.inputTokens,
+          output_tokens: ds.outputTokens,
+        });
+        return c.json(extractJson(ds.text));
+      } catch (err) {
+        console.error('deepseek analyze-exercise failed, falling back to Claude:', err);
+      }
+    }
+    const result = await textCall(prompt, 600, { ref, kind: 'exercise' });
     return c.json(result);
   } catch (err) {
     console.error('analyze-exercise failed:', err);
@@ -962,7 +984,7 @@ app.post('/api/coach', async (c) => {
       messages,
       tools: [SCHEDULE_TOOL],
     });
-    await trackUsage({ ref, kind: 'coach' }, MODEL, response);
+    await trackUsage({ ref, kind: 'coach' }, MODEL, response.usage);
     const reply = replyText(response);
     const toolUse = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_weekly_schedule',
@@ -1018,7 +1040,7 @@ app.post('/api/coach-attachment', async (c) => {
         },
       ],
     });
-    await trackUsage({ ref, kind: 'coach' }, MODEL, response);
+    await trackUsage({ ref, kind: 'coach' }, MODEL, response.usage);
     return c.json({ summary: replyText(response).trim() });
   } catch (err) {
     console.error('coach-attachment failed:', err);
@@ -1051,7 +1073,7 @@ app.post('/api/generate-program', async (c) => {
       tools: [PROGRAM_TOOL],
       tool_choice: { type: 'tool', name: 'propose_program' },
     });
-    await trackUsage({ ref, kind: 'program' }, MODEL, response);
+    await trackUsage({ ref, kind: 'program' }, MODEL, response.usage);
     const toolUse = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_program',
     );
