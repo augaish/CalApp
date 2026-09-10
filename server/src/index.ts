@@ -26,7 +26,9 @@ import {
   linkRefs,
   listUsers,
   markBillingEventApplied,
+  listShadowTests,
   readShareLink,
+  recordShadowTest,
   recordTokens,
   resolveRef,
   saveWhoopOAuthState,
@@ -64,7 +66,7 @@ import {
   whoopConfigured,
   WhoopAuthError,
 } from './whoop.js';
-import { deepseekConfigured, deepseekTextCall } from './deepseek.js';
+import { deepseekConfigured, deepseekTextCall, deepseekVisionCall } from './deepseek.js';
 import { estimateCostUsd } from './pricing.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
@@ -472,6 +474,52 @@ async function analyzeMealImage(
   return toMealAnalysis(replyText(response));
 }
 
+/**
+ * Background-only comparison call: runs DeepSeek's vision model on the same
+ * meal photo Claude just answered, purely to log how it compares before
+ * ever trusting it with a real answer on this route (the app's single most
+ * heavily used one). Never awaited by the request handler, never shown to
+ * the user, and never touches reserve()/release() — a DeepSeek failure or
+ * slowdown here can't affect or delay the real response. Results land in
+ * deepseek_shadow_log, visible on the admin dashboard.
+ */
+async function shadowTestMealAnalysis(
+  ref: string,
+  image: string,
+  language: Language,
+  claudeModel: string,
+  claudeResult: MealAnalysis,
+  claudeMs: number,
+): Promise<void> {
+  const start = Date.now();
+  try {
+    const ds = await deepseekVisionCall(image, mealPrompt(language), 2000);
+    const deepseekResult = toMealAnalysis(ds.text);
+    const deepseekCostUsd = estimateCostUsd(ds.model, ds.inputTokens, ds.outputTokens);
+    await recordShadowTest({
+      ref,
+      claudeModel,
+      claudeResult,
+      claudeMs,
+      deepseekResult,
+      deepseekError: null,
+      deepseekMs: Date.now() - start,
+      deepseekCostUsd,
+    });
+  } catch (err) {
+    await recordShadowTest({
+      ref,
+      claudeModel,
+      claudeResult,
+      claudeMs,
+      deepseekResult: null,
+      deepseekError: (err instanceof Error ? err.message : String(err)).slice(0, 500),
+      deepseekMs: Date.now() - start,
+      deepseekCostUsd: null,
+    });
+  }
+}
+
 async function analyze(
   image: string,
   prompt: string,
@@ -557,7 +605,12 @@ app.post('/api/analyze-meal', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const model = access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL;
+    const claudeStart = Date.now();
     const result = await analyzeMealImage(parsed.image, mealPrompt(parsed.language), model, { ref, kind: 'meal' });
+    if (deepseekConfigured()) {
+      // Fire-and-forget: the user's real response never waits on this.
+      void shadowTestMealAnalysis(ref, parsed.image, parsed.language, model, result, Date.now() - claudeStart);
+    }
     return c.json(result);
   } catch (err) {
     console.error('analyze-meal failed:', err);
@@ -1507,13 +1560,14 @@ function adminOk(c: { req: { header: (n: string) => string | undefined; query: (
 
 app.get('/admin/api/data', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const [stats, users, limits, sponsor] = await Promise.all([
+  const [stats, users, limits, sponsor, shadowTests] = await Promise.all([
     adminStats(),
     listUsers(),
     planLimits(),
     getSetting<Record<string, unknown> | null>('sponsor', null),
+    listShadowTests(),
   ]);
-  return c.json({ stats, users, limits, sponsor, plans: PLANS, cache: cacheEnabled });
+  return c.json({ stats, users, limits, sponsor, plans: PLANS, cache: cacheEnabled, shadowTests, deepseekConfigured: deepseekConfigured() });
 });
 
 app.post('/admin/api/plan', async (c) => {

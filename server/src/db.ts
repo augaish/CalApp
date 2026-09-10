@@ -77,6 +77,25 @@ export async function initDb(): Promise<void> {
   await pool.query(`ALTER TABLE usage_counters ADD COLUMN IF NOT EXISTS input_tokens BIGINT NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE usage_counters ADD COLUMN IF NOT EXISTS output_tokens BIGINT NOT NULL DEFAULT 0`);
   await pool.query(`ALTER TABLE usage_counters ADD COLUMN IF NOT EXISTS cost_usd NUMERIC(12,6) NOT NULL DEFAULT 0`);
+  // DeepSeek shadow-test log for the meal-photo route: every real meal scan
+  // Claude answers also gets a background, non-blocking DeepSeek vision call
+  // on the same photo, purely to compare accuracy and cost before ever
+  // trusting DeepSeek with a real answer on this route. Never read by
+  // anything user-facing, never touches quota — admin-dashboard-only.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS deepseek_shadow_log (
+      id                BIGSERIAL PRIMARY KEY,
+      ref               TEXT NOT NULL,
+      claude_model      TEXT NOT NULL,
+      claude_result     JSONB NOT NULL,
+      claude_ms         INTEGER,
+      deepseek_result   JSONB,
+      deepseek_error    TEXT,
+      deepseek_ms       INTEGER,
+      deepseek_cost_usd NUMERIC(12,6),
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
   // Small key/value store for runtime settings the admin page edits (plan
   // limits, the rented sponsor slot, …) so changes need no redeploy.
   await pool.query(`
@@ -899,4 +918,75 @@ export async function setCachedBarcode(
   } catch (err) {
     console.error('barcode cache write failed:', err);
   }
+}
+
+export interface ShadowTestInput {
+  ref: string;
+  claudeModel: string;
+  claudeResult: unknown;
+  claudeMs: number;
+  deepseekResult: unknown | null;
+  deepseekError: string | null;
+  deepseekMs: number;
+  deepseekCostUsd: number | null;
+}
+
+/** Best-effort: a lost shadow-test row must never surface as a user-facing error. */
+export async function recordShadowTest(t: ShadowTestInput): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO deepseek_shadow_log
+        (ref, claude_model, claude_result, claude_ms, deepseek_result, deepseek_error, deepseek_ms, deepseek_cost_usd)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        t.ref,
+        t.claudeModel,
+        JSON.stringify(t.claudeResult),
+        t.claudeMs,
+        t.deepseekResult ? JSON.stringify(t.deepseekResult) : null,
+        t.deepseekError,
+        t.deepseekMs,
+        t.deepseekCostUsd,
+      ],
+    );
+  } catch (err) {
+    console.error('shadow test log failed:', err);
+  }
+}
+
+export interface ShadowTestRow {
+  id: number;
+  ref: string;
+  claudeModel: string;
+  claudeResult: unknown;
+  claudeMs: number | null;
+  deepseekResult: unknown;
+  deepseekError: string | null;
+  deepseekMs: number | null;
+  deepseekCostUsd: number | null;
+  createdAt: string;
+}
+
+/** Most recent shadow-test rows, newest first, for the admin dashboard. */
+export async function listShadowTests(limit = 30): Promise<ShadowTestRow[]> {
+  if (!pool) return [];
+  const res = await pool.query(
+    `SELECT id, ref, claude_model, claude_result, claude_ms,
+            deepseek_result, deepseek_error, deepseek_ms, deepseek_cost_usd, created_at
+     FROM deepseek_shadow_log ORDER BY id DESC LIMIT $1`,
+    [limit],
+  );
+  return res.rows.map((r) => ({
+    id: r.id,
+    ref: r.ref,
+    claudeModel: r.claude_model,
+    claudeResult: r.claude_result,
+    claudeMs: r.claude_ms,
+    deepseekResult: r.deepseek_result,
+    deepseekError: r.deepseek_error,
+    deepseekMs: r.deepseek_ms,
+    deepseekCostUsd: r.deepseek_cost_usd == null ? null : Number(r.deepseek_cost_usd),
+    createdAt: r.created_at,
+  }));
 }

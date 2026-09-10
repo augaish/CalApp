@@ -113,6 +113,17 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
     </div>
 
+    <div class="card" id="shadowcard">
+      <b>DeepSeek shadow test — meal scans</b>
+      <div class="sub" style="margin:4px 0 10px">Every real meal scan is still answered by Claude only, shown here as-is. In the background, the same photo is also sent to DeepSeek's vision model and logged here for comparison — DeepSeek's answer is never shown to any user or saved to their log. Empty if <code>DEEPSEEK_API_KEY</code> isn't set on the server.</div>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Time</th><th>Ref</th><th>Claude (model · items · kcal · ms)</th><th>DeepSeek (items · kcal · ms)</th><th>DeepSeek cost (SAR)</th></tr></thead>
+          <tbody id="shadowrows"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card">
       <b>Users</b>
       <div class="err hide" id="rowerr"></div>
@@ -170,6 +181,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('sp_img').value = sp.imageUrl || '';
     document.getElementById('sp_link').value = sp.linkUrl || '';
     document.getElementById('sp_on').checked = !!sp.enabled;
+    renderShadow();
 
     // The table can only ever show what listUsers() returned in one response;
     // when that is fewer than the true total, say so instead of leaving a
@@ -201,6 +213,29 @@ export const ADMIN_HTML = `<!doctype html>
         '</tr>';
     });
     document.getElementById('rows').innerHTML = html || '<tr><td colspan="12" class="muted">No users yet.</td></tr>';
+  }
+  function mealSummary(m) {
+    if (!m || !Array.isArray(m.items)) return '—';
+    var kcal = m.items.reduce(function (sum, it) { return sum + (it.calories || 0); }, 0);
+    return m.items.length + ' item' + (m.items.length === 1 ? '' : 's') + ' · ' + kcal + ' kcal';
+  }
+  function renderShadow() {
+    var rows = data.shadowTests || [];
+    var html = '';
+    rows.forEach(function (t) {
+      var deepseekCell = t.deepseekError
+        ? '<span style="color:var(--danger)">' + esc(t.deepseekError) + '</span>'
+        : mealSummary(t.deepseekResult) + (t.deepseekMs != null ? ' · ' + t.deepseekMs + 'ms' : '');
+      html += '<tr>' +
+        '<td class="muted">' + new Date(t.createdAt).toLocaleString() + '</td>' +
+        '<td style="font-family:monospace">' + esc(t.ref) + '</td>' +
+        '<td>' + esc(t.claudeModel) + ' · ' + mealSummary(t.claudeResult) + (t.claudeMs != null ? ' · ' + t.claudeMs + 'ms' : '') + '</td>' +
+        '<td>' + deepseekCell + '</td>' +
+        '<td class="muted">' + (t.deepseekCostUsd == null ? '—' : (t.deepseekCostUsd * USD_TO_SAR).toFixed(4)) + '</td>' +
+        '</tr>';
+    });
+    document.getElementById('shadowrows').innerHTML = html || '<tr><td colspan="5" class="muted">No shadow tests logged yet.</td></tr>';
+    document.getElementById('shadowcard').style.display = data.deepseekConfigured || rows.length ? '' : 'none';
   }
   function fmtTokens(n) {
     if (n >= 1000000) return (n / 1000000).toFixed(2) + 'M';
