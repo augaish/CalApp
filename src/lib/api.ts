@@ -480,51 +480,45 @@ export async function generateProgram(
   return post<GeneratedProgram>('/api/generate-program', { language, context });
 }
 
-/** Open Food Facts lookup — free public API, called directly from the app. */
+/**
+ * Barcode → nutrition, via our own server: checks its first-party cache
+ * (grown from every product a user has resolved through the AI photo-scan
+ * fallback — see reportBarcode) before falling back to Open Food Facts,
+ * whose coverage of Gulf-market products is thin. See
+ * server/src/index.ts's /api/barcode.
+ */
 export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
-  const res = await fetch(
-    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_en,brands,nutriments`,
-    // OFF asks every client to identify itself; without a User-Agent requests
-    // are throttled/blocked and legit products come back as "not found".
-    { headers: { 'User-Agent': 'Calgym/1.0 (calapp; food tracker)' } },
-  );
-  if (!res.ok) return null;
-  const data = (await res.json()) as {
-    status: number;
-    product?: {
-      product_name?: string;
-      product_name_en?: string;
-      brands?: string;
-      nutriments?: Record<string, number>;
-    };
-  };
-  if (data.status !== 1 || !data.product) return null;
-  const n = data.product.nutriments ?? {};
-  // Prefer kcal; fall back to kJ (energy_100g / energy-kj_100g) → kcal so
-  // products that only store kilojoules still resolve.
-  let kcal = n['energy-kcal_100g'];
-  if (kcal == null) {
-    const kj = n['energy-kj_100g'] ?? n['energy_100g'];
-    if (kj != null) kcal = kj / 4.184;
+  if (isMockMode) return null;
+  try {
+    const res = await fetch(`${API_URL}/api/barcode?code=${encodeURIComponent(barcode)}`, {
+      headers: authHeaders(),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { item: FoodItem | null };
+    return data.item;
+  } catch {
+    return null;
   }
-  if (kcal == null) return null;
-  const per100 = {
-    calories: Math.round(kcal),
-    proteinG: Math.round(n['proteins_100g'] ?? 0),
-    carbsG: Math.round(n['carbohydrates_100g'] ?? 0),
-    fatG: Math.round(n['fat_100g'] ?? 0),
-  };
-  const label =
-    data.product.product_name_en || data.product.product_name || data.product.brands || barcode;
-  // Default to a 100 g serving; the user can dial in the real grams and the
-  // macros scale from `basePer100` on the review screen.
-  return {
-    name: label,
-    ...per100,
-    portion: '100 g',
-    basePer100: per100,
-    gramsEaten: 100,
-  };
+}
+
+/**
+ * Files an AI-resolved product into the shared barcode cache so the next
+ * scan of the same barcode — by anyone — gets an instant hit instead of
+ * needing AI again. Called after the "Use camera" fallback (see scan.tsx)
+ * succeeds for a barcode lookupBarcode couldn't resolve. Best-effort: the
+ * meal was already logged successfully regardless of whether this lands.
+ */
+export async function reportBarcode(barcode: string, item: FoodItem): Promise<void> {
+  if (isMockMode) return;
+  try {
+    await fetch(`${API_URL}/api/barcode/report`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ barcode, item }),
+    });
+  } catch {
+    // best-effort — nothing to recover from here
+  }
 }
 
 function delay(ms: number) {

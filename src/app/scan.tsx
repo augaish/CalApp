@@ -28,6 +28,7 @@ import {
   isMockMode,
   lookupBarcode,
   QuotaError,
+  reportBarcode,
 } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
@@ -36,7 +37,7 @@ import { photoPickerAvailable, pickPhoto, prepareImage } from '@/lib/photo';
 import { useAppStore } from '@/lib/store';
 
 export default function Scan() {
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const { mode, barcode: barcodeParam } = useLocalSearchParams<{ mode?: string; barcode?: string }>();
   const isGym = mode === 'gym';
   const isBarcode = mode === 'barcode';
   const isPhoto = mode === 'photo';
@@ -87,8 +88,12 @@ export default function Scan() {
             onPress: () => router.replace('/food-edit'),
           },
           {
+            // Straight into the AI meal-scan flow (not the raw-capture
+            // `mode=photo`, which never reads the label at all) — carrying
+            // the barcode along so a successful read can be filed into the
+            // shared barcode cache below, for the next person to scan it.
             text: t('barcode.usePhoto'),
-            onPress: () => router.replace('/scan?mode=photo'),
+            onPress: () => router.replace(`/scan?mode=meal&barcode=${encodeURIComponent(data)}`),
           },
           { text: t('common.cancel'), style: 'cancel', onPress: () => setAnalyzing(false) },
         ]);
@@ -122,6 +127,14 @@ export default function Scan() {
     } else {
       const analysis = await analyzeMeal(saved.base64, language);
       useEntitlement.getState().spend();
+      // Arrived here from a barcode OFF didn't have — a single-item read is
+      // exactly one resolved product, worth filing into the shared cache so
+      // the next scan of this barcode (anyone's) is instant. A multi-item
+      // result means the photo wasn't just the product label, so there's no
+      // one clear answer to cache against this barcode.
+      if (barcodeParam && analysis.items.length === 1) {
+        void reportBarcode(barcodeParam, analysis.items[0]);
+      }
       setMeal(analysis, saved.uri);
       router.replace('/meal-result');
     }
@@ -304,7 +317,7 @@ export default function Scan() {
               </View>
             )}
             {isBarcode && (
-              <Pressable onPress={() => router.replace('/scan?mode=photo')} style={styles.galleryBtn}>
+              <Pressable onPress={() => router.replace('/scan?mode=meal')} style={styles.galleryBtn}>
                 <Ionicons name="camera-outline" size={26} color="#fff" />
                 <Text style={styles.galleryText}>{t('barcode.usePhoto')}</Text>
               </Pressable>

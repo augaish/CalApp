@@ -16,6 +16,7 @@ import {
   createShareLink,
   deleteUser,
   deleteWhoopConnection,
+  getCachedBarcode,
   getCachedEquipment,
   getOrCreateUser,
   getSetting,
@@ -29,6 +30,7 @@ import {
   recordTokens,
   resolveRef,
   saveWhoopOAuthState,
+  setCachedBarcode,
   setCachedEquipment,
   setSetting,
   setUserDevice,
@@ -555,6 +557,122 @@ app.post('/api/analyze-meal', async (c) => {
     await release(ref, 'meal');
     return aiFailure(c, err, 'analysis_failed');
   }
+});
+
+/**
+ * The barcode item shape the client actually stores — a superset of the
+ * server's own slimmer FoodItem (parse.ts), which has no need for the
+ * per-100g scaling fields a packaged product's review screen uses.
+ * basePer100/gramsEaten are optional: an Open Food Facts hit always has
+ * them (real per-100g label data), but an AI-photo-resolved report might
+ * not — the model estimates one serving as photographed, not necessarily
+ * a clean per-100g figure, so this is cached and shown as a normal single
+ * scanned item rather than mislabeled as scalable per-100g data.
+ */
+interface BarcodeItem {
+  name: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  portion: string;
+  basePer100?: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  gramsEaten?: number;
+}
+
+/** Open Food Facts lookup, run server-side so a hit can be written through
+ * to barcode_cache — every product OFF actually has only needs asking OFF
+ * once, ever, across every Calgym user. */
+async function lookupOffBarcode(barcode: string): Promise<BarcodeItem | null> {
+  const res = await fetch(
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=product_name,product_name_en,brands,nutriments`,
+    { headers: { 'User-Agent': 'Calgym/1.0 (calapp; food tracker)' } },
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as {
+    status: number;
+    product?: {
+      product_name?: string;
+      product_name_en?: string;
+      brands?: string;
+      nutriments?: Record<string, number>;
+    };
+  };
+  if (data.status !== 1 || !data.product) return null;
+  const n = data.product.nutriments ?? {};
+  let kcal = n['energy-kcal_100g'];
+  if (kcal == null) {
+    const kj = n['energy-kj_100g'] ?? n['energy_100g'];
+    if (kj != null) kcal = kj / 4.184;
+  }
+  if (kcal == null) return null;
+  const per100 = {
+    calories: Math.round(kcal),
+    proteinG: Math.round(n['proteins_100g'] ?? 0),
+    carbsG: Math.round(n['carbohydrates_100g'] ?? 0),
+    fatG: Math.round(n['fat_100g'] ?? 0),
+  };
+  const label =
+    data.product.product_name_en || data.product.product_name || data.product.brands || barcode;
+  return { name: label, ...per100, portion: '100 g', basePer100: per100, gramsEaten: 100 };
+}
+
+/** Barcodes are plain digit strings (UPC/EAN) in practice; this just keeps
+ * garbage out of the cache table, not a real format validator. */
+function isPlausibleBarcode(v: string): boolean {
+  return /^[0-9]{6,14}$/.test(v);
+}
+
+/**
+ * Barcode → nutrition. Checks the app's own first-party cache first (see
+ * barcode_cache — grown from every product a user has ever resolved via the
+ * AI photo-scan fallback below), then Open Food Facts, write-through on an
+ * OFF hit so the same product is never looked up there twice. No AI call
+ * and no quota — this is exactly as free as the OFF lookup it replaces.
+ */
+app.get('/api/barcode', async (c) => {
+  const code = (c.req.query('code') ?? '').trim();
+  if (!isPlausibleBarcode(code)) return c.json({ error: 'invalid_request' }, 400);
+  const cached = await getCachedBarcode(code);
+  if (cached) return c.json({ item: cached });
+  try {
+    const item = await lookupOffBarcode(code);
+    if (item) await setCachedBarcode(code, item, 'off');
+    return c.json({ item });
+  } catch (err) {
+    console.error('barcode lookup failed:', err);
+    return c.json({ item: null });
+  }
+});
+
+/**
+ * Files an AI-resolved product into the shared barcode cache — called after
+ * the "Use camera" fallback (analyze-meal on a photo of the label) succeeds
+ * for a barcode neither the cache nor OFF had. No AI call happens here,
+ * just a cache write, so it costs nothing beyond the analyze-meal call the
+ * client already paid for.
+ */
+app.post('/api/barcode/report', async (c) => {
+  const body = await c.req
+    .json<{ barcode?: string; item?: BarcodeItem }>()
+    .catch(() => ({}) as never);
+  const barcode = (body.barcode ?? '').trim();
+  const item = body.item;
+  if (
+    !isPlausibleBarcode(barcode) ||
+    !item ||
+    typeof item.name !== 'string' ||
+    !item.name.trim() ||
+    typeof item.calories !== 'number'
+  ) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  // Never overwrite a product OFF (or an earlier scan) already resolved —
+  // one AI-vision read of one person's packaging is a plausible source of
+  // error, and the first answer in is generally the more careful one.
+  const existing = await getCachedBarcode(barcode);
+  if (!existing) await setCachedBarcode(barcode, item, 'photo');
+  return c.json({ ok: true });
 });
 
 app.post('/api/analyze-equipment', async (c) => {

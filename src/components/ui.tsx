@@ -3,6 +3,8 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -50,33 +52,43 @@ export function Screen({
     paddingBottom: footer ? Spacing.md : insets.bottom + Spacing.xl,
   };
   return (
-    <View style={{ flex: 1, backgroundColor: t.background }}>
-      {scroll ? (
-        <ScrollView
-          ref={scrollRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={[content, style]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {children}
-        </ScrollView>
-      ) : (
-        <View style={[content, { flex: 1 }, style]}>{children}</View>
-      )}
-      {footer ? (
-        <View
-          style={{
-            paddingHorizontal: Spacing.md,
-            paddingTop: Spacing.sm,
-            paddingBottom: insets.bottom + Spacing.md,
-            backgroundColor: t.background,
-          }}
-        >
-          {footer}
-        </View>
-      ) : null}
-    </View>
+    // Without this, nothing on a Screen-based page shifted for the keyboard —
+    // a focused input near the bottom (a note field, a chat-style correction
+    // box) just sat behind it, out of reach, taking any text selection/paste
+    // popup down with it. `padding` on iOS grows the bottom inset to clear
+    // the keyboard; Android already resizes the window on its own.
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={{ flex: 1, backgroundColor: t.background }}>
+        {scroll ? (
+          <ScrollView
+            ref={scrollRef}
+            style={{ flex: 1 }}
+            contentContainerStyle={[content, style]}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          <View style={[content, { flex: 1 }, style]}>{children}</View>
+        )}
+        {footer ? (
+          <View
+            style={{
+              paddingHorizontal: Spacing.md,
+              paddingTop: Spacing.sm,
+              paddingBottom: insets.bottom + Spacing.md,
+              backgroundColor: t.background,
+            }}
+          >
+            {footer}
+          </View>
+        ) : null}
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -70,7 +70,7 @@ export const PRIVACY_HTML = page(
 </ul>
 
 <h2>Barcode lookups</h2>
-<p>Scanning a barcode queries <a href="https://world.openfoodfacts.org">Open Food Facts</a>, a free public food database. Only the barcode number is sent.</p>
+<p>Scanning a barcode checks our own product database first, then <a href="https://world.openfoodfacts.org">Open Food Facts</a>, a free public food database — only the barcode number is sent to either. If a product isn't found and you resolve it yourself by photographing its label, the name and nutrition we read are saved against that barcode so the next person who scans the same product gets an instant result — no personal or photo data is kept, only the product's own nutrition facts.</p>
 
 <h2>Your choices</h2>
 <ul>

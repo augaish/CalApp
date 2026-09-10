@@ -32,6 +32,21 @@ export async function initDb(): Promise<void> {
       PRIMARY KEY (canonical, language)
     );
   `);
+  // First-party barcode → nutrition cache. Open Food Facts (the free public
+  // database this app also checks) has thin coverage of Gulf-market
+  // products; this table is written to every time a user resolves a barcode
+  // OFF didn't have via the AI photo-scan fallback, so the *next* person to
+  // scan that exact product anywhere gets an instant hit here first — the
+  // app's own barcode coverage grows from what its real users actually buy.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS barcode_cache (
+      barcode    TEXT PRIMARY KEY,
+      item       JSONB NOT NULL,
+      source     TEXT NOT NULL DEFAULT 'off',
+      hits       INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
   // Accounts. `ref` is whatever identifies the caller today (a device id) and
   // later the auth user id — the rest of the billing model never changes.
   await pool.query(`
@@ -847,5 +862,41 @@ export async function setCachedEquipment(
     );
   } catch (err) {
     console.error('cache write failed:', err);
+  }
+}
+
+export async function getCachedBarcode(barcode: string): Promise<unknown | null> {
+  if (!pool) return null;
+  try {
+    const res = await pool.query(
+      'UPDATE barcode_cache SET hits = hits + 1 WHERE barcode = $1 RETURNING item',
+      [barcode],
+    );
+    return res.rows[0]?.item ?? null;
+  } catch (err) {
+    console.error('barcode cache read failed:', err);
+    return null;
+  }
+}
+
+/** `source` is 'off' (Open Food Facts had it — write-through, so we never
+ * hit OFF for the same barcode twice) or 'photo' (a user's AI photo scan
+ * resolved a barcode OFF didn't have) — purely informational, for the admin
+ * page to see how much of the cache the app itself has grown. */
+export async function setCachedBarcode(
+  barcode: string,
+  item: unknown,
+  source: 'off' | 'photo',
+): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO barcode_cache (barcode, item, source)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (barcode) DO UPDATE SET item = EXCLUDED.item, source = EXCLUDED.source`,
+      [barcode, JSON.stringify(item), source],
+    );
+  } catch (err) {
+    console.error('barcode cache write failed:', err);
   }
 }
