@@ -122,7 +122,7 @@ export const ADMIN_HTML = `<!doctype html>
       <div id="dstest" class="sub hide"></div>
       <div class="scroll">
         <table>
-          <thead><tr><th>Time</th><th>Ref</th><th>Claude (model · items · kcal · ms)</th><th>DeepSeek (items · kcal · ms)</th><th>DeepSeek cost (SAR)</th></tr></thead>
+          <thead><tr><th>Time</th><th>Ref</th><th>Claude — item, kcal, P/C/F</th><th>DeepSeek — item, kcal, P/C/F</th><th>DeepSeek cost (SAR)</th></tr></thead>
           <tbody id="shadowrows"></tbody>
         </table>
       </div>
@@ -228,10 +228,13 @@ export const ADMIN_HTML = `<!doctype html>
       box.textContent = 'OK in ' + r.ms + 'ms · model ' + r.model + ' · ' + r.inputTokens + ' in / ' + r.outputTokens + ' out tokens · reply: ' + r.text;
     }).catch(function (e) { box.textContent = 'Request failed: ' + e; });
   }
-  function mealSummary(m) {
-    if (!m || !Array.isArray(m.items)) return '—';
-    var kcal = m.items.reduce(function (sum, it) { return sum + (it.calories || 0); }, 0);
-    return m.items.length + ' item' + (m.items.length === 1 ? '' : 's') + ' · ' + kcal + ' kcal';
+  /** One line per food item: name, calories, and P/C/F macros in grams. */
+  function mealDetail(m) {
+    if (!m || !Array.isArray(m.items) || !m.items.length) return '<span class="muted">—</span>';
+    return m.items.map(function (it) {
+      return esc(it.name) + ' — ' + Math.round(it.calories || 0) + ' kcal' +
+        ' (P' + Math.round(it.proteinG || 0) + ' C' + Math.round(it.carbsG || 0) + ' F' + Math.round(it.fatG || 0) + ')';
+    }).join('<br>');
   }
   function renderShadow() {
     var rows = data.shadowTests || [];
@@ -239,11 +242,11 @@ export const ADMIN_HTML = `<!doctype html>
     rows.forEach(function (t) {
       var deepseekCell = t.deepseekError
         ? '<span style="color:var(--danger)">' + esc(t.deepseekError) + '</span>'
-        : mealSummary(t.deepseekResult) + (t.deepseekMs != null ? ' · ' + t.deepseekMs + 'ms' : '');
+        : mealDetail(t.deepseekResult) + (t.deepseekMs != null ? '<div class="muted">' + t.deepseekMs + 'ms</div>' : '');
       html += '<tr>' +
         '<td class="muted">' + new Date(t.createdAt).toLocaleString() + '</td>' +
         '<td style="font-family:monospace">' + esc(t.ref) + '</td>' +
-        '<td>' + esc(t.claudeModel) + ' · ' + mealSummary(t.claudeResult) + (t.claudeMs != null ? ' · ' + t.claudeMs + 'ms' : '') + '</td>' +
+        '<td>' + mealDetail(t.claudeResult) + '<div class="muted">' + esc(t.claudeModel) + (t.claudeMs != null ? ' · ' + t.claudeMs + 'ms' : '') + '</div></td>' +
         '<td>' + deepseekCell + '</td>' +
         '<td class="muted">' + (t.deepseekCostUsd == null ? '—' : (t.deepseekCostUsd * USD_TO_SAR).toFixed(4)) + '</td>' +
         '</tr>';
