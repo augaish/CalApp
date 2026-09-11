@@ -1570,6 +1570,32 @@ app.get('/admin/api/data', async (c) => {
   return c.json({ stats, users, limits, sponsor, plans: PLANS, cache: cacheEnabled, shadowTests, deepseekConfigured: deepseekConfigured() });
 });
 
+// A minimal, structurally-valid 1x1 JPEG — just enough for DeepSeek's vision
+// endpoint to accept as input. Lets the admin dashboard fire one real
+// DeepSeek vision call on demand (see "Test DeepSeek vision now") to see the
+// raw response immediately, without spending a real user's meal scan on it.
+const TEST_JPEG_B64 =
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
+
+app.post('/admin/api/test-deepseek-vision', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  if (!deepseekConfigured()) return c.json({ error: 'not_configured' }, 400);
+  const start = Date.now();
+  try {
+    const ds = await deepseekVisionCall(TEST_JPEG_B64, mealPrompt('en'), 500);
+    return c.json({
+      ok: true,
+      ms: Date.now() - start,
+      model: ds.model,
+      inputTokens: ds.inputTokens,
+      outputTokens: ds.outputTokens,
+      text: ds.text,
+    });
+  } catch (err) {
+    return c.json({ ok: false, ms: Date.now() - start, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
 app.post('/admin/api/plan', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json<{ ref?: string; plan?: string; days?: number; note?: string }>().catch(() => ({}) as never);
