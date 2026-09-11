@@ -57,17 +57,35 @@ export async function deepseekTextCall(prompt: string, maxTokens = 1500): Promis
     const body = await res.text().catch(() => '');
     throw new Error(`DeepSeek request failed: ${res.status} ${body.slice(0, 300)}`);
   }
-  const json = (await res.json()) as {
-    choices: { message: { content: string } }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
+  const json = (await res.json()) as DeepseekChatResponse;
   const text = json.choices?.[0]?.message?.content ?? '';
+  if (!text) throw new Error(`DeepSeek reply had no content: ${describeEmptyReply(json)}`);
   return {
     text,
     model: MODEL,
     inputTokens: json.usage?.prompt_tokens ?? 0,
     outputTokens: json.usage?.completion_tokens ?? 0,
   };
+}
+
+interface DeepseekChatResponse {
+  choices?: { message?: { content?: string; reasoning_content?: string }; finish_reason?: string }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+}
+
+/**
+ * A 200 response with empty `content` has happened for reasons a blank
+ * string can't explain (finish_reason, a reasoning-model split into
+ * reasoning_content, a moderation refusal) — dump enough of the raw
+ * response to actually diagnose it instead of guessing.
+ */
+function describeEmptyReply(json: DeepseekChatResponse): string {
+  const choice = json.choices?.[0];
+  const bits = [
+    `finish_reason=${choice?.finish_reason ?? 'unknown'}`,
+    choice?.message?.reasoning_content ? `reasoning_content=${choice.message.reasoning_content.slice(0, 200)}` : null,
+  ].filter(Boolean);
+  return `${bits.join(', ')} raw=${JSON.stringify(json).slice(0, 400)}`;
 }
 
 /** Vision completion — one photo + a text prompt, OpenAI-compatible content-block format. */
@@ -98,11 +116,9 @@ export async function deepseekVisionCall(imageBase64Jpeg: string, prompt: string
     const body = await res.text().catch(() => '');
     throw new Error(`DeepSeek vision request failed: ${res.status} ${body.slice(0, 300)}`);
   }
-  const json = (await res.json()) as {
-    choices: { message: { content: string } }[];
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-  };
+  const json = (await res.json()) as DeepseekChatResponse;
   const text = json.choices?.[0]?.message?.content ?? '';
+  if (!text) throw new Error(`DeepSeek vision reply had no content: ${describeEmptyReply(json)}`);
   return {
     text,
     model: VISION_MODEL,
