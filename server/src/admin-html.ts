@@ -118,16 +118,23 @@ export const ADMIN_HTML = `<!doctype html>
       <div class="sub" style="margin:4px 0 10px">Every real meal scan is still answered by Claude only, shown here as-is. In the background, the same photo is also sent to DeepSeek's vision model and logged here for comparison — DeepSeek's answer is never shown to any user or saved to their log. Empty if <code>DEEPSEEK_API_KEY</code> isn't set on the server.</div>
       <div class="row" style="margin-bottom:10px">
         <button class="ghost" onclick="testDeepseekVision()">Test DeepSeek vision now</button>
-        <button class="ghost" onclick="testDeepseekText()">Test DeepSeek text (exercise info)</button>
       </div>
       <div id="dstest" class="sub hide"></div>
-      <div id="dstest2" class="sub hide"></div>
       <div class="scroll">
         <table>
           <thead><tr><th>Time</th><th>Ref</th><th>Claude — item, kcal, P/C/F</th><th>DeepSeek — item, kcal, P/C/F</th><th>DeepSeek cost (SAR)</th></tr></thead>
           <tbody id="shadowrows"></tbody>
         </table>
       </div>
+    </div>
+
+    <div class="card">
+      <b>DeepSeek pilot — exercise info (live)</b>
+      <div class="sub" style="margin:4px 0 10px">Unrelated to meal scans — this is the "info" lookup on an exercise (target muscles, instructions). When DeepSeek is configured, real users' taps actually go through DeepSeek here, falling back to Claude only on failure. Run this to sanity-check it's returning real answers rather than always falling back.</div>
+      <div class="row" style="margin-bottom:10px">
+        <button class="ghost" onclick="testDeepseekText()">Test DeepSeek text now</button>
+      </div>
+      <div id="dstest2" class="sub hide"></div>
     </div>
 
     <div class="card">
