@@ -118,8 +118,10 @@ export const ADMIN_HTML = `<!doctype html>
       <div class="sub" style="margin:4px 0 10px">Every real meal scan is still answered by Claude only, shown here as-is. In the background, the same photo is also sent to DeepSeek's vision model and logged here for comparison — DeepSeek's answer is never shown to any user or saved to their log. Empty if <code>DEEPSEEK_API_KEY</code> isn't set on the server.</div>
       <div class="row" style="margin-bottom:10px">
         <button class="ghost" onclick="testDeepseekVision()">Test DeepSeek vision now</button>
+        <button class="ghost" onclick="testDeepseekText()">Test DeepSeek text (exercise info)</button>
       </div>
       <div id="dstest" class="sub hide"></div>
+      <div id="dstest2" class="sub hide"></div>
       <div class="scroll">
         <table>
           <thead><tr><th>Time</th><th>Ref</th><th>Claude — item, kcal, P/C/F</th><th>DeepSeek — item, kcal, P/C/F</th><th>DeepSeek cost (SAR)</th></tr></thead>
@@ -229,6 +231,16 @@ export const ADMIN_HTML = `<!doctype html>
     }).catch(function (e) { box.textContent = 'Request failed: ' + e; });
   }
   /** One line per food item: name, calories, and P/C/F macros in grams. */
+  function testDeepseekText() {
+    var box = document.getElementById('dstest2');
+    box.classList.remove('hide');
+    box.textContent = 'Calling DeepSeek…';
+    api('/admin/api/test-deepseek-text', {}).then(function (r) {
+      if (r.error) { box.textContent = 'Error: ' + r.error; return; }
+      if (!r.ok) { box.textContent = 'Failed after ' + r.ms + 'ms: ' + r.error; return; }
+      box.textContent = 'OK in ' + r.ms + 'ms · model ' + r.model + ' · ' + r.inputTokens + ' in / ' + r.outputTokens + ' out tokens · reply: ' + r.text;
+    }).catch(function (e) { box.textContent = 'Request failed: ' + e; });
+  }
   function mealDetail(m) {
     if (!m || !Array.isArray(m.items) || !m.items.length) return '<span class="muted">—</span>';
     return m.items.map(function (it) {

@@ -493,7 +493,14 @@ async function shadowTestMealAnalysis(
 ): Promise<void> {
   const start = Date.now();
   try {
-    const ds = await deepseekVisionCall(image, mealPrompt(language), 2000);
+    // deepseek-flash is a reasoning model: its chain-of-thought competes with
+    // the final JSON answer for the same max_tokens budget on this model, so
+    // a text-heavy photo (a menu screenshot, several modifiers) can burn the
+    // whole budget thinking and leave nothing for the answer itself
+    // (finish_reason: length, empty content). Generous on purpose — this
+    // call is a fire-and-forget background comparison, never on the user's
+    // critical path, so the extra latency/cost is free to spend.
+    const ds = await deepseekVisionCall(image, mealPrompt(language), 8000);
     const deepseekResult = toMealAnalysis(ds.text);
     const deepseekCostUsd = estimateCostUsd(ds.model, ds.inputTokens, ds.outputTokens);
     await recordShadowTest({
@@ -965,7 +972,10 @@ app.post('/api/analyze-exercise', async (c) => {
     // DeepSeek-side failure falls back silently to the existing Claude path.
     if (deepseekConfigured()) {
       try {
-        const ds = await deepseekTextCall(prompt, 600);
+        // Same reasoning-token budget issue as the meal-vision shadow call
+        // (see there) — 600 was tight enough that this may have been
+        // silently losing to the Claude fallback on most real requests.
+        const ds = await deepseekTextCall(prompt, 4000);
         await trackUsage({ ref, kind: 'exercise' }, ds.model, {
           input_tokens: ds.inputTokens,
           output_tokens: ds.outputTokens,
@@ -1583,6 +1593,29 @@ app.post('/admin/api/test-deepseek-vision', async (c) => {
   const start = Date.now();
   try {
     const ds = await deepseekVisionCall(TEST_JPEG_B64, mealPrompt('en'), 500);
+    return c.json({
+      ok: true,
+      ms: Date.now() - start,
+      model: ds.model,
+      inputTokens: ds.inputTokens,
+      outputTokens: ds.outputTokens,
+      text: ds.text,
+    });
+  } catch (err) {
+    return c.json({ ok: false, ms: Date.now() - start, error: err instanceof Error ? err.message : String(err) });
+  }
+});
+
+// A realistic (not trivial) exercise-info prompt, so this actually exercises
+// deepseek-v4-flash's reasoning behavior the way a real request would —
+// unlike the vision test's blank image, a one-word prompt wouldn't tell us
+// whether the reasoning-token budget is actually large enough now.
+app.post('/admin/api/test-deepseek-text', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  if (!deepseekConfigured()) return c.json({ error: 'not_configured' }, 400);
+  const start = Date.now();
+  try {
+    const ds = await deepseekTextCall(exerciseInfoPrompt('en', 'Bulgarian Split Squat'), 4000);
     return c.json({
       ok: true,
       ms: Date.now() - start,
