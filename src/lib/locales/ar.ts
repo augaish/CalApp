@@ -736,6 +736,7 @@ export const ar: TranslationSchema = {
     analyzingBody: 'جارٍ قراءة تقريرك…',
     preparingPhoto: 'جارٍ تحضير الصورة…',
     analyzingHint: 'يأخذ ثواني قليلة، خل التطبيق مفتوح.',
+    analyzingDone: 'تم — جارٍ فتح النتيجة',
     galleryUnavailableTitle: 'غير متوفر في هذه النسخة',
     galleryUnavailable:
       'اختيار صورة من مكتبة الصور يحتاج تحديث التطبيق القادم. الحين صوّر الوجبة بالكاميرا تحت.',
@@ -845,6 +846,15 @@ export const ar: TranslationSchema = {
     uploadPdf: 'رفع ملف التقرير',
     stepReading: 'جارٍ قراءة الملف…',
     stepAnalyzing: 'جارٍ التحليل…',
+    stepDone: 'تم',
+    oldDateTitle: 'هذا التقرير ليس من اليوم',
+    oldDateBody:
+      'تاريخه {{date}}. حفظه بهذا التاريخ يبقي سجلك دقيقاً، لكنه سيظهر خلف قراءاتك الأحدث بدلاً من أعلى القائمة.',
+    oldDateUseReport: 'استخدم {{date}}',
+    oldDateUseToday: 'استخدم تاريخ اليوم',
+    savedTitle: 'تم حفظ القراءة',
+    savedOldBody:
+      'حُفظت بتاريخ {{date}}، لذا تظهر مع قراءاتك الأقدم لا في أعلى القائمة. تجدها في "القراءات الأخيرة" بالأسفل.',
     unsupportedFile: 'صيغة هذا الملف غير مدعومة — جرّب صورة بصيغة JPEG أو PNG، أو ملف PDF.',
     errorInvalidFile: 'تعذّرت معالجة هذا الملف — جرّب صورة أو ملف PDF أصغر حجماً.',
     errorAnalysisFailed: 'فشل التحليل — حاول مرة أخرى، أو جرّب صورة أوضح.',

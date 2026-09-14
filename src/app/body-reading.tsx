@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Animated, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 
 import {
   BodyMap,
@@ -18,6 +18,7 @@ import {
 } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { DatePickerModal } from '@/components/date-picker';
+import { ProgressBar } from '@/components/progress-bar';
 import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -66,6 +67,14 @@ const EMPTY_DIMENSIONS: Record<DimensionKey, string> = {
 /** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** How many days back a saved-at timestamp is from right now. A plain
+ * module-level function, not inlined in the component, because it reads the
+ * clock — which the React Compiler's purity check only allows outside the
+ * component body (same reason food.tsx extracts fastingCardLabel). */
+function daysSince(iso: string): number {
+  return Math.round((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
 /** A YYYY-MM-DD string → an ISO timestamp at local noon (a report gives a
@@ -187,11 +196,19 @@ export default function BodyReading() {
   // Set only when a PDF (not the camera) produced the current fields, so the
   // confirmation card can show a document icon instead of a photo thumbnail.
   const [pdfName, setPdfName] = useState<string | undefined>(undefined);
-  const [uploadStage, setUploadStage] = useState<'idle' | 'picking' | 'analyzing' | 'error'>('idle');
+  const [uploadStage, setUploadStage] = useState<'idle' | 'picking' | 'analyzing' | 'done' | 'error'>('idle');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const recent = useMemo(() => weights.slice(0, 6), [weights]);
+  // The `at` of the reading saved during this visit, so the list below can
+  // pin it even when its date puts it far outside the newest six.
+  const [justSavedAt, setJustSavedAt] = useState<string | null>(null);
+  const recent = useMemo(() => {
+    const top = weights.slice(0, 6);
+    if (!justSavedAt || top.some((w) => w.at === justSavedAt)) return top;
+    const saved = weights.find((w) => w.at === justSavedAt);
+    return saved ? [...top, saved] : top;
+  }, [weights, justSavedAt]);
   // Trend charts are "as of" whatever date is currently loaded on the form
   // — scrubbing to a past date via the date picker should visibly change
   // what the charts show, same as the composition map above already does.
@@ -426,7 +443,7 @@ export default function BodyReading() {
   };
 
   const uploadPdf = async () => {
-    if (uploadStage === 'picking' || uploadStage === 'analyzing') return;
+    if (uploadStage === 'picking' || uploadStage === 'analyzing' || uploadStage === 'done') return;
     setUploadStage('picking');
     setUploadError(null);
     const picked = await pickReportBase64().catch(() => null);
@@ -445,6 +462,10 @@ export default function BodyReading() {
         picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64, imageMediaType: picked.mimeType };
       const analysis = await analyzeBodyReading(payload, language);
       useEntitlement.getState().spend();
+      // Let the bar be seen completing before the fields fill in and it
+      // disappears, rather than vanishing mid-climb.
+      setUploadStage('done');
+      await new Promise((resolve) => setTimeout(resolve, 420));
       applyAnalysis(analysis);
       setPdfName(picked.name);
       setUploadStage('idle');
@@ -481,6 +502,33 @@ export default function BodyReading() {
   const save = () => {
     const weightKg = num(kg);
     if (!weightKg) return;
+    // How far back the form's date is. A scanned report fills this in from
+    // the date PRINTED on the sheet, which is often not today — an imported
+    // old printout, or a demo sheet from years back.
+    const daysOld = daysSince(isoFromDateInput(date));
+    // Saving under an old printed date is correct for a genuine import, but
+    // it files the reading behind every newer one — out of the recent list,
+    // out of the trend charts, and leaving the screen looking untouched.
+    // That reads as "Save did nothing", so ask rather than guess.
+    if (daysOld > 7) {
+      const printed = new Date(isoFromDateInput(date)).toLocaleDateString(locale, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      });
+      Alert.alert(t('bodyReading.oldDateTitle'), t('bodyReading.oldDateBody', { date: printed }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('bodyReading.oldDateUseToday'), onPress: () => commitSave(weightKg, ymd(new Date())) },
+        { text: t('bodyReading.oldDateUseReport', { date: printed }), onPress: () => commitSave(weightKg, date) },
+      ]);
+      return;
+    }
+    commitSave(weightKg, date);
+  };
+
+  /** Files the reading and makes sure the user can see that it happened. */
+  const commitSave = (weightKg: number, onDate: string) => {
+    const at = isoFromDateInput(onDate);
     const seg = {
       leftArm: num(segmental.leftArm),
       rightArm: num(segmental.rightArm),
@@ -501,7 +549,7 @@ export default function BodyReading() {
     const hasDim = Object.values(dim).some((v) => v != null);
     logBodyReading({
       kg: weightKg,
-      at: isoFromDateInput(date),
+      at,
       bodyFatPercent: num(bodyFat),
       skeletalMuscleMassKg: num(muscleMass),
       measurementsCm: hasDim ? dim : undefined,
@@ -514,6 +562,22 @@ export default function BodyReading() {
     });
     clearPending();
     successHaptic();
+    setJustSavedAt(at);
+    setDate(onDate);
+    // A reading filed in the past sorts behind every newer one, so nothing
+    // on screen changes and leaving immediately looks exactly like a save
+    // that failed. Stay put and say plainly what was filed and when — the
+    // history list below pins it too (see `recent`).
+    const savedOld = daysSince(at) > 7;
+    if (savedOld) {
+      Alert.alert(
+        t('bodyReading.savedTitle'),
+        t('bodyReading.savedOldBody', {
+          date: new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
+        }),
+      );
+      return;
+    }
     // A weight change big enough to matter gets a chance to update the
     // calorie goal before leaving — the same window Overview's quick
     // weigh-in shows, blocking the back-navigation until it's handled so it
@@ -867,27 +931,11 @@ function UploadProgress({
   stage,
   error,
 }: {
-  stage: 'picking' | 'analyzing' | 'error';
+  stage: 'picking' | 'analyzing' | 'done' | 'error';
   error: string | null;
 }) {
   const theme = useTheme();
   const { t } = useTranslation();
-  const [trackWidth, setTrackWidth] = useState(0);
-  const [anim] = useState(() => new Animated.Value(0));
-
-  // An indeterminate bar (a segment sliding end-to-end, looping) rather than
-  // a determinate one — there's no real percentage to report for "reading a
-  // file" or "waiting on the AI", so a moving bar is what actually reads as
-  // "still working" instead of stalled, the way static highlighted dots didn't.
-  useEffect(() => {
-    if (stage === 'error') return;
-    anim.setValue(0);
-    const loop = Animated.loop(
-      Animated.timing(anim, { toValue: 1, duration: 1100, useNativeDriver: true }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [stage, anim]);
 
   if (stage === 'error') {
     return (
@@ -903,30 +951,26 @@ function UploadProgress({
     );
   }
 
-  const segmentWidth = Math.max(48, trackWidth * 0.4);
-  const translateX = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-segmentWidth, trackWidth],
-  });
-
+  // Reading the file is near-instant; the AI call is the wait, and it
+  // reports nothing until it answers — so the bar climbs and slows rather
+  // than pretending to measure, and only completes once the reply is in
+  // (see ProgressBar). "picking" and "analyzing" share one continuous bar
+  // so it never restarts halfway through the same upload.
   return (
     <View style={[styles.uploadProgress, { backgroundColor: theme.cardSubtle }]}>
-      <Text style={{ fontSize: 12, fontWeight: '700', color: theme.text, marginBottom: 8 }}>
-        {stage === 'picking' ? t('bodyReading.stepReading') : t('bodyReading.stepAnalyzing')}
-      </Text>
-      <View
-        style={[styles.uploadTrack, { backgroundColor: theme.border }]}
-        onLayout={(e) => setTrackWidth(e.nativeEvent.layout.width)}
-      >
-        {trackWidth > 0 && (
-          <Animated.View
-            style={[
-              styles.uploadBar,
-              { width: segmentWidth, backgroundColor: theme.primary, transform: [{ translateX }] },
-            ]}
-          />
-        )}
-      </View>
+      <ProgressBar
+        done={stage === 'done'}
+        label={
+          stage === 'done'
+            ? t('bodyReading.stepDone')
+            : stage === 'picking'
+              ? t('bodyReading.stepReading')
+              : t('bodyReading.stepAnalyzing')
+        }
+        trackColor={theme.border}
+        fillColor={theme.primary}
+        textColor={theme.text}
+      />
     </View>
   );
 }
@@ -944,6 +988,4 @@ const styles = StyleSheet.create({
     padding: Spacing.sm,
     marginTop: Spacing.xs,
   },
-  uploadTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
-  uploadBar: { position: 'absolute', top: 0, bottom: 0, borderRadius: 3 },
 });

@@ -1,7 +1,8 @@
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
+import { ProgressBar } from '@/components/progress-bar';
 import { Spacing } from '@/constants/theme';
 
 /**
@@ -12,14 +13,21 @@ import { Spacing } from '@/constants/theme';
  * on the camera screen, unmounting the viewfinder behind it — is what stops the
  * wait from looking like a frozen camera.
  */
-export function PhotoProgress({ uri, label }: { uri: string; label: string }) {
+export function PhotoProgress({ uri, label, done = false }: { uri: string; label: string; done?: boolean }) {
   const { t } = useTranslation();
   return (
     <View style={styles.container}>
       <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
       <View style={styles.scrim}>
-        <ActivityIndicator color="#fff" size="large" />
-        <Text style={styles.label}>{label}</Text>
+        <Text style={styles.label}>{done ? t('scan.analyzingDone') : label}</Text>
+        <View style={styles.bar}>
+          <ProgressBar
+            done={done}
+            trackColor="rgba(255,255,255,0.25)"
+            fillColor="#fff"
+            textColor="#fff"
+          />
+        </View>
         <Text style={styles.hint}>{t('scan.analyzingHint')}</Text>
       </View>
     </View>
@@ -41,6 +49,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.xl,
   },
   label: { color: '#fff', fontSize: 18, fontWeight: '700', textAlign: 'center' },
+  bar: { alignSelf: 'stretch', marginTop: Spacing.xs },
   hint: {
     color: 'rgba(255,255,255,0.75)',
     fontSize: 14,

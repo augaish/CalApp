@@ -740,6 +740,7 @@ export const en = {
     analyzingBody: 'Reading your report…',
     preparingPhoto: 'Preparing your photo…',
     analyzingHint: 'This takes a few seconds. Keep the app open.',
+    analyzingDone: 'Done — opening your result',
     galleryUnavailableTitle: 'Not in this version yet',
     galleryUnavailable:
       'Choosing a photo from your library needs the next app update. For now, take the photo with the camera below.',
@@ -849,6 +850,15 @@ export const en = {
     uploadPdf: 'Upload a report file',
     stepReading: 'Reading file…',
     stepAnalyzing: 'Analyzing…',
+    stepDone: 'Done',
+    oldDateTitle: 'This report is not from today',
+    oldDateBody:
+      'It is dated {{date}}. Filing it under that date keeps your history accurate, but it will sit behind your newer readings instead of at the top.',
+    oldDateUseReport: 'Use {{date}}',
+    oldDateUseToday: "Use today's date",
+    savedTitle: 'Reading saved',
+    savedOldBody:
+      'Saved under {{date}}, so it sits with your older readings rather than at the top of the list. You can see it in Recent readings below.',
     unsupportedFile: "That file's format isn't supported — try a JPEG or PNG image, or a PDF.",
     errorInvalidFile: "That file couldn't be processed — try a smaller image or PDF.",
     errorAnalysisFailed: 'Analysis failed — try again, or try a clearer photo.',

@@ -59,6 +59,9 @@ export default function Scan() {
   // makes the wait feel like "reading your photo" rather than a live viewfinder
   // that has stopped responding to the shutter.
   const [shot, setShot] = useState<string | null>(null);
+  // Flips when the AI has actually answered, so the progress bar can finish
+  // at 100% and be seen doing it before the result screen replaces this one.
+  const [analysisDone, setAnalysisDone] = useState(false);
   const { width } = useWindowDimensions();
   const frameSize = Math.round(width * 0.78);
 
@@ -119,11 +122,13 @@ export default function Scan() {
       const analysis = await analyzeEquipment(saved.base64, language);
       useEntitlement.getState().spend();
       setEquipment(analysis, saved.uri);
+      await finishProgress();
       router.replace('/gym-result');
     } else if (isBody) {
       const analysis = await analyzeBodyReading({ image: saved.base64 }, language);
       useEntitlement.getState().spend();
       setBodyReading(analysis, saved.uri);
+      await finishProgress();
       router.replace('/body-reading?fromScan=1');
     } else {
       const analysis = await analyzeMeal(saved.base64, language);
@@ -137,6 +142,7 @@ export default function Scan() {
         void reportBarcode(barcodeParam, analysis.items[0]);
       }
       setMeal(analysis, saved.uri);
+      await finishProgress();
       router.replace('/meal-result');
     }
   };
@@ -151,6 +157,15 @@ export default function Scan() {
   const reset = () => {
     setAnalyzing(false);
     setShot(null);
+    setAnalysisDone(false);
+  };
+
+  /** Show the bar complete for a beat before navigating away from it.
+   * Without the pause the jump to 100% is rendered and replaced in the same
+   * frame, so the bar visibly stops partway instead of finishing. */
+  const finishProgress = async () => {
+    setAnalysisDone(true);
+    await new Promise((resolve) => setTimeout(resolve, 420));
   };
 
   const capture = async () => {
@@ -226,7 +241,7 @@ export default function Scan() {
   //
   // Checked before camera permission on purpose: a photo chosen from the
   // library needs no camera, and its progress should still be visible.
-  if (shot) return <PhotoProgress uri={shot} label={busyLabel} />;
+  if (shot) return <PhotoProgress uri={shot} label={busyLabel} done={analysisDone} />;
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 
