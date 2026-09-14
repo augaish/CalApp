@@ -157,6 +157,8 @@ export default function Training() {
   const removeWorkout = useAppStore((s) => s.removeWorkout);
   const setWorkoutTrained = useAppStore((s) => s.setWorkoutTrained);
   const skips = useAppStore((s) => s.skips);
+  const activeSession = useAppStore((s) => s.activeSession);
+  const startSession = useAppStore((s) => s.startSession);
   const skipPlanToday = useAppStore((s) => s.skipPlanToday);
   const restorePlanToday = useAppStore((s) => s.restorePlanToday);
   const selected = useViewDay((s) => s.day);
@@ -582,6 +584,38 @@ export default function Training() {
         </Card>
       </Pressable>
 
+      {/* Follow today's list as a session — one exercise at a time, with rest
+          timers — instead of checking exercises off after the fact. A session
+          left open (the app was closed mid-workout, or it's from another day)
+          is offered back first, since its sets are already logged. */}
+      {activeSession ? (
+        <Button
+          label={
+            activeSession.dayKey === dateKey(new Date())
+              ? t('session.resume')
+              : t('session.finishUnfinished', {
+                  date: (() => {
+                    const [y, m, d] = activeSession.dayKey.split('-').map(Number);
+                    return new Date(y, m, d).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+                  })(),
+                })
+          }
+          icon="play"
+          onPress={() => router.push('/session')}
+          style={styles.sessionBtn}
+        />
+      ) : selectedIsToday && visiblePlanIds.length > 0 ? (
+        <Button
+          label={t('session.start')}
+          icon="play"
+          onPress={() => {
+            startSession(selected, visiblePlanIds);
+            router.push('/session');
+          }}
+          style={styles.sessionBtn}
+        />
+      ) : null}
+
       {/* The day itself: the weekly plan plus anything else logged today. */}
       {visiblePlanIds.length > 0 ? (
         <Card>
@@ -968,6 +1002,7 @@ const styles = StyleSheet.create({
   dayLabel: { fontSize: 15, fontWeight: '700', minWidth: 60, textAlign: 'center' },
   burnCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   syncRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  sessionBtn: { marginBottom: Spacing.md },
   burnIcon: {
     width: 48,
     height: 48,

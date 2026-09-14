@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { findExercise } from './exercises';
 import { dailyTargets } from './tdee';
 import type {
+  ActiveSession,
   ChatMessage,
   CoachReferenceDoc,
   DailyTargets,
@@ -118,6 +119,8 @@ interface AppState {
   activeFast: FastingSession | null;
   /** Completed fasts, most recent first. */
   fastingHistory: FastingSession[];
+  /** The workout being followed right now, if any — see ActiveSession. */
+  activeSession: ActiveSession | null;
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -233,6 +236,9 @@ interface AppState {
    * applyCoachSchedule) so a program is just data here, same as any other
    * proposal the coach hands the UI to act on. */
   setActiveProgram: (program: Program | null) => void;
+  startSession: (day: Date, exerciseIds: string[]) => void;
+  updateSession: (patch: Partial<ActiveSession>) => void;
+  endSession: () => void;
   setRemindMeals: (on: boolean) => void;
   setRemindWater: (on: boolean) => void;
   setRemindWorkouts: (on: boolean) => void;
@@ -346,6 +352,7 @@ export const useAppStore = create<AppState>()(
       coachReferenceDocs: [],
       activeFast: null,
       fastingHistory: [],
+      activeSession: null,
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -783,6 +790,20 @@ export const useAppStore = create<AppState>()(
         })),
       deleteWeight: (at) => set((s) => ({ weights: s.weights.filter((w) => w.at !== at) })),
       setActiveProgram: (activeProgram) => set({ activeProgram }),
+      startSession: (day, exerciseIds) =>
+        set({
+          activeSession: {
+            startedAt: new Date().toISOString(),
+            dayKey: dateKey(day),
+            exerciseIds,
+            index: 0,
+            restEndsAt: null,
+            restSeconds: 90,
+          },
+        }),
+      updateSession: (patch) =>
+        set((s) => (s.activeSession ? { activeSession: { ...s.activeSession, ...patch } } : {})),
+      endSession: () => set({ activeSession: null }),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setRemindWater: (on) => set({ remindWater: on }),
       setRemindWorkouts: (on) => set({ remindWorkouts: on }),
@@ -923,6 +944,7 @@ export const useAppStore = create<AppState>()(
         coachReferenceDocs,
         activeFast,
         fastingHistory,
+        activeSession,
       }) => ({
         account,
         language,
@@ -956,6 +978,7 @@ export const useAppStore = create<AppState>()(
         coachReferenceDocs,
         activeFast,
         fastingHistory,
+        activeSession,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },

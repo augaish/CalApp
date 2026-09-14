@@ -366,6 +366,24 @@ export interface LoggedWorkout {
   caloriesBurned?: number;
 }
 
+/**
+ * A workout in progress: the ordered exercises the person committed to when
+ * they tapped Start, where they are in that list, and the rest timer. Sets
+ * themselves are logged straight into `workouts` as they're completed, so
+ * this is only the cursor — leaving the app, or the app dying mid-set, loses
+ * nothing but the position, and this keeps even that.
+ */
+export interface ActiveSession {
+  startedAt: string;
+  /** dateKey() of the day the session belongs to. */
+  dayKey: string;
+  exerciseIds: string[];
+  index: number;
+  /** ISO time the current rest ends, or null when not resting. */
+  restEndsAt: string | null;
+  restSeconds: number;
+}
+
 /** One workout WHOOP detected on a given day (real heart-rate-based numbers, not an estimate). */
 export interface WhoopDayWorkout {
   sportName: string;
