@@ -610,9 +610,16 @@ function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; typ
           {w.sets.map((s, i) => (
             <View key={i} style={styles.histSet}>
               <Text style={{ color: theme.textSecondary, fontSize: 13, width: 22 }}>{i + 1}.</Text>
-              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
-                {setLabel(s, type, kg, t('track.min'))}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
+                  {setLabel(s, type, kg, t('track.min'))}
+                </Text>
+                {s.comment ? (
+                  <Text style={{ color: theme.textTertiary, fontSize: 12 }} numberOfLines={1}>
+                    {s.comment}
+                  </Text>
+                ) : null}
+              </View>
               {i === bestSetIndex(w.sets, w.type) && <Ionicons name="trophy" size={13} color={theme.carbs} />}
               {type === 'weight_reps' && (s.weightKg ?? 0) > 0 && (s.reps ?? 0) > 0 ? (
                 <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
