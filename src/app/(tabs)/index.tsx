@@ -75,6 +75,7 @@ export default function Overview() {
   const setTourSeen = useAppStore((s) => s.setTourSeen);
   const logWeight = useAppStore((s) => s.logWeight);
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
+  const setWhoopDayWorkouts = useAppStore((s) => s.setWhoopDayWorkouts);
   // Starts already-flagged when there's a mismatch coming INTO this mount —
   // not only one created by logging a weight during this visit (see
   // submitWeight below, and body-reading's own save) — so profile.weightKg
@@ -100,6 +101,16 @@ export default function Overview() {
   // Same WHOOP refresh as the Training tab (see its effect for why): Overview
   // is often the first screen opened, so it shouldn't need a Training visit
   // to pick up today's real burn.
+  //
+  // This used to only keep `totalKcal`, discarding the per-workout
+  // breakdown the same response already carries — Training tab's identical
+  // call does store it (setWhoopDayWorkouts). That gap is exactly why
+  // Overview's day total and a per-exercise row on Training/exercise-detail
+  // could disagree: the total here was already WHOOP-real, but the rows
+  // elsewhere had no per-workout WHOOP data to split it by until Training
+  // happened to be opened too, so they were still on the plain formula
+  // estimate. Storing both from the one call Overview already makes closes
+  // that gap without a second request.
   useEffect(() => {
     if (!isSameDay(new Date().toISOString(), selected)) return;
     const start = new Date(selected);
@@ -107,8 +118,10 @@ export default function Overview() {
     const end = new Date(selected);
     end.setHours(23, 59, 59, 999);
     let alive = true;
-    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(({ totalKcal }) => {
-      if (alive) setWhoopDayBurn(selected, totalKcal);
+    fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(({ totalKcal, workouts: w }) => {
+      if (!alive) return;
+      setWhoopDayBurn(selected, totalKcal);
+      setWhoopDayWorkouts(selected, w);
     });
     return () => {
       alive = false;
