@@ -463,7 +463,9 @@ export default function BodyReading() {
                 ? 'bodyReading.errorInvalidFile'
                 : err.code === 'ai_credits_exhausted'
                   ? 'common.aiCreditsExhausted'
-                  : 'bodyReading.errorAnalysisFailed',
+                  : err.code === 'no_reading_detected'
+                    ? 'bodyReading.errorNoReading'
+                    : 'bodyReading.errorAnalysisFailed',
             )
           : t('bodyReading.errorOffline'),
       );

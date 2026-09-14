@@ -48,6 +48,7 @@ import {
   replyText,
   sanitizeProgram,
   sanitizeSchedulePlan,
+  toBodyReadingAnalysis,
   toMealAnalysis,
   type CoachSchedulePlan,
   type FoodItem,
@@ -844,10 +845,19 @@ app.post('/api/analyze-body-reading', async (c) => {
   try {
     const prompt = bodyReadingPrompt(parsed.language);
     const track = { ref, kind: 'bodyReading' };
-    const result =
+    const raw =
       'pdf' in parsed
         ? await analyzeDocument(parsed.pdf, prompt, MODEL, track)
         : await analyze(parsed.image, prompt, MODEL, parsed.mediaType, track);
+    const result = toBodyReadingAnalysis(raw);
+    if (!result) {
+      // A legitimate 200 from the model (unreadable photo, or a QR/barcode
+      // screen instead of the actual results printout) — not a thrown
+      // error, so it must be released here too, or a bad photo silently
+      // costs the user a real quota action for nothing.
+      await release(ref, 'bodyReading');
+      return c.json({ error: 'no_reading_detected' }, 422);
+    }
     return c.json(result);
   } catch (err) {
     console.error('analyze-body-reading failed:', err);

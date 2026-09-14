@@ -692,6 +692,7 @@ export const en = {
     unsupportedFile: "That file's format isn't supported — try a JPEG or PNG image, or a PDF.",
     errorInvalidFile: "That file couldn't be processed — try a smaller image or PDF.",
     errorAnalysisFailed: 'Analysis failed — try again, or try a clearer photo.',
+    errorNoReading: "Couldn't find any body-composition numbers in that file — make sure it's the results printout itself, not a QR/barcode screen, and try a clearer photo.",
     errorOffline: "Couldn't reach the server — check your connection.",
     scannedBadge: 'Filled in from your scan — check the numbers before saving',
     deviceLabel: 'Detected: {{device}}',

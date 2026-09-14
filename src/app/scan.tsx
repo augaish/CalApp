@@ -168,6 +168,11 @@ export default function Scan() {
         reset();
         return;
       }
+      if (err instanceof ApiError && err.code === 'no_reading_detected') {
+        Alert.alert(t('common.error'), t('bodyReading.errorNoReading'));
+        reset();
+        return;
+      }
       Alert.alert(t('common.error'));
       reset();
     }
@@ -191,6 +196,11 @@ export default function Scan() {
       if (err instanceof FeatureLockedError) return onLocked('equipment');
       if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
         Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
+        reset();
+        return;
+      }
+      if (err instanceof ApiError && err.code === 'no_reading_detected') {
+        Alert.alert(t('common.error'), t('bodyReading.errorNoReading'));
         reset();
         return;
       }

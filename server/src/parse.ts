@@ -236,6 +236,123 @@ export function toMealAnalysis(raw: string, sources?: string[]): MealAnalysis {
   };
 }
 
+// ── Body readings: a scanned InBody/Tanita/scale report ────────────────────
+
+export interface SegmentalLeanMass {
+  leftArm?: number;
+  rightArm?: number;
+  trunk?: number;
+  leftLeg?: number;
+  rightLeg?: number;
+}
+
+export type ZoneStatus = 'low' | 'normal' | 'high';
+
+export interface SegmentalStatus {
+  leftArm?: ZoneStatus;
+  rightArm?: ZoneStatus;
+  trunk?: ZoneStatus;
+  leftLeg?: ZoneStatus;
+  rightLeg?: ZoneStatus;
+}
+
+export interface BodyReadingAnalysis {
+  deviceLabel?: string;
+  testDate?: string;
+  weightKg?: number;
+  bodyFatPercent?: number;
+  skeletalMuscleMassKg?: number;
+  segmentalLeanMassKg?: SegmentalLeanMass;
+  segmentalFatMassKg?: SegmentalLeanMass;
+  segmentalLeanMassStatus?: SegmentalStatus;
+  segmentalFatMassStatus?: SegmentalStatus;
+  confidence: number;
+}
+
+/**
+ * A number the model actually printed, or undefined — never a fabricated
+ * default. `num()` above defaults to 0 on anything unparseable, which is
+ * right for a meal's calories (0 is a legitimate value) but wrong here: a
+ * body reading silently getting "0 kg" for a field the model wrote as
+ * "82.5 kg" (units it wasn't supposed to include) or garbled text would
+ * look like real data instead of the missing/malformed value it is.
+ */
+function numOrUndefined(value: unknown): number | undefined {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== 'string') return undefined;
+  const text = asciiDigits(value).replace(/,/g, '');
+  const match = text.match(/-?\d+(?:\.\d+)?/);
+  return match ? parseFloat(match[0]) : undefined;
+}
+
+function segmentalMass(value: unknown): SegmentalLeanMass | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const v = value as Record<string, unknown>;
+  const out: SegmentalLeanMass = {
+    leftArm: numOrUndefined(v.leftArm),
+    rightArm: numOrUndefined(v.rightArm),
+    trunk: numOrUndefined(v.trunk),
+    leftLeg: numOrUndefined(v.leftLeg),
+    rightLeg: numOrUndefined(v.rightLeg),
+  };
+  return Object.values(out).some((n) => n != null) ? out : undefined;
+}
+
+const ZONE_STATUSES = new Set(['low', 'normal', 'high']);
+function zoneStatus(value: unknown): ZoneStatus | undefined {
+  return typeof value === 'string' && ZONE_STATUSES.has(value) ? (value as ZoneStatus) : undefined;
+}
+
+function segmentalStatus(value: unknown): SegmentalStatus | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const v = value as Record<string, unknown>;
+  const out: SegmentalStatus = {
+    leftArm: zoneStatus(v.leftArm),
+    rightArm: zoneStatus(v.rightArm),
+    trunk: zoneStatus(v.trunk),
+    leftLeg: zoneStatus(v.leftLeg),
+    rightLeg: zoneStatus(v.rightLeg),
+  };
+  return Object.values(out).some((s) => s != null) ? out : undefined;
+}
+
+/**
+ * Coerce an already-JSON-parsed model reply into a trustworthy
+ * BodyReadingAnalysis, or null when nothing was actually read.
+ *
+ * The prompt tells the model to null every field and set confidence 0 for a
+ * bad photo or a non-report (e.g. an InBody machine's QR/barcode screen
+ * instead of its results printout) — that is a legitimate 200 response, not
+ * a thrown error, so the caller must check for it explicitly rather than
+ * pass it straight through as if real data had been captured. Before this,
+ * the raw model JSON went straight to the client with no validation at all
+ * (unlike meals' toMealAnalysis) — a malformed field (e.g. a number written
+ * with stray units) would still *display* correctly but fail to parse when
+ * Save tried to use it, with no visible error either way.
+ */
+export function toBodyReadingAnalysis(parsed: unknown): BodyReadingAnalysis | null {
+  const p = (parsed ?? {}) as Record<string, unknown>;
+  const result: BodyReadingAnalysis = {
+    deviceLabel: str(p.deviceLabel) || undefined,
+    testDate: str(p.testDate) || undefined,
+    weightKg: numOrUndefined(p.weightKg),
+    bodyFatPercent: numOrUndefined(p.bodyFatPercent),
+    skeletalMuscleMassKg: numOrUndefined(p.skeletalMuscleMassKg),
+    segmentalLeanMassKg: segmentalMass(p.segmentalLeanMassKg),
+    segmentalFatMassKg: segmentalMass(p.segmentalFatMassKg),
+    segmentalLeanMassStatus: segmentalStatus(p.segmentalLeanMassStatus),
+    segmentalFatMassStatus: segmentalStatus(p.segmentalFatMassStatus),
+    confidence: Math.min(1, Math.max(0, num(p.confidence, 0))),
+  };
+  const hasAnyReading =
+    result.weightKg != null ||
+    result.bodyFatPercent != null ||
+    result.skeletalMuscleMassKg != null ||
+    result.segmentalLeanMassKg != null ||
+    result.segmentalFatMassKg != null;
+  return hasAnyReading ? result : null;
+}
+
 // ── Coach: a proposed weekly schedule, as a client-executed tool call ──────
 
 export interface CoachScheduleExercise {
