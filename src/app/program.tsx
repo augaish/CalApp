@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { MealPlanCard } from '@/components/meal-plan-card';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { Button, Card, MacroTile, Screen, Title } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
@@ -83,6 +84,7 @@ export default function ProgramScreen() {
         summary: preview.summary,
         targets: preview.targets,
         schedule: preview.schedule,
+        mealPlan: preview.mealPlan,
       };
       setActiveProgram(program);
       setPreview(null);
@@ -154,6 +156,14 @@ export default function ProgramScreen() {
           onAdd={accept}
           style={{ maxWidth: '100%', alignSelf: 'stretch', marginTop: Spacing.md }}
         />
+        {preview.mealPlan && (
+          <>
+            <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: Spacing.sm }]}>
+              {t('program.mealPlan')}
+            </Text>
+            <MealPlanCard plan={preview.mealPlan} schedule={preview.schedule} locale={locale} />
+          </>
+        )}
       </Screen>
     );
   }
@@ -225,6 +235,15 @@ export default function ProgramScreen() {
           onAdd={() => {}}
           style={{ maxWidth: '100%', alignSelf: 'stretch' }}
         />
+
+        {activeProgram.mealPlan && (
+          <>
+            <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: Spacing.sm }]}>
+              {t('program.mealPlan')}
+            </Text>
+            <MealPlanCard plan={activeProgram.mealPlan} schedule={activeProgram.schedule} locale={locale} />
+          </>
+        )}
 
         <Button
           label={busy ? t('program.building') : t('program.regenerate')}

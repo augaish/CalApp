@@ -201,8 +201,58 @@ const PROGRAM_TOOL: Anthropic.Tool = {
         },
         required: ['days'],
       },
+      mealPlan: {
+        type: 'object',
+        description: 'Named meals for every day of the week that hit the daily targets.',
+        properties: {
+          summary: { type: 'string', description: "One short sentence on the eating approach, in the user's language." },
+          days: {
+            type: 'array',
+            minItems: 7,
+            maxItems: 7,
+            items: {
+              type: 'object',
+              properties: {
+                weekday: { type: 'integer', minimum: 0, maximum: 6, description: '0 = Sunday … 6 = Saturday.' },
+                meals: {
+                  type: 'array',
+                  minItems: 3,
+                  maxItems: 4,
+                  items: {
+                    type: 'object',
+                    properties: {
+                      slot: { type: 'string', enum: ['breakfast', 'lunch', 'dinner', 'snack'] },
+                      name: { type: 'string', description: "Dish name for the whole meal, in the user's language." },
+                      items: {
+                        type: 'array',
+                        minItems: 1,
+                        maxItems: 4,
+                        items: {
+                          type: 'object',
+                          properties: {
+                            name: { type: 'string' },
+                            portion: { type: 'string', description: "e.g. '150 g', '1 cup', in the user's language." },
+                            calories: { type: 'integer' },
+                            proteinG: { type: 'integer' },
+                            carbsG: { type: 'integer' },
+                            fatG: { type: 'integer' },
+                          },
+                          required: ['name', 'portion', 'calories', 'proteinG', 'carbsG', 'fatG'],
+                        },
+                      },
+                    },
+                    required: ['slot', 'name', 'items'],
+                  },
+                },
+              },
+              required: ['weekday', 'meals'],
+            },
+          },
+        },
+        required: ['days'],
+      },
     },
-    required: ['summary', 'durationWeeks', 'targets', 'schedule'],
+    required: ['summary', 'durationWeeks', 'targets', 'schedule', 'mealPlan'],
   },
 };
 
@@ -1142,9 +1192,11 @@ app.post('/api/generate-program', async (c) => {
   try {
     const response = await anthropic.messages.create({
       model: MODEL,
-      // A full week's schedule alongside targets and a real summary needs more
-      // room than a plain coach reply.
-      max_tokens: 2500,
+      // A full week's schedule AND a full week of named meals with macros
+      // alongside targets and a real summary — a 7-day meal plan alone is
+      // ~4k tokens of tool JSON, so this needs far more room than a coach
+      // reply. Cut off mid-JSON and the whole tool call is unusable.
+      max_tokens: 9000,
       system: programPrompt(language, contextText(body.context)),
       messages: [{ role: 'user', content: 'Design my program.' }],
       tools: [PROGRAM_TOOL],

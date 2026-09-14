@@ -203,6 +203,28 @@ export interface CoachSchedulePlan {
  * bare CoachSchedulePlan (which only ever proposes the schedule half) — the
  * accept flow commits both `targets` and `schedule` in one step.
  */
+/** One meal the program plans for a slot: a named dish made of the same
+ * FoodItem shape a scan produces, so "Log eaten" can drop the items straight
+ * into `meals` with no conversion. */
+export interface PlannedMeal {
+  slot: MealType;
+  name: string;
+  items: FoodItem[];
+}
+
+export interface MealPlanDay {
+  /** 0 = Sunday … 6 = Saturday, like CoachScheduleDay.weekday. */
+  weekday: number;
+  meals: PlannedMeal[];
+}
+
+/** The food half of a program: named meals for each weekday that add up to
+ * the program's targets. Repeats week to week, like the training schedule. */
+export interface MealPlan {
+  summary?: string;
+  days: MealPlanDay[];
+}
+
 export interface Program {
   id: string;
   createdAt: string;
@@ -211,12 +233,15 @@ export interface Program {
   summary: string;
   targets: DailyTargets;
   schedule: CoachSchedulePlan;
+  /** Optional: programs accepted before meal plans existed have none, and a
+   * generated plan the server couldn't validate is simply absent. */
+  mealPlan?: MealPlan;
 }
 
 /** What the server hands back before the user has accepted it — everything
  * a Program has except the bookkeeping fields (id/createdAt/goal) the store
  * adds on acceptance. */
-export type GeneratedProgram = Pick<Program, 'summary' | 'durationWeeks' | 'targets' | 'schedule'>;
+export type GeneratedProgram = Pick<Program, 'summary' | 'durationWeeks' | 'targets' | 'schedule' | 'mealPlan'>;
 
 export interface EquipmentAnalysis {
   /** Machine name in the user's language */

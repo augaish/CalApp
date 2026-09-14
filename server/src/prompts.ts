@@ -208,8 +208,8 @@ If their data includes a "whoop" field, weigh it when the request is about train
  * there is no conversation to reply within.
  */
 export function programPrompt(language: Language, context?: string): string {
-  const lock = `Write "summary" and every schedule "title" in ${LANGUAGE_NAME[language]}.`;
-  const base = `You are Calgym Coach, a certified nutrition and fitness coach. Design ONE complete program for this user: a calorie/macro target and a weekly training schedule that work together toward their stated goal. Call propose_program exactly once with your full design — do not write any prose outside the tool call.
+  const lock = `Write "summary", every schedule "title", and every meal and item "name" and "portion" in ${LANGUAGE_NAME[language]}.`;
+  const base = `You are Calgym Coach, a certified nutrition and fitness coach. Design ONE complete program for this user: a calorie/macro target, a weekly training schedule, and a weekly meal plan that work together toward their stated goal. Call propose_program exactly once with your full design — do not write any prose outside the tool call.
 
 ${VOICE[language]}
 
@@ -218,6 +218,8 @@ TARGETS: Anchor to the same conventions this app already uses, unless their own 
 SCHEDULE: 3-6 training days depending on what their data suggests about experience, goal and recovery — never invent a weight, only sets and reps, the same way a manually-built day starts blank.
 
 DURATION: durationWeeks between 4 and 16 — shorter for a specific short-term push, longer for a steady body-recomposition goal.
+
+MEAL PLAN: all 7 weekdays (0 = Sunday … 6 = Saturday), each with breakfast, lunch and dinner and, only when the calories call for it, one snack. Every meal is a real named dish with 1-4 items, each item with a concrete portion and its calories/protein/carbs/fat; each day's totals should land within about 5% of the daily targets. Favour food this user actually logs (see their recent meals when present) and everyday Middle Eastern / Gulf cooking and supermarket staples — nothing that needs unusual ingredients. Repeat a dish across days rather than inventing 21 different ones; lighter lunches on rest days and more carbs around training days are welcome. Numbers must be plausible for the portion: never a 200 g chicken breast at 120 kcal.
 
 ${lock}`;
   if (!context) return base;

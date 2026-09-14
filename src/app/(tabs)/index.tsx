@@ -39,6 +39,7 @@ import {
   mealTypeForNow,
   mealTypesLogged,
   overviewBodyStats,
+  plannedMealFor,
   programProgress,
   streakDays,
   totalsForDay,
@@ -136,6 +137,7 @@ export default function Overview() {
   const exercises = useAppStore((s) => s.exercises);
   const activeSession = useAppStore((s) => s.activeSession);
   const startSession = useAppStore((s) => s.startSession);
+  const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
   const checklistDismissed = useAppStore((s) => s.checklistDismissed);
   const dismissChecklist = useAppStore((s) => s.dismissChecklist);
   const tourSeen = useAppStore((s) => s.tourSeen);
@@ -230,6 +232,9 @@ export default function Overview() {
   const sessionIsToday = activeSession?.dayKey === dateKey(new Date());
   const mealsLogged = mealTypesLogged(meals, selected);
   const nextMeal = nextMealSlot(mealsLogged);
+  const nextPlanned = nextMeal
+    ? plannedMealFor(activeProgram?.mealPlan, selected, nextMeal, mealPlanSwaps)
+    : undefined;
   const openMealEntry = (slot: MealType, via: 'scan' | 'menu') => {
     usePending.getState().setMealTypeHint(slot);
     router.push(via === 'scan' ? '/scan?mode=meal' : '/add-menu?scope=food');
@@ -552,6 +557,11 @@ export default function Overview() {
               <Text style={[styles.todayMain, { color: theme.text }]} numberOfLines={1}>
                 {nextMeal ? t(`home.mealTypes.${nextMeal}`) : t('today.allLogged')}
               </Text>
+              {nextPlanned && (
+                <Text style={[styles.todaySubLine, { color: theme.textSecondary }]} numberOfLines={1}>
+                  {nextPlanned.name}
+                </Text>
+              )}
               <View style={styles.mealDots}>
                 {MAIN_MEALS.map((m) => (
                   <View

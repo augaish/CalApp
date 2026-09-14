@@ -1,16 +1,27 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { weekdayLabel } from '@/components/schedule-plan-card';
 import { Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useViewDay } from '@/lib/day';
+import { timestampFor, useViewDay } from '@/lib/day';
+import { successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { usePending } from '@/lib/pending';
-import { isSameDay, mealCalories, totalsForDay, useAppStore } from '@/lib/store';
+import {
+  dateKey,
+  isSameDay,
+  mealCalories,
+  plannedMealCalories,
+  plannedMealFor,
+  plannedMealOptions,
+  totalsForDay,
+  useAppStore,
+} from '@/lib/store';
 import type { FastingSession, LoggedMeal, MealType } from '@/lib/types';
 
 /** Xh Ym — same coarse-duration format the fasting screen itself uses. */
@@ -45,11 +56,41 @@ export default function Food() {
   const targets = useAppStore((s) => s.targets);
   const removeMeal = useAppStore((s) => s.removeMeal);
   const updateMeal = useAppStore((s) => s.updateMeal);
+  const logMeal = useAppStore((s) => s.logMeal);
   const activeFast = useAppStore((s) => s.activeFast);
+  const mealPlan = useAppStore((s) => s.activeProgram?.mealPlan);
+  const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
+  const swapPlannedMeal = useAppStore((s) => s.swapPlannedMeal);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
   const [sharing, setSharing] = useState(false);
+  // Which slot has its swap chooser open, and the last plan meal logged
+  // from this screen (so the row can offer Undo for a few seconds).
+  const [swapping, setSwapping] = useState<MealType | null>(null);
+  const [justLogged, setJustLogged] = useState<{ slot: MealType; mealId: string } | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const logPlanned = (slot: MealType) => {
+    const planned = plannedMealFor(mealPlan, selected, slot, mealPlanSwaps);
+    if (!planned) return;
+    // Copies, so a later edit of the logged meal never reaches into the plan.
+    logMeal(planned.items.map((i) => ({ ...i })), undefined, slot, timestampFor(selected));
+    // logMeal prepends, so the newest meal is the one just written.
+    const mealId = useAppStore.getState().meals[0]?.id;
+    successHaptic();
+    if (!mealId) return;
+    setJustLogged({ slot, mealId });
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+    undoTimer.current = setTimeout(() => setJustLogged(null), 8000);
+  };
+
+  const undoPlanned = () => {
+    if (!justLogged) return;
+    removeMeal(justLogged.mealId);
+    setJustLogged(null);
+    if (undoTimer.current) clearTimeout(undoTimer.current);
+  };
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const dayMeals = meals.filter((m) => isSameDay(m.at, selected));
@@ -136,13 +177,23 @@ export default function Food() {
         <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
       </Pressable>
 
-      <Text style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-        {t('home.eaten')}:{' '}
-        <Text style={{ color: theme.primary, fontWeight: '800' }}>
-          {Math.round(totals.calories)}
+      <View style={styles.eatenRow}>
+        <Text style={{ color: theme.textSecondary, flex: 1 }}>
+          {t('home.eaten')}:{' '}
+          <Text style={{ color: theme.primary, fontWeight: '800' }}>
+            {Math.round(totals.calories)}
+          </Text>
+          {targets ? ` / ${targets.calories} ${t('common.kcal')}` : ''}
         </Text>
-        {targets ? ` / ${targets.calories} ${t('common.kcal')}` : ''}
-      </Text>
+        {mealPlan && (
+          <Pressable onPress={() => router.push('/program')} hitSlop={8} style={styles.planLink}>
+            <Ionicons name="calendar-outline" size={14} color={theme.primary} />
+            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
+              {t('mealPlan.viewPlan')}
+            </Text>
+          </Pressable>
+        )}
+      </View>
 
       {dayMeals.length === 0 && (
         <View style={[styles.empty, { borderColor: theme.border }]}>
@@ -156,6 +207,13 @@ export default function Food() {
       {MEAL_TYPES.map((type) => {
         const sectionMeals = mealsOfType(type);
         const sectionKcal = sectionMeals.reduce((sum, m) => sum + mealCalories(m), 0);
+        // The plan's meal for this slot stays visible until something is
+        // logged here (whatever it was — a scan of the same dish counts),
+        // plus a beat longer for Undo right after "Log eaten".
+        const planned = plannedMealFor(mealPlan, selected, type, mealPlanSwaps);
+        const showPlanned = planned && (sectionMeals.length === 0 || justLogged?.slot === type);
+        const swapOptions = mealPlan && swapping === type ? plannedMealOptions(mealPlan, type) : [];
+        const swappedFrom = mealPlanSwaps[dateKey(selected)]?.[type];
         return (
           <Card key={type}>
             <View style={styles.sectionRow}>
@@ -182,6 +240,89 @@ export default function Food() {
                 <Ionicons name="add" size={18} color={theme.primary} />
               </Pressable>
             </View>
+            {showPlanned && planned && (
+              <View style={[styles.plannedBox, { backgroundColor: theme.cardSubtle }]}>
+                <View style={styles.plannedRow}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
+                      {t('mealPlan.planned')}
+                      {swappedFrom != null ? ` · ${weekdayLabel(swappedFrom, locale)}` : ''}
+                    </Text>
+                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }} numberOfLines={1}>
+                      {planned.name}
+                    </Text>
+                    <Text style={{ color: theme.textSecondary, fontSize: 12 }} numberOfLines={1}>
+                      {Math.round(plannedMealCalories(planned))} {t('common.kcal')}
+                      {' · '}
+                      {planned.items.map((i) => i.name).join(', ')}
+                    </Text>
+                  </View>
+                </View>
+                {justLogged?.slot === type ? (
+                  <View style={styles.plannedActions}>
+                    <View style={[styles.plannedBtn, { flex: 1 }]}>
+                      <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
+                      <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('mealPlan.logged')}</Text>
+                    </View>
+                    <Pressable
+                      onPress={undoPlanned}
+                      style={({ pressed }) => [styles.plannedBtn, { backgroundColor: theme.card }, pressed && { opacity: 0.7 }]}
+                    >
+                      <Ionicons name="arrow-undo" size={16} color={theme.text} />
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{t('mealPlan.undo')}</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View style={styles.plannedActions}>
+                    <Pressable
+                      onPress={() => setSwapping(swapping === type ? null : type)}
+                      style={({ pressed }) => [styles.plannedBtn, { backgroundColor: theme.card }, pressed && { opacity: 0.7 }]}
+                    >
+                      <Ionicons name="swap-horizontal" size={16} color={theme.text} />
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{t('mealPlan.swap')}</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => logPlanned(type)}
+                      style={({ pressed }) => [styles.plannedBtn, { flex: 1, backgroundColor: theme.primary }, pressed && { opacity: 0.85 }]}
+                    >
+                      <Ionicons name="checkmark" size={16} color={theme.onPrimary} />
+                      <Text style={{ color: theme.onPrimary, fontWeight: '700', fontSize: 13 }}>{t('mealPlan.logEaten')}</Text>
+                    </Pressable>
+                  </View>
+                )}
+                {swapping === type && (
+                  <View style={styles.swapList}>
+                    {swapOptions.map(({ weekday, meal }) => {
+                      const active = meal.name === planned.name;
+                      return (
+                        <Pressable
+                          key={weekday}
+                          onPress={() => {
+                            swapPlannedMeal(dateKey(selected), type, weekday === selected.getDay() ? null : weekday);
+                            setSwapping(null);
+                          }}
+                          style={({ pressed }) => [
+                            styles.swapRow,
+                            { borderColor: active ? theme.primary : theme.border, backgroundColor: theme.card },
+                            pressed && { opacity: 0.7 },
+                          ]}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: theme.text, fontWeight: '600', fontSize: 13 }} numberOfLines={1}>
+                              {meal.name}
+                            </Text>
+                            <Text style={{ color: theme.textTertiary, fontSize: 11 }}>
+                              {weekdayLabel(weekday, locale)} · {Math.round(plannedMealCalories(meal))} {t('common.kcal')}
+                            </Text>
+                          </View>
+                          {active && <Ionicons name="checkmark-circle" size={16} color={theme.primary} />}
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
             {sectionMeals.map((meal) =>
               meal.items.map((item, itemIndex) => (
                 <View key={`${meal.id}-${itemIndex}`} style={styles.mealRow}>
@@ -259,6 +400,31 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
     gap: Spacing.sm,
     marginBottom: Spacing.md,
+  },
+  eatenRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
+  planLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  plannedBox: { borderRadius: Radius.md, padding: Spacing.sm, marginTop: Spacing.sm, gap: Spacing.sm },
+  plannedRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  plannedActions: { flexDirection: 'row', gap: 6 },
+  plannedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderRadius: Radius.full,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    minHeight: 38,
+  },
+  swapList: { gap: 6 },
+  swapRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
   },
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   sectionName: { flex: 1, fontSize: 17, fontWeight: '700' },

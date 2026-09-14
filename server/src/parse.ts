@@ -461,11 +461,106 @@ export interface ProgramTargets {
   fatG: number;
 }
 
+// ── AI program: the food half — named meals per weekday ────────────────────
+
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+export interface PlannedMealItem {
+  name: string;
+  portion: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+}
+
+export interface PlannedMeal {
+  slot: MealSlot;
+  name: string;
+  items: PlannedMealItem[];
+}
+
+export interface MealPlanDay {
+  weekday: number;
+  meals: PlannedMeal[];
+}
+
+export interface MealPlan {
+  summary?: string;
+  days: MealPlanDay[];
+}
+
+/**
+ * Validate the meal-plan half of `propose_program`. Same stance as the
+ * schedule: the schema is a hint, not a guarantee. Each item's calories are
+ * reconciled against its own macros (like toMealAnalysis does for a scanned
+ * meal) so a plan can never claim 400 kcal for something whose macros add
+ * to 700. A day with no usable meal is dropped; a plan with no usable day
+ * is absent — the program still stands on its targets and schedule.
+ */
+export function sanitizeMealPlan(raw: unknown): MealPlan | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, unknown>;
+  const rawDays = Array.isArray(input.days) ? input.days : [];
+  const days: MealPlanDay[] = [];
+  for (const entry of rawDays.slice(0, 7)) {
+    const d = entry as Record<string, unknown>;
+    const weekday = Math.round(num(d?.weekday, -1));
+    if (weekday < 0 || weekday > 6) continue;
+    const rawMeals = Array.isArray(d?.meals) ? d.meals : [];
+    const meals: PlannedMeal[] = [];
+    for (const m of rawMeals.slice(0, 6)) {
+      const meal = m as Record<string, unknown>;
+      const slotRaw = str(meal?.slot).toLowerCase();
+      if (!MEAL_SLOTS.includes(slotRaw as MealSlot)) continue;
+      const slot = slotRaw as MealSlot;
+      const rawItems = Array.isArray(meal?.items) ? meal.items : [];
+      const items: PlannedMealItem[] = [];
+      for (const it of rawItems.slice(0, 6)) {
+        const i = it as Record<string, unknown>;
+        const name = str(i?.name).slice(0, 80);
+        if (!name) continue;
+        const proteinG = Math.max(0, Math.round(num(i?.proteinG, 0)));
+        const carbsG = Math.max(0, Math.round(num(i?.carbsG, 0)));
+        const fatG = Math.max(0, Math.round(num(i?.fatG, 0)));
+        const fromMacros = proteinG * 4 + carbsG * 4 + fatG * 9;
+        const stated = Math.max(0, Math.round(num(i?.calories, 0)));
+        // Trust the stated figure only when it's in the same neighbourhood
+        // as what the macros imply; otherwise the macros win.
+        const calories =
+          fromMacros > 0 && (stated === 0 || Math.abs(stated - fromMacros) / fromMacros > 0.25)
+            ? fromMacros
+            : stated;
+        items.push({ name, portion: str(i?.portion).slice(0, 40), calories, proteinG, carbsG, fatG });
+      }
+      if (items.length === 0) continue;
+      // One meal per slot per day — the last one named wins.
+      const existing = meals.findIndex((x) => x.slot === slot);
+      const planned: PlannedMeal = { slot, name: str(meal?.name).slice(0, 80) || items[0].name, items };
+      if (existing >= 0) meals[existing] = planned;
+      else meals.push(planned);
+    }
+    if (meals.length === 0) continue;
+    meals.sort((a, b) => MEAL_SLOTS.indexOf(a.slot) - MEAL_SLOTS.indexOf(b.slot));
+    const existingDay = days.findIndex((x) => x.weekday === weekday);
+    const day: MealPlanDay = { weekday, meals };
+    if (existingDay >= 0) days[existingDay] = day;
+    else days.push(day);
+  }
+  if (days.length === 0) return undefined;
+  days.sort((a, b) => a.weekday - b.weekday);
+  return { summary: str(input.summary).slice(0, 200) || undefined, days };
+}
+
 export interface ProgramPlan {
   summary: string;
   durationWeeks: number;
   targets: ProgramTargets;
   schedule: CoachSchedulePlan;
+  /** Absent when the model's meal plan didn't survive validation — the
+   * client treats that as "no food plan", never as an error. */
+  mealPlan?: MealPlan;
 }
 
 /**
@@ -492,5 +587,6 @@ export function sanitizeProgram(raw: unknown): ProgramPlan | undefined {
     durationWeeks: Math.min(16, Math.max(4, Math.round(num(input.durationWeeks, 8)))),
     targets: { calories, proteinG, carbsG, fatG },
     schedule,
+    mealPlan: sanitizeMealPlan(input.mealPlan),
   };
 }

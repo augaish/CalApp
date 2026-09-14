@@ -17,8 +17,10 @@ import type {
   Language,
   LoggedMeal,
   LoggedWorkout,
+  MealPlan,
   MealType,
   MuscleGroup,
+  PlannedMeal,
   PlannedSet,
   Profile,
   Program,
@@ -95,6 +97,10 @@ interface AppState {
   weights: WeightEntry[];
   /** The one AI-designed program currently in effect, if the user has accepted one. */
   activeProgram: Program | null;
+  /** Per-day meal-plan swaps: dateKey → slot → the weekday whose planned
+   * meal stands in for that slot. Empty for days following the plan as
+   * written. Additive (old persisted state simply lacks it → `{}`). */
+  mealPlanSwaps: Record<string, Partial<Record<MealType, number>>>;
   remindMeals: boolean;
   remindWater: boolean;
   remindWorkouts: boolean;
@@ -236,6 +242,10 @@ interface AppState {
    * applyCoachSchedule) so a program is just data here, same as any other
    * proposal the coach hands the UI to act on. */
   setActiveProgram: (program: Program | null) => void;
+  /** Swap the planned meal for one slot on one day (dateKey) for the plan's
+   * meal in that slot from another weekday — "not kabsa today, give me
+   * Tuesday's lunch instead". Pass null to go back to the day's own meal. */
+  swapPlannedMeal: (dayKey: string, slot: MealType, fromWeekday: number | null) => void;
   startSession: (day: Date, exerciseIds: string[]) => void;
   updateSession: (patch: Partial<ActiveSession>) => void;
   endSession: () => void;
@@ -340,6 +350,7 @@ export const useAppStore = create<AppState>()(
       water: [],
       weights: [],
       activeProgram: null,
+      mealPlanSwaps: {},
       remindMeals: true,
       remindWater: true,
       remindWorkouts: true,
@@ -790,6 +801,13 @@ export const useAppStore = create<AppState>()(
         })),
       deleteWeight: (at) => set((s) => ({ weights: s.weights.filter((w) => w.at !== at) })),
       setActiveProgram: (activeProgram) => set({ activeProgram }),
+      swapPlannedMeal: (dayKey, slot, fromWeekday) =>
+        set((s) => {
+          const day = { ...(s.mealPlanSwaps[dayKey] ?? {}) };
+          if (fromWeekday == null) delete day[slot];
+          else day[slot] = fromWeekday;
+          return { mealPlanSwaps: { ...s.mealPlanSwaps, [dayKey]: day } };
+        }),
       startSession: (day, exerciseIds) =>
         set({
           activeSession: {
@@ -932,6 +950,7 @@ export const useAppStore = create<AppState>()(
         water,
         weights,
         activeProgram,
+        mealPlanSwaps,
         remindMeals,
         remindWater,
         remindWorkouts,
@@ -966,6 +985,7 @@ export const useAppStore = create<AppState>()(
         water,
         weights,
         activeProgram,
+        mealPlanSwaps,
         remindMeals,
         remindWater,
         remindWorkouts,
@@ -1858,6 +1878,42 @@ export function overviewBodyStats(weights: WeightEntry[], asOf: Date, profile: P
     bodyFatTrend: bodyFatDelta != null ? bodyFatTrend(bodyFatDelta) : 'neutral',
     muscleTrend: muscleDelta != null ? muscleTrend(muscleDelta) : 'neutral',
   };
+}
+
+/**
+ * The meal the plan has in mind for `slot` on `day`, after any swap the
+ * user made for that day. A swap that points at a weekday whose plan has
+ * nothing in that slot falls back to the day's own meal.
+ */
+export function plannedMealFor(
+  plan: MealPlan | undefined,
+  day: Date,
+  slot: MealType,
+  swaps: Record<string, Partial<Record<MealType, number>>>,
+): PlannedMeal | undefined {
+  if (!plan) return undefined;
+  const find = (weekday: number) =>
+    plan.days.find((d) => d.weekday === weekday)?.meals.find((m) => m.slot === slot);
+  const swapped = swaps[dateKey(day)]?.[slot];
+  return (swapped != null ? find(swapped) : undefined) ?? find(day.getDay());
+}
+
+/** Every distinct planned meal for `slot` across the week, in weekday
+ * order, deduplicated by name — the candidates a swap can pick from. */
+export function plannedMealOptions(plan: MealPlan, slot: MealType): { weekday: number; meal: PlannedMeal }[] {
+  const seen = new Set<string>();
+  const out: { weekday: number; meal: PlannedMeal }[] = [];
+  for (const d of plan.days) {
+    const meal = d.meals.find((m) => m.slot === slot);
+    if (!meal || seen.has(meal.name)) continue;
+    seen.add(meal.name);
+    out.push({ weekday: d.weekday, meal });
+  }
+  return out;
+}
+
+export function plannedMealCalories(meal: PlannedMeal): number {
+  return meal.items.reduce((sum, i) => sum + i.calories, 0);
 }
 
 /** Meal types already logged on `day`. */
