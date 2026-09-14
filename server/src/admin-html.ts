@@ -115,7 +115,7 @@ export const ADMIN_HTML = `<!doctype html>
 
     <div class="card">
       <b>AI provider by membership</b>
-      <div class="sub" style="margin:4px 0 10px">Which model answers for each tier: meal photo scans, described meals, "refine" edits, exercise info and equipment scans. Takes effect on the next request — no redeploy. Claude stays fully configured either way; it simply isn't called for a tier set to DeepSeek, so it stops costing you anything there.</div>
+      <div class="sub" style="margin:4px 0 10px">Which model answers for each tier, across every AI route: meal photo scans, described meals, "refine" edits, exercise info, equipment scans, body readings, coach chat, coach attachments and program design. Takes effect on the next request — no redeploy. Claude stays fully configured either way; it simply isn't called for a tier set to DeepSeek, so it stops costing you anything there.</div>
       <div class="row">
         <div><label>Free</label>
           <select id="prov_free"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
@@ -130,7 +130,7 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
       <div id="prov_msg" class="sub hide" style="margin-top:8px"></div>
       <div class="sub" id="prov_warn" style="margin-top:8px"></div>
-      <div class="sub" style="margin-top:10px"><b>Always Claude, whatever is set above:</b></div>
+      <div class="sub" style="margin-top:10px"><b>One exception the setting cannot cover:</b></div>
       <div class="sub" id="prov_fixed"></div>
     </div>
 
@@ -164,7 +164,7 @@ export const ADMIN_HTML = `<!doctype html>
 
     <div class="card">
       <b>Report test — DeepSeek vs Claude on a real report</b>
-      <div class="sub" style="margin:4px 0 10px">Body readings are the one job still pinned to Claude, on the assumption that DeepSeek's image detail is too coarse to transcribe a printed table of numbers. This settles it: pick a real InBody/Tanita/DEXA report and both providers read it with the identical prompt the live route uses, shown field by field below. A photo or screenshot compares both; a PDF runs Claude only, since our DeepSeek client sends images. <b>This spends on both providers</b> — that is the point — and uses nobody's monthly allowance.</div>
+      <div class="sub" style="margin:4px 0 10px">Spot-check either provider on a real report. Pick an InBody/Tanita/DEXA report and both read it with the identical prompt the live route uses, shown field by field below, so you can confirm accuracy before trusting a new report format or re-checking after a model update. A photo or screenshot compares both; a PDF runs Claude only, since our DeepSeek client sends images. <b>This spends on both providers</b> — that is the point — and uses nobody's monthly allowance.</div>
       <div class="row" style="margin-bottom:10px">
         <div><label>Report file (image or PDF)</label><input id="rep_file" type="file" accept="image/*,application/pdf" /></div>
         <button class="ghost" onclick="testReport()">Run report test</button>

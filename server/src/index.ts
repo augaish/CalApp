@@ -694,19 +694,22 @@ async function providerFor(access: Access): Promise<AiProvider> {
 }
 
 /**
- * Routes that stay on Claude whatever the dashboard says, and why — shown
- * on the admin page so the reason is where the decision is made, not only
- * in this file.
+ * What the dashboard's provider setting cannot cover, and why. Every route
+ * now follows the per-tier setting; the only exception left is a file
+ * format, not a feature: our DeepSeek client speaks the OpenAI chat format,
+ * which carries images and not PDFs.
  *
- * Only the document-reading pair is left: a body-composition report arrives
- * as a PDF or a photo of dense small print, and our DeepSeek client sends
- * images only. Whether DeepSeek can transcribe a real printout accurately
- * is an open question, not a settled one — run the report test on the admin
- * page against a real report to answer it with evidence.
+ * Body readings used to be listed here on my assumption that DeepSeek's
+ * image detail was too coarse for a printed table of numbers. The admin
+ * report test disproved that on a real Arabic InBody printout — every
+ * field matched Claude, including the fat-percent-vs-fat-mass trap and the
+ * Arabic status words — so the route now follows the tier like the rest.
  */
 const AI_PROVIDER_FIXED_ROUTES = [
-  { route: 'Body readings', reason: 'Reads a PDF or a photo of dense small print. Use the report test below to check DeepSeek against Claude on a real report before moving this.' },
-  { route: 'Coach attachments', reason: 'Same document-reading job as body readings.' },
+  {
+    route: 'PDF uploads only',
+    reason: 'A report or attachment sent as a PDF goes to Claude whatever the tier says, because our DeepSeek client sends images. Photos of the same report follow the tier setting. Ask for PDF-to-image conversion if you want this last case moved too.',
+  },
 ];
 
 /** Our Anthropic tool definitions, in OpenAI's function-calling shape. The
@@ -1001,6 +1004,33 @@ function parseBodyReadingBody(
   return null;
 }
 
+/**
+ * Read an uploaded report — a photo or a PDF — with whichever provider the
+ * caller's tier is on.
+ *
+ * The one asymmetry: our DeepSeek client sends images only, so a PDF always
+ * goes to Claude regardless of the tier setting. That is a limit of the wire
+ * format we speak, not a judgement about DeepSeek's accuracy — a real
+ * Arabic InBody printout came back field-for-field identical to Claude's
+ * read in the admin report test, which is why this route moved here at all.
+ * Photos are the common case (people snap the printout at the gym), so in
+ * practice this leaves only the occasional emailed PDF on Claude.
+ */
+async function readDocument(
+  parsed: { image: string; mediaType: SupportedImageMediaType } | { pdf: string },
+  prompt: string,
+  provider: AiProvider,
+  track: Track,
+): Promise<unknown> {
+  if ('pdf' in parsed) return analyzeDocument(parsed.pdf, prompt, MODEL, track);
+  if (provider === 'deepseek') {
+    const ds = await withOneRetry(() => deepseekVisionCall(parsed.image, prompt, 8000));
+    await trackUsage(track, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+    return extractJson(ds.text);
+  }
+  return analyze(parsed.image, prompt, MODEL, parsed.mediaType, track);
+}
+
 app.post('/api/analyze-body-reading', async (c) => {
   const parsed = parseBodyReadingBody(await c.req.json<BodyReadingBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
@@ -1012,10 +1042,7 @@ app.post('/api/analyze-body-reading', async (c) => {
   try {
     const prompt = bodyReadingPrompt(parsed.language);
     const track = { ref, kind: 'bodyReading' };
-    const raw =
-      'pdf' in parsed
-        ? await analyzeDocument(parsed.pdf, prompt, MODEL, track)
-        : await analyze(parsed.image, prompt, MODEL, parsed.mediaType, track);
+    const raw = await readDocument(parsed, prompt, await providerFor(access), track);
     const result = toBodyReadingAnalysis(raw);
     if (!result) {
       // A legitimate 200 from the model (unreadable photo, or a QR/barcode
@@ -1294,6 +1321,17 @@ app.post('/api/coach-attachment', async (c) => {
   }
   try {
     const prompt = coachAttachmentSummaryPrompt(parsed.language);
+    // Same document-reading job as a body reading, and the same one
+    // asymmetry: a PDF goes to Claude because our DeepSeek client sends
+    // images. Unlike that route this wants prose back, not JSON.
+    if (!('pdf' in parsed) && (await providerFor(access)) === 'deepseek') {
+      const ds = await withOneRetry(() => deepseekVisionCall(parsed.image, prompt, 4000));
+      await trackUsage({ ref, kind: 'coach' }, ds.model, {
+        input_tokens: ds.inputTokens,
+        output_tokens: ds.outputTokens,
+      });
+      return c.json({ summary: ds.text.trim() });
+    }
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 600,
