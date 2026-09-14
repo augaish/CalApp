@@ -28,7 +28,7 @@ export const ADMIN_HTML = `<!doctype html>
   .stat b { display:block; font-size:26px; }
   .stat span { color:var(--muted); font-size:13px; }
   label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
-  input { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:9px;
+  input, select { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:9px;
     background:var(--bg); color:var(--text); font-size:14px; }
   button { background:var(--primary); color:#fff; border:0; border-radius:9px;
     padding:10px 16px; font-weight:700; cursor:pointer; font-size:14px; }
@@ -113,9 +113,43 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
     </div>
 
+    <div class="card">
+      <b>AI provider by membership</b>
+      <div class="sub" style="margin:4px 0 10px">Which model answers for each tier: meal photo scans, described meals, "refine" edits, exercise info and equipment scans. Takes effect on the next request — no redeploy. Claude stays fully configured either way; it simply isn't called for a tier set to DeepSeek, so it stops costing you anything there.</div>
+      <div class="row">
+        <div><label>Free</label>
+          <select id="prov_free"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
+        </div>
+        <div><label>Pro</label>
+          <select id="prov_pro"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
+        </div>
+        <div><label>Pro+</label>
+          <select id="prov_proPlus"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
+        </div>
+        <button onclick="saveProviders()">Save providers</button>
+      </div>
+      <div id="prov_msg" class="sub hide" style="margin-top:8px"></div>
+      <div class="sub" id="prov_warn" style="margin-top:8px"></div>
+      <div class="sub" style="margin-top:10px"><b>Always Claude, whatever is set above:</b></div>
+      <div class="sub" id="prov_fixed"></div>
+    </div>
+
+    <div class="card">
+      <b>Membership prices</b>
+      <div class="sub" style="margin:4px 0 10px">What the app's upgrade screen shows, and what the revenue estimate above is based on. <b>This does not change what anyone is actually charged</b> — the real amount comes from the product price in App Store Connect / Google Play (mirrored by RevenueCat). Change it there first, then set the same number here so the two agree.</div>
+      <div class="row">
+        <div><label>Pro / month</label><input id="pr_pro" type="number" step="0.01" /></div>
+        <div><label>Pro+ / month</label><input id="pr_proplus" type="number" step="0.01" /></div>
+        <div><label>Pro / year</label><input id="pr_proyear" type="number" step="0.01" /></div>
+        <div><label>Currency</label><input id="pr_cur" maxlength="8" /></div>
+        <button onclick="savePrices()">Save prices</button>
+      </div>
+      <div id="pr_msg" class="sub hide" style="margin-top:8px"></div>
+    </div>
+
     <div class="card" id="shadowcard">
       <b>DeepSeek shadow test — meal scans</b>
-      <div class="sub" style="margin:4px 0 10px">Every real meal scan is still answered by Claude only, shown here as-is. In the background, the same photo is also sent to DeepSeek's vision model and logged here for comparison — DeepSeek's answer is never shown to any user or saved to their log. Empty if <code>DEEPSEEK_API_KEY</code> isn't set on the server.</div>
+      <div class="sub" style="margin:4px 0 10px">Runs only for scans from a tier still set to Claude above: that scan is answered by Claude, and the same photo also goes to DeepSeek in the background and is logged here side by side. A tier already on DeepSeek has nothing to compare, so it makes no shadow call. Empty if <code>DEEPSEEK_API_KEY</code> isn't set on the server.</div>
       <div class="row" style="margin-bottom:10px">
         <button class="ghost" onclick="testDeepseekVision()">Test DeepSeek vision now</button>
       </div>
@@ -129,8 +163,8 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
-      <b>DeepSeek pilot — exercise info (live)</b>
-      <div class="sub" style="margin:4px 0 10px">Unrelated to meal scans — this is the "info" lookup on an exercise (target muscles, instructions). When DeepSeek is configured, real users' taps actually go through DeepSeek here, falling back to Claude only on failure. Run this to sanity-check it's returning real answers rather than always falling back.</div>
+      <b>DeepSeek connection test</b>
+      <div class="sub" style="margin:4px 0 10px">Fires one real DeepSeek text call (an exercise-info lookup) so you can confirm the key works and the model is answering, without spending a user's scan on it. Worth running right after changing any tier to DeepSeek above.</div>
       <div class="row" style="margin-bottom:10px">
         <button class="ghost" onclick="testDeepseekText()">Test DeepSeek text now</button>
       </div>
@@ -156,7 +190,13 @@ export const ADMIN_HTML = `<!doctype html>
   // the actual AI cost figures (both "Cost", real, and "Historical", a
   // per-kind-weighted guess — see HISTORICAL_COST_PER_ACTION_USD in
   // pricing.ts) come from the server; this just converts USD to SAR.
-  var PRICE_SAR = 13, STORE_CUT = 0.15, USD_TO_SAR = 3.75;
+  var STORE_CUT = 0.15, USD_TO_SAR = 3.75;
+  /** The monthly price the revenue estimate multiplies by — whatever is set
+   * in "Membership prices" below, falling back to the original 13. */
+  function monthlyPrice() {
+    var p = (data && data.prices) || {};
+    return typeof p.pro === 'number' ? p.pro : 13;
+  }
   var data = null;
   function tok() { return document.getElementById('token').value || sessionStorage.getItem('ct') || ''; }
   function api(path, body) {
@@ -182,7 +222,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('s_active').textContent = s.activeThisMonth;
     document.getElementById('s_actions').textContent = s.actionsThisMonth;
     document.getElementById('s_mrr').textContent =
-      Math.round(s.proUsers * PRICE_SAR * (1 - STORE_CUT));
+      Math.round(s.proUsers * monthlyPrice() * (1 - STORE_CUT));
     document.getElementById('s_cost').textContent =
       (s.costUsdThisMonth * USD_TO_SAR).toFixed(2);
     document.getElementById('lim_free').value = data.limits.free;
@@ -194,6 +234,8 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('sp_img').value = sp.imageUrl || '';
     document.getElementById('sp_link').value = sp.linkUrl || '';
     document.getElementById('sp_on').checked = !!sp.enabled;
+    renderProviders();
+    renderPrices();
     renderShadow();
 
     // The table can only ever show what listUsers() returned in one response;
@@ -226,6 +268,64 @@ export const ADMIN_HTML = `<!doctype html>
         '</tr>';
     });
     document.getElementById('rows').innerHTML = html || '<tr><td colspan="12" class="muted">No users yet.</td></tr>';
+  }
+  var PLAN_IDS = ['free', 'pro', 'proPlus'];
+  function renderProviders() {
+    var p = data.providers || {};
+    PLAN_IDS.forEach(function (id) {
+      document.getElementById('prov_' + id).value = p[id] || 'claude';
+    });
+    var warn = document.getElementById('prov_warn');
+    if (!data.deepseekConfigured) {
+      warn.innerHTML = '<span style="color:var(--danger)">DEEPSEEK_API_KEY is not set on the server — everything runs on Claude until it is.</span>';
+    } else if (p.proPlus === 'deepseek') {
+      // The app sells Pro+ on "highest-accuracy meal analysis"; that claim
+      // is about Claude's stronger model, so flag the mismatch rather than
+      // letting the store listing quietly stop being true.
+      warn.innerHTML = '<span style="color:var(--danger)">Note: the app advertises Pro+ as "highest-accuracy meal analysis". With Pro+ on DeepSeek it gets the same model as Free — either put Pro+ back on Claude or reword that line.</span>';
+    } else {
+      warn.textContent = '';
+    }
+    document.getElementById('prov_fixed').innerHTML = (data.fixedRoutes || []).map(function (f) {
+      return '• <b>' + esc(f.route) + '</b> — ' + esc(f.reason);
+    }).join('<br>');
+  }
+  function saveProviders() {
+    var box = document.getElementById('prov_msg');
+    box.classList.remove('hide');
+    box.textContent = 'Saving…';
+    var body = {};
+    PLAN_IDS.forEach(function (id) { body[id] = document.getElementById('prov_' + id).value; });
+    api('/admin/api/providers', body).then(function (r) {
+      if (r.error) { box.textContent = 'Error: ' + (r.error === 'not_configured' ? 'DEEPSEEK_API_KEY is not set on the server.' : r.error); return; }
+      data.providers = r.providers;
+      renderProviders();
+      box.textContent = 'Saved. Free: ' + r.providers.free + ' · Pro: ' + r.providers.pro + ' · Pro+: ' + r.providers.proPlus + '.';
+    }).catch(function (e) { box.textContent = 'Request failed: ' + e; });
+  }
+  function renderPrices() {
+    var p = data.prices || {};
+    document.getElementById('pr_pro').value = p.pro != null ? p.pro : '';
+    document.getElementById('pr_proplus').value = p.proPlus != null ? p.proPlus : '';
+    document.getElementById('pr_proyear').value = p.proYearly != null ? p.proYearly : '';
+    document.getElementById('pr_cur').value = p.currency || 'SAR';
+  }
+  function savePrices() {
+    var box = document.getElementById('pr_msg');
+    box.classList.remove('hide');
+    box.textContent = 'Saving…';
+    api('/admin/api/prices', {
+      pro: Number(document.getElementById('pr_pro').value),
+      proPlus: Number(document.getElementById('pr_proplus').value),
+      proYearly: Number(document.getElementById('pr_proyear').value),
+      currency: document.getElementById('pr_cur').value,
+    }).then(function (r) {
+      if (r.error) { box.textContent = 'Error: ' + r.error + ' (prices must be numbers, 0 or more)'; return; }
+      data.prices = r.prices;
+      renderPrices();
+      render();
+      box.textContent = 'Saved — the app shows these on its next launch. Store billing is unchanged.';
+    }).catch(function (e) { box.textContent = 'Request failed: ' + e; });
   }
   function testDeepseekVision() {
     var box = document.getElementById('dstest');

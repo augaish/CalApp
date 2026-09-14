@@ -33,7 +33,7 @@ import {
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { webviewAvailable } from '@/lib/native-modules';
-import { photoPickerAvailable, pickPhoto, prepareImage } from '@/lib/photo';
+import { photoPickerAvailable, pickPhoto, prepareImage, prepareReportImage } from '@/lib/photo';
 import { useAppStore } from '@/lib/store';
 
 export default function Scan() {
@@ -109,7 +109,8 @@ export default function Scan() {
 
   // Downscale, then either stash the photo (manual form) or run AI analysis.
   const processImage = async (uri: string) => {
-    const saved = await prepareImage(uri);
+    // A results printout needs its small print legible; a plate doesn't.
+    const saved = isBody ? await prepareReportImage(uri) : await prepareImage(uri);
 
     if (isPhoto) {
       setCapturedPhoto(saved.uri);

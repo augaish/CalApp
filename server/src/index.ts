@@ -5,7 +5,20 @@ import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
 import { PRIVACY_HTML, TERMS_HTML } from './legal-html.js';
-import { checkAccess, featureLocked, PLANS, planLimits, quotaError, release, reserve } from './billing.js';
+import {
+  aiProviders,
+  checkAccess,
+  featureLocked,
+  PLANS,
+  planLimits,
+  planPrices,
+  quotaError,
+  release,
+  reserve,
+  type Access,
+  type AiProvider,
+  type Plan,
+} from './billing.js';
 import {
   adminStats,
   billingEventIsCurrent,
@@ -323,7 +336,16 @@ const COMMIT = (
   'dev'
 ).slice(0, 7);
 
-app.get('/health', (c) => c.json({ ok: true, cache: cacheEnabled, commit: COMMIT }));
+app.get('/health', async (c) =>
+  c.json({
+    ok: true,
+    cache: cacheEnabled,
+    commit: COMMIT,
+    // Which AI is actually live per tier, so "did my dashboard change take
+    // effect on the deployed build?" is one request instead of guesswork.
+    providers: await aiProviders(deepseekConfigured()),
+  }),
+);
 
 /** What a bounce page says, per kind of thing being shared. */
 const BOUNCE_COPY = {
@@ -655,6 +677,51 @@ function aiFailure(c: Context, err: unknown, fallbackCode: string) {
     : c.json({ error: fallbackCode }, 502);
 }
 
+/**
+ * Which AI answers for this caller, from the per-membership setting the
+ * admin dashboard writes. Consulted only by routes DeepSeek can actually
+ * serve; the ones it can't are listed below.
+ */
+async function providerFor(access: Access): Promise<AiProvider> {
+  const providers = await aiProviders(deepseekConfigured());
+  return providers[access.plan] ?? 'claude';
+}
+
+/**
+ * Routes that stay on Claude whatever the dashboard says, and why — shown
+ * on the admin page so the reason is where the decision is made, not only
+ * in this file.
+ *
+ * - bodyReading / coachAttachment: a body-composition report arrives as a
+ *   PDF or a photo of dense small print. DeepSeek's chat API takes no PDF
+ *   at all, and bills/reads every image at a flat 384 tokens regardless of
+ *   resolution — nowhere near enough detail to transcribe a printed table
+ *   of numbers without inventing them.
+ * - coach / program: both depend on Anthropic tool calls (the "add this
+ *   schedule" and "propose_program" cards). Moving them means rewriting the
+ *   tool-call plumbing for a different wire format, not flipping a switch.
+ */
+const AI_PROVIDER_FIXED_ROUTES = [
+  { route: 'Body readings', reason: 'No PDF support, and images are capped at 384 tokens — too coarse to read a printout.' },
+  { route: 'Coach attachments', reason: 'Same: PDFs and dense report photos.' },
+  { route: 'Coach chat', reason: 'Uses Anthropic tool calls for the "add to my schedule" card.' },
+  { route: 'Program design', reason: 'Uses an Anthropic tool call for targets, schedule and meal plan.' },
+];
+
+/**
+ * DeepSeek's reasoning models occasionally spend the whole budget thinking
+ * and return no content at all; one retry catches nearly all of those
+ * without falling back to a paid Claude call.
+ */
+async function withOneRetry<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    console.warn('deepseek call failed once, retrying:', err instanceof Error ? err.message : err);
+    return await call();
+  }
+}
+
 app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
@@ -663,11 +730,20 @@ app.post('/api/analyze-meal', async (c) => {
   const claim = await reserve(ref, access, 'meal');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
+    if ((await providerFor(access)) === 'deepseek') {
+      // Same generous budget as the shadow test, for the same reason (a
+      // reasoning model's thinking shares max_tokens with the JSON answer).
+      const ds = await withOneRetry(() => deepseekVisionCall(parsed.image, mealPrompt(parsed.language), 8000));
+      await trackUsage({ ref, kind: 'meal' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+      return c.json(toMealAnalysis(ds.text));
+    }
     const model = access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL;
     const claudeStart = Date.now();
     const result = await analyzeMealImage(parsed.image, mealPrompt(parsed.language), model, { ref, kind: 'meal' });
     if (deepseekConfigured()) {
-      // Fire-and-forget: the user's real response never waits on this.
+      // Fire-and-forget: the user's real response never waits on this. Only
+      // runs while Claude is the live provider — it exists to compare the
+      // two, so with DeepSeek live there's nothing to compare against.
       void shadowTestMealAnalysis(ref, parsed.image, parsed.language, model, result, Date.now() - claudeStart);
     }
     return c.json(result);
@@ -803,14 +879,24 @@ app.post('/api/analyze-equipment', async (c) => {
   const claim = await reserve(ref, access, 'equipment');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
-    // Step 1: cheap vision call to identify the machine.
-    const id = (await analyze(
-      parsed.image,
-      identifyEquipmentPrompt(parsed.language),
-      undefined,
-      undefined,
-      { ref, kind: 'equipment' },
-    )) as {
+    const provider = await providerFor(access);
+    // Step 1: cheap vision call to identify the machine. Naming a machine
+    // needs far less image detail than reading a printout, so this one is
+    // within DeepSeek's flat 384-token image budget.
+    const id = (await (provider === 'deepseek'
+      ? withOneRetry(() => deepseekVisionCall(parsed.image, identifyEquipmentPrompt(parsed.language), 4000)).then(
+          async (ds) => {
+            await trackUsage({ ref, kind: 'equipment' }, ds.model, {
+              input_tokens: ds.inputTokens,
+              output_tokens: ds.outputTokens,
+            });
+            return extractJson(ds.text);
+          },
+        )
+      : analyze(parsed.image, identifyEquipmentPrompt(parsed.language), undefined, undefined, {
+          ref,
+          kind: 'equipment',
+        }))) as {
       name?: string;
       confidence?: number;
     };
@@ -840,7 +926,20 @@ app.post('/api/analyze-equipment', async (c) => {
     }
 
     // Step 3: cache miss — generate details (text only, no image) and store.
-    const raw = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500, { ref, kind: 'equipment' });
+    // The cache is shared across providers on purpose: these are stable
+    // facts about a machine, and the muscle-id sanitizer applies either way.
+    const detailsPrompt = equipmentDetailsPrompt(parsed.language, name);
+    let raw: unknown;
+    if (provider === 'deepseek') {
+      const ds = await withOneRetry(() => deepseekTextCall(detailsPrompt, 4000));
+      await trackUsage({ ref, kind: 'equipment' }, ds.model, {
+        input_tokens: ds.inputTokens,
+        output_tokens: ds.outputTokens,
+      });
+      raw = extractJson(ds.text);
+    } else {
+      raw = await textCall(detailsPrompt, 1500, { ref, kind: 'equipment' });
+    }
     const details = sanitizeEquipmentMuscles(raw as Record<string, unknown>);
     await setCachedEquipment(key, parsed.language, details);
     return c.json(details);
@@ -876,7 +975,11 @@ function parseBodyReadingBody(
   const mediaType = SUPPORTED_IMAGE_MEDIA_TYPES.has(body.imageMediaType ?? '')
     ? (body.imageMediaType as SupportedImageMediaType)
     : 'image/jpeg';
-  if (image && image.length >= 100 && image.length <= 10 * 1024 * 1024) {
+  // Anthropic rejects any single image over 5 MB of decoded bytes; base64
+  // inflates by 4/3, so ~6.6 MB of text is the real ceiling. Newer clients
+  // downscale before sending; an older build's raw upload is refused here
+  // with a code the app can explain rather than after a paid failed call.
+  if (image && image.length >= 100 && image.length <= 6_600_000) {
     return { image, mediaType, language };
   }
   const pdf = body.pdf?.replace(/^data:application\/pdf;base64,/, '');
@@ -930,6 +1033,13 @@ app.post('/api/analyze-text', async (c) => {
   const claim = await reserve(ref, access, 'describe');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
+    if ((await providerFor(access)) === 'deepseek') {
+      // No web search on this path — a branded/restaurant item gets
+      // DeepSeek's own knowledge of it rather than a live menu lookup.
+      const ds = await withOneRetry(() => deepseekTextCall(textMealPrompt(language, text), 4000));
+      await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+      return c.json(toMealAnalysis(ds.text));
+    }
     const request = {
       model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
       // A described meal can list several dishes, and an Arabic answer costs
@@ -995,6 +1105,11 @@ app.post('/api/refine-meal', async (c) => {
   const claim = await reserve(ref, access, 'describe');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
+    if ((await providerFor(access)) === 'deepseek') {
+      const ds = await withOneRetry(() => deepseekTextCall(refineMealPrompt(language, items, message), 4000));
+      await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+      return c.json(toMealAnalysis(ds.text));
+    }
     const request = {
       model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
       max_tokens: 3000,
@@ -1031,23 +1146,16 @@ app.post('/api/analyze-exercise', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     const prompt = exerciseInfoPrompt(language, name);
-    // Cost pilot: try the cheaper DeepSeek route first when configured, since
-    // this is a plain text-in/text-out call with no vision or tool use. Any
-    // DeepSeek-side failure falls back silently to the existing Claude path.
-    if (deepseekConfigured()) {
-      try {
-        // Same reasoning-token budget issue as the meal-vision shadow call
-        // (see there) — 600 was tight enough that this may have been
-        // silently losing to the Claude fallback on most real requests.
-        const ds = await deepseekTextCall(prompt, 4000);
-        await trackUsage({ ref, kind: 'exercise' }, ds.model, {
-          input_tokens: ds.inputTokens,
-          output_tokens: ds.outputTokens,
-        });
-        return c.json(extractJson(ds.text));
-      } catch (err) {
-        console.error('deepseek analyze-exercise failed, falling back to Claude:', err);
-      }
+    if ((await providerFor(access)) === 'deepseek') {
+      // Same reasoning-token budget issue as the meal call (see there) —
+      // 600 was tight enough that this used to lose to the Claude fallback
+      // on most real requests.
+      const ds = await withOneRetry(() => deepseekTextCall(prompt, 4000));
+      await trackUsage({ ref, kind: 'exercise' }, ds.model, {
+        input_tokens: ds.inputTokens,
+        output_tokens: ds.outputTokens,
+      });
+      return c.json(extractJson(ds.text));
     }
     const result = await textCall(prompt, 600, { ref, kind: 'exercise' });
     return c.json(result);
@@ -1227,6 +1335,7 @@ app.get('/api/me', async (c) => {
   const ref = await callerRef(c);
   const access = await checkAccess(ref, 'meal');
   const sponsor = await getSetting<Record<string, unknown> | null>('sponsor', null);
+  const [prices, limits] = await Promise.all([planPrices(), planLimits()]);
   const coachUsed =
     ref && typeof access.spec.coachCap === 'number'
       ? await getUsageKind(ref, 'coach', access.period)
@@ -1250,6 +1359,14 @@ app.get('/api/me', async (c) => {
       highAccuracy: access.spec.highAccuracy,
       coachCap: access.spec.coachCap ?? null,
       coachUsed,
+    },
+    // What the upgrade screen should show. Editable from the admin page so
+    // a price change doesn't need an app release — but note it only changes
+    // the DISPLAY: the amount actually charged comes from the store product.
+    pricing: {
+      ...prices,
+      limits,
+      coachCap: PLANS.free.coachCap ?? null,
     },
     sponsor,
   });
@@ -1636,14 +1753,66 @@ function adminOk(c: { req: { header: (n: string) => string | undefined; query: (
 
 app.get('/admin/api/data', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const [stats, users, limits, sponsor, shadowTests] = await Promise.all([
+  const [stats, users, limits, sponsor, shadowTests, providers, prices] = await Promise.all([
     adminStats(),
     listUsers(),
     planLimits(),
     getSetting<Record<string, unknown> | null>('sponsor', null),
     listShadowTests(),
+    aiProviders(deepseekConfigured()),
+    planPrices(),
   ]);
-  return c.json({ stats, users, limits, sponsor, plans: PLANS, cache: cacheEnabled, shadowTests, deepseekConfigured: deepseekConfigured() });
+  return c.json({
+    stats,
+    users,
+    limits,
+    sponsor,
+    plans: PLANS,
+    cache: cacheEnabled,
+    shadowTests,
+    deepseekConfigured: deepseekConfigured(),
+    providers,
+    prices,
+    fixedRoutes: AI_PROVIDER_FIXED_ROUTES,
+  });
+});
+
+const PLAN_IDS: Plan[] = ['free', 'pro', 'proPlus'];
+
+/** Set which AI answers for each membership tier. Takes effect on the next
+ * request — no redeploy. Refuses DeepSeek when its key isn't set. */
+app.post('/admin/api/providers', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<Partial<Record<Plan, string>>>().catch(() => ({}) as Partial<Record<Plan, string>>);
+  const next: Record<string, AiProvider> = {};
+  for (const plan of PLAN_IDS) {
+    const value = body[plan];
+    if (value !== 'claude' && value !== 'deepseek') return c.json({ error: 'invalid_request' }, 400);
+    if (value === 'deepseek' && !deepseekConfigured()) return c.json({ error: 'not_configured' }, 400);
+    next[plan] = value;
+  }
+  await setSetting('ai_providers', next);
+  return c.json({ ok: true, providers: await aiProviders(deepseekConfigured()) });
+});
+
+/** Set the prices the app displays and the dashboard's revenue estimate
+ * uses. Does NOT change what anyone is actually billed — see planPrices. */
+app.post('/admin/api/prices', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req
+    .json<{ pro?: number; proPlus?: number; proYearly?: number; currency?: string }>()
+    .catch(() => ({}) as Record<string, never>);
+  const valid = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 100000;
+  if (!valid(body.pro) || !valid(body.proPlus) || !valid(body.proYearly)) {
+    return c.json({ error: 'invalid_request' }, 400);
+  }
+  await setSetting('plan_prices', {
+    pro: body.pro,
+    proPlus: body.proPlus,
+    proYearly: body.proYearly,
+    currency: (body.currency ?? 'SAR').trim().slice(0, 8) || 'SAR',
+  });
+  return c.json({ ok: true, prices: await planPrices() });
 });
 
 // A minimal, structurally-valid 1x1 JPEG — just enough for DeepSeek's vision

@@ -22,8 +22,9 @@ const MODEL = process.env.DEEPSEEK_MODEL ?? 'deepseek-v4-flash';
 // `deepseek-v4-flash-vision-exp` alias still routes to it too). Every image
 // is capped at 384 tokens for billing *and* detail, regardless of
 // resolution — a much smaller detail budget than Claude gets for the same
-// photo — which is exactly why this is only used for a background shadow
-// test (index.ts), never shown to a real user.
+// photo. Fine for a plate of food (the shadow test showed it matching
+// Claude's reads closely); not fine for reading small print, which is why
+// body-composition reports stay on Claude.
 const VISION_MODEL = process.env.DEEPSEEK_VISION_MODEL ?? 'deepseek-flash';
 
 export function deepseekConfigured(): boolean {

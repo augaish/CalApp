@@ -12,7 +12,7 @@ import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/
 import { useEntitlement } from '@/lib/entitlement';
 import { webviewAvailable, viewShotAvailable } from '@/lib/native-modules';
 import { usePending } from '@/lib/pending';
-import { prepareImage } from '@/lib/photo';
+import { prepareReportImage } from '@/lib/photo';
 import { useAppStore } from '@/lib/store';
 
 /** The two body-scan native modules — react-native-webview and
@@ -65,7 +65,7 @@ export default function InBodyWeb() {
     setBusy(true);
     try {
       const uri = await mods.captureRef(shotRef, { format: 'jpg', quality: 0.9 });
-      const saved = await prepareImage(uri);
+      const saved = await prepareReportImage(uri);
       const analysis = await analyzeBodyReading({ image: saved.base64 }, language);
       useEntitlement.getState().spend();
       setBodyReading(analysis, saved.uri);

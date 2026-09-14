@@ -111,6 +111,21 @@ export interface Entitlement {
     coachCap?: number | null;
     coachUsed?: number;
   };
+  /**
+   * What the upgrade screen should display, set from the admin dashboard so
+   * a price or allowance change doesn't need an app release. Display only —
+   * the amount actually charged comes from the store product, not this.
+   * Absent when talking to a server that predates it; the screen falls back
+   * to its own built-in numbers.
+   */
+  pricing?: {
+    pro?: number;
+    proPlus?: number;
+    proYearly?: number;
+    currency?: string;
+    limits?: { free?: number; pro?: number; proPlus?: number };
+    coachCap?: number | null;
+  };
   sponsor?: {
     enabled?: boolean;
     title?: string;

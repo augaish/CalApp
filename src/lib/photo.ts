@@ -29,12 +29,28 @@ export async function pickPhoto(): Promise<string | null> {
  * plates legible while staying well under the server's upload cap.
  */
 export async function prepareImage(uri: string): Promise<{ uri: string; base64: string }> {
+  return encodeJpeg(uri, 1024, 0.7);
+}
+
+/**
+ * Same idea for a printed report (InBody sheet, a screenshot of a results
+ * app): wider and sharper than a meal photo, because the numbers on a
+ * results printout are small and a 1024px downscale blurs them into
+ * guesses. Still re-encoded to JPEG — the file picker hands back whatever
+ * the file was (HEIC from an iPhone, a 12 MB PNG screenshot), and the AI
+ * API rejects unsupported formats and anything over 5 MB outright.
+ */
+export async function prepareReportImage(uri: string): Promise<{ uri: string; base64: string }> {
+  return encodeJpeg(uri, 1600, 0.85);
+}
+
+async function encodeJpeg(uri: string, width: number, compress: number): Promise<{ uri: string; base64: string }> {
   const context = ImageManipulator.manipulate(uri);
-  context.resize({ width: 1024 });
+  context.resize({ width });
   const rendered = await context.renderAsync();
   const saved = await rendered.saveAsync({
     base64: true,
-    compress: 0.7,
+    compress,
     format: SaveFormat.JPEG,
   });
   return { uri: saved.uri, base64: saved.base64 ?? '' };

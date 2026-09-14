@@ -9,17 +9,16 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useEntitlement } from '@/lib/entitlement';
 
-const TIERS: {
-  id: 'free' | 'pro' | 'proPlus';
-  nameKey: string;
-  descKey: string;
-  price: number;
-  highlight?: boolean;
-}[] = [
-  { id: 'free', nameKey: 'upgrade.tierFree', descKey: 'upgrade.tierFreeDesc', price: 0 },
-  { id: 'pro', nameKey: 'upgrade.tierPro', descKey: 'upgrade.tierProDesc', price: 13, highlight: true },
-  { id: 'proPlus', nameKey: 'upgrade.tierProPlus', descKey: 'upgrade.tierProPlusDesc', price: 25 },
-];
+/** Used until `/api/me` answers (and on a server that predates `pricing`) —
+ * the same numbers this screen shipped with, so nothing ever renders blank. */
+const FALLBACK = {
+  pro: 13,
+  proPlus: 25,
+  proYearly: 129,
+  currency: 'SAR',
+  limits: { free: 15, pro: 150, proPlus: 500 },
+  coachCap: 5,
+};
 
 const FEATURES: { icon: keyof typeof Ionicons.glyphMap; key: string }[] = [
   { icon: 'camera', key: 'scan' },
@@ -38,7 +37,39 @@ export default function Upgrade() {
   const plan = useEntitlement((s) => s.plan);
   const used = useEntitlement((s) => s.used);
   const limit = useEntitlement((s) => s.limit);
+  const pricing = useEntitlement((s) => s.pricing);
   const pro = plan === 'pro' || plan === 'proPlus';
+
+  // Server-set where available, this screen's own numbers otherwise.
+  const currency = pricing?.currency ?? FALLBACK.currency;
+  const limits = { ...FALLBACK.limits, ...(pricing?.limits ?? {}) };
+  const coachCap = pricing?.coachCap ?? FALLBACK.coachCap;
+  const yearly = pricing?.proYearly ?? FALLBACK.proYearly;
+  const monthly = pricing?.pro ?? FALLBACK.pro;
+  // "Save N%" only holds while the yearly price really is a discount.
+  const savePct = monthly > 0 ? Math.round((1 - yearly / (monthly * 12)) * 100) : 0;
+
+  const tiers = [
+    {
+      id: 'free' as const,
+      name: t('upgrade.tierFree'),
+      desc: t('upgrade.tierFreeDesc', { count: limits.free, coach: coachCap }),
+      price: 0,
+    },
+    {
+      id: 'pro' as const,
+      name: t('upgrade.tierPro'),
+      desc: t('upgrade.tierProDesc', { count: limits.pro }),
+      price: monthly,
+      highlight: true,
+    },
+    {
+      id: 'proPlus' as const,
+      name: t('upgrade.tierProPlus'),
+      desc: t('upgrade.tierProPlusDesc', { count: limits.proPlus }),
+      price: pricing?.proPlus ?? FALLBACK.proPlus,
+    },
+  ];
 
   return (
     <Screen
@@ -125,7 +156,7 @@ export default function Upgrade() {
       <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.sm }]}>
         {t('upgrade.pricing')}
       </Text>
-      {TIERS.map((tier) => {
+      {tiers.map((tier) => {
         const current = plan === tier.id;
         return (
           <Card
@@ -134,7 +165,7 @@ export default function Upgrade() {
           >
             <View style={styles.tierHead}>
               <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800', flex: 1 }}>
-                {t(tier.nameKey)}
+                {tier.name}
               </Text>
               {current && (
                 <View style={[styles.currentBadge, { backgroundColor: theme.cardSubtle }]}>
@@ -147,15 +178,17 @@ export default function Upgrade() {
                 {tier.price}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                {tier.price === 0 ? '' : t('upgrade.perMonthShort')}
+                {tier.price === 0 ? '' : t('upgrade.perMonthShort', { currency })}
               </Text>
             </View>
             <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
-              {t(tier.descKey)}
+              {tier.desc}
             </Text>
-            {tier.id === 'pro' && (
+            {tier.id === 'pro' && yearly > 0 && (
               <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700', marginTop: 6 }}>
-                {t('upgrade.yearly')}
+                {savePct > 0
+                  ? t('upgrade.yearly', { price: yearly, currency, percent: savePct })
+                  : t('upgrade.yearlyPlain', { price: yearly, currency })}
               </Text>
             )}
           </Card>

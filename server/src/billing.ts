@@ -56,6 +56,59 @@ export async function planLimits(): Promise<Record<Plan, number>> {
   };
 }
 
+// ── Which AI answers, per membership tier ──────────────────────────────────
+
+export type AiProvider = 'deepseek' | 'claude';
+
+/** What each tier's sticker price is, and in which currency it's quoted. */
+export interface PlanPrices {
+  pro: number;
+  proPlus: number;
+  currency: string;
+  /** Optional yearly price for Pro, shown as the "or NNN/year" line. */
+  proYearly: number;
+}
+
+const DEFAULT_PRICES: PlanPrices = { pro: 13, proPlus: 25, proYearly: 129, currency: 'SAR' };
+
+/**
+ * Admin-editable prices. These drive what the app SHOWS on its upgrade
+ * screen and the dashboard's revenue estimate — they do not and cannot
+ * change what a subscriber is actually billed, which is set per product in
+ * App Store Connect / Google Play and mirrored by RevenueCat. Change it
+ * there first, then match it here so the two agree.
+ */
+export async function planPrices(): Promise<PlanPrices> {
+  const stored = await getSetting<Partial<PlanPrices>>('plan_prices', {});
+  const num = (v: unknown, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : fallback;
+  return {
+    pro: num(stored.pro, DEFAULT_PRICES.pro),
+    proPlus: num(stored.proPlus, DEFAULT_PRICES.proPlus),
+    proYearly: num(stored.proYearly, DEFAULT_PRICES.proYearly),
+    currency: typeof stored.currency === 'string' && stored.currency.trim() ? stored.currency.trim().slice(0, 8) : DEFAULT_PRICES.currency,
+  };
+}
+
+/**
+ * Which model family answers for each membership tier. DeepSeek is the
+ * default everywhere it is supported once its key is set — it costs a
+ * fraction of Claude for the same answer on these routes — and Claude stays
+ * fully configured so a tier can be moved back with one dashboard change and
+ * no redeploy. With no DeepSeek key the whole thing collapses to Claude.
+ *
+ * Only routes DeepSeek can actually serve consult this (meal photo,
+ * described meal, refine, exercise info, equipment). Body readings, coach
+ * chat, coach attachments and program design are pinned to Claude for
+ * technical reasons — see AI_PROVIDER_FIXED_ROUTES in index.ts.
+ */
+export async function aiProviders(deepseekAvailable: boolean): Promise<Record<Plan, AiProvider>> {
+  if (!deepseekAvailable) return { free: 'claude', pro: 'claude', proPlus: 'claude' };
+  const stored = await getSetting<Partial<Record<Plan, string>>>('ai_providers', {});
+  const pick = (v: unknown): AiProvider => (v === 'claude' ? 'claude' : 'deepseek');
+  return { free: pick(stored.free), pro: pick(stored.pro), proPlus: pick(stored.proPlus) };
+}
+
 export interface Access {
   plan: Plan;
   spec: PlanSpec;
