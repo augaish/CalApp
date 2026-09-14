@@ -13,8 +13,21 @@ const AUTH_URL = 'https://api.prod.whoop.com/oauth/oauth2/auth';
 const TOKEN_URL = 'https://api.prod.whoop.com/oauth/oauth2/token';
 const API_BASE = 'https://api.prod.whoop.com/developer/v2';
 
-/** Kept to the data the coach could plausibly use — see the playbook's wearable-sync entry. */
-export const WHOOP_SCOPES = ['read:cycles', 'read:workout', 'read:recovery', 'read:sleep'];
+/**
+ * Kept to the data the coach could plausibly use — see the playbook's
+ * wearable-sync entry — plus `offline`, which is not a data scope at all:
+ * per WHOOP's own docs, a refresh_token is only issued when `offline` is
+ * requested, both on the initial authorize AND on every refresh call (this
+ * array feeds both — see buildAuthorizeUrl and refreshWhoopToken below).
+ * Without it, WHOOP token exchanges can silently omit refresh_token, which
+ * is exactly what db.ts's and WhoopTokenResponse's comments already
+ * describe seeing ("not always reissued... observed missing on a
+ * re-authorization") — this was the real, root cause of repeat disconnects,
+ * not a retry-logic gap. Existing connections made before this shipped
+ * still need one manual reconnect to actually pick up a working
+ * refresh_token; this only fixes it going forward.
+ */
+export const WHOOP_SCOPES = ['read:cycles', 'read:workout', 'read:recovery', 'read:sleep', 'offline'];
 
 export interface WhoopTokenResponse {
   accessToken: string;
