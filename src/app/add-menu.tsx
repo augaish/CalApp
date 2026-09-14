@@ -137,6 +137,16 @@ export default function AddMenu() {
                   the same action lived in two places depending on the tab. */}
               <Tile icon="add-circle" label={t('addMenu.addExercise')} onPress={() => go('/exercise-library')} theme={theme} />
             </View>
+
+            {/* The button's position promises "add anything"; without this
+                group a weigh-in or a glass of water had to be hunted for
+                elsewhere, and the sheet stopped being the reflex tap. */}
+            <SectionLabel label={t('addMenu.health')} theme={theme} />
+            <View style={styles.grid}>
+              <Tile icon="body" label={t('addMenu.bodyReading')} onPress={() => go('/body-reading')} theme={theme} />
+              <Tile icon="water" label={t('addMenu.water')} onPress={() => go('/water')} theme={theme} />
+              <Tile icon="timer" label={t('addMenu.startFast')} onPress={() => go('/fasting')} theme={theme} />
+            </View>
           </>
         )}
       </Pressable>

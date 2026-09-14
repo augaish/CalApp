@@ -65,19 +65,37 @@ export default function Onboarding() {
     setStep('about');
   };
 
-  const parsedProfile = (): Profile | null => {
+  /** The first field that fails validation, so the alert can name it. */
+  const invalidField = (): 'birthDate' | 'height' | 'weight' | null => {
     const h = parseFloat(height);
     const w = parseFloat(weight);
     const a = birthDate ? ageFrom(birthDate) : 0;
-    if (!birthDate || a < 10 || a > 100 || !h || h < 100 || h > 250 || !w || w < 30 || w > 300) {
-      return null;
-    }
-    return { sex, birthDate, heightCm: h, weightKg: w, activityLevel: activity, goal, paceKgPerWeek };
+    if (!birthDate || a < 10 || a > 100) return 'birthDate';
+    if (!h || h < 100 || h > 250) return 'height';
+    if (!w || w < 30 || w > 300) return 'weight';
+    return null;
+  };
+
+  const parsedProfile = (): Profile | null => {
+    if (invalidField()) return null;
+    return {
+      sex,
+      birthDate,
+      heightCm: parseFloat(height),
+      weightKg: parseFloat(weight),
+      activityLevel: activity,
+      goal,
+      paceKgPerWeek,
+    };
   };
 
   const submitAbout = () => {
-    if (!parsedProfile()) {
-      Alert.alert(t('onboarding.invalidInput'));
+    const bad = invalidField();
+    if (bad) {
+      Alert.alert(
+        t('onboarding.invalidInput'),
+        t(bad === 'birthDate' ? 'onboarding.invalidBirthDate' : bad === 'height' ? 'onboarding.invalidHeight' : 'onboarding.invalidWeight'),
+      );
       return;
     }
     setStep('activity');

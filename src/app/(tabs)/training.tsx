@@ -523,7 +523,11 @@ export default function Training() {
                 </Text>
               </Pressable>
             )}
-            {selectedIsToday && whoopLastFetchedAt && (
+            {/* Only once WHOOP has actually answered "connected" — the fetch
+                timestamp alone gets set even when the reply was "not
+                connected", which read as "Synced just now" on a phone that
+                has never linked a wearable. */}
+            {selectedIsToday && whoopConnected === true && whoopLastFetchedAt && (
               <Pressable onPress={refreshWhoopRecent} hitSlop={8} style={styles.syncRow}>
                 <Ionicons name="refresh" size={11} color={theme.textTertiary} />
                 <Text style={{ color: theme.textTertiary, fontSize: 11 }}>

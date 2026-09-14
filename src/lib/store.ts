@@ -887,7 +887,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 9,
+      version: 10,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -1085,6 +1085,22 @@ function migrateStore(persisted: unknown, version: number): unknown {
     });
   }
 
+  // v9 → v10: single-set workouts no longer credit elapsed time (see
+  // workoutBurn) — recompute so an orphaned set edited after the fact stops
+  // carrying a duration it never had. Additive: no field changes, so a
+  // rollback to v9 reads this state unchanged.
+  if (version < 10 && Array.isArray(state.workouts)) {
+    const bodyKg = (state.profile as { weightKg?: number } | null | undefined)?.weightKg ?? 75;
+    const custom: Exercise[] = Array.isArray(state.exercises) ? (state.exercises as Exercise[]) : [];
+    state.workouts = (state.workouts as LoggedWorkout[]).map((w) => {
+      const category = findExercise(w.exerciseId, custom)?.category;
+      return {
+        ...w,
+        caloriesBurned: burnForSets(w.sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt)),
+      };
+    });
+  }
+
   if (version >= 2) return state;
 
   const oldWorkouts = Array.isArray(state.workouts) ? state.workouts : [];
@@ -1244,8 +1260,15 @@ export function workoutBurn(
 ): number {
   if (setCount <= 0) return 0;
   const met = MET_BY_CATEGORY[category] ?? 5.0;
+  // Real elapsed time is only a duration when it spans at least two sets.
+  // A single set has no measurable length, and `updatedAt` is the last
+  // *edit*, not the last work: log one set (2 min → 14 kcal), add a second
+  // ten minutes later (now "10 min" → 72), delete it again — the survivor
+  // was still credited the whole window, capped to 5 min → 36 kcal for the
+  // exact same set it started at 14 for. Same set, same work, a number that
+  // depended on edit history.
   const trustedMinutes =
-    minutes != null
+    minutes != null && setCount >= 2
       ? Math.min(minutes, MAX_MINUTES_PER_SET * setCount)
       : DEFAULT_MINUTES_PER_SET * setCount;
   return Math.round(((met * 3.5 * bodyKg) / 200) * trustedMinutes);
