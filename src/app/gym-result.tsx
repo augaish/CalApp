@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 
+import { BodyMap, BodyMapViewSwitch, viewForMuscles } from '@/components/body-map';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -20,6 +21,7 @@ export default function GymResult() {
   const photoUri = usePending((s) => s.photoUri);
   const custom = useAppStore((s) => s.exercises);
   const addExercise = useAppStore((s) => s.addExercise);
+  const updateExercise = useAppStore((s) => s.updateExercise);
 
   // Whether this machine was ALREADY in the library (built-in or saved from
   // an earlier scan) before this screen ever ran — computed once, from the
@@ -28,6 +30,7 @@ export default function GymResult() {
   // just happened.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const matched = useMemo(() => (analysis ? matchExerciseByName(analysis.name, custom) : undefined), [analysis]);
+  const [mapView, setMapView] = useState(() => (analysis ? viewForMuscles(analysis.primaryMuscles) : null));
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -35,7 +38,19 @@ export default function GymResult() {
 
   // Turn the scan into (or reuse) a reusable library exercise.
   const ensureExercise = (): string => {
-    if (matched) return matched.id;
+    if (matched) {
+      // An earlier scan (before muscle ids were saved) or a hand-added entry
+      // may still be missing this — a fresh scan is a free chance to fill it
+      // in, so the map isn't stuck generic forever just because the exercise
+      // already existed.
+      if (!matched.primaryMuscles?.length && analysis!.primaryMuscles.length) {
+        updateExercise(matched.id, {
+          primaryMuscles: analysis!.primaryMuscles,
+          secondaryMuscles: analysis!.secondaryMuscles.length ? analysis!.secondaryMuscles : undefined,
+        });
+      }
+      return matched.id;
+    }
     const description = [...analysis!.setupSteps, ...analysis!.formCues].map((s) => `• ${s}`).join('\n');
     return addExercise({
       name: analysis!.name,
@@ -44,6 +59,8 @@ export default function GymResult() {
       photoUri: photoUri ?? undefined,
       description,
       source: 'scan',
+      primaryMuscles: analysis!.primaryMuscles.length ? analysis!.primaryMuscles : undefined,
+      secondaryMuscles: analysis!.secondaryMuscles.length ? analysis!.secondaryMuscles : undefined,
     });
   };
 
@@ -103,14 +120,25 @@ export default function GymResult() {
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
 
-      <View style={styles.muscleRow}>
-        {analysis.primaryMuscles.map((m) => (
-          <Chip key={m} label={m} color={theme.primary} textColor={theme.onPrimary} />
-        ))}
-        {analysis.secondaryMuscles.map((m) => (
-          <Chip key={m} label={m} color={theme.card} textColor={theme.textSecondary} bordered />
-        ))}
-      </View>
+      {mapView && analysis.primaryMuscles.length > 0 && (
+        <Card style={styles.muscleMapCard}>
+          <BodyMap
+            view={mapView}
+            highlightedMuscles={analysis.primaryMuscles}
+            secondaryMuscles={analysis.secondaryMuscles}
+            size={110}
+          />
+          <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+          <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+            {t('exercises.targets')} {analysis.primaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')}
+          </Text>
+          {analysis.secondaryMuscles.length > 0 && (
+            <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '500' }}>
+              {t('exercises.alsoWorks')} {analysis.secondaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')}
+            </Text>
+          )}
+        </Card>
+      )}
 
       <Button
         label={t('gymResult.watchVideo')}
@@ -144,30 +172,6 @@ export default function GymResult() {
         {t('common.aiDisclaimer')}
       </Text>
     </Screen>
-  );
-}
-
-function Chip({
-  label,
-  color,
-  textColor,
-  bordered,
-}: {
-  label: string;
-  color: string;
-  textColor: string;
-  bordered?: boolean;
-}) {
-  const theme = useTheme();
-  return (
-    <View
-      style={[
-        styles.chip,
-        { backgroundColor: color, borderColor: bordered ? theme.border : 'transparent', borderWidth: bordered ? 1 : 0 },
-      ]}
-    >
-      <Text style={{ color: textColor, fontSize: 13, fontWeight: '600' }}>{label}</Text>
-    </View>
   );
 }
 
@@ -211,17 +215,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     marginBottom: Spacing.md,
   },
-  muscleRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: Radius.full,
-  },
+  muscleMapCard: { alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.md },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',

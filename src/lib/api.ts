@@ -551,8 +551,8 @@ async function mockEquipment(language: Language): Promise<EquipmentAnalysis> {
   return language === 'ar'
     ? {
         name: 'جهاز سحب علوي (لات بول داون)',
-        primaryMuscles: ['الظهر العريض'],
-        secondaryMuscles: ['البايسبس', 'الكتف الخلفي'],
+        primaryMuscles: ['lats'],
+        secondaryMuscles: ['biceps', 'rear_delts'],
         setupSteps: ['اضبط مسند الفخذين على ساقيك', 'أمسك القبضة أوسع من كتفيك', 'اجلس وصدرك مرفوع'],
         formCues: ['اسحب البار إلى أعلى الصدر', 'حرّك مرفقيك للأسفل والخلف', 'تحكم في الرجوع ببطء'],
         commonMistakes: ['التأرجح بالجذع', 'السحب خلف الرقبة', 'استخدام وزن أثقل من اللازم'],
@@ -561,8 +561,8 @@ async function mockEquipment(language: Language): Promise<EquipmentAnalysis> {
       }
     : {
         name: 'Lat pulldown machine',
-        primaryMuscles: ['Lats'],
-        secondaryMuscles: ['Biceps', 'Rear delts'],
+        primaryMuscles: ['lats'],
+        secondaryMuscles: ['biceps', 'rear_delts'],
         setupSteps: ['Adjust thigh pad snug on your legs', 'Grip slightly wider than shoulders', 'Sit tall, chest up'],
         formCues: ['Pull the bar to upper chest', 'Drive elbows down and back', 'Control the way up'],
         commonMistakes: ['Swinging the torso', 'Pulling behind the neck', 'Going too heavy'],

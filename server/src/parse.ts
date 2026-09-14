@@ -353,6 +353,41 @@ export function toBodyReadingAnalysis(parsed: unknown): BodyReadingAnalysis | nu
   return hasAnyReading ? result : null;
 }
 
+// ── Equipment: muscle-id sanitizing ─────────────────────────────────────
+
+/**
+ * The client's canonical muscle-id vocabulary (see MUSCLE_ID_RULE in
+ * prompts.ts, and MuscleId in the client's src/lib/types.ts) — kept as a
+ * plain set here since server and client don't share types.
+ */
+const MUSCLE_IDS = new Set([
+  'chest', 'front_delts', 'side_delts', 'rear_delts', 'biceps', 'triceps', 'forearms',
+  'abs', 'obliques', 'lats', 'traps', 'rhomboids', 'lower_back', 'glutes', 'quads',
+  'hamstrings', 'adductors', 'hip_flexors', 'calves',
+]);
+
+function sanitizeMuscleIds(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string' && MUSCLE_IDS.has(v));
+}
+
+/**
+ * Coerce an equipment-analysis reply's muscle arrays to the canonical id
+ * vocabulary — drops anything else, which also covers entries cached
+ * before this vocabulary existed (localized muscle names) rather than
+ * passing them through as if they were valid ids the client's body-map
+ * component understands. Every other field (name, steps, cues, mistakes,
+ * suggestion, confidence) is left untouched — those are free text the
+ * model already localizes correctly.
+ */
+export function sanitizeEquipmentMuscles<T extends Record<string, unknown>>(details: T): T {
+  return {
+    ...details,
+    primaryMuscles: sanitizeMuscleIds(details.primaryMuscles),
+    secondaryMuscles: sanitizeMuscleIds(details.secondaryMuscles),
+  };
+}
+
 // ── Coach: a proposed weekly schedule, as a client-executed tool call ──────
 
 export interface CoachScheduleExercise {

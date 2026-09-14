@@ -46,6 +46,7 @@ import {
   isInsufficientCreditError,
   isWebSearchDisabled,
   replyText,
+  sanitizeEquipmentMuscles,
   sanitizeProgram,
   sanitizeSchedulePlan,
   toBodyReadingAnalysis,
@@ -783,11 +784,14 @@ app.post('/api/analyze-equipment', async (c) => {
     const key = canonicalKey(name);
     const cached = await getCachedEquipment(key, parsed.language);
     if (cached) {
-      return c.json(cached);
+      // Filters out anything cached before the muscle-id vocabulary
+      // existed (old entries hold localized muscle names, not ids).
+      return c.json(sanitizeEquipmentMuscles(cached as Record<string, unknown>));
     }
 
     // Step 3: cache miss — generate details (text only, no image) and store.
-    const details = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500, { ref, kind: 'equipment' });
+    const raw = await textCall(equipmentDetailsPrompt(parsed.language, name), 1500, { ref, kind: 'equipment' });
+    const details = sanitizeEquipmentMuscles(raw as Record<string, unknown>);
     await setCachedEquipment(key, parsed.language, details);
     return c.json(details);
   } catch (err) {

@@ -221,8 +221,11 @@ export type GeneratedProgram = Pick<Program, 'summary' | 'durationWeeks' | 'targ
 export interface EquipmentAnalysis {
   /** Machine name in the user's language */
   name: string;
-  primaryMuscles: string[];
-  secondaryMuscles: string[];
+  /** Canonical muscle-id slugs (see MuscleId below), not localized text —
+   * the same vocabulary Exercise.primaryMuscles uses, so a scan's result
+   * can drive BodyMap and be persisted onto a saved Exercise directly. */
+  primaryMuscles: MuscleId[];
+  secondaryMuscles: MuscleId[];
   setupSteps: string[];
   formCues: string[];
   commonMistakes: string[];

@@ -23,6 +23,18 @@ const JSON_RULES = `NUMBER AND FORMAT RULES (strict):
 - For each food, "calories" MUST equal proteinG × 4 + carbsG × 4 + fatG × 9. Estimate the portion's calories first, then split them into macros that add back up to it. A breakdown that does not add up is shown to the user as a total that disagrees with its own parts.`;
 
 /**
+ * The exact muscle-id vocabulary the client's body-map component and its
+ * Exercise records use (see MuscleId in the client's src/lib/types.ts —
+ * duplicated here the same way FoodItem's shape is, since server and client
+ * are separate projects). Equipment analysis must answer in these fixed,
+ * untranslated ids rather than a localized muscle name, so the result can
+ * drive the same body-diagram exercises already use and be saved onto the
+ * exercise the scan creates without a separate mapping step.
+ */
+const MUSCLE_ID_RULE =
+  '"primaryMuscles" and "secondaryMuscles" are NOT translated — pick 1-3 ids each from EXACTLY this fixed set, matching the specific region(s) this machine trains (not just its broad muscle group): "chest", "front_delts", "side_delts", "rear_delts", "biceps", "triceps", "forearms", "abs", "obliques", "lats", "traps", "rhomboids", "lower_back", "glutes", "quads", "hamstrings", "adductors", "hip_flexors", "calves". Never invent an id outside this list.';
+
+/**
  * Calibration guidance shared by the photo + text meal prompts. The single most
  * common error is UNDER-counting (estimates come out ~half of reality), because
  * models pick small "diet" portions and ignore cooking fat. This pushes toward
@@ -401,7 +413,8 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 }
 
 Rules:
-- All text values must be written in ${LANGUAGE_NAME[language]}.
+- "name", "setupSteps", "formCues", "commonMistakes" and "suggestion.note" must be written in ${LANGUAGE_NAME[language]}.
+- ${MUSCLE_ID_RULE}
 - "name" should be the machine name in ${LANGUAGE_NAME[language]}.
 - 2-4 short entries per list, each a single actionable sentence.
 - "reps" is a range like "10-12". "confidence" is 0-1.`;
@@ -425,7 +438,8 @@ Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 }
 
 Rules:
-- All text values must be written in ${LANGUAGE_NAME[language]}.
+- "name", "setupSteps", "formCues", "commonMistakes" and "suggestion.note" must be written in ${LANGUAGE_NAME[language]}.
+- ${MUSCLE_ID_RULE}
 - 2-4 short entries per list, each a single actionable sentence.
 - "reps" is a range like "10-12".
 - "confidence" is 0-1.
