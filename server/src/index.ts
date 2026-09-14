@@ -81,7 +81,13 @@ import {
   whoopConfigured,
   WhoopAuthError,
 } from './whoop.js';
-import { deepseekConfigured, deepseekTextCall, deepseekVisionCall } from './deepseek.js';
+import {
+  deepseekConfigured,
+  deepseekTextCall,
+  deepseekToolCall,
+  deepseekVisionCall,
+  type DeepseekTool,
+} from './deepseek.js';
 import { estimateCostUsd } from './pricing.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
 import {
@@ -692,21 +698,25 @@ async function providerFor(access: Access): Promise<AiProvider> {
  * on the admin page so the reason is where the decision is made, not only
  * in this file.
  *
- * - bodyReading / coachAttachment: a body-composition report arrives as a
- *   PDF or a photo of dense small print. DeepSeek's chat API takes no PDF
- *   at all, and bills/reads every image at a flat 384 tokens regardless of
- *   resolution — nowhere near enough detail to transcribe a printed table
- *   of numbers without inventing them.
- * - coach / program: both depend on Anthropic tool calls (the "add this
- *   schedule" and "propose_program" cards). Moving them means rewriting the
- *   tool-call plumbing for a different wire format, not flipping a switch.
+ * Only the document-reading pair is left: a body-composition report arrives
+ * as a PDF or a photo of dense small print, and our DeepSeek client sends
+ * images only. Whether DeepSeek can transcribe a real printout accurately
+ * is an open question, not a settled one — run the report test on the admin
+ * page against a real report to answer it with evidence.
  */
 const AI_PROVIDER_FIXED_ROUTES = [
-  { route: 'Body readings', reason: 'No PDF support, and images are capped at 384 tokens — too coarse to read a printout.' },
-  { route: 'Coach attachments', reason: 'Same: PDFs and dense report photos.' },
-  { route: 'Coach chat', reason: 'Uses Anthropic tool calls for the "add to my schedule" card.' },
-  { route: 'Program design', reason: 'Uses an Anthropic tool call for targets, schedule and meal plan.' },
+  { route: 'Body readings', reason: 'Reads a PDF or a photo of dense small print. Use the report test below to check DeepSeek against Claude on a real report before moving this.' },
+  { route: 'Coach attachments', reason: 'Same document-reading job as body readings.' },
 ];
+
+/** Our Anthropic tool definitions, in OpenAI's function-calling shape. The
+ * schema body is identical JSON Schema; only the wrapper differs. */
+function toDeepseekTool(tool: Anthropic.Tool): DeepseekTool {
+  return {
+    type: 'function',
+    function: { name: tool.name, description: tool.description, parameters: tool.input_schema },
+  };
+}
 
 /**
  * DeepSeek's reasoning models occasionally spend the whole budget thinking
@@ -1210,12 +1220,36 @@ app.post('/api/coach', async (c) => {
       : c.json(quotaError(access), 402);
   }
   try {
+    const system = coachSystemPrompt(language, contextText(body.context));
+    if ((await providerFor(access)) === 'deepseek') {
+      // OpenAI-shaped: the system prompt is the first message rather than a
+      // separate field, and the schedule tool stays optional (tool_choice
+      // auto) because most coach messages are just conversation.
+      const ds = await withOneRetry(() =>
+        deepseekToolCall(
+          [{ role: 'system', content: system }, ...messages],
+          [toDeepseekTool(SCHEDULE_TOOL)],
+          6000,
+        ),
+      );
+      await trackUsage({ ref, kind: 'coach' }, ds.model, {
+        input_tokens: ds.inputTokens,
+        output_tokens: ds.outputTokens,
+      });
+      const call = ds.toolCalls.find((t) => t.name === 'propose_weekly_schedule');
+      const plan = call ? sanitizeSchedulePlan(call.args) : undefined;
+      // A tool-only reply has no prose; the app shows the card alone, but a
+      // blank bubble above it reads as a glitch, so borrow the plan's own
+      // one-line summary the way the Claude path's fallbackIntro does.
+      const reply = ds.text || (plan ? (plan.summary ?? '') : '');
+      return c.json({ reply, schedulePlan: plan });
+    }
     const response = await anthropic.messages.create({
       model: MODEL,
       // A plain reply fits easily in 500, but a full week's worth of days and
       // exercises inside the propose_weekly_schedule tool call does not.
       max_tokens: 2000,
-      system: coachSystemPrompt(language, contextText(body.context)),
+      system,
       messages,
       tools: [SCHEDULE_TOOL],
     });
@@ -1298,6 +1332,36 @@ app.post('/api/generate-program', async (c) => {
   const claim = await reserve(ref, access, 'program');
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
+    if ((await providerFor(access)) === 'deepseek') {
+      // Far more headroom than Claude's 9000: on a reasoning model the
+      // chain-of-thought shares this budget with the answer, and the answer
+      // here is a week of training plus a week of named meals with macros.
+      const ds = await withOneRetry(() =>
+        deepseekToolCall(
+          [
+            { role: 'system', content: programPrompt(language, contextText(body.context)) },
+            { role: 'user', content: 'Design my program.' },
+          ],
+          [toDeepseekTool(PROGRAM_TOOL)],
+          20000,
+          'propose_program',
+        ),
+      );
+      await trackUsage({ ref, kind: 'program' }, ds.model, {
+        input_tokens: ds.inputTokens,
+        output_tokens: ds.outputTokens,
+      });
+      const call = ds.toolCalls.find((t) => t.name === 'propose_program');
+      // Belt and braces: a model that ignores tool_choice and just writes the
+      // JSON as prose still produces a usable program, and costs nothing to
+      // try before giving up.
+      const program = sanitizeProgram(call ? call.args : extractJson(ds.text));
+      if (!program) {
+        await release(ref, 'program');
+        return c.json({ error: 'analysis_failed' }, 502);
+      }
+      return c.json(program);
+    }
     const response = await anthropic.messages.create({
       model: MODEL,
       // A full week's schedule AND a full week of named meals with macros
@@ -1839,6 +1903,69 @@ app.post('/admin/api/test-deepseek-vision', async (c) => {
   } catch (err) {
     return c.json({ ok: false, ms: Date.now() - start, error: err instanceof Error ? err.message : String(err) });
   }
+});
+
+/**
+ * Settle the open question above with evidence instead of reasoning: run one
+ * REAL body-composition report through both providers with the identical
+ * prompt the live route uses, and hand back both parsed results so they can
+ * be compared field by field.
+ *
+ * Deliberately spends on both providers — that is the point of the test —
+ * and charges no user's quota, since no user made the request.
+ */
+app.post('/admin/api/test-report', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const parsed = parseBodyReadingBody(await c.req.json<BodyReadingBody>().catch(() => ({})));
+  if (!parsed) return c.json({ error: 'invalid_request' }, 400);
+  const prompt = bodyReadingPrompt(parsed.language);
+  const isPdf = 'pdf' in parsed;
+
+  const claudeStart = Date.now();
+  const claude = await (isPdf
+    ? analyzeDocument(parsed.pdf, prompt, MODEL)
+    : analyze(parsed.image, prompt, MODEL, parsed.mediaType)
+  )
+    .then((raw) => ({ ok: true, ms: Date.now() - claudeStart, model: MODEL, parsed: toBodyReadingAnalysis(raw), raw }))
+    .catch((err) => ({
+      ok: false,
+      ms: Date.now() - claudeStart,
+      model: MODEL,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+
+  if (isPdf) {
+    return c.json({
+      claude,
+      deepseek: {
+        ok: false,
+        skipped: true,
+        error: 'Our DeepSeek client sends images only, so a PDF cannot be compared. Re-run with a photo or screenshot of the report to test DeepSeek.',
+      },
+    });
+  }
+  if (!deepseekConfigured()) {
+    return c.json({ claude, deepseek: { ok: false, skipped: true, error: 'DEEPSEEK_API_KEY is not set on this server.' } });
+  }
+
+  const dsStart = Date.now();
+  const deepseek = await deepseekVisionCall(parsed.image, prompt, 8000)
+    .then((ds) => ({
+      ok: true,
+      ms: Date.now() - dsStart,
+      model: ds.model,
+      inputTokens: ds.inputTokens,
+      outputTokens: ds.outputTokens,
+      parsed: toBodyReadingAnalysis(extractJson(ds.text)),
+      raw: ds.text.slice(0, 2000),
+    }))
+    .catch((err) => ({
+      ok: false,
+      ms: Date.now() - dsStart,
+      error: err instanceof Error ? err.message : String(err),
+    }));
+
+  return c.json({ claude, deepseek });
 });
 
 // A realistic (not trivial) exercise-info prompt, so this actually exercises

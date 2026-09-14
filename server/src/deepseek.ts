@@ -69,8 +69,17 @@ export async function deepseekTextCall(prompt: string, maxTokens = 1500): Promis
   };
 }
 
+interface DeepseekToolCallWire {
+  id?: string;
+  type?: string;
+  function?: { name?: string; arguments?: string };
+}
+
 interface DeepseekChatResponse {
-  choices?: { message?: { content?: string; reasoning_content?: string }; finish_reason?: string }[];
+  choices?: {
+    message?: { content?: string; reasoning_content?: string; tool_calls?: DeepseekToolCallWire[] };
+    finish_reason?: string;
+  }[];
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
@@ -87,6 +96,89 @@ function describeEmptyReply(json: DeepseekChatResponse): string {
     choice?.message?.reasoning_content ? `reasoning_content=${choice.message.reasoning_content.slice(0, 200)}` : null,
   ].filter(Boolean);
   return `${bits.join(', ')} raw=${JSON.stringify(json).slice(0, 400)}`;
+}
+
+// ── Tool calling ───────────────────────────────────────────────────────────
+
+/** A tool the model may call, in OpenAI's function-calling shape. The
+ * `parameters` object is plain JSON Schema — the same schema Anthropic takes
+ * as `input_schema`, so our existing tool definitions convert by renaming
+ * one field (see toDeepseekTool in index.ts). */
+export interface DeepseekTool {
+  type: 'function';
+  function: { name: string; description?: string; parameters: unknown };
+}
+
+export interface DeepseekChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+export interface DeepseekToolResult extends DeepseekResult {
+  /** Every tool the model chose to call, with `arguments` already parsed.
+   * Empty when it answered in prose instead — which is the normal case for
+   * an optional tool like the coach's schedule proposal. */
+  toolCalls: { name: string; args: unknown }[];
+}
+
+/**
+ * Chat completion that may return tool calls. Unlike the plain text/vision
+ * helpers, an empty `content` is NOT an error here: a model that answers
+ * purely by calling a tool legitimately sends no prose with it.
+ *
+ * `forceTool` names a tool the model must call (OpenAI's tool_choice), for
+ * the cases where the whole point of the request is a structured payload.
+ */
+export async function deepseekToolCall(
+  messages: DeepseekChatMessage[],
+  tools: DeepseekTool[],
+  maxTokens = 4000,
+  forceTool?: string,
+): Promise<DeepseekToolResult> {
+  const key = process.env.DEEPSEEK_API_KEY;
+  if (!key) throw new Error('DEEPSEEK_API_KEY not set');
+  const res = await fetch(API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: maxTokens,
+      messages,
+      tools,
+      tool_choice: forceTool ? { type: 'function', function: { name: forceTool } } : 'auto',
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`DeepSeek tool request failed: ${res.status} ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as DeepseekChatResponse;
+  const message = json.choices?.[0]?.message;
+  const toolCalls: { name: string; args: unknown }[] = [];
+  for (const call of message?.tool_calls ?? []) {
+    const name = call.function?.name;
+    if (!name) continue;
+    try {
+      toolCalls.push({ name, args: JSON.parse(call.function?.arguments ?? '{}') });
+    } catch {
+      // A tool call truncated mid-JSON (the reasoning budget ran out) is
+      // dropped rather than thrown: the caller's sanitizer would reject it
+      // anyway, and for an optional tool the prose reply still stands.
+      console.warn(`DeepSeek tool call "${name}" had unparseable arguments; ignoring it`);
+    }
+  }
+  const text = message?.content ?? '';
+  // Only a reply with neither prose nor a usable tool call is a real failure.
+  if (!text && toolCalls.length === 0) {
+    throw new Error(`DeepSeek tool reply was empty: ${describeEmptyReply(json)}`);
+  }
+  return {
+    text,
+    toolCalls,
+    model: MODEL,
+    inputTokens: json.usage?.prompt_tokens ?? 0,
+    outputTokens: json.usage?.completion_tokens ?? 0,
+  };
 }
 
 /** Vision completion — one photo + a text prompt, OpenAI-compatible content-block format. */

@@ -163,6 +163,23 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
+      <b>Report test — DeepSeek vs Claude on a real report</b>
+      <div class="sub" style="margin:4px 0 10px">Body readings are the one job still pinned to Claude, on the assumption that DeepSeek's image detail is too coarse to transcribe a printed table of numbers. This settles it: pick a real InBody/Tanita/DEXA report and both providers read it with the identical prompt the live route uses, shown field by field below. A photo or screenshot compares both; a PDF runs Claude only, since our DeepSeek client sends images. <b>This spends on both providers</b> — that is the point — and uses nobody's monthly allowance.</div>
+      <div class="row" style="margin-bottom:10px">
+        <div><label>Report file (image or PDF)</label><input id="rep_file" type="file" accept="image/*,application/pdf" /></div>
+        <button class="ghost" onclick="testReport()">Run report test</button>
+      </div>
+      <div id="rep_msg" class="sub hide"></div>
+      <div class="scroll hide" id="rep_wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Claude</th><th>DeepSeek</th><th>Match</th></tr></thead>
+          <tbody id="rep_rows"></tbody>
+        </table>
+      </div>
+      <div id="rep_raw" class="sub hide" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
       <b>DeepSeek connection test</b>
       <div class="sub" style="margin:4px 0 10px">Fires one real DeepSeek text call (an exercise-info lookup) so you can confirm the key works and the model is answering, without spending a user's scan on it. Worth running right after changing any tier to DeepSeek above.</div>
       <div class="row" style="margin-bottom:10px">
@@ -326,6 +343,75 @@ export const ADMIN_HTML = `<!doctype html>
       render();
       box.textContent = 'Saved — the app shows these on its next launch. Store billing is unchanged.';
     }).catch(function (e) { box.textContent = 'Request failed: ' + e; });
+  }
+  /** Flatten a BodyReadingAnalysis into comparable "field -> value" pairs,
+   * segmental sub-objects included, so the table can line the two up. */
+  function flattenReading(r) {
+    var out = {};
+    if (!r) return out;
+    ['deviceLabel','testDate','weightKg','bodyFatPercent','skeletalMuscleMassKg'].forEach(function (k) {
+      if (r[k] != null) out[k] = r[k];
+    });
+    ['segmentalLeanMassKg','segmentalFatMassKg','segmentalLeanMassStatus','segmentalFatMassStatus'].forEach(function (g) {
+      var v = r[g]; if (!v) return;
+      Object.keys(v).forEach(function (k) { if (v[k] != null) out[g.replace('segmental','').replace('Kg','') + '.' + k] = v[k]; });
+    });
+    return out;
+  }
+  function testReport() {
+    var msg = document.getElementById('rep_msg');
+    var input = document.getElementById('rep_file');
+    var file = input.files && input.files[0];
+    msg.classList.remove('hide');
+    if (!file) { msg.textContent = 'Pick a report file first.'; return; }
+    msg.textContent = 'Reading ' + file.name + ' and sending to both providers…';
+    document.getElementById('rep_wrap').classList.add('hide');
+    document.getElementById('rep_raw').classList.add('hide');
+    var reader = new FileReader();
+    reader.onload = function () {
+      var b64 = String(reader.result).split(',')[1] || '';
+      var isPdf = file.type === 'application/pdf' || /\\.pdf$/i.test(file.name);
+      var body = isPdf ? { pdf: b64 } : { image: b64, imageMediaType: file.type || 'image/jpeg' };
+      api('/admin/api/test-report', body).then(function (r) {
+        if (r.error) { msg.textContent = 'Error: ' + r.error; return; }
+        renderReport(r);
+      }).catch(function (e) { msg.textContent = 'Request failed: ' + e; });
+    };
+    reader.onerror = function () { msg.textContent = 'Could not read that file.'; };
+    reader.readAsDataURL(file);
+  }
+  function renderReport(r) {
+    var msg = document.getElementById('rep_msg');
+    var c = r.claude || {}, d = r.deepseek || {};
+    var cFlat = flattenReading(c.parsed), dFlat = flattenReading(d.parsed);
+    var keys = Object.keys(cFlat).concat(Object.keys(dFlat)).filter(function (k, i, a) { return a.indexOf(k) === i; }).sort();
+    var agree = 0, compared = 0, html = '';
+    keys.forEach(function (k) {
+      var cv = cFlat[k], dv = dFlat[k];
+      var both = cv != null && dv != null;
+      // Numbers within 2% count as agreement — two OCR reads of the same
+      // printed figure shouldn't be called a mismatch over rounding.
+      var same = both && (typeof cv === 'number' && typeof dv === 'number'
+        ? Math.abs(cv - dv) <= Math.max(0.05, Math.abs(cv) * 0.02)
+        : String(cv).trim().toLowerCase() === String(dv).trim().toLowerCase());
+      if (both) { compared++; if (same) agree++; }
+      var mark = !both ? '<span class="muted">—</span>' : same ? '<span style="color:var(--primary)">✓</span>' : '<span style="color:var(--danger)">✗</span>';
+      html += '<tr><td>' + esc(k) + '</td><td>' + (cv == null ? '<span class="muted">—</span>' : esc(String(cv))) +
+        '</td><td>' + (dv == null ? '<span class="muted">—</span>' : esc(String(dv))) + '</td><td>' + mark + '</td></tr>';
+    });
+    document.getElementById('rep_rows').innerHTML = html || '<tr><td colspan="4" class="muted">Neither provider returned any readable field.</td></tr>';
+    document.getElementById('rep_wrap').classList.remove('hide');
+    var parts = [];
+    parts.push(c.ok ? 'Claude read ' + Object.keys(cFlat).length + ' fields in ' + c.ms + 'ms' : 'Claude failed: ' + esc(c.error || '?'));
+    if (d.skipped) parts.push('DeepSeek skipped — ' + esc(d.error || ''));
+    else parts.push(d.ok ? 'DeepSeek read ' + Object.keys(dFlat).length + ' fields in ' + d.ms + 'ms' : 'DeepSeek failed: ' + esc(d.error || '?'));
+    if (compared) parts.push('<b>' + agree + ' of ' + compared + ' shared fields agree.</b>');
+    msg.innerHTML = parts.join(' · ');
+    if (d.raw) {
+      var raw = document.getElementById('rep_raw');
+      raw.classList.remove('hide');
+      raw.innerHTML = '<b>DeepSeek raw reply:</b><br><code>' + esc(String(d.raw).slice(0, 1200)) + '</code>';
+    }
   }
   function testDeepseekVision() {
     var box = document.getElementById('dstest');
