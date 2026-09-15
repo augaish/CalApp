@@ -335,9 +335,26 @@ export default function Coach() {
   );
 }
 
+/**
+ * Which way a single message should read, from its own text rather than the
+ * app's language setting. The coach answers in whichever language it was
+ * spoken to, so one conversation can hold both — and left-aligned Arabic
+ * (or right-aligned English) is exactly what that looks like when every
+ * bubble inherits one direction from the app.
+ *
+ * Counts letters of each script and lets the majority win, so a mostly-
+ * Arabic reply quoting "bench press" still reads right-to-left.
+ */
+function directionOf(text: string): 'rtl' | 'ltr' {
+  const arabic = (text.match(/[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/g) ?? []).length;
+  const latin = (text.match(/[A-Za-z]/g) ?? []).length;
+  return arabic > latin ? 'rtl' : 'ltr';
+}
+
 function Bubble({ role, text }: { role: 'user' | 'assistant'; text: string }) {
   const theme = useTheme();
   const isUser = role === 'user';
+  const rtl = directionOf(text) === 'rtl';
   return (
     <View
       style={[
@@ -347,7 +364,15 @@ function Bubble({ role, text }: { role: 'user' | 'assistant'; text: string }) {
           : [styles.assistant, { backgroundColor: theme.card }, cardShadow(theme.shadow)],
       ]}
     >
-      <Text style={{ color: isUser ? theme.onPrimary : theme.text, fontSize: 15, lineHeight: 21 }}>
+      <Text
+        style={{
+          color: isUser ? theme.onPrimary : theme.text,
+          fontSize: 15,
+          lineHeight: 21,
+          textAlign: rtl ? 'right' : 'left',
+          writingDirection: rtl ? 'rtl' : 'ltr',
+        }}
+      >
         {text}
       </Text>
     </View>

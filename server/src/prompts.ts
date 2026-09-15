@@ -184,6 +184,14 @@ Rules:
  * The rule is also repeated as the closing line below, because that is the part
  * of a long system prompt the model weighs most.
  */
+/**
+ * How to sound in each language. The one-shot prompts (program design, meal
+ * analysis) pick the entry for the app's configured language, because their
+ * output is stored and rendered in the app's UI. The coach picks BOTH — see
+ * coachSystemPrompt — because it answers in whichever language it was
+ * spoken to, so it needs the Arabic voice available even on an
+ * English-configured app.
+ */
 const VOICE: Record<Language, string> = {
   en: 'Reply in English, in a warm and direct coaching voice.',
   ar: `تكلم بالعربية بلهجة سعودية واضحة (نجدية/خليجية)، مثل مدرب سعودي يتكلم مع عميله — لا فصحى جامدة ولا لهجة مصرية.
@@ -233,17 +241,29 @@ The data above is labelled in English for convenience. ${lock}`;
 }
 
 export function coachSystemPrompt(language: Language, context?: string): string {
-  const lock = `Write your entire reply in ${LANGUAGE_NAME[language]}, whatever language the user's message is in.`;
+  // A conversation, unlike everything else this server asks for, is not
+  // stored and re-rendered in the app's UI — so it follows the person rather
+  // than the app's language setting. Writing in Arabic and being answered in
+  // English (because the app happens to be set to English) is the bug this
+  // replaced; the old rule said the opposite in as many words.
+  const lock = `LANGUAGE — match the user, not the app:
+- Reply in the SAME language the user's latest message is written in. Arabic in, Arabic out. English in, English out. This holds even when it differs from the app's language setting, and even when earlier messages in this conversation were in the other language — follow the latest one.
+- If that message is too short or ambiguous to tell (a bare number, an emoji, a single word that exists in both, "ok"), use ${LANGUAGE_NAME[language]}, and stay in whatever language the conversation was already using.
+- The one exception: if they explicitly ask for a translation, or ask you to answer in a particular language, do exactly that.`;
   const base = `You are Calgym Coach, a friendly certified nutrition and fitness coach.
 
 ${lock}
-${VOICE[language]}
+
+When you reply in English: ${VOICE.en}
+عندما ترد بالعربية: ${VOICE.ar}
 
 - Keep replies short: 2-5 sentences, practical and specific.
 - You know Middle Eastern and Gulf cuisine and gym training well.
 - Never give medical diagnoses; suggest seeing a professional for medical issues.
 
-${SCHEDULE_TOOL_GUIDE}`;
+${SCHEDULE_TOOL_GUIDE}
+
+One thing does NOT follow the user's message language: if you call propose_weekly_schedule, write every day "title" in ${LANGUAGE_NAME[language]}. Those titles are saved into the user's weekly schedule and shown throughout an app set to ${LANGUAGE_NAME[language]}, so they have to match it — your prose reply alongside the card still follows the rule above.`;
   if (!context) return `${base}\n\n${lock}`;
   return `${base}
 
