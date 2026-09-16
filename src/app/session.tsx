@@ -87,7 +87,13 @@ export default function SessionScreen() {
   const todayWorkout = exId ? workoutFor(workouts, exId, day) : undefined;
   const doneSets = todayWorkout?.sets.filter((s) => s.done) ?? [];
   const setNo = doneSets.length;
-  const target: SetShape | undefined = planned[setNo] ?? planned[planned.length - 1];
+  // Only while the plan actually has a row for this set. It used to fall back
+  // to `planned[planned.length - 1]`, so a fourth set on a three-set plan was
+  // handed the third row again and called it a target — an instruction nobody
+  // wrote, printed directly under "All planned sets done", and worse, fed to
+  // the steppers: you finish 40 kg × 3 and the inputs reset to a stale 30 × 8.
+  // Past the plan there is no target, and saying so is the honest answer.
+  const target: SetShape | undefined = planned[setNo];
   // The record to beat, not "whatever came last". The old reference read the
   // same set number out of your previous session and, when that session was
   // shorter than this one, fell through to its *final* set — the burnout set
@@ -103,12 +109,14 @@ export default function SessionScreen() {
   const lastSet: SetShape | undefined =
     lastSession?.sets[setNo] ?? lastSession?.sets[lastSession.sets.length - 1];
 
-  // This set's inputs: prefilled from the plan's target, else what was lifted
-  // last time, else the set just completed — so an unchanged set is one tap.
+  // This set's inputs: the plan's target while there is one, else the set you
+  // have just finished, else last time — so an unchanged set is one tap. Today
+  // comes before last week because an extra set follows on from the set before
+  // it, not from the same position in a different session.
   // Hand edits are kept per (exercise, set number) and simply fall away when
   // either changes, rather than being synced back and forth in an effect.
   const prefillKey = `${exId ?? ''}:${setNo}`;
-  const prefillSrc = target ?? lastSet ?? doneSets[doneSets.length - 1];
+  const prefillSrc = target ?? doneSets[doneSets.length - 1] ?? lastSet;
   const prefill: Required<SetShape> = {
     weightKg: prefillSrc?.weightKg ?? 0,
     reps: prefillSrc?.reps ?? 0,
@@ -390,10 +398,23 @@ export default function SessionScreen() {
           )}
         </View>
         <View style={styles.refRow}>
-          <View style={styles.ref}>
-            <Text style={[styles.refLabel, { color: theme.textTertiary }]}>{t('session.target')}</Text>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>{label(target)}</Text>
-          </View>
+          {/* No cell at all past the plan. An empty "Target —" would be one
+              more thing to read that says nothing. */}
+          {target && (
+            <Pressable
+              style={styles.ref}
+              // "Where does this number come from?" should be answerable, and
+              // answerable by going there. It comes from the sets saved
+              // against this weekday — which is also the only place to change
+              // it, so a target that has fallen behind what you actually lift
+              // is one tap from being fixed instead of a mystery.
+              onPress={() => router.push(`/schedule-plan?weekday=${day.getDay()}&id=${encodeURIComponent(exId ?? '')}`)}
+            >
+              <Text style={[styles.refLabel, { color: theme.textTertiary }]}>{t('session.target')}</Text>
+              <Text style={{ color: theme.text, fontWeight: '700' }}>{label(target)}</Text>
+              <Text style={{ color: theme.primary, fontSize: 11 }}>{t('session.targetFromPlan')}</Text>
+            </Pressable>
+          )}
           <View style={styles.ref}>
             <Text style={[styles.refLabel, { color: theme.textTertiary }]}>{t('session.best')}</Text>
             <Text style={{ color: theme.text, fontWeight: '700' }}>{label(best?.set)}</Text>

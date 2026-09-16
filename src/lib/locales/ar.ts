@@ -180,6 +180,7 @@ export const ar: TranslationSchema = {
     setNumber: 'المجموعة {{n}}',
     setsOfPlanned: '{{done}}/{{planned}} مجموعات',
     target: 'الهدف',
+    targetFromPlan: 'من خطتك الأسبوعية · تعديل',
     lastAtReps: 'آخر × {{reps}}:',
     noRepsRecord: 'لا توجد مجموعة مكتملة بهذا العدد بعد',
     whenToday: 'اليوم',

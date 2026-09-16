@@ -178,6 +178,7 @@ export const en = {
     setNumber: 'Set {{n}}',
     setsOfPlanned: '{{done}}/{{planned}} sets',
     target: 'Target',
+    targetFromPlan: 'From your weekly plan · edit',
     lastAtReps: 'Last × {{reps}}:',
     noRepsRecord: 'No completed set at these reps yet',
     whenToday: 'today',
