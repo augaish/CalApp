@@ -98,6 +98,13 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
+      <b>Product review queue</b>
+      <div class="sub" style="margin:4px 0 10px">Products read from a label photo are served back to whoever added them, and to nobody else until checked here. Compare the readings — two people reading the same label differently is the signal something is wrong — then publish the right one to everyone, or reject it.</div>
+      <div id="queue_empty" class="muted">Nothing waiting.</div>
+      <div id="queue"></div>
+    </div>
+
+    <div class="card">
       <b>Grant or revoke Pro</b>
       <div class="row">
         <div><label>User ref</label><input id="g_ref" placeholder="paste from the table" /></div>
@@ -260,6 +267,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('lim_free').value = data.limits.free;
     document.getElementById('lim_pro').value = data.limits.pro;
     document.getElementById('lim_proplus').value = data.limits.proPlus;
+    loadQueue();
     var W = data.weights || {};
     WEIGHT_KINDS.forEach(function (k) {
       var el = document.getElementById('w_' + k);
@@ -495,6 +503,87 @@ export const ADMIN_HTML = `<!doctype html>
       days: isNaN(days) ? undefined : days,
       note: document.getElementById('g_note').value || undefined,
     }).then(load);
+  }
+  function renderQueue(rows) {
+    var host = document.getElementById('queue');
+    var empty = document.getElementById('queue_empty');
+    host.innerHTML = '';
+    empty.className = rows.length ? 'hide' : 'muted';
+    rows.forEach(function (r) {
+      var box = document.createElement('div');
+      box.style.cssText = 'border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px';
+
+      var head = document.createElement('div');
+      head.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap';
+      var code = document.createElement('b');
+      code.textContent = r.barcode;
+      head.appendChild(code);
+      var src = document.createElement('span');
+      src.className = 'pill free';
+      src.textContent = r.source;
+      head.appendChild(src);
+      if (r.flags > 0) {
+        var flag = document.createElement('span');
+        flag.className = 'pill';
+        flag.style.cssText = 'background:rgba(229,87,78,.18);color:#E5574E';
+        flag.textContent = r.flags + ' reported';
+        head.appendChild(flag);
+      }
+      var hits = document.createElement('span');
+      hits.className = 'muted';
+      hits.textContent = r.hits + ' lookups';
+      head.appendChild(hits);
+      box.appendChild(head);
+
+      var scroll = document.createElement('div');
+      scroll.className = 'scroll';
+      scroll.style.marginTop = '8px';
+      var table = document.createElement('table');
+      table.innerHTML = '<thead><tr><th>Name</th><th>kcal</th><th>Protein</th><th>From</th></tr></thead>';
+      var tbody = document.createElement('tbody');
+      r.submissions.forEach(function (sub) {
+        var it = sub.item || {};
+        var tr = document.createElement('tr');
+        // Built as text nodes, never as markup: a product name comes from a
+        // user's photo and must never be able to run as HTML in here.
+        [it.name || '?', it.calories != null ? it.calories : '?',
+         it.proteinG != null ? it.proteinG : '?', sub.ref || 'anon'].forEach(function (v, i) {
+          var td = document.createElement('td');
+          td.textContent = String(v);
+          if (i === 3) td.className = 'muted';
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      scroll.appendChild(table);
+      box.appendChild(scroll);
+
+      var actions = document.createElement('div');
+      actions.className = 'row';
+      actions.style.marginTop = '10px';
+      var pub = document.createElement('button');
+      pub.textContent = 'Publish to everyone';
+      pub.addEventListener('click', function () { reviewBarcode(r.barcode, 'publish'); });
+      var rej = document.createElement('button');
+      rej.className = 'ghost';
+      rej.textContent = 'Reject';
+      rej.addEventListener('click', function () { reviewBarcode(r.barcode, 'reject'); });
+      actions.appendChild(pub);
+      actions.appendChild(rej);
+      box.appendChild(actions);
+
+      host.appendChild(box);
+    });
+  }
+  function loadQueue() {
+    fetch('/admin/api/barcode-queue', { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderQueue(d.queue || []); })
+      .catch(function () {});
+  }
+  function reviewBarcode(barcode, action) {
+    api('/admin/api/barcode-review', { barcode: barcode, action: action }).then(loadQueue);
   }
   var WEIGHT_KINDS = ['meal','describe','equipment','exercise','bodyReading','coach','program'];
   function saveWeights() {

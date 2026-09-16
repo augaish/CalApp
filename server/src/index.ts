@@ -31,6 +31,8 @@ import {
   createShareLink,
   deleteUser,
   deleteWhoopConnection,
+  barcodeQueue,
+  flagBarcode,
   getCachedBarcode,
   getCachedEquipment,
   getOrCreateUser,
@@ -47,7 +49,10 @@ import {
   recordTokens,
   resolveRef,
   saveWhoopOAuthState,
+  reviewBarcode,
   setCachedBarcode,
+  submissionsToday,
+  submitBarcode,
   setCachedEquipment,
   setSetting,
   setUserDevice,
@@ -783,6 +788,9 @@ async function providerFor(access: Access): Promise<AiProvider> {
  * field matched Claude, including the fat-percent-vs-fat-mass trap and the
  * Arabic status words — so the route now follows the tier like the rest.
  */
+/** Products one person may add per day before the queue stops accepting them. */
+const SUBMISSIONS_PER_DAY = 25;
+
 const AI_PROVIDER_FIXED_ROUTES = [
   {
     route: 'PDF uploads only',
@@ -919,11 +927,14 @@ function isPlausibleBarcode(v: string): boolean {
 app.get('/api/barcode', async (c) => {
   const code = (c.req.query('code') ?? '').trim();
   if (!isPlausibleBarcode(code)) return c.json({ error: 'invalid_request' }, 400);
-  const cached = await getCachedBarcode(code);
+  const ref = await callerRef(c);
+  const cached = await getCachedBarcode(code, ref);
   // `source` tells the app whether this product's facts came from Open Food
   // Facts, which is ODbL-licensed and must be credited on screen, or from our
-  // own label reads, which need no credit.
-  if (cached) return c.json({ item: cached.item, source: cached.source });
+  // own label reads, which need no credit. `status` marks a reading that has
+  // not been checked by a person yet — served back to whoever contributed it,
+  // never to anyone else.
+  if (cached) return c.json({ item: cached.item, source: cached.source, status: cached.status });
   try {
     const item = await lookupOffBarcode(code);
     if (item) await setCachedBarcode(code, item, 'off');
@@ -956,12 +967,32 @@ app.post('/api/barcode/report', async (c) => {
   ) {
     return c.json({ error: 'invalid_request' }, 400);
   }
-  // Never overwrite a product OFF (or an earlier scan) already resolved —
-  // one AI-vision read of one person's packaging is a plausible source of
-  // error, and the first answer in is generally the more careful one.
-  const existing = await getCachedBarcode(barcode);
-  if (!existing) await setCachedBarcode(barcode, item, 'photo');
-  return c.json({ ok: true });
+  const ref = await callerRef(c);
+  // One person can add a reasonable number of products a day. Beyond that it
+  // is a misfiring client or someone gaming the catalogue, and either way a
+  // reviewer should not have to wade through it.
+  if (ref && (await submissionsToday(ref)) >= SUBMISSIONS_PER_DAY) {
+    return c.json({ error: 'rate_limited' }, 429);
+  }
+  // Every reading is recorded, including one that disagrees with what is
+  // already on file — that disagreement is exactly the signal a reviewer
+  // needs, and dropping it (as this route used to) threw it away. The cache
+  // row is still only created when nothing is there, and starts unpublished.
+  const result = await submitBarcode(barcode, item, ref);
+  return c.json({ ok: result.recorded, conflicting: result.conflicting });
+});
+
+/**
+ * "This product is wrong." Enough reports and it stops being served to
+ * everyone until a person looks at it — a wrong entry left published is worse
+ * than no entry at all, because it is silently believed.
+ */
+app.post('/api/barcode/flag', async (c) => {
+  const body = await c.req.json<{ barcode?: string }>().catch(() => ({}) as never);
+  const barcode = (body.barcode ?? '').trim();
+  if (!isPlausibleBarcode(barcode)) return c.json({ error: 'invalid_request' }, 400);
+  const flags = await flagBarcode(barcode);
+  return c.json({ ok: true, flags });
 });
 
 app.post('/api/analyze-equipment', async (c) => {
@@ -2250,6 +2281,28 @@ app.post('/admin/api/weights', async (c) => {
   }
   await setSetting('action_weights', next);
   return c.json({ ok: true, weights: await actionWeights() });
+});
+
+/** Products waiting on a person, newest and most-reported first, each with
+ * every competing reading so two can be compared side by side. */
+app.get('/admin/api/barcode-queue', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ queue: await barcodeQueue(50) });
+});
+
+/** Publish a checked product to everyone, or reject it. Publishing stamps
+ * when it was checked, which is the only thing that makes "verified" mean
+ * anything later. */
+app.post('/admin/api/barcode-review', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req
+    .json<{ barcode?: string; action?: string; item?: unknown }>()
+    .catch(() => ({}) as never);
+  const barcode = (body.barcode ?? '').trim();
+  const action = body.action === 'reject' ? 'reject' : 'publish';
+  if (!isPlausibleBarcode(barcode)) return c.json({ error: 'invalid_request' }, 400);
+  const ok = await reviewBarcode(barcode, action, body.item);
+  return c.json({ ok });
 });
 
 /** The rented sponsor slot (a real advertiser you sell the spot to). */

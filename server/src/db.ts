@@ -71,6 +71,33 @@ export async function initDb(): Promise<void> {
       PRIMARY KEY (ref, period, kind)
     );
   `);
+  // Catalogue quality. A product read from a photo is one person's reading of
+  // one label in one light — good enough for them, not yet good enough to hand
+  // to everyone. `status` is what separates the two.
+  await pool.query(
+    `ALTER TABLE barcode_cache ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'published'`,
+  );
+  await pool.query(`ALTER TABLE barcode_cache ADD COLUMN IF NOT EXISTS contributed_by TEXT`);
+  await pool.query(`ALTER TABLE barcode_cache ADD COLUMN IF NOT EXISTS verified_at TIMESTAMPTZ`);
+  await pool.query(`ALTER TABLE barcode_cache ADD COLUMN IF NOT EXISTS flags INTEGER NOT NULL DEFAULT 0`);
+  // Every reading ever submitted for a barcode, not just the first. Two people
+  // reading the same label differently is the signal a reviewer needs, and the
+  // old write-once behaviour threw the second one away.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS barcode_submissions (
+      id         BIGSERIAL PRIMARY KEY,
+      barcode    TEXT NOT NULL,
+      item       JSONB NOT NULL,
+      ref        TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS barcode_submissions_barcode_idx ON barcode_submissions (barcode)`,
+  );
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS barcode_submissions_ref_idx ON barcode_submissions (ref, created_at)`,
+  );
   // Real token counts and their estimated USD cost (see pricing.ts), summed
   // onto the same row `reserve()` already creates — added after the fact via
   // ALTER so an existing deployment's counters keep their count history.
@@ -898,18 +925,180 @@ export async function setCachedEquipment(
  * such obligation, so the app can tell the two apart. */
 export async function getCachedBarcode(
   barcode: string,
-): Promise<{ item: unknown; source: string } | null> {
+  /** Who is asking. A pending entry is served back to the person who
+   * contributed it — it is their own reading, and withholding it would only
+   * make them scan the same label twice — but to nobody else until reviewed. */
+  ref?: string | null,
+): Promise<{ item: unknown; source: string; status: string } | null> {
   if (!pool) return null;
   try {
     const res = await pool.query(
-      'UPDATE barcode_cache SET hits = hits + 1 WHERE barcode = $1 RETURNING item, source',
-      [barcode],
+      `UPDATE barcode_cache SET hits = hits + 1
+        WHERE barcode = $1
+          AND (status = 'published' OR (status = 'pending' AND contributed_by IS NOT DISTINCT FROM $2))
+        RETURNING item, source, status`,
+      [barcode, ref ?? null],
     );
     const row = res.rows[0];
-    return row ? { item: row.item, source: row.source ?? 'off' } : null;
+    return row ? { item: row.item, source: row.source ?? 'off', status: row.status ?? 'published' } : null;
   } catch (err) {
     console.error('barcode cache read failed:', err);
     return null;
+  }
+}
+
+/** How many products this caller has submitted in the last day — the basis
+ * for a contribution cap, so one misfiring client cannot flood the queue. */
+export async function submissionsToday(ref: string): Promise<number> {
+  if (!pool) return 0;
+  try {
+    const res = await pool.query(
+      `SELECT COUNT(*)::int AS n FROM barcode_submissions
+        WHERE ref = $1 AND created_at > now() - interval '1 day'`,
+      [ref],
+    );
+    return res.rows[0]?.n ?? 0;
+  } catch (err) {
+    console.error('submissionsToday failed:', err);
+    return 0;
+  }
+}
+
+/**
+ * File one person's reading of a label.
+ *
+ * Always recorded as a submission, even when a cache row already exists —
+ * a second, different reading of the same barcode is exactly what tells a
+ * reviewer something is wrong, and the old write-once behaviour discarded it.
+ * The cache row itself is only created when there is nothing there yet, and
+ * it starts pending.
+ */
+export async function submitBarcode(
+  barcode: string,
+  item: unknown,
+  ref: string | null,
+): Promise<{ recorded: boolean; conflicting: boolean }> {
+  if (!pool) return { recorded: false, conflicting: false };
+  try {
+    await pool.query(
+      'INSERT INTO barcode_submissions (barcode, item, ref) VALUES ($1, $2, $3)',
+      [barcode, JSON.stringify(item), ref],
+    );
+    const existing = await pool.query('SELECT item FROM barcode_cache WHERE barcode = $1', [barcode]);
+    if (existing.rowCount === 0) {
+      await pool.query(
+        `INSERT INTO barcode_cache (barcode, item, source, status, contributed_by)
+         VALUES ($1, $2, 'photo', 'pending', $3)
+         ON CONFLICT (barcode) DO NOTHING`,
+        [barcode, JSON.stringify(item), ref],
+      );
+      return { recorded: true, conflicting: false };
+    }
+    // Something is already on file. Whether this agrees with it is the
+    // reviewer's question, not ours — we only flag that they differ.
+    const before = existing.rows[0].item as { calories?: number } | null;
+    const after = item as { calories?: number } | null;
+    const conflicting =
+      typeof before?.calories === 'number' &&
+      typeof after?.calories === 'number' &&
+      Math.abs(before.calories - after.calories) > Math.max(20, before.calories * 0.15);
+    return { recorded: true, conflicting };
+  } catch (err) {
+    console.error('submitBarcode failed:', err);
+    return { recorded: false, conflicting: false };
+  }
+}
+
+/** Someone says a shared product is wrong. Enough of those and it stops being
+ * shared until a person looks at it — a wrong entry left published is worse
+ * than no entry at all. */
+export async function flagBarcode(barcode: string, threshold = 3): Promise<number> {
+  if (!pool) return 0;
+  try {
+    const res = await pool.query(
+      `UPDATE barcode_cache SET flags = flags + 1,
+         status = CASE WHEN flags + 1 >= $2 AND source = 'photo' THEN 'pending' ELSE status END
+        WHERE barcode = $1 RETURNING flags`,
+      [barcode, threshold],
+    );
+    return res.rows[0]?.flags ?? 0;
+  } catch (err) {
+    console.error('flagBarcode failed:', err);
+    return 0;
+  }
+}
+
+export interface QueuedBarcode {
+  barcode: string;
+  item: unknown;
+  source: string;
+  status: string;
+  hits: number;
+  flags: number;
+  createdAt: string;
+  submissions: { item: unknown; ref: string | null; createdAt: string }[];
+}
+
+/** Everything waiting on a person: pending entries, newest first, each with
+ * every competing reading so they can be compared side by side. */
+export async function barcodeQueue(limit = 50): Promise<QueuedBarcode[]> {
+  if (!pool) return [];
+  try {
+    const res = await pool.query(
+      `SELECT barcode, item, source, status, hits, flags, created_at
+         FROM barcode_cache WHERE status = 'pending'
+        ORDER BY flags DESC, hits DESC, created_at DESC LIMIT $1`,
+      [limit],
+    );
+    const out: QueuedBarcode[] = [];
+    for (const row of res.rows) {
+      const subs = await pool.query(
+        `SELECT item, ref, created_at FROM barcode_submissions
+          WHERE barcode = $1 ORDER BY created_at DESC LIMIT 10`,
+        [row.barcode],
+      );
+      out.push({
+        barcode: row.barcode,
+        item: row.item,
+        source: row.source,
+        status: row.status,
+        hits: row.hits,
+        flags: row.flags,
+        createdAt: row.created_at,
+        submissions: subs.rows.map((r) => ({ item: r.item, ref: r.ref, createdAt: r.created_at })),
+      });
+    }
+    return out;
+  } catch (err) {
+    console.error('barcodeQueue failed:', err);
+    return [];
+  }
+}
+
+/** A person's decision on a queued product. Publishing stamps when it was
+ * checked, which is the only thing that makes "verified" mean anything. */
+export async function reviewBarcode(
+  barcode: string,
+  action: 'publish' | 'reject',
+  item?: unknown,
+): Promise<boolean> {
+  if (!pool) return false;
+  try {
+    if (action === 'reject') {
+      await pool.query(`UPDATE barcode_cache SET status = 'rejected' WHERE barcode = $1`, [barcode]);
+      return true;
+    }
+    await pool.query(
+      `UPDATE barcode_cache
+          SET status = 'published', verified_at = now(), flags = 0
+              ${item ? ', item = $2' : ''}
+        WHERE barcode = $1`,
+      item ? [barcode, JSON.stringify(item)] : [barcode],
+    );
+    return true;
+  } catch (err) {
+    console.error('reviewBarcode failed:', err);
+    return false;
   }
 }
 
