@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { categoryForMuscles, findExercise } from './exercises';
+import { perServing, roundMacros, scaleMacros, servingCountLabel } from './recipes';
 import { dailyTargets } from './tdee';
 import type {
   ActiveSession,
@@ -109,6 +110,16 @@ interface AppState {
    * meal stands in for that slot. Empty for days following the plan as
    * written. Additive (old persisted state simply lacks it → `{}`). */
   mealPlanSwaps: Record<string, Partial<Record<MealType, number>>>;
+  /**
+   * A recipe standing in for one planned slot on ONE specific date
+   * (dateKey → slot → which recipe, and how much of it is one portion).
+   *
+   * Deliberately per-date rather than per-weekday: replacing today's lunch
+   * should change today's lunch, not every Tuesday for the rest of the
+   * programme. Changing the saved recipe, or other days, stays an explicit
+   * separate act. Additive — old persisted state simply lacks it.
+   */
+  mealPlanRecipes: Record<string, Partial<Record<MealType, { recipeId: string; servings: number }>>>;
   remindMeals: boolean;
   remindWater: boolean;
   remindWorkouts: boolean;
@@ -265,6 +276,13 @@ interface AppState {
    * meal in that slot from another weekday — "not kabsa today, give me
    * Tuesday's lunch instead". Pass null to go back to the day's own meal. */
   swapPlannedMeal: (dayKey: string, slot: MealType, fromWeekday: number | null) => void;
+  /** Point one planned slot on one date at a recipe, or pass null to put the
+   * programme's own meal back. */
+  setPlannedRecipe: (
+    dayKey: string,
+    slot: MealType,
+    value: { recipeId: string; servings: number } | null,
+  ) => void;
   startSession: (day: Date, exerciseIds: string[]) => void;
   updateSession: (patch: Partial<ActiveSession>) => void;
   endSession: () => void;
@@ -370,6 +388,7 @@ export const useAppStore = create<AppState>()(
       weights: [],
       activeProgram: null,
       mealPlanSwaps: {},
+      mealPlanRecipes: {},
       recipes: [],
       remindMeals: true,
       remindWater: true,
@@ -908,6 +927,13 @@ export const useAppStore = create<AppState>()(
         })),
       deleteWeight: (at) => set((s) => ({ weights: s.weights.filter((w) => w.at !== at) })),
       setActiveProgram: (activeProgram) => set({ activeProgram }),
+      setPlannedRecipe: (dayKey, slot, value) =>
+        set((s) => {
+          const day = { ...(s.mealPlanRecipes[dayKey] ?? {}) };
+          if (value == null) delete day[slot];
+          else day[slot] = value;
+          return { mealPlanRecipes: { ...s.mealPlanRecipes, [dayKey]: day } };
+        }),
       swapPlannedMeal: (dayKey, slot, fromWeekday) =>
         set((s) => {
           const day = { ...(s.mealPlanSwaps[dayKey] ?? {}) };
@@ -1059,6 +1085,7 @@ export const useAppStore = create<AppState>()(
         weights,
         activeProgram,
         mealPlanSwaps,
+        mealPlanRecipes,
         remindMeals,
         remindWater,
         remindWorkouts,
@@ -1095,6 +1122,7 @@ export const useAppStore = create<AppState>()(
         weights,
         activeProgram,
         mealPlanSwaps,
+        mealPlanRecipes,
         remindMeals,
         remindWater,
         remindWorkouts,
@@ -1288,6 +1316,9 @@ function migrateStore(persisted: unknown, version: number): unknown {
   // before v12 looks at the field.
   if (version < 12 && !Array.isArray(state.recipes)) {
     state.recipes = [];
+  }
+  if (version < 12 && !state.mealPlanRecipes) {
+    state.mealPlanRecipes = {};
   }
 
   if (version >= 2) return state;
@@ -2091,12 +2122,52 @@ export function plannedMealFor(
   day: Date,
   slot: MealType,
   swaps: Record<string, Partial<Record<MealType, number>>>,
+  /** Recipe standing in for a slot on a specific date, and the saved recipes
+   * to resolve it against. Both optional, so callers that predate recipes
+   * behave exactly as before. */
+  recipeOverrides?: Record<string, Partial<Record<MealType, { recipeId: string; servings: number }>>>,
+  recipes?: Recipe[],
 ): PlannedMeal | undefined {
+  // A recipe put on this slot wins over both the swap and the programme's own
+  // meal — it is the most specific thing the person asked for, for this date.
+  const override = recipeOverrides?.[dateKey(day)]?.[slot];
+  if (override && recipes) {
+    const recipe = recipes.find((r) => r.id === override.recipeId);
+    // A recipe since deleted falls through to the plan rather than blanking
+    // the slot: the programme's own meal is a better answer than nothing.
+    if (recipe) return plannedMealFromRecipe(recipe, slot, override.servings);
+  }
   if (!plan) return undefined;
   const find = (weekday: number) =>
     plan.days.find((d) => d.weekday === weekday)?.meals.find((m) => m.slot === slot);
   const swapped = swaps[dateKey(day)]?.[slot];
   return (swapped != null ? find(swapped) : undefined) ?? find(day.getDay());
+}
+
+/** A recipe portion expressed as a planned meal, so every screen that already
+ * renders the plan renders this too without knowing recipes exist. */
+export function plannedMealFromRecipe(
+  recipe: Recipe,
+  slot: MealType,
+  servings: number,
+): PlannedMeal {
+  const m = roundMacros(scaleMacros(perServing(recipe), servings));
+  return {
+    slot,
+    name: recipe.name,
+    items: [
+      {
+        name: recipe.name,
+        calories: m.calories,
+        proteinG: m.proteinG,
+        carbsG: m.carbsG,
+        fatG: m.fatG,
+        portion: `${servingCountLabel(servings)}`,
+        recipeId: recipe.id,
+        recipeServings: servings,
+      },
+    ],
+  };
 }
 
 /** Every distinct planned meal for `slot` across the week, in weekday

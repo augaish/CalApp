@@ -62,9 +62,17 @@ export function perServing(recipe: Pick<Recipe, 'ingredients' | 'servings'>): Ma
   return scaleMacros(recipeTotals(recipe), 1 / servings);
 }
 
-/** True when any ingredient's nutrition was guessed rather than recognised. */
-export function isEstimated(recipe: Pick<Recipe, 'ingredients'>): boolean {
-  return recipe.ingredients.some((i) => i.estimated);
+/**
+ * Whether this recipe's nutrition is estimated.
+ *
+ * Decided by where the numbers CAME FROM, not by how sure the model sounded.
+ * Anything an AI wrote stays estimated until someone verifies it — a
+ * confident guess is still a guess, and letting confidence clear the flag
+ * would quietly turn the least reliable figures into the ones shown without
+ * a caveat.
+ */
+export function isEstimated(recipe: Pick<Recipe, 'ingredients' | 'source'>): boolean {
+  return recipe.source === 'ai' || recipe.ingredients.some((i) => i.estimated);
 }
 
 /**
@@ -135,6 +143,12 @@ export function servingCountLabel(servings: number): string {
   const frac = FRACTIONS[String(rest)];
   if (frac) return whole > 0 ? `${whole}${frac}` : frac;
   return String(Math.round(servings * 100) / 100);
+}
+
+/** Which plural form a serving count takes. A fraction of one serving is
+ * still one serving's worth of thing — "½ serving", never "½ servings". */
+export function servingPluralCount(servings: number): number {
+  return servings <= 1 ? 1 : servings;
 }
 
 /** The portion sizes offered as chips. Fractions of a serving, not grams. */

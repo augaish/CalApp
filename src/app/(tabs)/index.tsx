@@ -138,6 +138,8 @@ export default function Overview() {
   const activeSession = useAppStore((s) => s.activeSession);
   const startSession = useAppStore((s) => s.startSession);
   const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
+  const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
+  const recipes = useAppStore((s) => s.recipes);
   const checklistDismissed = useAppStore((s) => s.checklistDismissed);
   const dismissChecklist = useAppStore((s) => s.dismissChecklist);
   const tourSeen = useAppStore((s) => s.tourSeen);
@@ -233,7 +235,14 @@ export default function Overview() {
   const mealsLogged = mealTypesLogged(meals, selected);
   const nextMeal = nextMealSlot(mealsLogged);
   const nextPlanned = nextMeal
-    ? plannedMealFor(activeProgram?.mealPlan, selected, nextMeal, mealPlanSwaps)
+    ? plannedMealFor(
+        activeProgram?.mealPlan,
+        selected,
+        nextMeal,
+        mealPlanSwaps,
+        mealPlanRecipes,
+        recipes,
+      )
     : undefined;
   const openMealEntry = (slot: MealType, via: 'scan' | 'menu') => {
     usePending.getState().setMealTypeHint(slot);

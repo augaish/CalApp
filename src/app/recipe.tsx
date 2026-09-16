@@ -18,6 +18,7 @@ import {
   scaleMacros,
   scaledIngredients,
   servingCountLabel,
+  servingPluralCount,
   SERVING_STEPS,
 } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
@@ -54,7 +55,14 @@ export default function RecipeScreen() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id?: string }>();
+  const { id, day, slot: slotParam } = useLocalSearchParams<{
+    id?: string;
+    /** Set when opened FROM a planned meal, which changes what the primary
+     * action should be: there, you are about to eat it, not plan it. */
+    day?: string;
+    slot?: string;
+  }>();
+  const fromPlan = !!day;
 
   const recipes = useAppStore((s) => s.recipes);
   const meals = useAppStore((s) => s.meals);
@@ -65,7 +73,9 @@ export default function RecipeScreen() {
 
   const [cookingFor, setCookingFor] = useState(recipe?.servings ?? 2);
   const [portion, setPortion] = useState(1);
-  const [slot, setSlot] = useState<MealType>(currentSlot);
+  const [slot, setSlot] = useState<MealType>(() =>
+    MEAL_SLOTS.includes(slotParam as MealType) ? (slotParam as MealType) : currentSlot(),
+  );
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [showTotals, setShowTotals] = useState(false);
   // The id of the meal this screen just logged, so it can be undone and so a
@@ -103,7 +113,7 @@ export default function RecipeScreen() {
   };
 
   const portionLabel = (servings: number) =>
-    `${servingCountLabel(servings)} ${t('recipe.servingUnit', { count: servings })}`;
+    `${servingCountLabel(servings)} ${t('recipe.servingUnit', { count: servingPluralCount(servings) })}`;
 
   const remove = () => {
     Alert.alert(t('recipe.deleteTitle'), t('recipe.deleteBody'), [
@@ -132,8 +142,25 @@ export default function RecipeScreen() {
               <Text style={{ color: theme.primary, fontWeight: '700' }}>{t('recipe.undo')}</Text>
             </Pressable>
           </View>
-        ) : (
+        ) : fromPlan ? (
+          // Opened from today's plan: you are about to eat it.
           <Button label={t('recipe.logEaten', { portion: portionLabel(portion) })} icon="add" onPress={logIt} />
+        ) : (
+          // Discovery: planning is the likely next step, but logging stays one
+          // tap away for someone who just cooked it.
+          <View style={{ gap: Spacing.xs }}>
+            <Button
+              label={t('recipe.addToPlan')}
+              icon="calendar"
+              onPress={() => router.push(`/plan-meal?recipeId=${encodeURIComponent(recipe.id)}`)}
+            />
+            <Button
+              label={t('recipe.logEaten', { portion: portionLabel(portion) })}
+              variant="secondary"
+              icon="add"
+              onPress={logIt}
+            />
+          </View>
         )
       }
     >
@@ -168,6 +195,9 @@ export default function RecipeScreen() {
             {showTotals ? t('recipe.hideTotals') : t('recipe.showTotals')}
           </Text>
         </Pressable>
+        {showTotals && estimated && (
+          <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('recipe.estimatedDetail')}</Text>
+        )}
         {showTotals && (
           <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
             {t('recipe.batchTotals', {

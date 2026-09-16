@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -9,6 +9,7 @@ import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { generateRecipe, QuotaError } from '@/lib/api';
 import { successHaptic } from '@/lib/feedback';
+import { resolveIngredientKey } from '@/lib/ingredients';
 import { perServing, roundMacros } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
 
@@ -27,6 +28,10 @@ export default function Recipes() {
   const theme = useTheme();
   const router = useRouter();
 
+  // Opened as a picker for one planned slot, rather than as a plain library.
+  const { day, slot } = useLocalSearchParams<{ day?: string; slot?: string }>();
+  const planTarget = day && slot ? `&day=${encodeURIComponent(day)}&slot=${encodeURIComponent(slot)}` : '';
+
   const recipes = useAppStore((s) => s.recipes);
   const addRecipe = useAppStore((s) => s.addRecipe);
   const [request, setRequest] = useState('');
@@ -38,10 +43,22 @@ export default function Recipes() {
     setBusy(true);
     try {
       const written = await generateRecipe(ask, lang);
-      const id = addRecipe({ ...written, language: lang, source: 'ai' });
+      // The model's `key` is a hint, not a guarantee — the same onion comes
+      // back spelled four ways across generations. Resolve every ingredient
+      // against the local table BEFORE saving, so a shopping list merges on
+      // a stable identity rather than on whatever the model typed that time.
+      const id = addRecipe({
+        ...written,
+        ingredients: written.ingredients.map((i) => ({
+          ...i,
+          key: resolveIngredientKey(i.name, i.key),
+        })),
+        language: lang,
+        source: 'ai',
+      });
       successHaptic();
       setRequest('');
-      router.push(`/recipe?id=${encodeURIComponent(id)}`);
+      router.push(`/recipe?id=${encodeURIComponent(id)}${planTarget}`);
     } catch (err) {
       if (err instanceof QuotaError) Alert.alert(t('upgrade.quotaTitle'), t('upgrade.quotaBody'));
       else Alert.alert(t('common.error'));
@@ -102,7 +119,7 @@ export default function Recipes() {
         return (
           <Pressable
             key={r.id}
-            onPress={() => router.push(`/recipe?id=${encodeURIComponent(r.id)}`)}
+            onPress={() => router.push(`/recipe?id=${encodeURIComponent(r.id)}${planTarget}`)}
             style={({ pressed }) => [
               styles.row,
               { backgroundColor: theme.card, borderColor: theme.border },
