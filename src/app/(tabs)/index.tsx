@@ -242,6 +242,7 @@ export default function Overview() {
         mealPlanSwaps,
         mealPlanRecipes,
         recipes,
+        activeProgram?.id,
       )
     : undefined;
   const openMealEntry = (slot: MealType, via: 'scan' | 'menu') => {

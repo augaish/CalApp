@@ -79,6 +79,7 @@ export default function PlanMeal() {
     mealPlanSwaps,
     mealPlanRecipes,
     recipes,
+    activeProgram?.id,
   );
   const currentKcal = current ? Math.round(plannedMealCalories(current)) : 0;
   const next = roundMacros(scaleMacros(perServing(recipe), servings));

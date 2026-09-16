@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { categoryForMuscles, findExercise } from './exercises';
 import { perServing, roundMacros, scaleMacros, servingCountLabel } from './recipes';
+import type { PlannedRecipeMeal } from './shopping';
 import { dailyTargets } from './tdee';
 import type {
   ActiveSession,
@@ -57,6 +58,24 @@ interface AppState {
    * reopening one never costs another AI call.
    */
   recipes: Recipe[];
+  /**
+   * The shopping trip in progress. Only DECISIONS live here — which dates,
+   * what is already in the cupboard, what has been ticked off and at what
+   * quantity, and which recipes are being cooked as one batch. The amounts
+   * are recomputed from the plan every time the list is opened, so a plan
+   * change moves the quantities without throwing away the progress.
+   */
+  shopping: {
+    fromKey: string;
+    toKey: string;
+    /** Ticked off in the shop, and the amount it was ticked at — so a later
+     * increase reads as "300 g more needed" rather than silently passing. */
+    checkedAt: Record<string, number>;
+    /** "Already have this" — excluded from what needs buying. */
+    have: Record<string, boolean>;
+    /** recipeId → these meals come out of one pot. */
+    oneBatch: Record<string, boolean>;
+  } | null;
   /**
    * Recurring weekly plan: weekday (0=Sun … 6=Sat) → exercises for that day,
    * plus optional planned target sets per exercise (`plans`).
@@ -119,7 +138,10 @@ interface AppState {
    * programme. Changing the saved recipe, or other days, stays an explicit
    * separate act. Additive — old persisted state simply lacks it.
    */
-  mealPlanRecipes: Record<string, Partial<Record<MealType, { recipeId: string; servings: number }>>>;
+  mealPlanRecipes: Record<
+    string,
+    Partial<Record<MealType, { recipeId: string; servings: number; programId?: string; batchId?: string }>>
+  >;
   remindMeals: boolean;
   remindWater: boolean;
   remindWorkouts: boolean;
@@ -174,6 +196,12 @@ interface AppState {
    * sets someone already did are kept, just filed under the right exercise.
    */
   mergeExercise: (fromId: string, intoId: string) => void;
+  /** Start (or restart) a shopping trip for a stretch of dates. */
+  startShopping: (fromKey: string, toKey: string) => void;
+  setShoppingChecked: (key: string, amount: number | null) => void;
+  setShoppingHave: (key: string, have: boolean) => void;
+  setShoppingOneBatch: (recipeId: string, oneBatch: boolean) => void;
+  clearShopping: () => void;
   /** Saves a generated or hand-written recipe and returns its id. */
   addRecipe: (input: Omit<Recipe, 'id' | 'createdAt'> & { id?: string; createdAt?: string }) => string;
   updateRecipe: (id: string, patch: Partial<Recipe>) => void;
@@ -281,7 +309,7 @@ interface AppState {
   setPlannedRecipe: (
     dayKey: string,
     slot: MealType,
-    value: { recipeId: string; servings: number } | null,
+    value: { recipeId: string; servings: number; batchId?: string } | null,
   ) => void;
   startSession: (day: Date, exerciseIds: string[]) => void;
   updateSession: (patch: Partial<ActiveSession>) => void;
@@ -390,6 +418,7 @@ export const useAppStore = create<AppState>()(
       mealPlanSwaps: {},
       mealPlanRecipes: {},
       recipes: [],
+      shopping: null,
       remindMeals: true,
       remindWater: true,
       remindWorkouts: true,
@@ -467,6 +496,40 @@ export const useAppStore = create<AppState>()(
         })),
       removeExercise: (exId) =>
         set((s) => ({ exercises: s.exercises.filter((e) => e.id !== exId) })),
+      startShopping: (fromKey, toKey) =>
+        set((s) => ({
+          // Re-picking the same dates keeps the trip you are already on; a
+          // different stretch is a different trip and starts clean.
+          shopping:
+            s.shopping && s.shopping.fromKey === fromKey && s.shopping.toKey === toKey
+              ? s.shopping
+              : { fromKey, toKey, checkedAt: {}, have: {}, oneBatch: {} },
+        })),
+      setShoppingChecked: (key, amount) =>
+        set((s) => {
+          if (!s.shopping) return {};
+          const checkedAt = { ...s.shopping.checkedAt };
+          if (amount == null) delete checkedAt[key];
+          else checkedAt[key] = amount;
+          return { shopping: { ...s.shopping, checkedAt } };
+        }),
+      setShoppingHave: (key, have) =>
+        set((s) => {
+          if (!s.shopping) return {};
+          const next = { ...s.shopping.have };
+          if (have) next[key] = true;
+          else delete next[key];
+          return { shopping: { ...s.shopping, have: next } };
+        }),
+      setShoppingOneBatch: (recipeId, oneBatch) =>
+        set((s) => {
+          if (!s.shopping) return {};
+          const next = { ...s.shopping.oneBatch };
+          if (oneBatch) next[recipeId] = true;
+          else delete next[recipeId];
+          return { shopping: { ...s.shopping, oneBatch: next } };
+        }),
+      clearShopping: () => set({ shopping: null }),
       addRecipe: (input) => {
         const rid = input.id ?? `recipe:${id()}`;
         set((s) => ({
@@ -926,12 +989,37 @@ export const useAppStore = create<AppState>()(
           ),
         })),
       deleteWeight: (at) => set((s) => ({ weights: s.weights.filter((w) => w.at !== at) })),
-      setActiveProgram: (activeProgram) => set({ activeProgram }),
+      setActiveProgram: (activeProgram) =>
+        set((s) => {
+          // A replacement belongs to the plan it was made against. Switching
+          // programmes drops the ones that no longer apply rather than
+          // re-pointing them at a different plan's meals — the slot visibly
+          // reverts to the new programme's own meal, which is the honest
+          // outcome and the visible one.
+          const keep: typeof s.mealPlanRecipes = {};
+          for (const [dayKey, slots] of Object.entries(s.mealPlanRecipes)) {
+            const kept: (typeof slots) = {};
+            for (const [slot, entry] of Object.entries(slots)) {
+              if (!entry) continue;
+              // No programId means it predates this stamping; leave it be
+              // rather than deleting something the person set up.
+              if (entry.programId == null || entry.programId === activeProgram?.id) {
+                kept[slot as MealType] = entry;
+              }
+            }
+            if (Object.keys(kept).length > 0) keep[dayKey] = kept;
+          }
+          return { activeProgram, mealPlanRecipes: keep };
+        }),
       setPlannedRecipe: (dayKey, slot, value) =>
         set((s) => {
           const day = { ...(s.mealPlanRecipes[dayKey] ?? {}) };
           if (value == null) delete day[slot];
-          else day[slot] = value;
+          // Stamped with the programme it was made against. "Tuesday's lunch"
+          // only means something inside a particular plan, so on a programme
+          // switch this stops an old replacement from silently attaching
+          // itself to a different plan's meal.
+          else day[slot] = { ...value, programId: s.activeProgram?.id };
           return { mealPlanRecipes: { ...s.mealPlanRecipes, [dayKey]: day } };
         }),
       swapPlannedMeal: (dayKey, slot, fromWeekday) =>
@@ -1070,6 +1158,7 @@ export const useAppStore = create<AppState>()(
         meals,
         exercises,
         recipes,
+        shopping,
         schedule,
         skips,
         installId,
@@ -1107,6 +1196,7 @@ export const useAppStore = create<AppState>()(
         meals,
         exercises,
         recipes,
+        shopping,
         schedule,
         skips,
         installId,
@@ -2125,13 +2215,21 @@ export function plannedMealFor(
   /** Recipe standing in for a slot on a specific date, and the saved recipes
    * to resolve it against. Both optional, so callers that predate recipes
    * behave exactly as before. */
-  recipeOverrides?: Record<string, Partial<Record<MealType, { recipeId: string; servings: number }>>>,
+  recipeOverrides?: Record<
+    string,
+    Partial<Record<MealType, { recipeId: string; servings: number; programId?: string }>>
+  >,
   recipes?: Recipe[],
+  /** The programme currently in force. An override stamped with a different
+   * one is ignored, so a replacement never lands on another plan's meal. */
+  activeProgramId?: string,
 ): PlannedMeal | undefined {
   // A recipe put on this slot wins over both the swap and the programme's own
   // meal — it is the most specific thing the person asked for, for this date.
   const override = recipeOverrides?.[dateKey(day)]?.[slot];
-  if (override && recipes) {
+  const overrideApplies =
+    !!override && (override.programId == null || override.programId === activeProgramId);
+  if (override && overrideApplies && recipes) {
     const recipe = recipes.find((r) => r.id === override.recipeId);
     // A recipe since deleted falls through to the plan rather than blanking
     // the slot: the programme's own meal is a better answer than nothing.
@@ -2142,6 +2240,64 @@ export function plannedMealFor(
     plan.days.find((d) => d.weekday === weekday)?.meals.find((m) => m.slot === slot);
   const swapped = swaps[dateKey(day)]?.[slot];
   return (swapped != null ? find(swapped) : undefined) ?? find(day.getDay());
+}
+
+/**
+ * Every planned meal in a date range that a recipe actually stands behind.
+ *
+ * A programme meal with no recipe has no ingredients, so it cannot be shopped
+ * for — those are counted separately rather than silently dropped, because
+ * "6 of 14 planned meals have a recipe" is the honest thing to show before
+ * someone trusts a list.
+ */
+export function plannedRecipeMealsBetween(
+  fromKey: string,
+  toKey: string,
+  overrides: AppState['mealPlanRecipes'],
+  recipes: Recipe[],
+  mealPlan: MealPlan | undefined,
+  activeProgramId: string | undefined,
+): { meals: PlannedRecipeMeal[]; plannedTotal: number } {
+  const meals: PlannedRecipeMeal[] = [];
+  let plannedTotal = 0;
+  for (const day of datesBetween(fromKey, toKey)) {
+    const key = dateKey(day);
+    const slots = mealPlan?.days.find((d) => d.weekday === day.getDay())?.meals ?? [];
+    plannedTotal += slots.length;
+    const dayOverrides = overrides[key];
+    if (!dayOverrides) continue;
+    for (const [slot, entry] of Object.entries(dayOverrides)) {
+      if (!entry) continue;
+      if (entry.programId != null && entry.programId !== activeProgramId) continue;
+      const recipe = recipes.find((r) => r.id === entry.recipeId);
+      if (!recipe) continue;
+      meals.push({
+        dayKey: key,
+        slot: slot as MealType,
+        recipe,
+        servings: entry.servings,
+        batchId: entry.batchId,
+      });
+    }
+  }
+  return { meals, plannedTotal };
+}
+
+/** Inclusive list of dates from one dateKey to another, capped so a bad range
+ * can never spin. */
+export function datesBetween(fromKey: string, toKey: string): Date[] {
+  // dateKey's month is getMonth() — already zero-based — so it feeds straight
+  // into the Date constructor. Subtracting one here shifted every range back a
+  // month and quietly matched nothing.
+  const [fy, fm, fd] = fromKey.split('-').map(Number);
+  const [ty, tm, td] = toKey.split('-').map(Number);
+  const start = new Date(fy, fm, fd);
+  const end = new Date(ty, tm, td);
+  const out: Date[] = [];
+  for (let d = new Date(start); d <= end && out.length < 60; d.setDate(d.getDate() + 1)) {
+    out.push(new Date(d));
+  }
+  return out;
 }
 
 /** A recipe portion expressed as a planned meal, so every screen that already

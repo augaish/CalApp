@@ -129,6 +129,7 @@ export default function AddMenu() {
           {/* Cooking is the other half of eating: a recipe is where a planned
               meal becomes something you can actually make and then log. */}
           <Tile icon="restaurant" label={t('addMenu.recipes')} onPress={() => go('/recipes')} theme={theme} />
+          <Tile icon="cart" label={t('addMenu.shopping')} onPress={() => go('/shopping')} theme={theme} />
         </View>
 
         {!foodOnly && (

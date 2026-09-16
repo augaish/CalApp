@@ -59,6 +59,7 @@ export default function Food() {
   const logMeal = useAppStore((s) => s.logMeal);
   const activeFast = useAppStore((s) => s.activeFast);
   const mealPlan = useAppStore((s) => s.activeProgram?.mealPlan);
+  const activeProgramId = useAppStore((s) => s.activeProgram?.id);
   const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
   const swapPlannedMeal = useAppStore((s) => s.swapPlannedMeal);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
@@ -74,7 +75,7 @@ export default function Food() {
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const logPlanned = (slot: MealType) => {
-    const planned = plannedMealFor(mealPlan, selected, slot, mealPlanSwaps, mealPlanRecipes, recipes);
+    const planned = plannedMealFor(mealPlan, selected, slot, mealPlanSwaps, mealPlanRecipes, recipes, activeProgramId);
     if (!planned) return;
     // Copies, so a later edit of the logged meal never reaches into the plan.
     logMeal(planned.items.map((i) => ({ ...i })), undefined, slot, timestampFor(selected));
@@ -212,7 +213,7 @@ export default function Food() {
         // The plan's meal for this slot stays visible until something is
         // logged here (whatever it was — a scan of the same dish counts),
         // plus a beat longer for Undo right after "Log eaten".
-        const planned = plannedMealFor(mealPlan, selected, type, mealPlanSwaps, mealPlanRecipes, recipes);
+        const planned = plannedMealFor(mealPlan, selected, type, mealPlanSwaps, mealPlanRecipes, recipes, activeProgramId);
         const showPlanned = planned && (sectionMeals.length === 0 || justLogged?.slot === type);
         const swapOptions = mealPlan && swapping === type ? plannedMealOptions(mealPlan, type) : [];
         const swappedFrom = mealPlanSwaps[dateKey(selected)]?.[type];
@@ -298,7 +299,9 @@ export default function Food() {
                       style={({ pressed }) => [styles.plannedBtn, { backgroundColor: theme.card }, pressed && { opacity: 0.7 }]}
                     >
                       <Ionicons name="restaurant" size={16} color={theme.text} />
-                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{t('mealPlan.cook')}</Text>
+                      <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
+                        {planned.items[0]?.recipeId ? t('mealPlan.viewRecipe') : t('mealPlan.addRecipe')}
+                      </Text>
                     </Pressable>
                     <Pressable
                       onPress={() => logPlanned(type)}
