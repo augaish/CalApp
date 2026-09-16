@@ -79,7 +79,22 @@ export const ADMIN_HTML = `<!doctype html>
         <div><label>Pro+</label><input id="lim_proplus" type="number" min="0" /></div>
         <button onclick="saveLimits()">Save</button>
       </div>
-      <div class="sub" style="margin:10px 0 0">Every AI action counts: meal photo, describe, equipment and each coach message.</div>
+      <div class="sub" style="margin:10px 0 0">Every AI action counts, but not all cost the same — see the action costs below.</div>
+    </div>
+
+    <div class="card">
+      <b>Action costs</b>
+      <div class="row">
+        <div><label>Meal photo</label><input id="w_meal" type="number" min="1" max="50" /></div>
+        <div><label>Describe</label><input id="w_describe" type="number" min="1" max="50" /></div>
+        <div><label>Equipment</label><input id="w_equipment" type="number" min="1" max="50" /></div>
+        <div><label>Exercise</label><input id="w_exercise" type="number" min="1" max="50" /></div>
+        <div><label>Body reading</label><input id="w_bodyReading" type="number" min="1" max="50" /></div>
+        <div><label>Coach msg</label><input id="w_coach" type="number" min="1" max="50" /></div>
+        <div><label>Programme</label><input id="w_program" type="number" min="1" max="50" /></div>
+        <button onclick="saveWeights()">Save</button>
+      </div>
+      <div class="sub" style="margin:10px 0 0">How many credits each route spends from the allowance above. Designing a programme is a long tool-calling conversation costing many times a single meal photo — charging both as one action is what lets a free user spend the whole month on the most expensive route. Set these from the per-kind spend in the usage table, not by feel.</div>
     </div>
 
     <div class="card">
@@ -245,6 +260,11 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('lim_free').value = data.limits.free;
     document.getElementById('lim_pro').value = data.limits.pro;
     document.getElementById('lim_proplus').value = data.limits.proPlus;
+    var W = data.weights || {};
+    WEIGHT_KINDS.forEach(function (k) {
+      var el = document.getElementById('w_' + k);
+      if (el) el.value = W[k] || 1;
+    });
     var sp = data.sponsor || {};
     document.getElementById('sp_title').value = sp.title || '';
     document.getElementById('sp_sub').value = sp.subtitle || '';
@@ -475,6 +495,15 @@ export const ADMIN_HTML = `<!doctype html>
       days: isNaN(days) ? undefined : days,
       note: document.getElementById('g_note').value || undefined,
     }).then(load);
+  }
+  var WEIGHT_KINDS = ['meal','describe','equipment','exercise','bodyReading','coach','program'];
+  function saveWeights() {
+    var body = {};
+    WEIGHT_KINDS.forEach(function (k) {
+      var v = parseInt(document.getElementById('w_' + k).value, 10);
+      if (v >= 1) body[k] = v;
+    });
+    api('/admin/api/weights', body).then(load);
   }
   function saveLimits() {
     api('/admin/api/limits', {

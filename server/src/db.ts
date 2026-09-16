@@ -424,17 +424,23 @@ export type Reservation =
   | { ok: false; reason: 'quota' | 'cap'; used: number; kindUsed: number };
 
 /**
- * Claim one action against the allowance, checking and incrementing under a
- * lock on the account row. Reading the total and then writing it as two steps
- * let a burst of parallel requests all see "14 of 15 used" and every one of
- * them proceed; holding the row makes that impossible. The lock is per account,
- * so one user's burst never slows anyone else down.
+ * Claim `weight` actions against the allowance, checking and incrementing
+ * under a lock on the account row. Reading the total and then writing it as
+ * two steps let a burst of parallel requests all see "14 of 15 used" and every
+ * one of them proceed; holding the row makes that impossible. The lock is per
+ * account, so one user's burst never slows anyone else down.
+ *
+ * `weight` is what a route costs us: a meal photo is 1, designing a whole
+ * programme is several. An action that would overshoot the allowance is
+ * refused outright rather than part-served, so the last few credits of a month
+ * can still buy something cheap.
  */
 export async function reserveUsage(
   ref: string,
   kind: string,
   limit: number,
   kindCap?: number,
+  weight = 1,
 ): Promise<Reservation> {
   if (!pool) return { ok: true, used: 0, kindUsed: 0 };
   const period = currentPeriod();
@@ -455,21 +461,21 @@ export async function reserveUsage(
     const kindUsed = res.rows[0].k as number;
     // The shared allowance is the hard stop; a per-kind cap only rations that
     // one feature, so the two are reported apart for the right error.
-    if (used >= limit) {
+    if (used + weight > limit) {
       await client.query('ROLLBACK');
       return { ok: false, reason: 'quota', used, kindUsed };
     }
-    if (typeof kindCap === 'number' && kindUsed >= kindCap) {
+    if (typeof kindCap === 'number' && kindUsed + weight > kindCap) {
       await client.query('ROLLBACK');
       return { ok: false, reason: 'cap', used, kindUsed };
     }
     await client.query(
-      `INSERT INTO usage_counters (ref, period, kind, count) VALUES ($1, $2, $3, 1)
-       ON CONFLICT (ref, period, kind) DO UPDATE SET count = usage_counters.count + 1`,
-      [ref, period, kind],
+      `INSERT INTO usage_counters (ref, period, kind, count) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (ref, period, kind) DO UPDATE SET count = usage_counters.count + $4`,
+      [ref, period, kind, weight],
     );
     await client.query('COMMIT');
-    return { ok: true, used: used + 1, kindUsed: kindUsed + 1 };
+    return { ok: true, used: used + weight, kindUsed: kindUsed + weight };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
     throw err;
@@ -478,14 +484,16 @@ export async function reserveUsage(
   }
 }
 
-/** Hand a reserved action back when the model call itself failed. */
-export async function refundUsage(ref: string, kind: string): Promise<void> {
+/** Hand a reserved action back when the model call itself failed. Refunds the
+ * same weight that was reserved, so an expensive route that failed does not
+ * quietly keep the difference. */
+export async function refundUsage(ref: string, kind: string, weight = 1): Promise<void> {
   if (!pool) return;
   try {
     await pool.query(
-      `UPDATE usage_counters SET count = GREATEST(0, count - 1)
+      `UPDATE usage_counters SET count = GREATEST(0, count - $4)
         WHERE ref = $1 AND period = $2 AND kind = $3`,
-      [ref, currentPeriod(), kind],
+      [ref, currentPeriod(), kind, weight],
     );
   } catch (err) {
     // A lost refund only ever costs the user one action; never fail their
@@ -495,13 +503,13 @@ export async function refundUsage(ref: string, kind: string): Promise<void> {
 }
 
 /** Record one AI action. Returns the new period total. */
-export async function recordUsage(ref: string, kind: string): Promise<number> {
+export async function recordUsage(ref: string, kind: string, weight = 1): Promise<number> {
   if (!pool) return 0;
   try {
     await pool.query(
-      `INSERT INTO usage_counters (ref, period, kind, count) VALUES ($1, $2, $3, 1)
-       ON CONFLICT (ref, period, kind) DO UPDATE SET count = usage_counters.count + 1`,
-      [ref, currentPeriod(), kind],
+      `INSERT INTO usage_counters (ref, period, kind, count) VALUES ($1, $2, $3, $4)
+       ON CONFLICT (ref, period, kind) DO UPDATE SET count = usage_counters.count + $4`,
+      [ref, currentPeriod(), kind, weight],
     );
     return await getUsage(ref);
   } catch (err) {
@@ -884,14 +892,21 @@ export async function setCachedEquipment(
   }
 }
 
-export async function getCachedBarcode(barcode: string): Promise<unknown | null> {
+/** The cached product plus where it came from. `source` travels with it
+ * because Open Food Facts is ODbL-licensed and has to be credited wherever
+ * its data is shown; rows we resolved ourselves from a label photo carry no
+ * such obligation, so the app can tell the two apart. */
+export async function getCachedBarcode(
+  barcode: string,
+): Promise<{ item: unknown; source: string } | null> {
   if (!pool) return null;
   try {
     const res = await pool.query(
-      'UPDATE barcode_cache SET hits = hits + 1 WHERE barcode = $1 RETURNING item',
+      'UPDATE barcode_cache SET hits = hits + 1 WHERE barcode = $1 RETURNING item, source',
       [barcode],
     );
-    return res.rows[0]?.item ?? null;
+    const row = res.rows[0];
+    return row ? { item: row.item, source: row.source ?? 'off' } : null;
   } catch (err) {
     console.error('barcode cache read failed:', err);
     return null;

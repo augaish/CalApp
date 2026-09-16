@@ -46,6 +46,50 @@ export const PLANS: Record<Plan, PlanSpec> = {
 
 export type Feature = 'meal' | 'describe' | 'equipment' | 'coach' | 'bodyReading' | 'program';
 
+/**
+ * What each metered route costs against the monthly allowance. Keyed by the
+ * usage *kind* (what gets metered), which is not always the Feature name —
+ * the exercise lookup is gated as 'equipment' but metered as 'exercise'.
+ *
+ * Counting every route as one action is what makes a free tier expensive:
+ * designing a whole programme is a long tool-calling conversation costing us
+ * many times a single meal photo, so a user could spend their entire month on
+ * the one route that loses us the most money. Weighting keeps the cheap,
+ * habit-forming actions plentiful and prices the expensive ones honestly.
+ *
+ * Editable from the admin page without a redeploy, because these are cost
+ * hypotheses — the real ratios come from the per-kind spend the usage table
+ * already records.
+ */
+export const DEFAULT_ACTION_WEIGHTS: Record<string, number> = {
+  meal: 1,
+  describe: 1,
+  equipment: 1,
+  exercise: 1,
+  bodyReading: 1,
+  coach: 1,
+  program: 5,
+};
+
+/** Admin-overridable per-kind action weights. */
+export async function actionWeights(): Promise<Record<string, number>> {
+  const stored = await getSetting<Record<string, unknown>>('action_weights', {});
+  const out = { ...DEFAULT_ACTION_WEIGHTS };
+  for (const kind of Object.keys(out)) {
+    const v = stored[kind];
+    // A zero-weight route would be free and unbounded; a huge one would lock
+    // the feature out entirely. Keep it inside something sane.
+    if (typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 50) out[kind] = Math.round(v);
+  }
+  return out;
+}
+
+/** What one call to this kind costs, after admin overrides. */
+export async function weightFor(kind: string): Promise<number> {
+  const weights = await actionWeights();
+  return weights[kind] ?? 1;
+}
+
 /** Admin-overridable per-plan limits. */
 export async function planLimits(): Promise<Record<Plan, number>> {
   const stored = await getSetting<Partial<Record<Plan, number>>>('plan_limits', {});
@@ -116,14 +160,28 @@ export interface Access {
   used: number;
   limit: number;
   period: string;
+  /** What this particular action costs against the allowance. */
+  weight: number;
   /** false when the plan does not include the requested feature at all. */
   featureAllowed: boolean;
   /** false when the monthly allowance is spent. */
   withinQuota: boolean;
 }
 
-/** Resolve the caller's plan, feature access and remaining allowance. */
-export async function checkAccess(ref: string | null, feature: Feature): Promise<Access> {
+/**
+ * Resolve the caller's plan, feature access and remaining allowance.
+ *
+ * `kind` is the usage kind this call will be metered as, which is normally the
+ * feature's own name — pass it only where the two differ. It decides what the
+ * action costs, so a 5-credit programme design is refused up front with 3
+ * credits left instead of being turned away by reserve() after the UI has
+ * already promised it.
+ */
+export async function checkAccess(
+  ref: string | null,
+  feature: Feature,
+  kind: string = feature,
+): Promise<Access> {
   const period = currentPeriod();
   const limits = await planLimits();
   const user = ref ? await getOrCreateUser(ref) : null;
@@ -138,23 +196,25 @@ export async function checkAccess(ref: string | null, feature: Feature): Promise
     const coachUsed = await getUsageKind(ref, 'coach', period);
     if (coachUsed >= spec.coachCap) featureAllowed = false;
   }
+  const weight = await weightFor(kind);
   return {
     plan,
     spec,
     used,
     limit,
     period,
+    weight,
     featureAllowed,
     // No id means nothing to meter against. The metered routes reject those
     // callers outright; failing closed here too keeps a route that forgets the
     // check from handing out unlimited AI.
-    withinQuota: !!ref && used < limit,
+    withinQuota: !!ref && used + weight <= limit,
   };
 }
 
 export async function consume(ref: string | null, kind: string): Promise<void> {
   if (!ref) return;
-  await recordUsage(ref, kind);
+  await recordUsage(ref, kind, await weightFor(kind));
 }
 
 /**
@@ -164,11 +224,11 @@ export async function consume(ref: string | null, kind: string): Promise<void> {
  */
 export async function reserve(ref: string, access: Access, kind: string): Promise<Reservation> {
   const cap = kind === 'coach' ? access.spec.coachCap : undefined;
-  return reserveUsage(ref, kind, access.limit, cap);
+  return reserveUsage(ref, kind, access.limit, cap, await weightFor(kind));
 }
 
 export async function release(ref: string, kind: string): Promise<void> {
-  await refundUsage(ref, kind);
+  await refundUsage(ref, kind, await weightFor(kind));
 }
 
 /** 403 body: the plan does not include this feature. */
@@ -176,7 +236,15 @@ export function featureLocked(a: Access) {
   return { error: 'feature_locked', feature: true, plan: a.plan, used: a.used, limit: a.limit };
 }
 
-/** 402 body: allowance for the month is spent. */
+/** 402 body: allowance for the month is spent — or too thin for this action,
+ * which `cost` lets the app explain rather than just refusing. */
 export function quotaError(a: Access) {
-  return { error: 'quota_exceeded', plan: a.plan, used: a.used, limit: a.limit, period: a.period };
+  return {
+    error: 'quota_exceeded',
+    plan: a.plan,
+    used: a.used,
+    limit: a.limit,
+    cost: a.weight,
+    period: a.period,
+  };
 }

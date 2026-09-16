@@ -83,8 +83,8 @@ export default function Scan() {
     if (analyzing) return;
     setAnalyzing(true);
     try {
-      const item = await lookupBarcode(data);
-      if (!item) {
+      const found = await lookupBarcode(data);
+      if (!found) {
         Alert.alert(t('barcode.notFoundTitle'), t('barcode.notFound'), [
           {
             text: t('barcode.enterManually'),
@@ -102,7 +102,7 @@ export default function Scan() {
         ]);
         return;
       }
-      setMeal({ items: [item], confidence: 1 }, null);
+      setMeal({ items: [found.item], confidence: 1, source: found.source ?? undefined }, null);
       router.replace('/meal-result');
     } catch {
       Alert.alert(t('common.error'));

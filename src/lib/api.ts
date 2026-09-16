@@ -505,15 +505,19 @@ export async function generateProgram(
  * whose coverage of Gulf-market products is thin. See
  * server/src/index.ts's /api/barcode.
  */
-export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
+export async function lookupBarcode(
+  barcode: string,
+): Promise<{ item: FoodItem; source: string | null } | null> {
   if (isMockMode) return null;
   try {
     const res = await fetch(`${API_URL}/api/barcode?code=${encodeURIComponent(barcode)}`, {
       headers: authHeaders(),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { item: FoodItem | null };
-    return data.item;
+    const data = (await res.json()) as { item: FoodItem | null; source?: string | null };
+    // `source` is 'off' when the facts came from Open Food Facts, whose ODbL
+    // licence requires crediting it wherever the data is shown.
+    return data.item ? { item: data.item, source: data.source ?? null } : null;
   } catch {
     return null;
   }

@@ -6,8 +6,10 @@ import { cors } from 'hono/cors';
 import { ADMIN_HTML } from './admin-html.js';
 import { PRIVACY_HTML, TERMS_HTML } from './legal-html.js';
 import {
+  actionWeights,
   aiProviders,
   checkAccess,
+  DEFAULT_ACTION_WEIGHTS,
   featureLocked,
   PLANS,
   planLimits,
@@ -842,14 +844,17 @@ app.get('/api/barcode', async (c) => {
   const code = (c.req.query('code') ?? '').trim();
   if (!isPlausibleBarcode(code)) return c.json({ error: 'invalid_request' }, 400);
   const cached = await getCachedBarcode(code);
-  if (cached) return c.json({ item: cached });
+  // `source` tells the app whether this product's facts came from Open Food
+  // Facts, which is ODbL-licensed and must be credited on screen, or from our
+  // own label reads, which need no credit.
+  if (cached) return c.json({ item: cached.item, source: cached.source });
   try {
     const item = await lookupOffBarcode(code);
     if (item) await setCachedBarcode(code, item, 'off');
-    return c.json({ item });
+    return c.json({ item, source: item ? 'off' : null });
   } catch (err) {
     console.error('barcode lookup failed:', err);
-    return c.json({ item: null });
+    return c.json({ item: null, source: null });
   }
 });
 
@@ -1184,7 +1189,9 @@ app.post('/api/analyze-exercise', async (c) => {
   if (name.length < 2) return c.json({ error: 'invalid_request' }, 400);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
   const ref = (await callerRef(c))!;
-  const access = await checkAccess(ref, 'equipment');
+  // Gated as equipment, metered as its own kind — so pass the kind too, or the
+  // quota check would price this against the wrong route's weight.
+  const access = await checkAccess(ref, 'equipment', 'exercise');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   const claim = await reserve(ref, access, 'exercise');
   if (!claim.ok) return c.json(quotaError(access), 402);
@@ -1444,7 +1451,11 @@ app.get('/api/me', async (c) => {
   const ref = await callerRef(c);
   const access = await checkAccess(ref, 'meal');
   const sponsor = await getSetting<Record<string, unknown> | null>('sponsor', null);
-  const [prices, limits] = await Promise.all([planPrices(), planLimits()]);
+  const [prices, limits, weights] = await Promise.all([
+    planPrices(),
+    planLimits(),
+    actionWeights(),
+  ]);
   const coachUsed =
     ref && typeof access.spec.coachCap === 'number'
       ? await getUsageKind(ref, 'coach', access.period)
@@ -1477,6 +1488,9 @@ app.get('/api/me', async (c) => {
       limits,
       coachCap: PLANS.free.coachCap ?? null,
     },
+    // What each action costs against the allowance, so the app can say "this
+    // uses 5 of your credits" before spending them rather than after.
+    weights,
     sponsor,
   });
 });
@@ -1862,15 +1876,17 @@ function adminOk(c: { req: { header: (n: string) => string | undefined; query: (
 
 app.get('/admin/api/data', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const [stats, users, limits, sponsor, shadowTests, providers, prices] = await Promise.all([
-    adminStats(),
-    listUsers(),
-    planLimits(),
-    getSetting<Record<string, unknown> | null>('sponsor', null),
-    listShadowTests(),
-    aiProviders(deepseekConfigured()),
-    planPrices(),
-  ]);
+  const [stats, users, limits, sponsor, shadowTests, providers, prices, weights] =
+    await Promise.all([
+      adminStats(),
+      listUsers(),
+      planLimits(),
+      getSetting<Record<string, unknown> | null>('sponsor', null),
+      listShadowTests(),
+      aiProviders(deepseekConfigured()),
+      planPrices(),
+      actionWeights(),
+    ]);
   return c.json({
     stats,
     users,
@@ -1882,6 +1898,7 @@ app.get('/admin/api/data', async (c) => {
     deepseekConfigured: deepseekConfigured(),
     providers,
     prices,
+    weights,
     fixedRoutes: AI_PROVIDER_FIXED_ROUTES,
   });
 });
@@ -2064,6 +2081,25 @@ app.post('/admin/api/limits', async (c) => {
     proPlus: pick(body.proPlus, cur.proPlus),
   });
   return c.json({ ok: true, limits: await planLimits() });
+});
+
+/**
+ * What each AI route costs against a plan's monthly allowance. These are cost
+ * hypotheses, not fixed truths — the per-kind spend the usage table records is
+ * what should eventually set them, so they are editable without a redeploy.
+ */
+app.post('/admin/api/weights', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as never);
+  const cur = await actionWeights();
+  const next: Record<string, number> = {};
+  for (const kind of Object.keys(DEFAULT_ACTION_WEIGHTS)) {
+    const v = body[kind];
+    next[kind] =
+      typeof v === 'number' && Number.isFinite(v) && v >= 1 && v <= 50 ? Math.round(v) : cur[kind];
+  }
+  await setSetting('action_weights', next);
+  return c.json({ ok: true, weights: await actionWeights() });
 });
 
 /** The rented sponsor slot (a real advertiser you sell the spot to). */

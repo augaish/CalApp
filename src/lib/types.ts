@@ -63,6 +63,13 @@ export interface MealAnalysis {
   notes?: string;
   /** Domains a restaurant/product lookup actually checked, e.g. "mcdonalds.com". */
   sources?: string[];
+  /**
+   * Where a barcode result's nutrition came from: 'off' for Open Food Facts,
+   * 'photo' for a label we read ourselves. Open Food Facts is ODbL-licensed
+   * and must be credited on screen wherever its data is shown; our own reads
+   * carry no such obligation, so only 'off' renders the credit.
+   */
+  source?: string;
 }
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';

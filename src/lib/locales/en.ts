@@ -190,7 +190,6 @@ export const en = {
     restLength: 'Rest',
     nextExercise: 'Next exercise',
     previousExercise: 'Previous',
-    skipExercise: 'Skip',
     finish: 'Finish',
     keepGoing: 'Keep going',
     summaryTitle: 'Workout summary',
@@ -777,6 +776,7 @@ export const en = {
     noItems: 'No items left. Swipe back or cancel to discard.',
     notes: 'Assumed: {{notes}}',
     sources: 'Checked against: {{domains}}',
+    offCredit: 'Product data from Open Food Facts (ODbL)',
   },
   mealEdit: {
     deleteMeal: 'Delete this meal',

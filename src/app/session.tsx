@@ -405,7 +405,10 @@ export default function SessionScreen() {
           style={{ flex: 1 }}
         />
         <Button
-          label={isLast ? t('session.finish') : allPlannedDone ? t('session.nextExercise') : t('session.skipExercise')}
+          // Always "Next exercise" — the button moves on either way, and
+          // calling it "Skip" when sets are outstanding read as abandoning
+          // them rather than simply advancing.
+          label={isLast ? t('session.finish') : t('session.nextExercise')}
           variant="secondary"
           icon={isLast ? 'flag' : 'arrow-forward'}
           onPress={() => (isLast ? setFinishing(true) : go(1))}

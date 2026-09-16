@@ -192,7 +192,6 @@ export const ar: TranslationSchema = {
     restLength: 'الراحة',
     nextExercise: 'التمرين التالي',
     previousExercise: 'السابق',
-    skipExercise: 'تخطي',
     finish: 'إنهاء',
     keepGoing: 'متابعة',
     summaryTitle: 'ملخص التمرين',
@@ -773,6 +772,7 @@ export const ar: TranslationSchema = {
     noItems: 'لا توجد أصناف. ارجع أو ألغِ للتجاهل.',
     notes: 'افتراض: {{notes}}',
     sources: 'تم التحقق من: {{domains}}',
+    offCredit: 'بيانات المنتج من Open Food Facts (رخصة ODbL)',
   },
   mealEdit: {
     deleteMeal: 'حذف هذه الوجبة',

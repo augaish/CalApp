@@ -72,6 +72,9 @@ export const PRIVACY_HTML = page(
 <h2>Barcode lookups</h2>
 <p>Scanning a barcode checks our own product database first, then <a href="https://world.openfoodfacts.org">Open Food Facts</a>, a free public food database — only the barcode number is sent to either. If a product isn't found and you resolve it yourself by photographing its label, the name and nutrition we read are saved against that barcode so the next person who scans the same product gets an instant result — no personal or photo data is kept, only the product's own nutrition facts.</p>
 
+<h2>Product data credits</h2>
+<p>Packaged-product nutrition shown in Calgym may come from <a href="https://world.openfoodfacts.org">Open Food Facts</a>, made available under the <a href="https://opendatacommons.org/licenses/odbl/1-0/">Open Database License (ODbL) v1.0</a>. Individual product facts are used under the <a href="https://opendatacommons.org/licenses/dbcl/1-0/">Database Contents License</a>. Open Food Facts contributors are not affiliated with Calgym and do not endorse it. Where a product's nutrition was read from its own label instead, Calgym shows no such credit, because that reading is our own.</p>
+
 <h2>Your choices</h2>
 <ul>
   <li><strong>Export.</strong> Profile → Export my data gives you a copy of everything stored on your device.</li>
@@ -106,6 +109,12 @@ export const PRIVACY_HTML = page(
   <li><strong>بريدك الإلكتروني إذا أنشأت حساباً:</strong> يُحفظ مع باقتك واستخدامك كي نتعرّف على حسابك ونساعدك عند التواصل مع الدعم. لا يُستخدم للتسويق إطلاقاً، والضيوف لا يقدّمونه.</li>
   <li><strong>جدول تمرين تختار مشاركته:</strong> عند استخدام زر المشاركة يُحفظ الجدول ليتمكن الرابط من فتحه. يحتوي على التمارين والمجموعات المستهدفة فقط — دون أي بيانات شخصية أو صور — ويُحذف بعد ستة أشهر.</li>
 </ul>
+
+<h2>مسح الباركود</h2>
+<p>عند مسح باركود نبحث أولاً في قاعدة منتجاتنا، ثم في <a href="https://world.openfoodfacts.org">Open Food Facts</a>، وهي قاعدة بيانات غذائية عامة ومجانية — ولا يُرسل إلى أي منهما سوى رقم الباركود. وإذا لم يُعثر على المنتج وقمت بحلّه بنفسك عبر تصوير ملصقه، يُحفظ الاسم والقيم الغذائية التي قرأناها مقابل ذلك الباركود ليحصل من يمسحه لاحقاً على نتيجة فورية — دون حفظ أي بيانات شخصية أو صور، بل حقائق المنتج الغذائية فقط.</p>
+
+<h2>مصادر بيانات المنتجات</h2>
+<p>قد تأتي القيم الغذائية للمنتجات المعلّبة الظاهرة في كالجم من <a href="https://world.openfoodfacts.org">Open Food Facts</a>، المتاحة بموجب <a href="https://opendatacommons.org/licenses/odbl/1-0/">رخصة قاعدة البيانات المفتوحة (ODbL) الإصدار 1.0</a>، وتُستخدم حقائق المنتجات الفردية بموجب <a href="https://opendatacommons.org/licenses/dbcl/1-0/">رخصة محتويات قاعدة البيانات</a>. والمساهمون في Open Food Facts لا تربطهم بكالجم أي علاقة ولا يُعدّ ظهور بياناتهم تأييداً منهم. أما إذا قُرئت القيم الغذائية من ملصق المنتج نفسه، فلا يظهر هذا الإسناد لأن تلك القراءة من عندنا.</p>
 
 <h2>ما لا نفعله</h2>
 <ul>

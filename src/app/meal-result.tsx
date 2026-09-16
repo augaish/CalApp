@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
 import { RefineBox } from '@/components/refine-box';
@@ -197,7 +197,7 @@ export default function MealResult() {
         </Card>
       )}
 
-      {(!!analysis.notes || !!analysis.sources?.length) && (
+      {(!!analysis.notes || !!analysis.sources?.length || analysis.source === 'off') && (
         <View style={styles.infoRow}>
           <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
           <View style={{ flex: 1, gap: 2 }}>
@@ -209,6 +209,17 @@ export default function MealResult() {
             {!!analysis.sources?.length && (
               <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                 {t('mealResult.sources', { domains: analysis.sources.join(', ') })}
+              </Text>
+            )}
+            {/* Required credit: Open Food Facts is ODbL-licensed, so its data
+                has to be attributed wherever it is shown. Products we read
+                ourselves from a label are not OFF's and show nothing. */}
+            {analysis.source === 'off' && (
+              <Text
+                onPress={() => Linking.openURL('https://world.openfoodfacts.org')}
+                style={{ color: theme.textTertiary, fontSize: 12, textDecorationLine: 'underline' }}
+              >
+                {t('mealResult.offCredit')}
               </Text>
             )}
           </View>
