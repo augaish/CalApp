@@ -32,6 +32,19 @@ export function timestampFor(day: Date): string {
 }
 
 /**
+ * Whole calendar days between an entry and a reference day — 1 for yesterday
+ * however few hours ago that was, which is what a person means by "a day ago".
+ * Counted from midnight to midnight rather than in 24-hour blocks, so a set at
+ * 11pm and one at 7am the next morning are a day apart, not zero.
+ */
+export function calendarDaysBetween(iso: string, day: Date): number {
+  const from = new Date(iso);
+  const a = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+  const b = new Date(day.getFullYear(), day.getMonth(), day.getDate()).getTime();
+  return Math.round((b - a) / 86_400_000);
+}
+
+/**
  * Is `remoteAt` a later instant than `localAt`? Used to decide whether the
  * account's copy should replace this device's.
  *

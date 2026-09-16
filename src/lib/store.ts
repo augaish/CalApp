@@ -2048,6 +2048,98 @@ export function historyFor(workouts: LoggedWorkout[], exerciseId: string): Logge
 }
 
 /**
+ * The heaviest set ever completed for an exercise, and the day it happened —
+ * the record to beat. Ranked by `setScore`, so the set called "best" here is
+ * the same one the trophy marks in a session and the same one the Training
+ * tab prints as "Max".
+ *
+ * Only sets flagged `done` count. Opening a scheduled exercise pre-fills the
+ * day with untrained rows, and a number nobody has lifted yet has no business
+ * being anybody's record.
+ */
+export function bestSetEver(
+  workouts: LoggedWorkout[],
+  exerciseId: string,
+): { set: WorkoutSet; at: string; type: LoggedWorkout['type'] } | undefined {
+  let best: { set: WorkoutSet; at: string; type: LoggedWorkout['type'] } | undefined;
+  let bestScore = 0;
+  for (const w of workouts) {
+    if (w.exerciseId !== exerciseId) continue;
+    for (const s of w.sets) {
+      if (!s.done) continue;
+      const score = setScore(s, w.type);
+      if (score > bestScore) {
+        bestScore = score;
+        best = { set: s, at: w.at, type: w.type };
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * The most recent set at a given rep count — the only like-for-like reference
+ * while you are choosing a weight. 25 kg × 10 against 25 kg × 7 is not a
+ * comparison; 25 kg × 10 against the last time you did ten is.
+ *
+ * Within that session the *heaviest* set at the rep count wins, because what
+ * you want to know is what you can hold for ten, not whichever ten happened to
+ * come last after the others had already emptied you.
+ *
+ * When that rep count has never been done, the nearest one that has is
+ * returned along with its own rep count, for the caller to label honestly: a
+ * weight printed under "× 10" that was really a set of six would be worse than
+ * printing nothing.
+ */
+export function lastSetAtReps(
+  workouts: LoggedWorkout[],
+  exerciseId: string,
+  reps: number,
+): { set: WorkoutSet; at: string; reps: number } | undefined {
+  const sessions = historyFor(workouts, exerciseId)
+    .map((w) => ({ at: w.at, sets: w.sets.filter((s) => s.done && (s.reps ?? 0) > 0) }))
+    .filter((w) => w.sets.length > 0);
+  if (sessions.length === 0) return undefined;
+
+  const counts = new Set<number>();
+  for (const w of sessions) for (const s of w.sets) counts.add(s.reps as number);
+  // Ties go to the lower rep count: heavier and closer to a working set than
+  // the same distance above, which is usually a lighter, longer one.
+  const want = counts.has(reps)
+    ? reps
+    : [...counts].reduce((a, b) => {
+        const da = Math.abs(a - reps);
+        const db = Math.abs(b - reps);
+        return db < da || (db === da && b < a) ? b : a;
+      });
+
+  for (const w of sessions) {
+    const matches = w.sets.filter((s) => s.reps === want);
+    if (matches.length === 0) continue;
+    const set = matches.reduce((b, s) => ((s.weightKg ?? 0) > (b.weightKg ?? 0) ? s : b));
+    return { set, at: w.at, reps: want };
+  }
+  return undefined;
+}
+
+/**
+ * The most recent session of an exercise strictly before `day` — what you
+ * actually did last time.
+ *
+ * Strictly earlier, not merely "a different day": filtering on "not this day"
+ * also sweeps in later sessions, so looking back at a day you missed would
+ * show it numbers from a workout that had not happened yet.
+ */
+export function lastSessionBefore(
+  workouts: LoggedWorkout[],
+  exerciseId: string,
+  day: Date,
+): LoggedWorkout | undefined {
+  const dayStart = startOfDay(day).getTime();
+  return historyFor(workouts, exerciseId).find((w) => new Date(w.at).getTime() < dayStart);
+}
+
+/**
  * The other days that have training on them, newest first, for the History
  * list. The day being viewed is left out: it is already laid out in full above.
  *

@@ -17,11 +17,12 @@ import { successHaptic } from '@/lib/feedback';
 import {
   actualBurnedForDay,
   applyOrder,
+  bestSetEver,
   bestSetIndex,
   dateKey,
   dayBurnAllocation,
-  historyFor,
   isSameDay,
+  lastSessionBefore,
   setScore,
   useAppStore,
   whoopCalibrationFactor,
@@ -86,36 +87,12 @@ function setChipLabel(s: WorkoutSet, type: ExerciseType, kg: string, min: string
   return parts.join(' · ');
 }
 
-/** Short label of the best (heaviest) set in a session, for the plan preview. */
-function bestSetLabel(w: LoggedWorkout, type: ExerciseType, kg: string): string {
-  const best = w.sets.reduce<WorkoutSet | undefined>((b, s) => {
-    if (!b) return s;
-    if (type === 'weight_reps') return (s.weightKg ?? 0) >= (b.weightKg ?? 0) ? s : b;
-    if (type === 'bodyweight_reps') return (s.reps ?? 0) >= (b.reps ?? 0) ? s : b;
-    if (type === 'time') return (s.seconds ?? 0) >= (b.seconds ?? 0) ? s : b;
-    return (s.distanceM ?? 0) >= (b.distanceM ?? 0) ? s : b;
-  }, undefined);
-  if (!best) return '';
+/** Short label of a record set, for the "Max" line under an exercise. */
+function bestSetLabel(best: WorkoutSet, type: ExerciseType, kg: string): string {
   if (type === 'weight_reps') return `${best.weightKg ?? 0} ${kg} × ${best.reps ?? 0}`;
   if (type === 'bodyweight_reps') return `× ${best.reps ?? 0}`;
   if (type === 'time') return `${best.seconds ?? 0}s`;
   return `${((best.distanceM ?? 0) / 1000).toFixed(1)} km`;
-}
-
-/** Numeric "best set" score of a session, for picking the highest prior. */
-function sessionTopScore(w: LoggedWorkout): number {
-  return Math.max(
-    0,
-    ...w.sets.map((s) =>
-      w.type === 'weight_reps'
-        ? (s.weightKg ?? 0) * 1000 + (s.reps ?? 0)
-        : w.type === 'bodyweight_reps'
-          ? (s.reps ?? 0)
-          : w.type === 'time'
-            ? (s.seconds ?? 0)
-            : (s.distanceM ?? 0),
-    ),
-  );
 }
 
 /** Short one-line summary of a logged exercise: sets · top load. */
@@ -657,23 +634,39 @@ export default function Training() {
               const planned = plan?.plans?.[exId] ?? [];
               const type = ex?.type ?? 'weight_reps';
               const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
-              // Every set for this day, right on the card — what is already
-              // logged if you have started, otherwise the plan's targets. No
-              // tapping through to find out what you are meant to lift.
+              // Every set for this day, right on the card. No tapping through
+              // to find out what you are meant to lift.
+              //
+              // Falls back to your last session before it falls back to the
+              // plan, because the plan is a copy of some earlier session that
+              // never moves while you get stronger — and because opening the
+              // exercise seeds the day from that same last session anyway. The
+              // card used to show the stale plan until you went in, and then
+              // silently changed to real numbers when you came back out, which
+              // made navigating look like it had edited your workout.
+              //
               // Sorted lightest to heaviest so the strip reads the same way
               // whether the sets were logged warming up or dropping down, and
               // the day's best lands at the end. This is a display copy only:
               // Exercise Detail keeps the real logged order, because its rows
               // are numbered and edited by index.
+              const lastSession = lastSessionBefore(workouts, exId, selected);
+              const source: 'today' | 'last' | 'plan' = wToday?.sets.length
+                ? 'today'
+                : lastSession?.sets.length
+                  ? 'last'
+                  : 'plan';
               const rows: WorkoutSet[] = (
-                wToday?.sets.length ? [...wToday.sets] : planned.map((p) => ({ ...p, done: false }))
+                source === 'today'
+                  ? [...wToday!.sets]
+                  : source === 'last'
+                    ? lastSession!.sets.map((s) => ({ ...s, done: false }))
+                    : planned.map((p) => ({ ...p, done: false }))
               ).sort((a, b) => setScore(a, type) - setScore(b, type));
-              // Your highest-ever session, kept as the reference to beat.
-              const best = historyFor(workouts, exId).reduce<LoggedWorkout | undefined>(
-                (b, w) => (!b || sessionTopScore(w) > sessionTopScore(b) ? w : b),
-                undefined,
-              );
-              const maxLabel = best ? bestSetLabel(best, best.type, kg) : '';
+              // Your heaviest completed set, kept as the reference to beat —
+              // the same ranking the session screen and the trophy use.
+              const best = bestSetEver(workouts, exId);
+              const maxLabel = best ? bestSetLabel(best.set, best.type, kg) : '';
               const wTodayCalories = wToday ? selectedDayAllocation.get(wToday.id) : undefined;
               return (
                 <View key={exId} style={styles.planItem}>
@@ -735,6 +728,15 @@ export default function Training() {
                   </View>
                   {rows.length > 0 && !dragging && (
                     <View style={styles.setStrip}>
+                      {/* Says which numbers these are. Without it, last
+                          time's sets and today's look identical, and the
+                          strip changing after you log reads as the app
+                          having invented figures. */}
+                      {source !== 'today' && (
+                        <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '700' }}>
+                          {t(source === 'last' ? 'training.lastTime' : 'training.planned')}
+                        </Text>
+                      )}
                       {rows.map((s, i) => {
                         // The heaviest set of the row, always — whether it is
                         // a target or already lifted. The two signals stay

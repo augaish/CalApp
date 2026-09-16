@@ -10,14 +10,16 @@ import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
-import { timestampFor } from '@/lib/day';
+import { calendarDaysBetween, timestampFor } from '@/lib/day';
 import { exerciseName, findExercise, logStyleFor, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import {
+  bestSetEver,
   bestSetIndex,
   dayBurnAllocation,
-  historyFor,
   isSameDay,
+  lastSessionBefore,
+  lastSetAtReps,
   useAppStore,
   whoopCalibrationFactor,
   workoutFor,
@@ -86,10 +88,19 @@ export default function SessionScreen() {
   const doneSets = todayWorkout?.sets.filter((s) => s.done) ?? [];
   const setNo = doneSets.length;
   const target: SetShape | undefined = planned[setNo] ?? planned[planned.length - 1];
-  const lastSession = exId
-    ? historyFor(workouts, exId).find((w) => !isSameDay(w.at, day))
-    : undefined;
-  const previous: SetShape | undefined =
+  // The record to beat, not "whatever came last". The old reference read the
+  // same set number out of your previous session and, when that session was
+  // shorter than this one, fell through to its *final* set — the burnout set
+  // you finish on. Standing on set 4 being told last time was 25 kg × 7 makes
+  // a session that went 25 × 10, 25 × 9, 25 × 7 look like a decline. The
+  // highest set is the only reference that means the same thing every time.
+  const best = exId ? bestSetEver(workouts, exId) : undefined;
+  // Still read off the last session, but only to prefill the steppers. Putting
+  // a personal best from weeks ago in the inputs every time hands you a number
+  // to aim at where a number to start from belongs — the same reason Exercise
+  // Detail seeds from where you left off rather than from your record.
+  const lastSession = exId ? lastSessionBefore(workouts, exId, day) : undefined;
+  const lastSet: SetShape | undefined =
     lastSession?.sets[setNo] ?? lastSession?.sets[lastSession.sets.length - 1];
 
   // This set's inputs: prefilled from the plan's target, else what was lifted
@@ -97,7 +108,7 @@ export default function SessionScreen() {
   // Hand edits are kept per (exercise, set number) and simply fall away when
   // either changes, rather than being synced back and forth in an effect.
   const prefillKey = `${exId ?? ''}:${setNo}`;
-  const prefillSrc = target ?? previous ?? doneSets[doneSets.length - 1];
+  const prefillSrc = target ?? lastSet ?? doneSets[doneSets.length - 1];
   const prefill: Required<SetShape> = {
     weightKg: prefillSrc?.weightKg ?? 0,
     reps: prefillSrc?.reps ?? 0,
@@ -111,6 +122,14 @@ export default function SessionScreen() {
   const seconds = live.seconds ?? prefill.seconds;
   const distance = live.distanceM ?? prefill.distanceM;
   const edit = (patch: Partial<SetShape>) => setEdits({ ...live, key: prefillKey, ...patch });
+
+  // What you last lifted for exactly the reps now in the stepper — the only
+  // like-for-like read there is, and it follows the stepper as you turn it, so
+  // "can I hold this weight for two more?" is answered where it is asked.
+  // Weight work only: for bodyweight, time and distance the reps are not a
+  // second dial you set against a load, so there is nothing to hold constant.
+  const sameReps =
+    type === 'weight_reps' && exId && reps > 0 ? lastSetAtReps(workouts, exId, reps) : undefined;
 
   const defaultView = initialBodyView(ex?.primaryMuscles, ex?.category);
   const [viewOverride, setViewOverride] = useState<{ key: string; view: 'front' | 'back' } | null>(null);
@@ -158,6 +177,18 @@ export default function SessionScreen() {
       case 'distance_time':
         return `${s.distanceM ?? 0} ${t('session.meters')} · ${s.seconds ?? 0} ${t('session.seconds')}`;
     }
+  };
+
+  /** "today" / "yesterday" / "4 days ago" / "3 weeks ago" / a date, relative
+   * to the day being trained rather than to the wall clock — a session being
+   * finished off tomorrow morning should not call last night "yesterday". */
+  const whenLabel = (iso: string): string => {
+    const days = calendarDaysBetween(iso, day);
+    if (days <= 0) return t('session.whenToday');
+    if (days === 1) return t('session.whenYesterday');
+    if (days < 14) return t('session.whenDaysAgo', { days });
+    if (days < 60) return t('session.whenWeeksAgo', { weeks: Math.round(days / 7) });
+    return new Date(iso).toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' });
   };
 
   const completeSet = () => {
@@ -364,8 +395,11 @@ export default function SessionScreen() {
             <Text style={{ color: theme.text, fontWeight: '700' }}>{label(target)}</Text>
           </View>
           <View style={styles.ref}>
-            <Text style={[styles.refLabel, { color: theme.textTertiary }]}>{t('session.previous')}</Text>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>{label(previous)}</Text>
+            <Text style={[styles.refLabel, { color: theme.textTertiary }]}>{t('session.best')}</Text>
+            <Text style={{ color: theme.text, fontWeight: '700' }}>{label(best?.set)}</Text>
+            {best && (
+              <Text style={{ color: theme.textTertiary, fontSize: 11 }}>{whenLabel(best.at)}</Text>
+            )}
           </View>
         </View>
         <Text style={[styles.refLabel, { color: theme.textTertiary, marginTop: Spacing.sm }]}>{t('session.thisSet')}</Text>
@@ -392,6 +426,26 @@ export default function SessionScreen() {
             <Stepper label={t('track.distance')} value={distance} onChange={(v) => edit({ distanceM: v })} step={100} />
           )}
         </View>
+        {type === 'weight_reps' && (
+          <View style={[styles.sameReps, { borderTopColor: theme.border }]}>
+            <Ionicons name="repeat" size={14} color={theme.textTertiary} />
+            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+              {sameReps
+                ? t('session.lastAtReps', { reps: sameReps.reps })
+                : t('session.noRepsRecord')}
+            </Text>
+            {sameReps && (
+              <>
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
+                  {sameReps.set.weightKg ?? 0} {kg}
+                </Text>
+                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                  · {whenLabel(sameReps.at)}
+                </Text>
+              </>
+            )}
+          </View>
+        )}
         <View style={styles.restPick}>
           <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('session.restLength')}</Text>
           {REST_OPTIONS.map((s) => {
@@ -489,6 +543,15 @@ const styles = StyleSheet.create({
   ref: { flex: 1 },
   refLabel: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 2 },
   stepperRow: { flexDirection: 'row', gap: Spacing.md, marginTop: 4 },
+  sameReps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 5,
+    marginTop: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+  },
   restPick: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.md },
   chip: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: Radius.full },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 },
