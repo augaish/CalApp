@@ -262,13 +262,24 @@ export default function ExerciseEdit() {
       </View>
 
       {existing && existing.source !== 'builtin' ? (
-        <Button
-          label={t('exerciseEdit.delete')}
-          variant="ghost"
-          icon="trash-outline"
-          onPress={del}
-          style={{ marginTop: Spacing.xs }}
-        />
+        <>
+          {/* For the duplicate case — the same movement saved twice under two
+              names — deleting would take its logged sets with it. Merging
+              moves them onto the entry that survives. */}
+          <Button
+            label={t('exerciseEdit.merge')}
+            variant="ghost"
+            icon="git-merge-outline"
+            onPress={() => router.push(`/exercise-merge?id=${encodeURIComponent(existing.id)}`)}
+            style={{ marginTop: Spacing.xs }}
+          />
+          <Button
+            label={t('exerciseEdit.delete')}
+            variant="ghost"
+            icon="trash-outline"
+            onPress={del}
+          />
+        </>
       ) : null}
     </Screen>
   );

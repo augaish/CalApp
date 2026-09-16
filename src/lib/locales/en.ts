@@ -422,10 +422,21 @@ export const en = {
     videoPlaceholder: 'https://…',
     save: 'Save exercise',
     delete: 'Delete exercise',
+    merge: 'Merge into another exercise',
     deleteConfirm: 'Delete this exercise? Its logged sessions stay in your history.',
     nameRequired: 'Please enter an exercise name.',
     autofill: 'Auto-fill with AI',
     autofillNeedsName: 'Enter a name or paste a video link first.',
+  },
+  exerciseMerge: {
+    title: 'Merge duplicate',
+    keepsSets: 'Its {{count}} logged sets move to whichever exercise you pick.',
+    noSets: 'Nothing has been logged against this one yet.',
+    pickTarget: 'Merge it into',
+    confirmTitle: 'Merge exercises?',
+    confirmBody:
+      '"{{from}}" will be merged into "{{into}}" and removed. Its {{count}} logged sets, schedule slots and planned targets all move across.',
+    action: 'Merge',
   },
   track: {
     track: 'Track',

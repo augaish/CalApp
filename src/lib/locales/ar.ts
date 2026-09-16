@@ -424,10 +424,21 @@ export const ar: TranslationSchema = {
     videoPlaceholder: 'https://…',
     save: 'حفظ التمرين',
     delete: 'حذف التمرين',
+    merge: 'دمج في تمرين آخر',
     deleteConfirm: 'حذف هذا التمرين؟ ستبقى جلساتك المسجّلة في السجل.',
     nameRequired: 'يرجى إدخال اسم التمرين.',
     autofill: 'تعبئة تلقائية بالذكاء الاصطناعي',
     autofillNeedsName: 'أدخل اسماً أو الصق رابط فيديو أولاً.',
+  },
+  exerciseMerge: {
+    title: 'دمج المكرر',
+    keepsSets: 'ستنتقل مجموعاته المسجّلة ({{count}}) إلى التمرين الذي تختاره.',
+    noSets: 'لم يُسجَّل شيء على هذا التمرين بعد.',
+    pickTarget: 'ادمجه في',
+    confirmTitle: 'دمج التمرينين؟',
+    confirmBody:
+      'سيُدمج «{{from}}» في «{{into}}» ثم يُحذف. وستنتقل مجموعاته المسجّلة ({{count}}) ومواضعه في الجدول وأهدافه المخططة كلها معه.',
+    action: 'دمج',
   },
   track: {
     track: 'تسجيل',

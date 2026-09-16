@@ -149,6 +149,13 @@ interface AppState {
   addExercise: (input: Omit<Exercise, 'id' | 'source'> & { source?: Exercise['source'] }) => string;
   updateExercise: (id: string, patch: Partial<Exercise>) => void;
   removeExercise: (id: string) => void;
+  /**
+   * Fold a duplicate exercise into the one it duplicates, then delete it.
+   * Everything logged against it moves across — history, weekly schedule,
+   * planned sets, skips, day ordering and any session in progress — so the
+   * sets someone already did are kept, just filed under the right exercise.
+   */
+  mergeExercise: (fromId: string, intoId: string) => void;
   /** Append a set to the (exercise, day) workout, creating it if needed. */
   logSet: (
     exercise: { id: string; name: string; type: LoggedWorkout['type']; category?: MuscleGroup },
@@ -429,6 +436,70 @@ export const useAppStore = create<AppState>()(
         })),
       removeExercise: (exId) =>
         set((s) => ({ exercises: s.exercises.filter((e) => e.id !== exId) })),
+      mergeExercise: (fromId, intoId) =>
+        set((s) => {
+          if (fromId === intoId) return {};
+          const target = findExercise(intoId, s.exercises);
+          if (!target) return {};
+          const bodyKg = s.profile?.weightKg ?? 75;
+          // Replace the id wherever it appears in a list, without leaving a
+          // duplicate behind if the target was already in that same list.
+          const swapList = (ids: string[]): string[] => {
+            const out: string[] = [];
+            for (const id of ids) {
+              const next = id === fromId ? intoId : id;
+              if (!out.includes(next)) out.push(next);
+            }
+            return out;
+          };
+
+          const workouts = s.workouts.map((w) =>
+            w.exerciseId === fromId
+              ? {
+                  ...w,
+                  exerciseId: intoId,
+                  exerciseName: target.name,
+                  // The burn was computed from the old exercise's category and
+                  // MET, so it has to be redone against the one it now belongs
+                  // to — otherwise the history keeps the wrong figure forever.
+                  caloriesBurned: burnForSets(
+                    w.sets,
+                    bodyKg,
+                    target.category,
+                    elapsedMinutes(w.at, w.updatedAt),
+                    target,
+                  ),
+                }
+              : w,
+          );
+
+          const schedule: typeof s.schedule = {};
+          for (const [weekday, day] of Object.entries(s.schedule)) {
+            const plans = day.plans ? { ...day.plans } : undefined;
+            // Planned sets follow the exercise, but never overwrite targets
+            // the person already set on the exercise being merged into.
+            if (plans && plans[fromId]) {
+              if (!plans[intoId]) plans[intoId] = plans[fromId];
+              delete plans[fromId];
+            }
+            schedule[Number(weekday)] = { ...day, exerciseIds: swapList(day.exerciseIds), plans };
+          }
+
+          const remap = (rec: Record<string, string[]>): Record<string, string[]> =>
+            Object.fromEntries(Object.entries(rec).map(([k, ids]) => [k, swapList(ids)]));
+
+          return {
+            workouts,
+            schedule,
+            skips: remap(s.skips),
+            dayOrder: remap(s.dayOrder),
+            activeSession: s.activeSession
+              ? { ...s.activeSession, exerciseIds: swapList(s.activeSession.exerciseIds) }
+              : s.activeSession,
+            // Built-ins live in code, so only a custom entry is ever removed.
+            exercises: s.exercises.filter((e) => e.id !== fromId),
+          };
+        }),
       logSet: (exercise, newSet, at) =>
         set((s) => {
           const when = at ?? new Date().toISOString();
