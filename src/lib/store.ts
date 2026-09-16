@@ -504,6 +504,12 @@ export const useAppStore = create<AppState>()(
         set((s) => {
           const when = at ?? new Date().toISOString();
           const bodyKg = s.profile?.weightKg ?? 75;
+          // Callers pass only enough to name the workout, so the MET and pace
+          // model live on the library entry, not on what was handed in. Look
+          // the full exercise up here or a freshly logged padel match burns at
+          // the coarse category rate while the very same session, once edited,
+          // recalculates correctly — the recalculation paths already look it up.
+          const full = findExercise(exercise.id, s.exercises) ?? exercise;
           const existing = s.workouts.find(
             (w) => w.exerciseId === exercise.id && isSameDay(w.at, new Date(when)),
           );
@@ -521,9 +527,9 @@ export const useAppStore = create<AppState>()(
                       caloriesBurned: burnForSets(
                         withPR,
                         bodyKg,
-                        exercise.category,
+                        full.category,
                         elapsedMinutes(existing.at, when),
-                        exercise,
+                        full,
                       ),
                     }
                   : w,
@@ -541,7 +547,7 @@ export const useAppStore = create<AppState>()(
                 exerciseName: exercise.name,
                 type: exercise.type,
                 sets,
-                caloriesBurned: burnForSets(sets, bodyKg, exercise.category, undefined, exercise),
+                caloriesBurned: burnForSets(sets, bodyKg, full.category, undefined, full),
               },
               ...s.workouts,
             ],

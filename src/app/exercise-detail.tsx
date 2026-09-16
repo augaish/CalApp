@@ -16,12 +16,13 @@ import {
 
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
+import { Stopwatch } from '@/components/stopwatch';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
-import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
+import { exerciseName, findExercise, logStyleFor, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { scrollInputIntoView } from '@/lib/scroll-to-input';
 import {
@@ -159,11 +160,17 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   const lastSet = recent?.sets[recent.sets.length - 1];
   const repsSeed = exercise && (exercise.type === 'weight_reps' || exercise.type === 'bodyweight_reps') ? 10 : 0;
 
+  // One unbroken effort (a padel match, a treadmill run) has no sets to count,
+  // so the day holds a single record that is edited rather than appended to —
+  // which also means it seeds from TODAY, not from the last time.
+  const continuous = logStyleFor(exercise) === 'continuous';
+  const seedSet = continuous ? todaySets[0] : lastSet;
+
   const [tab, setTab] = useState<Tab>(initialTab);
   const [weight, setWeight] = useState(lastSet?.weightKg ?? 0);
   const [reps, setReps] = useState(lastSet?.reps ?? repsSeed);
-  const [seconds, setSeconds] = useState(lastSet?.seconds ?? 0);
-  const [distance, setDistance] = useState(lastSet?.distanceM ?? 0);
+  const [seconds, setSeconds] = useState(seedSet?.seconds ?? 0);
+  const [distance, setDistance] = useState(seedSet?.distanceM ?? 0);
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const scrollRef = useRef<ScrollView>(null);
@@ -191,6 +198,13 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
 
   const primary = () => {
     successHaptic();
+    // Saving a continuous effort twice should correct the day, not stack a
+    // second match on top of the first.
+    if (continuous && today && today.sets.length > 0) {
+      updateSet(today.id, 0, buildSet(), timestampFor(viewDay));
+      useCelebrate.getState().celebrate(t('celebrate.setLogged'));
+      return;
+    }
     if (editingIndex !== null && today) {
       updateSet(today.id, editingIndex, buildSet(), timestampFor(viewDay));
       setEditingIndex(null);
@@ -246,8 +260,14 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
               <Button label={t('common.cancel')} variant="ghost" onPress={cancelEdit} style={{ flex: 1 }} />
             )}
             <Button
-              label={editingIndex !== null ? t('track.saveSet') : t('track.addSet')}
-              icon={editingIndex !== null ? 'checkmark' : 'add'}
+              label={
+                continuous
+                  ? t('track.saveSession')
+                  : editingIndex !== null
+                    ? t('track.saveSet')
+                    : t('track.addSet')
+              }
+              icon={continuous || editingIndex !== null ? 'checkmark' : 'add'}
               onPress={primary}
               style={{ flex: 2 }}
             />
@@ -363,6 +383,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
       {tab === 'track' && (
         <TrackTab
           type={type}
+          continuous={continuous}
           weight={weight}
           reps={reps}
           seconds={seconds}
@@ -408,6 +429,7 @@ function setLabel(s: WorkoutSet, type: ExerciseType, kg: string, min = 'min'): s
 
 function TrackTab({
   type,
+  continuous,
   weight,
   reps,
   seconds,
@@ -431,6 +453,8 @@ function TrackTab({
   noteInputRef,
 }: {
   type: ExerciseType;
+  /** One unbroken effort: no set list, one record for the day. */
+  continuous: boolean;
   weight: number;
   reps: number;
   seconds: number;
@@ -484,6 +508,13 @@ function TrackTab({
       </View>
 
       <Card>
+        {/* Timed work is timed, not remembered: nobody knows they planked for
+            47 seconds. The steppers below still work for a session logged
+            from memory afterwards. */}
+        {(type === 'time' || type === 'distance_time') && (
+          <Stopwatch value={seconds} onChange={setSeconds} />
+        )}
+
         <View style={styles.stepperGroup}>
           {type === 'weight_reps' && (
             <>
@@ -529,7 +560,14 @@ function TrackTab({
         )}
       </Card>
 
-      {sets.length === 0 ? (
+      {continuous ? (
+        // No set list: there is one effort, and it is already in the fields
+        // above. Repeating it as a one-row table would only invite someone to
+        // "add" a second match they did not play.
+        <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.sm }}>
+          {sets.length > 0 ? t('track.sessionLogged') : t('track.sessionHint')}
+        </Text>
+      ) : sets.length === 0 ? (
         <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.sm }}>
           {t('training.emptyDay')}
         </Text>

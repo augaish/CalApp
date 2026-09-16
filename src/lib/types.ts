@@ -365,6 +365,20 @@ export interface Exercise {
    * cannot see anyway.
    */
   paceModel?: 'foot';
+  /**
+   * How this exercise is actually performed, which decides how it is logged.
+   *
+   * 'sets' is the default and covers anything done in bouts you repeat — a
+   * plank held three times, a farmer's walk carried three times. 'continuous'
+   * covers a single unbroken effort: a treadmill run, a padel match, fifteen
+   * minutes of skipping. Those have no sets to count, and asking for them
+   * invites made-up numbers.
+   *
+   * `type` is a separate question — it decides which fields are shown
+   * (seconds, or distance and seconds) — while this decides whether there is
+   * a set list at all.
+   */
+  logStyle?: 'sets' | 'continuous';
   /** Photo of the machine/movement — from the camera or an equipment scan. */
   photoUri?: string;
   /** Form cues / how-to, shown on the exercise page. */

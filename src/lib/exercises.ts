@@ -22,6 +22,8 @@ type Seed = {
   met?: number;
   /** Burn derived from actual pace rather than a fixed rate. See Exercise.paceModel. */
   paceModel?: 'foot';
+  /** One unbroken effort rather than repeated bouts. See Exercise.logStyle. */
+  logStyle?: 'sets' | 'continuous';
   aliases?: string[];
 };
 
@@ -111,9 +113,9 @@ const SEEDS: Seed[] = [
   { id: 'tennis', en: 'Tennis', ar: 'التنس', category: 'cardio', type: 'time', met: 7.3, aliases: ['tennis', 'تنس'] },
   { id: 'football', en: 'Football', ar: 'كرة القدم', category: 'cardio', type: 'time', met: 7.0, aliases: ['football', 'soccer', 'كرة قدم', 'فوتبول'] },
   { id: 'basketball', en: 'Basketball', ar: 'كرة السلة', category: 'cardio', type: 'time', met: 6.5, aliases: ['basketball', 'كرة سلة'] },
-  { id: 'boxing-bag', en: 'Boxing (heavy bag)', ar: 'الملاكمة (كيس)', category: 'cardio', type: 'time', met: 6.0, aliases: ['boxing', 'heavy bag', 'punching bag', 'ملاكمة', 'كيس ملاكمة'] },
-  { id: 'battle-ropes', en: 'Battle Ropes', ar: 'حبال المقاومة', category: 'cardio', type: 'time', met: 8.0, aliases: ['battle ropes', 'battle rope', 'حبال', 'حبال قتالية'] },
-  { id: 'sled-push', en: 'Sled Push', ar: 'دفع الزحافة', category: 'cardio', type: 'time', met: 8.0, aliases: ['sled push', 'prowler', 'زحافة', 'دفع زحافة'] },
+  { id: 'boxing-bag', en: 'Boxing (heavy bag)', ar: 'الملاكمة (كيس)', category: 'cardio', type: 'time', met: 6.0, logStyle: 'sets', aliases: ['boxing', 'heavy bag', 'punching bag', 'ملاكمة', 'كيس ملاكمة'] },
+  { id: 'battle-ropes', en: 'Battle Ropes', ar: 'حبال المقاومة', category: 'cardio', type: 'time', met: 8.0, logStyle: 'sets', aliases: ['battle ropes', 'battle rope', 'حبال', 'حبال قتالية'] },
+  { id: 'sled-push', en: 'Sled Push', ar: 'دفع الزحافة', category: 'cardio', type: 'time', met: 8.0, logStyle: 'sets', aliases: ['sled push', 'prowler', 'زحافة', 'دفع زحافة'] },
 
   // ── Full body ──────────────────────────────────────────
   // This category exists for movements that genuinely work the whole body.
@@ -196,6 +198,7 @@ export const BUILTIN_EXERCISES: Exercise[] = SEEDS.map((s) => ({
   type: s.type ?? 'weight_reps',
   met: s.met,
   paceModel: s.paceModel,
+  logStyle: s.logStyle,
   aliases: s.aliases,
   source: 'builtin',
 }));
@@ -282,6 +285,25 @@ export const MUSCLE_ID_COLORS: Record<MuscleId, string> = Object.fromEntries(
  * "not sure" — that is exactly how a recognisable chin/dip machine ended up
  * filed under Full body with no muscle map.
  */
+/**
+ * How an exercise should be logged: as repeated bouts you count, or as one
+ * unbroken effort.
+ *
+ * Only timed and distance work can ever be continuous — a bench press is sets
+ * by definition. Among those, the split is not what the exercise measures but
+ * how it is performed: a plank is held three times, a padel match is played
+ * once. Cardio is the continuous case by default, with the exceptions marked
+ * on the entries themselves, because boxing rounds, sled pushes and battle
+ * ropes are genuinely done in bouts despite sitting in that category.
+ */
+export function logStyleFor(
+  exercise: Pick<Exercise, 'type' | 'category' | 'logStyle'> | undefined,
+): 'sets' | 'continuous' {
+  if (!exercise) return 'sets';
+  if (exercise.type !== 'time' && exercise.type !== 'distance_time') return 'sets';
+  return exercise.logStyle ?? (exercise.category === 'cardio' ? 'continuous' : 'sets');
+}
+
 export function categoryForMuscles(muscles: MuscleId[] | undefined): MuscleGroup | null {
   if (!muscles?.length) return null;
   const tally = new Map<MuscleGroup, number>();

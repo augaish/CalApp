@@ -5,12 +5,13 @@ import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
+import { Stopwatch } from '@/components/stopwatch';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor } from '@/lib/day';
-import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
+import { exerciseName, findExercise, logStyleFor, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import {
   bestSetIndex,
@@ -32,6 +33,13 @@ function dayFromKey(key: string): Date {
 }
 
 type SetShape = Pick<WorkoutSet, 'weightKg' | 'reps' | 'seconds' | 'distanceM'>;
+
+/** When a rest of `seconds` starting now would end. Module-level because the
+ * React Compiler's purity rule forbids reading the clock from a component
+ * body or a handler declared inside one. */
+function restEndsAtFrom(seconds: number): string {
+  return new Date(Date.now() + seconds * 1000).toISOString();
+}
 
 /**
  * The workout as it happens: one exercise at a time, target and last-time
@@ -55,6 +63,7 @@ export default function SessionScreen() {
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const logSet = useAppStore((s) => s.logSet);
   const removeSet = useAppStore((s) => s.removeSet);
+  const updateSet = useAppStore((s) => s.updateSet);
   const updateSession = useAppStore((s) => s.updateSession);
   const endSession = useAppStore((s) => s.endSession);
 
@@ -131,6 +140,11 @@ export default function SessionScreen() {
   const isLast = index >= total - 1;
   const nextEx = !isLast ? findExercise(session.exerciseIds[index + 1], custom) : undefined;
   const allPlannedDone = planned.length > 0 && setNo >= planned.length;
+  // A padel match or a treadmill run is one effort, not a stack of sets — so
+  // this exercise gets a single record for the day, saved over rather than
+  // appended to, and no rest timer afterwards.
+  const continuous = logStyleFor(ex) === 'continuous';
+  const loggedContinuous = continuous && (todayWorkout?.sets.length ?? 0) > 0;
 
   const label = (s: SetShape | undefined): string => {
     if (!s) return t('session.none');
@@ -155,10 +169,17 @@ export default function SessionScreen() {
       distanceM: type === 'distance_time' ? distance : undefined,
       done: true,
     };
-    logSet({ id: ex.id, name: exerciseName(ex, lang), type, category: ex.category }, set, timestampFor(day));
+    if (continuous && todayWorkout && todayWorkout.sets.length > 0) {
+      updateSet(todayWorkout.id, 0, set, timestampFor(day));
+    } else {
+      logSet({ id: ex.id, name: exerciseName(ex, lang), type, category: ex.category }, set, timestampFor(day));
+    }
     successHaptic();
     useCelebrate.getState().celebrate(t('celebrate.setLogged'));
-    updateSession({ restEndsAt: new Date(Date.now() + session.restSeconds * 1000).toISOString() });
+    // Resting between sets of one continuous effort is meaningless.
+    if (!continuous) {
+      updateSession({ restEndsAt: restEndsAtFrom(session.restSeconds) });
+    }
   };
 
   const undoLast = () => {
@@ -268,7 +289,12 @@ export default function SessionScreen() {
     <Screen
       footer={
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <Button label={t('session.completeSet')} icon="checkmark" onPress={completeSet} style={{ flex: 2 }} />
+          <Button
+            label={continuous ? t('track.saveSession') : t('session.completeSet')}
+            icon="checkmark"
+            onPress={completeSet}
+            style={{ flex: 2 }}
+          />
           <Button label={t('session.finish')} variant="secondary" onPress={() => setFinishing(true)} style={{ flex: 1 }} />
         </View>
       }
@@ -321,7 +347,11 @@ export default function SessionScreen() {
 
       <Card>
         <View style={styles.setHead}>
-          <Text style={[styles.setTitle, { color: theme.text }]}>{t('session.setNumber', { n: setNo + 1 })}</Text>
+          <Text style={[styles.setTitle, { color: theme.text }]}>
+            {continuous
+              ? t(loggedContinuous ? 'track.sessionLogged' : 'session.thisSession')
+              : t('session.setNumber', { n: setNo + 1 })}
+          </Text>
           {allPlannedDone && (
             <Text style={{ color: theme.success, fontSize: 12, fontWeight: '600', flex: 1 }}>
               {t('session.allPlannedDone')}
@@ -339,6 +369,9 @@ export default function SessionScreen() {
           </View>
         </View>
         <Text style={[styles.refLabel, { color: theme.textTertiary, marginTop: Spacing.sm }]}>{t('session.thisSet')}</Text>
+        {(type === 'time' || type === 'distance_time') && (
+          <Stopwatch value={seconds} onChange={(v) => edit({ seconds: v })} compact />
+        )}
         <View style={styles.stepperRow}>
           {type === 'weight_reps' && (
             <Stepper
