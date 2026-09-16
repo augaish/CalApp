@@ -84,6 +84,30 @@ interface AppState {
     number,
     { title?: string; exerciseIds: string[]; plans?: Record<string, PlannedSet[]> }
   >;
+  /**
+   * Named schedules you can keep side by side — Gym, Home, Travel — and load
+   * one at a time.
+   *
+   * `schedule` above stays the single source of truth for what you are doing
+   * NOW, so every screen that reads it is unchanged. These are saved copies:
+   * activating one replaces the working schedule, and "update" captures the
+   * working schedule back into it. Explicit in both directions, because a
+   * schedule silently rewriting itself under you is worse than one that asks.
+   */
+  savedSchedules: {
+    id: string;
+    /** Empty means "use the default label" — a migration cannot localise. */
+    name: string;
+    days: Record<
+      number,
+      { title?: string; exerciseIds: string[]; plans?: Record<string, PlannedSet[]> }
+    >;
+    createdAt: string;
+    /** When this was last loaded, shown as "active since". */
+    activatedAt?: string;
+  }[];
+  /** Which saved schedule the working schedule was last loaded from. */
+  activeScheduleId: string | null;
   /** Plan exercises skipped on a specific date (dateKey → exerciseIds). The
    * weekly schedule is untouched, so a skipped exercise returns next week. */
   skips: Record<string, string[]>;
@@ -303,6 +327,15 @@ interface AppState {
   /** Swap the planned meal for one slot on one day (dateKey) for the plan's
    * meal in that slot from another weekday — "not kabsa today, give me
    * Tuesday's lunch instead". Pass null to go back to the day's own meal. */
+  /** Capture the working schedule as a new named one, and make it active. */
+  saveScheduleAs: (name: string) => string;
+  /** Capture the working schedule back into a saved one. */
+  updateSavedSchedule: (id: string) => void;
+  /** Load a saved schedule into the working schedule. History and any session
+   * in progress are untouched. */
+  activateSchedule: (id: string) => void;
+  renameSchedule: (id: string, name: string) => void;
+  deleteSchedule: (id: string) => void;
   swapPlannedMeal: (dayKey: string, slot: MealType, fromWeekday: number | null) => void;
   /** Point one planned slot on one date at a recipe, or pass null to put the
    * programme's own meal back. */
@@ -402,6 +435,8 @@ export const useAppStore = create<AppState>()(
       meals: [],
       exercises: [],
       schedule: {},
+      savedSchedules: [],
+      activeScheduleId: null,
       skips: {},
       installId: null,
       linkedRef: null,
@@ -1022,6 +1057,47 @@ export const useAppStore = create<AppState>()(
           else day[slot] = { ...value, programId: s.activeProgram?.id };
           return { mealPlanRecipes: { ...s.mealPlanRecipes, [dayKey]: day } };
         }),
+      saveScheduleAs: (name) => {
+        const sid = `sched:${id()}`;
+        const now = new Date().toISOString();
+        set((s) => ({
+          savedSchedules: [
+            ...s.savedSchedules,
+            { id: sid, name: name.trim(), days: s.schedule, createdAt: now, activatedAt: now },
+          ],
+          activeScheduleId: sid,
+        }));
+        return sid;
+      },
+      updateSavedSchedule: (sid) =>
+        set((s) => ({
+          savedSchedules: s.savedSchedules.map((x) => (x.id === sid ? { ...x, days: s.schedule } : x)),
+        })),
+      activateSchedule: (sid) =>
+        set((s) => {
+          const found = s.savedSchedules.find((x) => x.id === sid);
+          if (!found) return {};
+          const now = new Date().toISOString();
+          // Only the plan moves. Logged workouts, personal bests and a session
+          // already in progress are records of what happened and are never a
+          // schedule's to rewrite.
+          return {
+            schedule: found.days,
+            activeScheduleId: sid,
+            savedSchedules: s.savedSchedules.map((x) => (x.id === sid ? { ...x, activatedAt: now } : x)),
+          };
+        }),
+      renameSchedule: (sid, name) =>
+        set((s) => ({
+          savedSchedules: s.savedSchedules.map((x) => (x.id === sid ? { ...x, name: name.trim() } : x)),
+        })),
+      deleteSchedule: (sid) =>
+        set((s) => ({
+          savedSchedules: s.savedSchedules.filter((x) => x.id !== sid),
+          // The working schedule stays exactly as it is — deleting a saved
+          // copy must not empty the week you are training.
+          activeScheduleId: s.activeScheduleId === sid ? null : s.activeScheduleId,
+        })),
       swapPlannedMeal: (dayKey, slot, fromWeekday) =>
         set((s) => {
           const day = { ...(s.mealPlanSwaps[dayKey] ?? {}) };
@@ -1147,7 +1223,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 12,
+      version: 13,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -1160,6 +1236,8 @@ export const useAppStore = create<AppState>()(
         recipes,
         shopping,
         schedule,
+        savedSchedules,
+        activeScheduleId,
         skips,
         installId,
         linkedRef,
@@ -1198,6 +1276,8 @@ export const useAppStore = create<AppState>()(
         recipes,
         shopping,
         schedule,
+        savedSchedules,
+        activeScheduleId,
         skips,
         installId,
         linkedRef,
@@ -1409,6 +1489,23 @@ function migrateStore(persisted: unknown, version: number): unknown {
   }
   if (version < 12 && !state.mealPlanRecipes) {
     state.mealPlanRecipes = {};
+  }
+
+  // v12 → v13: the week someone already built becomes their first saved
+  // schedule, so turning on presets never looks like losing it. The name is
+  // left blank because a migration cannot localise; the screen shows a
+  // default label for that. Additive — nothing before v13 reads either field.
+  if (version < 13 && !Array.isArray(state.savedSchedules)) {
+    const existing = (state.schedule ?? {}) as Record<string, unknown>;
+    const hasWeek = Object.values(existing).some(
+      (d) => Array.isArray((d as { exerciseIds?: string[] })?.exerciseIds) &&
+        ((d as { exerciseIds: string[] }).exerciseIds.length > 0),
+    );
+    const now = new Date().toISOString();
+    state.savedSchedules = hasWeek
+      ? [{ id: 'sched:original', name: '', days: state.schedule, createdAt: now, activatedAt: now }]
+      : [];
+    state.activeScheduleId = hasWeek ? 'sched:original' : null;
   }
 
   if (version >= 2) return state;
