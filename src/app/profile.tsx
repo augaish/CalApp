@@ -311,6 +311,16 @@ export default function Profile() {
           <Ionicons name="open-outline" size={16} color={theme.textTertiary} />
         </Card>
       </Pressable>
+      {/* What actually happened this week, and what to change about it. */}
+      <Pressable onPress={() => router.push('/review')}>
+        <Card style={styles.linkRow}>
+          <Ionicons name="stats-chart-outline" size={18} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('review.title')}
+          </Text>
+          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
       <Pressable onPress={exportData}>
         <Card style={styles.linkRow}>
           <Ionicons name="download-outline" size={18} color={theme.primary} />
