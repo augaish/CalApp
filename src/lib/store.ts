@@ -25,6 +25,7 @@ import type {
   PlannedSet,
   Profile,
   Program,
+  Recipe,
   WeightEntry,
   WhoopDayWorkout,
   WorkoutSet,
@@ -49,6 +50,12 @@ interface AppState {
   meals: LoggedMeal[];
   /** User-made & scan-saved exercises (built-ins live in code, not here). */
   exercises: Exercise[];
+  /**
+   * Saved recipes — dishes with ingredients and steps, as opposed to a
+   * PlannedMeal, which is only a name and its macros. Kept once generated so
+   * reopening one never costs another AI call.
+   */
+  recipes: Recipe[];
   /**
    * Recurring weekly plan: weekday (0=Sun … 6=Sat) → exercises for that day,
    * plus optional planned target sets per exercise (`plans`).
@@ -156,6 +163,10 @@ interface AppState {
    * sets someone already did are kept, just filed under the right exercise.
    */
   mergeExercise: (fromId: string, intoId: string) => void;
+  /** Saves a generated or hand-written recipe and returns its id. */
+  addRecipe: (input: Omit<Recipe, 'id' | 'createdAt'> & { id?: string; createdAt?: string }) => string;
+  updateRecipe: (id: string, patch: Partial<Recipe>) => void;
+  removeRecipe: (id: string) => void;
   /** Append a set to the (exercise, day) workout, creating it if needed. */
   logSet: (
     exercise: { id: string; name: string; type: LoggedWorkout['type']; category?: MuscleGroup },
@@ -359,6 +370,7 @@ export const useAppStore = create<AppState>()(
       weights: [],
       activeProgram: null,
       mealPlanSwaps: {},
+      recipes: [],
       remindMeals: true,
       remindWater: true,
       remindWorkouts: true,
@@ -436,6 +448,19 @@ export const useAppStore = create<AppState>()(
         })),
       removeExercise: (exId) =>
         set((s) => ({ exercises: s.exercises.filter((e) => e.id !== exId) })),
+      addRecipe: (input) => {
+        const rid = input.id ?? `recipe:${id()}`;
+        set((s) => ({
+          recipes: [
+            { ...input, id: rid, createdAt: input.createdAt ?? new Date().toISOString() },
+            ...s.recipes.filter((r) => r.id !== rid),
+          ],
+        }));
+        return rid;
+      },
+      updateRecipe: (rid, patch) =>
+        set((s) => ({ recipes: s.recipes.map((r) => (r.id === rid ? { ...r, ...patch } : r)) })),
+      removeRecipe: (rid) => set((s) => ({ recipes: s.recipes.filter((r) => r.id !== rid) })),
       mergeExercise: (fromId, intoId) =>
         set((s) => {
           if (fromId === intoId) return {};
@@ -1008,7 +1033,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 11,
+      version: 12,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -1018,6 +1043,7 @@ export const useAppStore = create<AppState>()(
         targets,
         meals,
         exercises,
+        recipes,
         schedule,
         skips,
         installId,
@@ -1053,6 +1079,7 @@ export const useAppStore = create<AppState>()(
         targets,
         meals,
         exercises,
+        recipes,
         schedule,
         skips,
         installId,
@@ -1254,6 +1281,13 @@ function migrateStore(persisted: unknown, version: number): unknown {
         caloriesBurned: burnForSets(w.sets, bodyKg, ex?.category, elapsedMinutes(w.at, w.updatedAt), ex),
       };
     });
+  }
+
+  // v11 → v12: recipes are new, so an older store simply has none. Purely
+  // additive — a rollback to v11 reads this state unchanged, since nothing
+  // before v12 looks at the field.
+  if (version < 12 && !Array.isArray(state.recipes)) {
+    state.recipes = [];
   }
 
   if (version >= 2) return state;

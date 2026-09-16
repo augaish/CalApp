@@ -54,6 +54,16 @@ export interface FoodItem {
    * (non-barcode items only) — persisted so reopening a saved meal can show
    * which chip was actually picked instead of always defaulting to "1". */
   portionMultiplier?: number;
+  /**
+   * Where this came from, when it was cooked from a saved recipe. The macros
+   * above stay a SNAPSHOT taken at the moment it was logged — editing the
+   * recipe, swapping an ingredient or regenerating it later must never
+   * rewrite what someone already ate. This only lets the diary entry offer
+   * "view recipe" and "edit the portion I logged".
+   */
+  recipeId?: string;
+  /** Servings of that recipe this entry represents, e.g. 0.5. */
+  recipeServings?: number;
 }
 
 export interface MealAnalysis {
@@ -230,6 +240,100 @@ export interface MealPlanDay {
 export interface MealPlan {
   summary?: string;
   days: MealPlanDay[];
+}
+
+/** Rough supermarket section, used only to group a shopping list so a week's
+ * ingredients read as a route round the shop rather than an alphabetical pile. */
+export type RecipeAisle =
+  | 'produce'
+  | 'meat'
+  | 'dairy'
+  | 'bakery'
+  | 'pantry'
+  | 'frozen'
+  | 'spices'
+  | 'other';
+
+export interface RecipeIngredient {
+  /** In the language the recipe was written in. */
+  name: string;
+  /**
+   * Language-independent identity, lowercase English, for merging a shopping
+   * list: "rice", "chicken_breast", "olive_oil". Without it "rice", "أرز" and
+   * "basmati rice" become three lines on the same shopping trip. Two entries
+   * merge only when this AND `unit` AND `state` all agree.
+   */
+  key: string;
+  /**
+   * How much, in `unit`. Everything — scaling, per-serving macros, the
+   * shopping list — is computed from this, so it is the only quantity that
+   * has to be right.
+   */
+  amount: number;
+  /** Grams for solids, millilitres for liquids. Never mixed when merging. */
+  unit: 'g' | 'ml';
+  /**
+   * Whether `amount` describes the ingredient before or after cooking. Rice
+   * roughly triples and meat loses water, so merging 100 g raw rice with
+   * 300 g cooked rice would be wrong in both directions.
+   */
+  state?: 'raw' | 'cooked';
+  /**
+   * The same amount as someone would actually measure it, spelled precisely:
+   * "1 tbsp" not "1 spoon", "ملعقة كبيرة" not "ملعقة". Always shown beside
+   * the weight, never instead of it.
+   */
+  measure?: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  aisle?: RecipeAisle;
+  /**
+   * These numbers are an estimate, not a measurement. The app's arithmetic on
+   * top of them is exact, which is not the same thing as the totals being
+   * right — so the screen says so rather than implying precision it does not
+   * have, and every value stays editable.
+   */
+  estimated?: boolean;
+}
+
+/**
+ * A dish you can actually cook, as opposed to a PlannedMeal, which is only a
+ * name and its macros.
+ *
+ * Per-serving nutrition is deliberately NOT stored: it is the ingredient
+ * totals divided by servings, computed on demand. Storing it would let the
+ * two drift the moment an ingredient is swapped or the batch is scaled, and
+ * the whole point is that the app owns the arithmetic while the AI only
+ * supplies the estimates it is good at.
+ */
+export interface Recipe {
+  id: string;
+  name: string;
+  /** How many servings the ingredient list as written produces. */
+  servings: number;
+  prepMinutes?: number;
+  cookMinutes?: number;
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  /**
+   * Cooked weight of the whole batch, where it is known. Rice triples and
+   * meat loses water, so without this, logging "200 g of what I cooked"
+   * against raw ingredient weights is simply wrong. It is itself an estimate
+   * unless someone weighed the pan, so logging by serving fraction is the
+   * default and this only backs the by-weight option.
+   */
+  cookedYieldG?: number;
+  /** Set once someone has actually weighed the batch, which makes logging by
+   * cooked weight trustworthy rather than a second guess on top of a guess. */
+  cookedYieldMeasured?: boolean;
+  /** Which language it was written in — recipes are not translated in place. */
+  language: Language;
+  source: 'ai' | 'custom';
+  createdAt: string;
+  photoUri?: string;
+  notes?: string;
 }
 
 export interface Program {

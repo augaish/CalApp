@@ -9,6 +9,7 @@ import type {
   GeneratedProgram,
   Language,
   MealAnalysis,
+  Recipe,
   WhoopDayWorkout,
 } from './types';
 
@@ -499,6 +500,21 @@ export async function generateProgram(
 }
 
 /**
+ * One cookable recipe: ingredients with weights and their own nutrition, plus
+ * steps. The server returns the recipe WITHOUT an id or timestamp — those are
+ * the store's to assign when it is saved, so generating one twice never
+ * silently overwrites the first.
+ */
+export async function generateRecipe(
+  request: string,
+  language: Language,
+  context?: unknown,
+): Promise<Omit<Recipe, 'id' | 'createdAt' | 'language' | 'source'>> {
+  if (isMockMode) return mockRecipe(language);
+  return post('/api/generate-recipe', { request, language, context });
+}
+
+/**
  * Barcode → nutrition, via our own server: checks its first-party cache
  * (grown from every product a user has resolved through the AI photo-scan
  * fallback — see reportBarcode) before falling back to Open Food Facts,
@@ -591,6 +607,30 @@ async function mockEquipment(language: Language): Promise<EquipmentAnalysis> {
         suggestion: { sets: 3, reps: '10–12', note: 'Start with a weight you can control' },
         confidence: 0.85,
       };
+}
+
+/** Demo-mode recipe, so the screen is exercisable with no server attached. */
+async function mockRecipe(
+  language: Language,
+): Promise<Omit<Recipe, 'id' | 'createdAt' | 'language' | 'source'>> {
+  await delay(1200);
+  const ar = language === 'ar';
+  return {
+    name: ar ? 'دجاج بالأرز' : 'Chicken and Rice',
+    servings: 4,
+    prepMinutes: 15,
+    cookMinutes: 30,
+    cookedYieldG: 1400,
+    ingredients: [
+      { name: ar ? 'صدور دجاج' : 'Chicken breast', key: 'chicken_breast', amount: 600, unit: 'g', state: 'raw', measure: ar ? '٣ حبات' : '3 pieces', calories: 660, proteinG: 124, carbsG: 0, fatG: 14, aisle: 'meat' },
+      { name: ar ? 'أرز بسمتي' : 'Basmati rice', key: 'rice', amount: 300, unit: 'g', state: 'raw', measure: ar ? 'كوب ونصف' : '1½ cups', calories: 1080, proteinG: 22, carbsG: 234, fatG: 3, aisle: 'pantry' },
+      { name: ar ? 'زيت زيتون' : 'Olive oil', key: 'olive_oil', amount: 30, unit: 'ml', measure: ar ? 'ملعقتان كبيرتان' : '2 tbsp', calories: 265, proteinG: 0, carbsG: 0, fatG: 30, aisle: 'pantry' },
+      { name: ar ? 'بصل' : 'Onion', key: 'onion', amount: 150, unit: 'g', state: 'raw', measure: ar ? 'حبة متوسطة' : '1 medium', calories: 60, proteinG: 1.5, carbsG: 14, fatG: 0, aisle: 'produce' },
+    ],
+    steps: ar
+      ? ['اغسل الأرز وانقعه ٢٠ دقيقة.', 'حمّر البصل بالزيت حتى يذبل.', 'أضف الدجاج وقلّبه حتى يتحمّر.', 'أضف الأرز والماء واتركه على نار هادئة ٢٠ دقيقة.']
+      : ['Rinse the rice and soak it for 20 minutes.', 'Soften the onion in the oil over medium heat.', 'Add the chicken and brown on both sides.', 'Add the rice and water, cover, and simmer 20 minutes.'],
+  };
 }
 
 async function mockProgram(language: Language): Promise<GeneratedProgram> {

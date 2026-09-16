@@ -126,6 +126,9 @@ export default function AddMenu() {
           <Tile icon="barcode" label={t('addMenu.scanBarcode')} onPress={() => go('/scan?mode=barcode')} theme={theme} />
           <Tile icon="create" label={t('addMenu.describe')} onPress={() => go('/describe')} theme={theme} />
           <Tile icon="pencil" label={t('addMenu.manual')} onPress={() => go('/food-edit')} theme={theme} />
+          {/* Cooking is the other half of eating: a recipe is where a planned
+              meal becomes something you can actually make and then log. */}
+          <Tile icon="restaurant" label={t('addMenu.recipes')} onPress={() => go('/recipes')} theme={theme} />
         </View>
 
         {!foodOnly && (

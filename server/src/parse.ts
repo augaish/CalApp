@@ -571,6 +571,105 @@ export interface ProgramPlan {
  * not a guarantee. A program with no usable schedule is not a program, so
  * this returns undefined rather than a half-formed one.
  */
+const AISLES = ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'frozen', 'spices', 'other'];
+
+export interface RecipeIngredientPlan {
+  name: string;
+  key: string;
+  amount: number;
+  unit: 'g' | 'ml';
+  state?: 'raw' | 'cooked';
+  measure?: string;
+  calories: number;
+  proteinG: number;
+  carbsG: number;
+  fatG: number;
+  aisle?: string;
+  estimated?: boolean;
+}
+
+export interface RecipePlan {
+  name: string;
+  servings: number;
+  prepMinutes?: number;
+  cookMinutes?: number;
+  cookedYieldG?: number;
+  ingredients: RecipeIngredientPlan[];
+  steps: string[];
+}
+
+/**
+ * A recipe is only usable if it can be cooked and counted, so this drops
+ * anything that would break either: an ingredient with no weight cannot be
+ * scaled or shopped for, and a recipe with fewer than two of them or no steps
+ * is not a recipe. Nutrition is clamped rather than rejected — a wrong number
+ * the user can correct beats no recipe at all.
+ */
+export function sanitizeRecipe(raw: unknown): RecipePlan | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, unknown>;
+  const name = str(input.name).slice(0, 80);
+  if (!name) return undefined;
+
+  const rawIngredients = Array.isArray(input.ingredients) ? input.ingredients : [];
+  const ingredients: RecipeIngredientPlan[] = [];
+  for (const entry of rawIngredients.slice(0, 20)) {
+    if (!entry || typeof entry !== 'object') continue;
+    const i = entry as Record<string, unknown>;
+    const iname = str(i.name).slice(0, 60);
+    const amount = num(i.amount, 0);
+    // No weight means nothing downstream works: not scaling, not the
+    // per-serving macros, not the shopping list.
+    if (!iname || amount <= 0) continue;
+    // A missing key would split this item off from the same thing in every
+    // other recipe, so fall back to a slug of its own name rather than blank.
+    const key =
+      str(i.key)
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 40) || iname.toLowerCase().replace(/\s+/g, '_').slice(0, 40);
+    const aisle = str(i.aisle).toLowerCase();
+    ingredients.push({
+      name: iname,
+      key,
+      amount: Math.round(amount * 10) / 10,
+      unit: str(i.unit) === 'ml' ? 'ml' : 'g',
+      state: str(i.state) === 'cooked' ? 'cooked' : 'raw',
+      measure: str(i.measure).slice(0, 40) || undefined,
+      calories: Math.max(0, Math.round(num(i.calories, 0))),
+      proteinG: Math.max(0, Math.round(num(i.proteinG, 0) * 10) / 10),
+      carbsG: Math.max(0, Math.round(num(i.carbsG, 0) * 10) / 10),
+      fatG: Math.max(0, Math.round(num(i.fatG, 0) * 10) / 10),
+      aisle: AISLES.includes(aisle) ? aisle : undefined,
+      estimated: i.estimated === true || undefined,
+    });
+  }
+  if (ingredients.length < 2) return undefined;
+
+  const steps = (Array.isArray(input.steps) ? input.steps : [])
+    .map((v) => str(v).slice(0, 300))
+    .filter(Boolean)
+    .slice(0, 15);
+  if (steps.length < 2) return undefined;
+
+  const minutes = (v: unknown, max: number): number | undefined => {
+    const n = Math.round(num(v, 0));
+    return n > 0 && n <= max ? n : undefined;
+  };
+  const yieldG = Math.round(num(input.cookedYieldG, 0));
+
+  return {
+    name,
+    servings: Math.min(12, Math.max(1, Math.round(num(input.servings, 2)))),
+    prepMinutes: minutes(input.prepMinutes, 240),
+    cookMinutes: minutes(input.cookMinutes, 480),
+    cookedYieldG: yieldG > 0 && yieldG <= 20000 ? yieldG : undefined,
+    ingredients,
+    steps,
+  };
+}
+
 export function sanitizeProgram(raw: unknown): ProgramPlan | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const input = raw as Record<string, unknown>;

@@ -44,7 +44,14 @@ export const PLANS: Record<Plan, PlanSpec> = {
   proPlus: { limit: 500, coach: true, equipment: true, highAccuracy: true },
 };
 
-export type Feature = 'meal' | 'describe' | 'equipment' | 'coach' | 'bodyReading' | 'program';
+export type Feature =
+  | 'meal'
+  | 'describe'
+  | 'equipment'
+  | 'coach'
+  | 'bodyReading'
+  | 'program'
+  | 'recipe';
 
 /**
  * What each metered route costs against the monthly allowance. Keyed by the
@@ -69,6 +76,9 @@ export const DEFAULT_ACTION_WEIGHTS: Record<string, number> = {
   bodyReading: 1,
   coach: 1,
   program: 5,
+  // A full recipe is a long tool call — ingredients with four macros each,
+  // plus steps — but nothing like designing a whole week of training and food.
+  recipe: 2,
 };
 
 /** Admin-overridable per-kind action weights. */

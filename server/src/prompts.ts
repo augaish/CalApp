@@ -397,6 +397,38 @@ Rules:
 ${JSON_RULES}`;
 }
 
+/**
+ * One cookable dish: ingredients with weights AND their nutrition, plus steps.
+ *
+ * The app does every calculation on top of these numbers — scaling the batch,
+ * per-serving macros, the shopping list — so the ingredients have to be
+ * self-consistent. What the app cannot do is check whether the estimates are
+ * right, which is why `estimated` exists and why the screen labels them.
+ */
+export function recipePrompt(language: Language, request: string, context?: string): string {
+  const base = `You are Calgym Coach, a cook and a nutritionist. Write ONE recipe for this request: "${request.replace(/"/g, "'")}". Call write_recipe exactly once with the complete recipe — do not write any prose outside the tool call.
+
+${VOICE[language]}
+
+INGREDIENTS: every one with a weight for the WHOLE batch and its own calories/protein/carbs/fat for that weight. Numbers must be plausible for the amount — never a 200 g chicken breast at 120 kcal, never olive oil at 20 kcal per tablespoon. Include the oil, butter, sauces and sugar people forget; they are often a fifth of the calories. Set "estimated" true on anything you are genuinely unsure of rather than presenting a guess as fact.
+
+"key" is the shopping identity and matters as much as the nutrition: the same item must carry the same key in every recipe and in both languages, so "rice", "أرز" and "basmati rice" all key as "rice" unless they are genuinely different things to buy.
+
+MEASURES: give "measure" as a person would really measure it, and be precise about it — "1 tbsp" not "1 spoon", "ملعقة كبيرة" not "ملعقة", assuming a 240 ml cup. For anything counted, such as حبة or a piece, the weight must be realistic for one of them (a medium onion is about 150 g, an egg about 50 g).
+
+STATE: mark whether each weight is "raw" or "cooked" — dry rice is raw, and it roughly triples. Give "cookedYieldG" for the whole batch when you can estimate it.
+
+STEPS: numbered, one instruction each, in the order they happen, specific about heat and time. Assume a normal home kitchen and ingredients available in a Gulf supermarket.
+
+Write "name", every ingredient "name", every "measure" and every step in ${LANGUAGE_NAME[language]}. Keep "key", "unit", "state" and "aisle" as the exact English slugs the schema lists.`;
+  if (!context) return base;
+  return `${base}
+
+The user's own Calgym data is below. Fit the recipe to their targets and to food they actually eat, without mentioning that you looked.
+
+${context}`;
+}
+
 /** Text-only: infer an exercise's muscle group, measure type and how-to. */
 export function exerciseInfoPrompt(language: Language, name: string): string {
   return `You are a certified personal trainer. A user is adding this exercise to their log: "${name.replace(/"/g, "'")}".

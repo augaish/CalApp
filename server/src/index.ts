@@ -63,6 +63,7 @@ import {
   replyText,
   sanitizeEquipmentMuscles,
   sanitizeProgram,
+  sanitizeRecipe,
   sanitizeSchedulePlan,
   toBodyReadingAnalysis,
   toMealAnalysis,
@@ -101,6 +102,7 @@ import {
   identifyEquipmentPrompt,
   mealPrompt,
   programPrompt,
+  recipePrompt,
   refineMealPrompt,
   textMealPrompt,
   type Language,
@@ -190,6 +192,80 @@ const SCHEDULE_TOOL: Anthropic.Tool = {
       days: SCHEDULE_DAYS_SCHEMA,
     },
     required: ['days'],
+  },
+};
+
+const RECIPE_TOOL: Anthropic.Tool = {
+  name: 'write_recipe',
+  description:
+    'Write one complete, cookable recipe: ingredients with weights and nutrition, and numbered steps.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', description: "The dish's name, in the user's language." },
+      servings: {
+        type: 'integer',
+        minimum: 1,
+        maximum: 12,
+        description: 'How many servings the ingredient list as written produces.',
+      },
+      prepMinutes: { type: 'integer', minimum: 0, maximum: 240 },
+      cookMinutes: { type: 'integer', minimum: 0, maximum: 480 },
+      cookedYieldG: {
+        type: 'integer',
+        description:
+          'Approximate cooked weight of the WHOLE batch, in grams. Rice roughly triples; meat loses about a quarter. Omit if you cannot estimate it.',
+      },
+      ingredients: {
+        type: 'array',
+        minItems: 2,
+        maxItems: 20,
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', description: "In the user's language." },
+            key: {
+              type: 'string',
+              description:
+                'Language-independent identity, lowercase English with underscores: "rice", "chicken_breast", "olive_oil", "onion". Two lines that are the same shopping item MUST share this exactly, across recipes and languages. Do not put the variety in it unless it changes what you buy.',
+            },
+            amount: { type: 'number', description: 'How much, in `unit`, for the whole batch.' },
+            unit: { type: 'string', enum: ['g', 'ml'], description: 'g for solids, ml for liquids.' },
+            state: {
+              type: 'string',
+              enum: ['raw', 'cooked'],
+              description: 'Whether `amount` is before or after cooking. Weigh dry rice as raw.',
+            },
+            measure: {
+              type: 'string',
+              description:
+                'The same amount as a person would measure it, precisely — "1 tbsp" not "1 spoon", "ملعقة كبيرة" not "ملعقة". For a cup, assume 240 ml. For anything counted, such as حبة or a piece, the weight above must match a realistic one.',
+            },
+            calories: { type: 'number' },
+            proteinG: { type: 'number' },
+            carbsG: { type: 'number' },
+            fatG: { type: 'number' },
+            aisle: {
+              type: 'string',
+              enum: ['produce', 'meat', 'dairy', 'bakery', 'pantry', 'frozen', 'spices', 'other'],
+            },
+            estimated: {
+              type: 'boolean',
+              description: 'true when the nutrition is a rough guess rather than a figure you are confident in.',
+            },
+          },
+          required: ['name', 'key', 'amount', 'unit', 'calories', 'proteinG', 'carbsG', 'fatG'],
+        },
+      },
+      steps: {
+        type: 'array',
+        minItems: 2,
+        maxItems: 15,
+        items: { type: 'string' },
+        description: "Numbered cooking steps, one instruction each, in the user's language.",
+      },
+    },
+    required: ['name', 'servings', 'ingredients', 'steps'],
   },
 };
 
@@ -1374,6 +1450,80 @@ interface ProgramBody {
   language?: string;
   context?: unknown;
 }
+
+interface RecipeBody {
+  request?: string;
+  language?: string;
+  context?: unknown;
+}
+
+/**
+ * One cookable recipe. Costs more than a meal scan and less than a programme,
+ * so it is metered as its own kind (see DEFAULT_ACTION_WEIGHTS).
+ */
+app.post('/api/generate-recipe', async (c) => {
+  const body = await c.req.json<RecipeBody>().catch(() => ({}) as RecipeBody);
+  const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const request = (body.request ?? '').trim().slice(0, 300);
+  if (request.length < 2) return c.json({ error: 'invalid_request' }, 400);
+  const ref = (await callerRef(c))!;
+  const access = await checkAccess(ref, 'recipe');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
+  const claim = await reserve(ref, access, 'recipe');
+  if (!claim.ok) return c.json(quotaError(access), 402);
+  try {
+    if ((await providerFor(access)) === 'deepseek') {
+      const ds = await withOneRetry(() =>
+        deepseekToolCall(
+          [
+            { role: 'system', content: recipePrompt(language, request, contextText(body.context)) },
+            { role: 'user', content: request },
+          ],
+          [toDeepseekTool(RECIPE_TOOL)],
+          8000,
+          'write_recipe',
+        ),
+      );
+      await trackUsage({ ref, kind: 'recipe' }, ds.model, {
+        input_tokens: ds.inputTokens,
+        output_tokens: ds.outputTokens,
+      });
+      const call = ds.toolCalls.find((t) => t.name === 'write_recipe');
+      // Same belt and braces as the programme route: a model that writes the
+      // JSON as prose instead of calling the tool still gives a usable recipe.
+      const recipe = sanitizeRecipe(call ? call.args : extractJson(ds.text));
+      if (!recipe) {
+        await release(ref, 'recipe');
+        return c.json({ error: 'analysis_failed' }, 502);
+      }
+      return c.json(recipe);
+    }
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      // Up to 20 ingredients with four macros each plus 15 steps; cut off
+      // mid-JSON and the whole tool call is unusable.
+      max_tokens: 4000,
+      system: recipePrompt(language, request, contextText(body.context)),
+      messages: [{ role: 'user', content: request }],
+      tools: [RECIPE_TOOL],
+      tool_choice: { type: 'tool', name: 'write_recipe' },
+    });
+    await trackUsage({ ref, kind: 'recipe' }, MODEL, response.usage);
+    const toolUse = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'write_recipe',
+    );
+    const recipe = toolUse ? sanitizeRecipe(toolUse.input) : undefined;
+    if (!recipe) {
+      await release(ref, 'recipe');
+      return c.json({ error: 'analysis_failed' }, 502);
+    }
+    return c.json(recipe);
+  } catch (err) {
+    console.error('generate-recipe failed:', err);
+    await release(ref, 'recipe');
+    return aiFailure(c, err, 'analysis_failed');
+  }
+});
 
 app.post('/api/generate-program', async (c) => {
   const body = await c.req.json<ProgramBody>().catch(() => ({}) as ProgramBody);
