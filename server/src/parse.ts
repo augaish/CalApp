@@ -380,7 +380,9 @@ function sanitizeMuscleIds(value: unknown): string[] {
  * suggestion, confidence) is left untouched — those are free text the
  * model already localizes correctly.
  */
-export function sanitizeEquipmentMuscles<T extends Record<string, unknown>>(details: T): T {
+export function sanitizeEquipmentMuscles<T extends Record<string, unknown>>(
+  details: T,
+): T & { primaryMuscles: string[]; secondaryMuscles: string[] } {
   return {
     ...details,
     primaryMuscles: sanitizeMuscleIds(details.primaryMuscles),

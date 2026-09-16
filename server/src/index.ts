@@ -933,9 +933,16 @@ app.post('/api/analyze-equipment', async (c) => {
     const key = canonicalKey(name);
     const cached = await getCachedEquipment(key, parsed.language);
     if (cached) {
-      // Filters out anything cached before the muscle-id vocabulary
-      // existed (old entries hold localized muscle names, not ids).
-      return c.json(sanitizeEquipmentMuscles(cached as Record<string, unknown>));
+      // Filters out anything cached before the muscle-id vocabulary existed
+      // (old entries hold localized muscle names, not ids).
+      const clean = sanitizeEquipmentMuscles(cached as Record<string, unknown>);
+      // ...but filtering an old entry leaves it with NO muscles at all, and
+      // serving that hid the muscle map on every future scan of the machine
+      // — permanently, since the empty answer came from cache and rescanning
+      // returned the same empty answer. An entry with nothing left to draw
+      // is treated as a miss so it gets regenerated and overwritten below.
+      if (clean.primaryMuscles.length > 0) return c.json(clean);
+      console.warn(`equipment cache entry "${key}" (${parsed.language}) has no usable muscle ids; regenerating`);
     }
 
     // Step 3: cache miss — generate details (text only, no image) and store.

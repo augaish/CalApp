@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, StyleSheet, Text, View } from 'react-native';
 
-import { BodyMap, BodyMapViewSwitch, viewForMuscles } from '@/components/body-map';
+import { BodyMap, BodyMapViewSwitch, initialBodyView } from '@/components/body-map';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,7 +30,7 @@ export default function GymResult() {
   // just happened.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const matched = useMemo(() => (analysis ? matchExerciseByName(analysis.name, custom) : undefined), [analysis]);
-  const [mapView, setMapView] = useState(() => (analysis ? viewForMuscles(analysis.primaryMuscles) : null));
+  const [mapView, setMapView] = useState(() => initialBodyView(analysis?.primaryMuscles));
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -120,7 +120,7 @@ export default function GymResult() {
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
 
-      {mapView && analysis.primaryMuscles.length > 0 && (
+      {analysis.primaryMuscles.length > 0 && (
         <Card style={styles.muscleMapCard}>
           <BodyMap
             view={mapView}

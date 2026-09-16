@@ -89,6 +89,38 @@ export function viewForGroup(group: MuscleGroup): BodyMapView | null {
   return null;
 }
 
+/** Every group that actually has a drawable region. */
+const ALL_GROUPS: MuscleGroup[] = [...FRONT_GROUPS, ...BACK_GROUPS];
+
+/**
+ * Which coarse groups to light up for an exercise's category, used when the
+ * exercise has no precise muscle ids to draw with.
+ *
+ * 'fullBody' lights the whole figure, which is the honest reading of a
+ * full-body movement rather than a value we failed to map. 'cardio' has no
+ * one region, so the figure stays neutral — still a body, just unhighlighted.
+ */
+export function groupsForCategory(group: MuscleGroup): MuscleGroup[] {
+  if (group === 'fullBody') return ALL_GROUPS;
+  if (group === 'cardio') return [];
+  return [group];
+}
+
+/**
+ * Which view to open a muscle map on. Never null.
+ *
+ * The two helpers above return null for anything they cannot place — most
+ * notably the 'fullBody' and 'cardio' categories — and every screen used
+ * that null to hide the entire muscle-map card. So a machine the AI
+ * classified as full body showed no diagram at all, just a gap where one
+ * should be. A body with nothing highlighted still tells you more than a
+ * missing card, so callers get a view either way.
+ */
+export function initialBodyView(muscles: MuscleId[] | undefined, group?: MuscleGroup): BodyMapView {
+  if (muscles?.length) return viewForMuscles(muscles) ?? 'front';
+  return (group ? viewForGroup(group) : null) ?? 'front';
+}
+
 /**
  * Which view actually shows these muscles — unlike a MuscleGroup, a specific
  * exercise's muscle list can span both (e.g. a squat's quads read on the

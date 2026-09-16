@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BodyMap, BodyMapViewSwitch, viewForGroup, viewForMuscles } from '@/components/body-map';
+import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -103,11 +103,7 @@ export default function SessionScreen() {
   const distance = live.distanceM ?? prefill.distanceM;
   const edit = (patch: Partial<SetShape>) => setEdits({ ...live, key: prefillKey, ...patch });
 
-  const defaultView = ex?.primaryMuscles?.length
-    ? viewForMuscles(ex.primaryMuscles)
-    : ex
-      ? viewForGroup(ex.category)
-      : null;
+  const defaultView = initialBodyView(ex?.primaryMuscles, ex?.category);
   const [viewOverride, setViewOverride] = useState<{ key: string; view: 'front' | 'back' } | null>(null);
   const mapView = viewOverride && viewOverride.key === exId ? viewOverride.view : defaultView;
 
@@ -424,15 +420,12 @@ export default function SessionScreen() {
       </Pressable>
       {showGuidance && ex && (
         <Card style={styles.guidanceCard}>
-          {mapView &&
-            (ex.primaryMuscles?.length ? (
-              <BodyMap view={mapView} highlightedMuscles={ex.primaryMuscles} secondaryMuscles={ex.secondaryMuscles} size={100} />
-            ) : (
-              <BodyMap view={mapView} highlighted={[ex.category]} size={100} />
-            ))}
-          {mapView && (
-            <BodyMapViewSwitch view={mapView} onChange={(v) => setViewOverride({ key: exId ?? '', view: v })} />
+          {ex.primaryMuscles?.length ? (
+            <BodyMap view={mapView} highlightedMuscles={ex.primaryMuscles} secondaryMuscles={ex.secondaryMuscles} size={100} />
+          ) : (
+            <BodyMap view={mapView} highlighted={groupsForCategory(ex.category)} size={100} />
           )}
+          <BodyMapViewSwitch view={mapView} onChange={(v) => setViewOverride({ key: exId ?? '', view: v })} />
           {ex.description ? (
             <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19, alignSelf: 'stretch' }}>
               {ex.description}

@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 
-import { BodyMap, BodyMapViewSwitch, viewForGroup, viewForMuscles } from '@/components/body-map';
+import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -168,13 +168,13 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   const [note, setNote] = useState('');
   const scrollRef = useRef<ScrollView>(null);
   const noteInputRef = useRef<TextInput>(null);
-  const initialMapView =
-    exercise?.primaryMuscles?.length
-      ? viewForMuscles(exercise.primaryMuscles)
-      : exercise
-        ? viewForGroup(exercise.category)
-        : null;
-  const [mapView, setMapView] = useState(initialMapView);
+  const [mapView, setMapView] = useState(() =>
+    initialBodyView(exercise?.primaryMuscles, exercise?.category),
+  );
+  // A scan's photo is a local file URI, which does not survive the app being
+  // reinstalled or the OS clearing its cache. Without this the failed load
+  // left a 150pt blank rectangle mid-screen that read as a broken layout.
+  const [photoFailed, setPhotoFailed] = useState(false);
 
   if (!exercise) return null;
 
@@ -287,8 +287,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
         </View>
       </View>
 
-      {mapView && (
-        <Card style={styles.muscleMapCard}>
+      <Card style={styles.muscleMapCard}>
           {exercise.primaryMuscles?.length ? (
             <BodyMap
               view={mapView}
@@ -297,7 +296,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
               size={110}
             />
           ) : (
-            <BodyMap view={mapView} highlighted={[exercise.category]} size={110} />
+            <BodyMap view={mapView} highlighted={groupsForCategory(exercise.category)} size={110} />
           )}
           <BodyMapViewSwitch view={mapView} onChange={setMapView} />
           <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
@@ -311,11 +310,15 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
               {t('exercises.alsoWorks')} {exercise.secondaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')}
             </Text>
           )}
-        </Card>
-      )}
+      </Card>
 
-      {exercise.photoUri ? (
-        <Image source={{ uri: exercise.photoUri }} style={styles.photo} contentFit="cover" />
+      {exercise.photoUri && !photoFailed ? (
+        <Image
+          source={{ uri: exercise.photoUri }}
+          style={styles.photo}
+          contentFit="cover"
+          onError={() => setPhotoFailed(true)}
+        />
       ) : null}
       {exercise.description ? (
         <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: Spacing.md }}>
