@@ -7,14 +7,39 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { generateRecipe, QuotaError } from '@/lib/api';
-import { successHaptic } from '@/lib/feedback';
+import { generateRecipe } from '@/lib/api';
+import { aiFailureAction } from '@/lib/api-errors';
+import { useEntitlement } from '@/lib/entitlement';
+import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { resolveIngredientKey } from '@/lib/ingredients';
 import { perServing, roundMacros } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
+import type { Recipe } from '@/lib/types';
 
 /** A few starting points, so an empty box is not the first thing you meet. */
 const SUGGESTIONS = ['recipes.ideaHighProtein', 'recipes.ideaQuick', 'recipes.ideaGulf'] as const;
+
+/** Show the filter box only once scrolling is the alternative. */
+const SEARCH_FROM = 5;
+
+/**
+ * Favourites first, then newest. A library you cook from is a few things you
+ * make constantly plus a pile of experiments, and strict newest-first buries
+ * the ones worth keeping under the ones you tried once.
+ */
+function libraryOrder(a: Recipe, b: Recipe): number {
+  if (!!a.favorite !== !!b.favorite) return a.favorite ? -1 : 1;
+  return b.createdAt.localeCompare(a.createdAt);
+}
+
+function matches(r: Recipe, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    r.name.toLowerCase().includes(q) ||
+    r.ingredients.some((i) => i.name.toLowerCase().includes(q))
+  );
+}
 
 /**
  * Saved recipes, and the one box that makes a new one.
@@ -34,8 +59,13 @@ export default function Recipes() {
 
   const recipes = useAppStore((s) => s.recipes);
   const addRecipe = useAppStore((s) => s.addRecipe);
+  const updateRecipe = useAppStore((s) => s.updateRecipe);
   const [request, setRequest] = useState('');
+  const [query, setQuery] = useState('');
   const [busy, setBusy] = useState(false);
+
+  const library = [...recipes].sort(libraryOrder);
+  const shown = library.filter((r) => matches(r, query));
 
   const create = async (text: string) => {
     const ask = text.trim();
@@ -60,18 +90,117 @@ export default function Recipes() {
       setRequest('');
       router.push(`/recipe?id=${encodeURIComponent(id)}${planTarget}`);
     } catch (err) {
-      if (err instanceof QuotaError) Alert.alert(t('upgrade.quotaTitle'), t('upgrade.quotaBody'));
-      else Alert.alert(t('common.error'));
+      // This screen used to collapse every failure into "Something went
+      // wrong. Please try again." — vague, and wrong for most of them, since
+      // retrying cannot refill a spent allowance or put credit in an empty AI
+      // account. The rule for what to say lives in aiFailureAction, where it
+      // can be tested; Alert.alert is a no-op on web and cannot be.
+      const action = aiFailureAction(err, {
+        titleKey: 'recipes.unusableTitle',
+        bodyKey: 'recipes.unusableBody',
+      });
+      if (action.kind === 'upgrade') {
+        useEntitlement.getState().refresh();
+        router.push(`/upgrade?reason=${action.reason}`);
+        return;
+      }
+      Alert.alert(t(action.titleKey), t(action.bodyKey, action.values));
     } finally {
       setBusy(false);
     }
+  };
+
+  const toggleFavorite = (r: Recipe) => {
+    updateRecipe(r.id, { favorite: !r.favorite });
+    lightHaptic();
   };
 
   return (
     <Screen>
       <Title>{t('recipes.title')}</Title>
 
-      <Card style={{ gap: Spacing.sm }}>
+      {/* The library comes first once there is one. Leading with the
+          generator framed a recipe as something you spend a credit on every
+          time you want dinner, when the whole point is that what you already
+          have costs nothing to reopen. With nothing saved yet the generator
+          is still the first thing you meet, because an empty list is not an
+          invitation. */}
+      {library.length > 0 && (
+        <>
+          {library.length >= SEARCH_FROM && (
+            <View style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Ionicons name="search" size={16} color={theme.textTertiary} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder={t('recipes.searchPlaceholder')}
+                placeholderTextColor={theme.textTertiary}
+                style={{ flex: 1, color: theme.text, fontSize: 15, padding: 0 }}
+                maxLength={60}
+              />
+              {query.length > 0 && (
+                <Pressable onPress={() => setQuery('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={16} color={theme.textTertiary} />
+                </Pressable>
+              )}
+            </View>
+          )}
+
+          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>
+            {t('recipes.saved')}
+          </Text>
+
+          {shown.map((r) => {
+            const m = roundMacros(perServing(r));
+            return (
+              <Pressable
+                key={r.id}
+                onPress={() => router.push(`/recipe?id=${encodeURIComponent(r.id)}${planTarget}`)}
+                style={({ pressed }) => [
+                  styles.row,
+                  { backgroundColor: theme.card, borderColor: theme.border },
+                  cardShadow(theme.shadow),
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.text, fontWeight: '700' }} numberOfLines={1}>
+                    {r.name}
+                  </Text>
+                  <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                    {t('recipes.perServingShort', { kcal: m.calories, protein: m.proteinG })}
+                    {' · '}
+                    {t('recipes.servingsCount', { count: r.servings })}
+                  </Text>
+                </View>
+                {/* Its own hit area, so keeping a recipe never opens it and
+                    opening one never keeps it. */}
+                <Pressable
+                  onPress={() => toggleFavorite(r)}
+                  hitSlop={10}
+                  accessibilityLabel={t(r.favorite ? 'recipes.unfavorite' : 'recipes.favorite')}
+                >
+                  <Ionicons
+                    name={r.favorite ? 'heart' : 'heart-outline'}
+                    size={19}
+                    color={r.favorite ? theme.protein : theme.textTertiary}
+                  />
+                </Pressable>
+                <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+              </Pressable>
+            );
+          })}
+
+          {shown.length === 0 && (
+            <Text style={{ color: theme.textTertiary, marginBottom: Spacing.md }}>
+              {t('recipes.noMatches', { query: query.trim() })}
+            </Text>
+          )}
+        </>
+      )}
+
+      <Card style={{ gap: Spacing.sm, marginTop: library.length > 0 ? Spacing.md : 0 }}>
+        <Text style={{ color: theme.text, fontWeight: '700' }}>{t('recipes.writeNew')}</Text>
         <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('recipes.askBody')}</Text>
         <View style={[styles.input, { backgroundColor: theme.background, borderColor: theme.border }]}>
           <TextInput
@@ -108,41 +237,7 @@ export default function Recipes() {
         />
       </Card>
 
-      {recipes.length > 0 && (
-        <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>
-          {t('recipes.saved')}
-        </Text>
-      )}
-
-      {recipes.map((r) => {
-        const m = roundMacros(perServing(r));
-        return (
-          <Pressable
-            key={r.id}
-            onPress={() => router.push(`/recipe?id=${encodeURIComponent(r.id)}${planTarget}`)}
-            style={({ pressed }) => [
-              styles.row,
-              { backgroundColor: theme.card, borderColor: theme.border },
-              cardShadow(theme.shadow),
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.text, fontWeight: '700' }} numberOfLines={1}>
-                {r.name}
-              </Text>
-              <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                {t('recipes.perServingShort', { kcal: m.calories, protein: m.proteinG })}
-                {' · '}
-                {t('recipes.servingsCount', { count: r.servings })}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-          </Pressable>
-        );
-      })}
-
-      {recipes.length === 0 && (
+      {library.length === 0 && (
         <View style={[styles.empty, { borderColor: theme.border }]}>
           <Ionicons name="restaurant-outline" size={30} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>{t('recipes.empty')}</Text>
@@ -154,6 +249,16 @@ export default function Recipes() {
 
 const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: Radius.sm, padding: Spacing.md, minHeight: 64 },
+  search: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    marginBottom: Spacing.sm,
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderWidth: 1, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 7 },
   row: {

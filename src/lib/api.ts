@@ -1,3 +1,4 @@
+import { ApiError, FeatureLockedError, QuotaError } from './api-errors';
 import { deviceLabel } from './device';
 import { useAppStore } from './store';
 import type {
@@ -44,37 +45,10 @@ function authHeaders(): Record<string, string> {
   return { 'x-calgym-user': id };
 }
 
-/** Raised when the caller has used up the month's AI allowance. */
-export class QuotaError extends Error {
-  constructor(
-    public plan: string,
-    public used: number,
-    public limit: number,
-  ) {
-    super('quota_exceeded');
-    this.name = 'QuotaError';
-  }
-}
-
-/** Raised when the caller's plan does not include the feature at all. */
-export class FeatureLockedError extends Error {
-  constructor(public plan: string) {
-    super('feature_locked');
-    this.name = 'FeatureLockedError';
-  }
-}
-
-/** Raised when the request actually reached the server and it responded
- * with a failure — as opposed to a plain network error (offline, timeout,
- * DNS), which surfaces as fetch's own thrown error instead. `code` is the
- * server's own error string (e.g. "invalid_request", "analysis_failed")
- * when it sent one, so a caller can show *why* rather than just "failed". */
-export class ApiError extends Error {
-  constructor(public code: string) {
-    super(code);
-    this.name = 'ApiError';
-  }
-}
+// Defined in a leaf module so the rule for what to say about each failure
+// can be tested without dragging React Native in. Re-exported here because
+// every screen already imports them from '@/lib/api'.
+export { ApiError, FeatureLockedError, QuotaError } from './api-errors';
 
 async function post<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {

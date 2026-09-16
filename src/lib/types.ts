@@ -345,6 +345,15 @@ export interface Recipe {
   createdAt: string;
   photoUri?: string;
   notes?: string;
+  /**
+   * Kept at the top of the library. A collection you cook from is mostly a
+   * handful of things you make again and again with the experiments piled on
+   * top, and newest-first buries exactly the ones worth keeping.
+   */
+  favorite?: boolean;
+  /** When it was last opened to cook from, so "what do I actually make" is
+   * answerable without asking anyone to rate anything. */
+  lastCookedAt?: string;
 }
 
 export interface Program {
