@@ -97,10 +97,11 @@ export async function planPrices(): Promise<PlanPrices> {
  * fully configured so a tier can be moved back with one dashboard change and
  * no redeploy. With no DeepSeek key the whole thing collapses to Claude.
  *
- * Only routes DeepSeek can actually serve consult this (meal photo,
- * described meal, refine, exercise info, equipment). Body readings, coach
- * chat, coach attachments and program design are pinned to Claude for
- * technical reasons — see AI_PROVIDER_FIXED_ROUTES in index.ts.
+ * Every AI route now follows this setting — meal photo, described meal,
+ * refine, exercise info, equipment, body readings, coach chat and program
+ * design. The one exception is a PDF upload, which goes to Claude whatever
+ * the tier says because our DeepSeek client sends images; a photo of the
+ * same report follows the tier. See AI_PROVIDER_FIXED_ROUTES in index.ts.
  */
 export async function aiProviders(deepseekAvailable: boolean): Promise<Record<Plan, AiProvider>> {
   if (!deepseekAvailable) return { free: 'claude', pro: 'claude', proPlus: 'claude' };
