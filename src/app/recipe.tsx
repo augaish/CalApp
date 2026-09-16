@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -20,6 +20,7 @@ import {
   servingCountLabel,
   servingPluralCount,
   SERVING_STEPS,
+  withIngredientAmount,
 } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
 import type { MealType } from '@/lib/types';
@@ -65,6 +66,8 @@ export default function RecipeScreen() {
   const fromPlan = !!day;
 
   const recipes = useAppStore((s) => s.recipes);
+  const updateRecipe = useAppStore((s) => s.updateRecipe);
+  const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
   const meals = useAppStore((s) => s.meals);
   const logMeal = useAppStore((s) => s.logMeal);
   const removeMeal = useAppStore((s) => s.removeMeal);
@@ -78,6 +81,9 @@ export default function RecipeScreen() {
   );
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [showTotals, setShowTotals] = useState(false);
+  // Index of the ingredient being corrected, and the text in its field.
+  const [editing, setEditing] = useState<number | null>(null);
+  const [draft, setDraft] = useState('');
   // The id of the meal this screen just logged, so it can be undone and so a
   // second tap cannot quietly create a duplicate entry.
   const [loggedId, setLoggedId] = useState<string | null>(null);
@@ -114,6 +120,24 @@ export default function RecipeScreen() {
 
   const portionLabel = (servings: number) =>
     `${servingCountLabel(servings)} ${t('recipe.servingUnit', { count: servingPluralCount(servings) })}`;
+
+  // How many planned meals this recipe currently stands on. Correcting a
+  // quantity moves their totals too, so say so before it happens rather than
+  // after.
+  const plannedUses = Object.values(mealPlanRecipes).reduce(
+    (n, day) => n + Object.values(day).filter((e) => e?.recipeId === recipe.id).length,
+    0,
+  );
+
+  const saveAmount = (i: number) => {
+    const value = Number(draft.replace(/[^0-9.]/g, ''));
+    setEditing(null);
+    if (!(value > 0)) return;
+    const next = withIngredientAmount(recipe, i, value);
+    if (next === recipe) return;
+    updateRecipe(recipe.id, { ingredients: next.ingredients });
+    successHaptic();
+  };
 
   const remove = () => {
     Alert.alert(t('recipe.deleteTitle'), t('recipe.deleteBody'), [
@@ -242,23 +266,30 @@ export default function RecipeScreen() {
       <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>
         {t('recipe.ingredients')}
       </Text>
+      {plannedUses > 0 && (
+        <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: 6 }}>
+          {t('recipe.onPlannedMeals', { count: plannedUses })}
+        </Text>
+      )}
       <Card style={{ paddingVertical: Spacing.xs }}>
         {ingredients.map((ing, i) => {
           const on = checked[ing.key];
+          const isEditing = editing === i;
           return (
-            <Pressable
+            <View
               key={`${ing.key}-${i}`}
-              onPress={() => setChecked((c) => ({ ...c, [ing.key]: !c[ing.key] }))}
               style={[
                 styles.ingredient,
                 i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
               ]}
             >
-              <Ionicons
-                name={on ? 'checkbox' : 'square-outline'}
-                size={20}
-                color={on ? theme.primary : theme.textTertiary}
-              />
+              <Pressable onPress={() => setChecked((c) => ({ ...c, [ing.key]: !c[ing.key] }))} hitSlop={6}>
+                <Ionicons
+                  name={on ? 'checkbox' : 'square-outline'}
+                  size={20}
+                  color={on ? theme.primary : theme.textTertiary}
+                />
+              </Pressable>
               <Text
                 style={{
                   color: on ? theme.textTertiary : theme.text,
@@ -268,10 +299,45 @@ export default function RecipeScreen() {
               >
                 {ing.name}
               </Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
-                {ingredientAmountLabel(ing)}
-              </Text>
-            </Pressable>
+              {isEditing ? (
+                <View style={[styles.amountEdit, { borderColor: theme.primary }]}>
+                  <TextInput
+                    value={draft}
+                    onChangeText={setDraft}
+                    keyboardType="numeric"
+                    autoFocus
+                    selectTextOnFocus
+                    style={{ color: theme.text, fontSize: 14, fontWeight: '700', minWidth: 46, padding: 0, textAlign: 'center' }}
+                    onBlur={() => saveAmount(i)}
+                    onSubmitEditing={() => saveAmount(i)}
+                  />
+                  <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{ing.unit}</Text>
+                </View>
+              ) : (
+                // The visible way to correct a quantity. Only offered at the
+                // recipe's own batch size: editing a scaled-up view would
+                // have to divide the change back down, which is a good way to
+                // save a number nobody typed.
+                <Pressable
+                  onPress={() => {
+                    if (cookingFor !== recipe.servings) {
+                      Alert.alert(t('recipe.editAtBatchTitle'), t('recipe.editAtBatchBody'));
+                      return;
+                    }
+                    lightHaptic();
+                    setDraft(String(Math.round(ing.amount * 10) / 10));
+                    setEditing(i);
+                  }}
+                  hitSlop={6}
+                  style={styles.amountTap}
+                >
+                  <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+                    {ingredientAmountLabel(ing)}
+                  </Text>
+                  <Ionicons name="pencil" size={13} color={theme.textTertiary} />
+                </Pressable>
+              )}
+            </View>
           );
         })}
       </Card>
@@ -414,6 +480,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ingredient: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 11 },
+  amountTap: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  amountEdit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    borderWidth: 1.5,
+    borderRadius: Radius.sm,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
   step: { flexDirection: 'row', gap: Spacing.sm, alignItems: 'flex-start' },
   stepNum: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

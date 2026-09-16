@@ -349,7 +349,15 @@ export default function Food() {
               meal.items.map((item, itemIndex) => (
                 <View key={`${meal.id}-${itemIndex}`} style={styles.mealRow}>
                   <Pressable
-                    onPress={() => router.push(`/meal-edit?id=${encodeURIComponent(meal.id)}`)}
+                    onPress={() =>
+                      // Something cooked from a recipe has a portion to correct;
+                      // anything else opens the ordinary editor.
+                      router.push(
+                        item.recipeId
+                          ? `/edit-portion?id=${encodeURIComponent(meal.id)}&index=${itemIndex}`
+                          : `/meal-edit?id=${encodeURIComponent(meal.id)}`,
+                      )
+                    }
                     style={({ pressed }) => [styles.mealTap, pressed && { opacity: 0.6 }]}
                   >
                     <View style={[styles.mealAvatar, { backgroundColor: theme.cardSubtle }]}>

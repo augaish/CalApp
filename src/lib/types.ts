@@ -64,6 +64,17 @@ export interface FoodItem {
   recipeId?: string;
   /** Servings of that recipe this entry represents, e.g. 0.5. */
   recipeServings?: number;
+  /**
+   * ONE serving's nutrition at full precision, as the recipe stood when this
+   * was logged.
+   *
+   * The macros above are rounded for display and storage, so rescaling from
+   * them compounds: correcting ½ → 1 → ¾ would drift a little further each
+   * time. This is the unrounded basis every correction multiplies, so a
+   * portion edited five times lands exactly where editing it once would.
+   * It is still a SNAPSHOT — changing the recipe later never touches it.
+   */
+  recipeBasis?: { calories: number; proteinG: number; carbsG: number; fatG: number };
 }
 
 export interface MealAnalysis {

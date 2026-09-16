@@ -117,7 +117,8 @@ export function ingredientAmountLabel(i: RecipeIngredient): string {
  * reach back and rewrite a day someone has already lived.
  */
 export function foodItemForServings(recipe: Recipe, servings: number, portion: string): FoodItem {
-  const m = roundMacros(scaleMacros(perServing(recipe), servings));
+  const basis = perServing(recipe);
+  const m = roundMacros(scaleMacros(basis, servings));
   return {
     name: recipe.name,
     calories: m.calories,
@@ -127,7 +128,30 @@ export function foodItemForServings(recipe: Recipe, servings: number, portion: s
     portion,
     recipeId: recipe.id,
     recipeServings: servings,
+    // Unrounded, so a later correction rescales from this rather than from
+    // the rounded figures above — five edits land where one would.
+    recipeBasis: basis,
   };
+}
+
+/**
+ * What one serving of a logged entry was worth, for correcting its portion
+ * later.
+ *
+ * Prefers the basis stored at log time. Falls back to dividing the rounded
+ * macros by the servings for entries logged before that existed — lossy, but
+ * correct to within a calorie and far better than refusing to edit. Returns
+ * null when the entry records no servings at all, which the screen has to
+ * say plainly rather than guess at.
+ */
+export function loggedBasis(item: FoodItem): Macros | null {
+  if (item.recipeBasis) return item.recipeBasis;
+  const servings = item.recipeServings;
+  if (!servings || servings <= 0) return null;
+  return scaleMacros(
+    { calories: item.calories, proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG },
+    1 / servings,
+  );
 }
 
 /**
@@ -153,6 +177,48 @@ export function servingPluralCount(servings: number): number {
 
 /** The portion sizes offered as chips. Fractions of a serving, not grams. */
 export const SERVING_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
+
+/**
+ * A recipe with one ingredient's quantity corrected.
+ *
+ * Its nutrition moves with the amount, because an estimate per 150 g of onion
+ * is no longer true at 300 g. Identity, unit and raw/cooked state never move —
+ * changing how much of a thing you use is not changing the thing, and a
+ * shopping list must keep merging it with the same item elsewhere. A
+ * substitution is a different feature entirely.
+ *
+ * A household measure written for the old amount is dropped rather than left
+ * to lie: "1 cup" stops being true the moment the weight changes.
+ */
+export function withIngredientAmount(
+  recipe: Recipe,
+  index: number,
+  amount: number,
+): Recipe {
+  const current = recipe.ingredients[index];
+  if (!current || !(amount > 0)) return recipe;
+  const factor = amount / current.amount;
+  if (!Number.isFinite(factor)) return recipe;
+  return {
+    ...recipe,
+    ingredients: recipe.ingredients.map((i, n) =>
+      n === index
+        ? {
+            ...i,
+            amount,
+            calories: i.calories * factor,
+            proteinG: i.proteinG * factor,
+            carbsG: i.carbsG * factor,
+            fatG: i.fatG * factor,
+            measure: undefined,
+            // Hand-corrected, but the nutrition per gram is still the
+            // model's estimate — the flag belongs to where the numbers came
+            // from, and that has not changed.
+          }
+        : i,
+    ),
+  };
+}
 
 /**
  * Merge key for a shopping list. Two ingredients combine only when they are
