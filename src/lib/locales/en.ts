@@ -271,6 +271,13 @@ export const en = {
     deleteTitle: 'Delete recipe',
     deleteBody: 'Delete this recipe? Anything you have already logged from it stays in your diary.',
   },
+  food: {
+    recipesSaved: '{{n}} saved',
+    recipesNone: 'Write one',
+    shoppingOpen: 'List in progress',
+    shoppingFromPlan: 'From your week',
+    reviewNote: 'Last 7 days',
+  },
   shopping: {
     title: 'Shopping list',
     dates: 'Which days',

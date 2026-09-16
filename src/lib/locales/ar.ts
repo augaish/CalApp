@@ -273,6 +273,13 @@ export const ar: TranslationSchema = {
     deleteTitle: 'حذف الوصفة',
     deleteBody: 'حذف هذه الوصفة؟ كل ما سجّلته منها يبقى في يومياتك.',
   },
+  food: {
+    recipesSaved: '{{n}} محفوظة',
+    recipesNone: 'اكتب واحدة',
+    shoppingOpen: 'قائمة قيد التجهيز',
+    shoppingFromPlan: 'من أسبوعك',
+    reviewNote: 'آخر ٧ أيام',
+  },
   shopping: {
     title: 'قائمة التسوق',
     dates: 'أي أيام',

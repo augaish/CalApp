@@ -64,6 +64,7 @@ export default function Food() {
   const swapPlannedMeal = useAppStore((s) => s.swapPlannedMeal);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
   const recipes = useAppStore((s) => s.recipes);
+  const shopping = useAppStore((s) => s.shopping);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
@@ -179,6 +180,69 @@ export default function Food() {
         </Text>
         <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
       </Pressable>
+
+      {/* Cooking, shopping and reviewing the week are the other half of
+          eating, and none of them had a home here. Recipes and the shopping
+          list were tiles in the "+" sheet — a sheet for logging something you
+          are eating NOW, which is the wrong question for "what am I cooking
+          on Thursday" — and the weekly review sat in Profile underneath the
+          terms of service. Each tile carries its own state so the row reports
+          something rather than only leading somewhere. */}
+      <View style={styles.kitchenRow}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.kitchenTile,
+            { backgroundColor: theme.cardSubtle, borderColor: theme.border },
+            pressed && { opacity: 0.6 },
+          ]}
+          onPress={() => router.push('/recipes')}
+        >
+          <Ionicons name="restaurant-outline" size={18} color={theme.primary} />
+          <Text style={[styles.kitchenLabel, { color: theme.text }]} numberOfLines={1}>
+            {t('recipes.title')}
+          </Text>
+          <Text style={[styles.kitchenNote, { color: theme.textTertiary }]} numberOfLines={1}>
+            {recipes.length > 0
+              // `n`, not `count` — `count` is i18next's plural selector, so it
+              // would look for recipesSaved_one/_other, find neither, and fall
+              // back to the raw string with "{{n}}" still in it.
+              ? t('food.recipesSaved', { n: recipes.length })
+              : t('food.recipesNone')}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.kitchenTile,
+            { backgroundColor: theme.cardSubtle, borderColor: theme.border },
+            pressed && { opacity: 0.6 },
+          ]}
+          onPress={() => router.push('/shopping')}
+        >
+          <Ionicons name="cart-outline" size={18} color={theme.primary} />
+          <Text style={[styles.kitchenLabel, { color: theme.text }]} numberOfLines={1}>
+            {t('shopping.title')}
+          </Text>
+          <Text style={[styles.kitchenNote, { color: theme.textTertiary }]} numberOfLines={1}>
+            {shopping ? t('food.shoppingOpen') : t('food.shoppingFromPlan')}
+          </Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.kitchenTile,
+            { backgroundColor: theme.cardSubtle, borderColor: theme.border },
+            pressed && { opacity: 0.6 },
+          ]}
+          onPress={() => router.push('/review')}
+        >
+          <Ionicons name="stats-chart-outline" size={18} color={theme.primary} />
+          <Text style={[styles.kitchenLabel, { color: theme.text }]} numberOfLines={1}>
+            {t('review.title')}
+          </Text>
+          <Text style={[styles.kitchenNote, { color: theme.textTertiary }]} numberOfLines={1}>
+            {t('food.reviewNote')}
+          </Text>
+        </Pressable>
+      </View>
 
       <View style={styles.eatenRow}>
         <Text style={{ color: theme.textSecondary, flex: 1 }}>
@@ -406,6 +470,17 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     marginBottom: Spacing.md,
   },
+  kitchenRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  kitchenTile: {
+    flex: 1,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: 10,
+    gap: 2,
+  },
+  kitchenLabel: { fontSize: 13, fontWeight: '700' },
+  kitchenNote: { fontSize: 11 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
