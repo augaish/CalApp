@@ -39,6 +39,11 @@ export default function ExerciseEdit() {
   const [name, setName] = useState(existing?.name ?? '');
   const [category, setCategory] = useState<MuscleGroup>(existing?.category ?? 'chest');
   const [type, setType] = useState<ExerciseType>(existing?.type ?? 'weight_reps');
+  // Carried through the form untouched — there is no sensible way to type a
+  // metabolic equivalent, so it is either the AI's estimate or the existing
+  // value, and the per-category default applies when it is absent.
+  const [met, setMet] = useState<number | undefined>(existing?.met);
+  const [lowConfidence, setLowConfidence] = useState(false);
   const [description, setDescription] = useState(existing?.description ?? '');
   const [video, setVideo] = useState(existing?.videoUrl ?? '');
 
@@ -57,6 +62,7 @@ export default function ExerciseEdit() {
       name: name.trim(),
       category,
       type,
+      met,
       description: description.trim() || undefined,
       videoUrl: video.trim() || undefined,
       photoUri: photo,
@@ -93,6 +99,12 @@ export default function ExerciseEdit() {
       if ((MUSCLE_GROUPS as string[]).includes(info.category)) setCategory(info.category as MuscleGroup);
       if ((TYPES as string[]).includes(info.type)) setType(info.type as ExerciseType);
       if (info.description?.trim()) setDescription(info.description.trim());
+      // Plausible MET only — a wild value would quietly distort every future
+      // calorie estimate for this exercise.
+      if (typeof info.met === 'number' && info.met >= 1 && info.met <= 20) setMet(info.met);
+      // The category below is already editable, so a shaky guess just needs
+      // pointing at rather than blocking on.
+      setLowConfidence(typeof info.confidence === 'number' && info.confidence < 0.4);
       successHaptic();
     } catch {
       Alert.alert(t('common.error'));
@@ -161,6 +173,13 @@ export default function ExerciseEdit() {
       <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>
         {t('exerciseEdit.category')}
       </Text>
+      {/* The AI fills this in above, but says when it was unsure — the field
+          is already editable, so this only needs pointing at, not blocking. */}
+      {lowConfidence && (
+        <Text style={{ color: theme.warning, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>
+          {t('exerciseEdit.lowConfidence')}
+        </Text>
+      )}
       <View style={styles.chipWrap}>
         {MUSCLE_GROUPS.map((cat) => {
           const active = category === cat;

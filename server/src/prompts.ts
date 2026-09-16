@@ -403,9 +403,10 @@ export function exerciseInfoPrompt(language: Language, name: string): string {
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 {
-  "category": "chest" | "back" | "shoulders" | "biceps" | "triceps" | "legs" | "glutes" | "core" | "forearms" | "cardio" | "fullBody",
+  "category": "chest" | "back" | "shoulders" | "biceps" | "triceps" | "legs" | "calves" | "glutes" | "core" | "forearms" | "cardio" | "fullBody",
   "type": "weight_reps" | "bodyweight_reps" | "time" | "distance_time",
   "primaryMuscles": string[],
+  "met": number,
   "description": string,
   "confidence": number
 }
@@ -415,7 +416,9 @@ Rules:
 - Choose "type": weight_reps for weighted lifts, bodyweight_reps for bodyweight moves (push-ups, pull-ups), time for holds (plank), distance_time for cardio (running, rowing).
 - "primaryMuscles" and "description" must be written in ${LANGUAGE_NAME[language]}.
 - "description" is 1-3 short sentences of form cues / how to perform it.
-- "confidence" is 0-1; if the name is not a real exercise, set confidence 0 and category "fullBody".`;
+- "fullBody" means the movement genuinely works the whole body (burpee, clean and press, thruster). It is NOT a fallback for "unsure" — ALWAYS name the single category that fits best, even when you are not certain, and say so through "confidence" instead.
+- "met" is the Compendium of Physical Activities metabolic equivalent for this exercise, used to estimate calories: roughly 3.5 for walking, 5-6 for light machine work, 7-8 for vigorous cardio or a racket sport, 9-10 for running, 12 for skipping rope. Give your best estimate for the movement named.
+- "confidence" is 0-1. Set it below 0.4 when you are guessing, and 0 only when the name is not an exercise at all — but still fill "category" with your closest guess either way.`;
 }
 
 /** Full analysis for a known machine name (no image needed → cacheable). */

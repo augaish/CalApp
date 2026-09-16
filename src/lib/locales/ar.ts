@@ -404,6 +404,7 @@ export const ar: TranslationSchema = {
     calves: 'السمانة',
   },
   exerciseEdit: {
+    lowConfidence: 'لسنا متأكدين من هذا — تحقق من المجموعة بالأسفل.',
     addTitle: 'تمرين جديد',
     editTitle: 'تعديل التمرين',
     name: 'اسم التمرين',
@@ -821,6 +822,8 @@ export const ar: TranslationSchema = {
     nameRequired: 'يرجى إدخال اسم الطعام.',
   },
   gymResult: {
+    pickGroupTitle: 'أي مجموعة عضلية هذا الجهاز؟',
+    pickGroupBody: 'لم يحدد المسح العضلات بوضوح كافٍ لتصنيفه تلقائياً. اختر المجموعة المناسبة وسيُحفظ فيها.',
     title: 'تم التعرف على الجهاز',
     primaryMuscles: 'العضلات الأساسية',
     secondaryMuscles: 'العضلات المساعدة',

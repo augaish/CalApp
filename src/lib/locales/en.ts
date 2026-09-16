@@ -402,6 +402,7 @@ export const en = {
     calves: 'Calves',
   },
   exerciseEdit: {
+    lowConfidence: 'Not sure about this one — check the group below.',
     addTitle: 'New exercise',
     editTitle: 'Edit exercise',
     name: 'Exercise name',
@@ -825,6 +826,8 @@ export const en = {
     nameRequired: 'Please enter a food name.',
   },
   gymResult: {
+    pickGroupTitle: 'Which muscle group is this?',
+    pickGroupBody: "This scan didn't identify the muscles clearly enough to file it on its own. Pick the group it belongs to and it'll be saved there.",
     title: 'Equipment identified',
     primaryMuscles: 'Primary muscles',
     secondaryMuscles: 'Secondary muscles',

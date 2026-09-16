@@ -376,6 +376,9 @@ export interface ExerciseInfo {
   category: string;
   type: string;
   primaryMuscles: string[];
+  /** Compendium MET for this movement, so its calorie estimate reflects its
+   * real intensity instead of one flat rate per category. */
+  met?: number;
   description: string;
   confidence: number;
 }

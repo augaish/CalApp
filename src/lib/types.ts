@@ -340,6 +340,24 @@ export interface Exercise {
   primaryMuscles?: MuscleId[];
   secondaryMuscles?: MuscleId[];
   type: ExerciseType;
+  /**
+   * Metabolic equivalent for THIS exercise, overriding the coarse per-category
+   * rate. One number for all of "cardio" cannot be right when it spans walking
+   * (~3.5) and skipping rope (~12), so anything whose real intensity differs
+   * meaningfully from its group carries its own. Values follow the Compendium
+   * of Physical Activities.
+   */
+  met?: number;
+  /**
+   * Set when the burn should be derived from actual pace rather than a fixed
+   * rate — true for anything done on foot, where covering 3 km in 15 minutes
+   * and in 45 minutes are wildly different efforts. Without it a slow walk
+   * scores MORE calories than a hard run over the same distance, purely
+   * because it took longer. Only 'foot' is modelled: ACSM's walking and
+   * running equations do not describe a bike or a rower, whose resistance we
+   * cannot see anyway.
+   */
+  paceModel?: 'foot';
   /** Photo of the machine/movement — from the camera or an equipment scan. */
   photoUri?: string;
   /** Form cues / how-to, shown on the exercise page. */

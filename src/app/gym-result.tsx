@@ -3,15 +3,16 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BodyMap, BodyMapViewSwitch, initialBodyView } from '@/components/body-map';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { matchExerciseByName } from '@/lib/exercises';
+import { categoryForMuscles, matchExerciseByName, MUSCLE_GROUPS } from '@/lib/exercises';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
+import type { MuscleGroup } from '@/lib/types';
 
 export default function GymResult() {
   const { t } = useTranslation();
@@ -31,6 +32,17 @@ export default function GymResult() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const matched = useMemo(() => (analysis ? matchExerciseByName(analysis.name, custom) : undefined), [analysis]);
   const [mapView, setMapView] = useState(() => initialBodyView(analysis?.primaryMuscles));
+  // Where this machine belongs, worked out from the muscles the scan actually
+  // identified. Null only when it identified none — the single case where we
+  // genuinely cannot place it and have to ask, rather than filing it under
+  // Full body and hoping (which is how a plain chin/dip machine ended up
+  // there with no muscle map at all).
+  const derivedCategory = categoryForMuscles(analysis?.primaryMuscles);
+  const [pickedCategory, setPickedCategory] = useState<MuscleGroup | null>(null);
+  const category = derivedCategory ?? pickedCategory;
+  // Nothing is written to the library until this is answered, so the screen
+  // must not claim it was saved, and logging has to wait for the answer too.
+  const needsGroup = !matched && !category;
 
   useEffect(() => {
     if (!analysis && router.canGoBack()) router.back();
@@ -54,7 +66,7 @@ export default function GymResult() {
     const description = [...analysis!.setupSteps, ...analysis!.formCues].map((s) => `• ${s}`).join('\n');
     return addExercise({
       name: analysis!.name,
-      category: 'fullBody',
+      category: category ?? 'fullBody',
       type: 'weight_reps',
       photoUri: photoUri ?? undefined,
       description,
@@ -71,12 +83,14 @@ export default function GymResult() {
   // isn't created if the effect ever fires twice for one screen instance.
   const savedRef = useRef(false);
   useEffect(() => {
-    if (analysis && !savedRef.current) {
+    // Hold off while we still have to ask which group it belongs to —
+    // saving first would file it wrongly and the answer would arrive too late.
+    if (analysis && category && !savedRef.current) {
       savedRef.current = true;
       ensureExercise();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [analysis]);
+  }, [analysis, category]);
 
   if (!analysis) return null;
 
@@ -90,7 +104,7 @@ export default function GymResult() {
     <Screen
       footer={
         <View>
-          <Button label={t('gymResult.logWorkout')} icon="add" onPress={logIt} />
+          <Button label={t('gymResult.logWorkout')} icon="add" onPress={logIt} disabled={needsGroup} />
           <Button
             label={t('common.done')}
             variant="ghost"
@@ -104,19 +118,48 @@ export default function GymResult() {
     >
       <Title>{analysis.name}</Title>
 
-      <Card style={{ backgroundColor: theme.cardSubtle }}>
-        <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
-          <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>
-              {t(matched ? 'gymResult.matchedTitle' : 'gymResult.savedTitle')}
-            </Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-              {t(matched ? 'gymResult.matchedBody' : 'gymResult.savedToLibrary')}
-            </Text>
+      {/* Held back while the group is still unanswered — nothing has been
+          written yet, so saying "saved to library" would be untrue. */}
+      {!needsGroup && (
+        <Card style={{ backgroundColor: theme.cardSubtle }}>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
+            <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.text, fontWeight: '700' }}>
+                {t(matched ? 'gymResult.matchedTitle' : 'gymResult.savedTitle')}
+              </Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                {t(matched ? 'gymResult.matchedBody' : 'gymResult.savedToLibrary')}
+              </Text>
+            </View>
           </View>
-        </View>
-      </Card>
+        </Card>
+      )}
+
+      {/* Asked ONLY when the scan identified no muscles at all, so there is
+          genuinely nothing to place it by. Anything with muscles is filed
+          automatically and never interrupts. */}
+      {needsGroup && (
+        <Card style={{ gap: Spacing.sm }}>
+          <Text style={{ color: theme.text, fontWeight: '700' }}>{t('gymResult.pickGroupTitle')}</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('gymResult.pickGroupBody')}</Text>
+          <View style={styles.groupGrid}>
+            {MUSCLE_GROUPS.map((g) => (
+              <Pressable
+                key={g}
+                onPress={() => setPickedCategory(g)}
+                style={({ pressed }) => [
+                  styles.groupChip,
+                  { backgroundColor: theme.cardSubtle, borderColor: theme.border },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={{ color: theme.text, fontSize: 13, fontWeight: '600' }}>{t(`muscles.${g}`)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </Card>
+      )}
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
 
@@ -209,6 +252,8 @@ function Section({
 }
 
 const styles = StyleSheet.create({
+  groupGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  groupChip: { borderWidth: 1, borderRadius: Radius.full, paddingVertical: 8, paddingHorizontal: 12 },
   photo: {
     width: '100%',
     height: 140,

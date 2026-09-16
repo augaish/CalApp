@@ -17,6 +17,11 @@ type Seed = {
   primaryMuscles?: MuscleId[];
   secondaryMuscles?: MuscleId[];
   type?: ExerciseType; // defaults to 'weight_reps'
+  /** Compendium-of-Physical-Activities MET, where this exercise's real
+   * intensity differs from its category's average. See Exercise.met. */
+  met?: number;
+  /** Burn derived from actual pace rather than a fixed rate. See Exercise.paceModel. */
+  paceModel?: 'foot';
   aliases?: string[];
 };
 
@@ -26,7 +31,7 @@ const SEEDS: Seed[] = [
   { id: 'incline-bench', en: 'Incline Bench Press', ar: 'ضغط بار مائل', category: 'chest', primaryMuscles: ['chest'], secondaryMuscles: ['triceps', 'front_delts'], aliases: ['incline bench', 'incline press', 'ضغط مائل'] },
   { id: 'dumbbell-press', en: 'Dumbbell Bench Press', ar: 'ضغط دمبل مسطح', category: 'chest', primaryMuscles: ['chest'], secondaryMuscles: ['triceps', 'front_delts'], aliases: ['dumbbell press', 'db press', 'ضغط دمبل'] },
   { id: 'chest-fly', en: 'Pec Deck / Chest Fly', ar: 'جهاز تفتيح الصدر', category: 'chest', primaryMuscles: ['chest'], secondaryMuscles: ['front_delts'], aliases: ['pec deck', 'pec fly', 'chest fly machine', 'butterfly', 'فراشة'] },
-  { id: 'cable-crossover', en: 'Cable Crossover', ar: 'كابل كروس أوفر', category: 'chest', primaryMuscles: ['chest'], secondaryMuscles: ['front_delts'], aliases: ['cable crossover', 'cable fly', 'كابل صدر'] },
+  { id: 'cable-crossover', en: 'Cable Crossover', ar: 'كابل كروس أوفر', category: 'chest', primaryMuscles: ['chest'], secondaryMuscles: ['front_delts'], aliases: ['cable crossover', 'كابل صدر'] },
   { id: 'chest-press-machine', en: 'Chest Press Machine', ar: 'جهاز ضغط الصدر', category: 'chest', primaryMuscles: ['chest'], secondaryMuscles: ['triceps', 'front_delts'], aliases: ['chest press', 'seated chest press', 'جهاز صدر'] },
   { id: 'push-up', en: 'Push-Up', ar: 'تمرين الضغط', category: 'chest', primaryMuscles: ['chest'], secondaryMuscles: ['triceps', 'front_delts', 'abs'], type: 'bodyweight_reps', aliases: ['push up', 'pushup', 'ضغط'] },
 
@@ -35,7 +40,7 @@ const SEEDS: Seed[] = [
   { id: 'seated-row', en: 'Seated Cable Row', ar: 'تجديف جالس بالكابل', category: 'back', primaryMuscles: ['lats', 'rhomboids', 'traps'], secondaryMuscles: ['rear_delts', 'biceps', 'forearms'], aliases: ['seated row', 'cable row', 'low row', 'تجديف', 'روو'] },
   { id: 'bent-over-row', en: 'Barbell Row', ar: 'تجديف بار منحني', category: 'back', primaryMuscles: ['lats', 'rhomboids', 'traps'], secondaryMuscles: ['rear_delts', 'biceps', 'lower_back'], aliases: ['barbell row', 'bent over row', 'تجديف بار'] },
   { id: 'pull-up', en: 'Pull-Up', ar: 'العقلة', category: 'back', primaryMuscles: ['lats'], secondaryMuscles: ['biceps', 'rhomboids', 'traps', 'rear_delts', 'forearms'], type: 'bodyweight_reps', aliases: ['pull up', 'pullup', 'chin up', 'عقلة', 'سحب عقلة'] },
-  { id: 'assisted-pull-up-machine', en: 'Assisted Pull-Up / Chin-Up Machine (Kneeling)', ar: 'جهاز العقلة المساعد (جلوس على الركبة)', category: 'back', primaryMuscles: ['lats'], secondaryMuscles: ['biceps', 'rhomboids', 'traps', 'rear_delts', 'forearms'], aliases: ['assisted pull up machine', 'assisted chin up machine', 'assisted pull-up machine', 'kneeling pull up machine', 'kneeling chin dip machine', 'chin dip machine', 'assisted chin dip machine', 'مساعد عقلة', 'جهاز عقلة مساعد', 'جهاز شد مساعد بالركبة'] },
+  { id: 'assisted-pull-up-machine', en: 'Assisted Pull-Up / Chin-Up Machine (Kneeling)', ar: 'جهاز العقلة المساعد (جلوس على الركبة)', category: 'back', primaryMuscles: ['lats'], secondaryMuscles: ['biceps', 'rhomboids', 'traps', 'rear_delts', 'forearms'], aliases: ['assisted pull up machine', 'assisted chin up machine', 'assisted pull-up machine', 'kneeling pull up machine', 'kneeling chin dip machine', 'chin dip machine', 'assisted chin dip machine', 'chin dip', 'kneeling chin dip', 'chin dip assisted', 'chin dip assist', 'assisted chin up', 'assisted chin', 'chin assist', 'gravitron', 'مساعد عقلة', 'جهاز عقلة مساعد', 'جهاز شد مساعد بالركبة'] },
   { id: 'deadlift', en: 'Deadlift', ar: 'الرفعة الميتة', category: 'back', primaryMuscles: ['lower_back', 'lats', 'traps'], secondaryMuscles: ['glutes', 'hamstrings', 'forearms', 'quads'], aliases: ['deadlift', 'ديدليفت', 'رفعة ميتة'] },
   { id: 't-bar-row', en: 'T-Bar Row', ar: 'تجديف تي بار', category: 'back', primaryMuscles: ['lats', 'rhomboids', 'traps'], secondaryMuscles: ['rear_delts', 'biceps'], aliases: ['t-bar row', 't bar', 'تي بار'] },
 
@@ -58,7 +63,7 @@ const SEEDS: Seed[] = [
   { id: 'tricep-pushdown', en: 'Triceps Pushdown', ar: 'دفع الترايسبس بالكابل', category: 'triceps', primaryMuscles: ['triceps'], secondaryMuscles: ['forearms'], aliases: ['pushdown', 'tricep pushdown', 'rope pushdown', 'تراي كابل', 'دفع ترايسبس'] },
   { id: 'tricep-extension', en: 'Overhead Triceps Extension', ar: 'تمديد الترايسبس علوي', category: 'triceps', primaryMuscles: ['triceps'], secondaryMuscles: ['side_delts', 'abs'], aliases: ['overhead extension', 'tricep extension', 'تمديد ترايسبس'] },
   { id: 'dips', en: 'Dips', ar: 'الغطس (ديبس)', category: 'triceps', primaryMuscles: ['triceps'], secondaryMuscles: ['chest', 'front_delts'], type: 'bodyweight_reps', aliases: ['dips', 'dip', 'ديبس', 'غطس'] },
-  { id: 'assisted-dip-machine', en: 'Assisted Dip Machine (Kneeling)', ar: 'جهاز الغطس المساعد (جلوس على الركبة)', category: 'triceps', primaryMuscles: ['triceps'], secondaryMuscles: ['chest', 'front_delts'], aliases: ['assisted dip machine', 'kneeling dip machine', 'kneeling chin dip machine', 'chin dip machine', 'assisted chin dip machine', 'مساعد غطس', 'جهاز غطس مساعد', 'جهاز غطس مساعد بالركبة'] },
+  { id: 'assisted-dip-machine', en: 'Assisted Dip Machine (Kneeling)', ar: 'جهاز الغطس المساعد (جلوس على الركبة)', category: 'triceps', primaryMuscles: ['triceps'], secondaryMuscles: ['chest', 'front_delts'], aliases: ['assisted dip machine', 'kneeling dip machine', 'assisted dip', 'dip assist', 'مساعد غطس', 'جهاز غطس مساعد', 'جهاز غطس مساعد بالركبة'] },
   { id: 'skull-crusher', en: 'Skull Crusher', ar: 'كسر الجمجمة', category: 'triceps', primaryMuscles: ['triceps'], aliases: ['skull crusher', 'lying extension', 'سكل كراشر'] },
   { id: 'close-grip-bench', en: 'Close-Grip Bench Press', ar: 'ضغط بقبضة ضيقة', category: 'triceps', primaryMuscles: ['triceps'], secondaryMuscles: ['chest', 'front_delts'], aliases: ['close grip bench', 'قبضة ضيقة'] },
 
@@ -88,10 +93,36 @@ const SEEDS: Seed[] = [
   { id: 'reverse-curl', en: 'Reverse Curl', ar: 'مرجحة عكسية', category: 'forearms', primaryMuscles: ['forearms'], secondaryMuscles: ['biceps'], aliases: ['reverse curl', 'مرجحة عكسية'] },
 
   // ── Cardio ─────────────────────────────────────────────
-  { id: 'treadmill', en: 'Treadmill', ar: 'جهاز المشي', category: 'cardio', type: 'distance_time', aliases: ['treadmill', 'running', 'جهاز مشي', 'جري'] },
-  { id: 'cycling', en: 'Stationary Bike', ar: 'الدراجة الثابتة', category: 'cardio', type: 'distance_time', aliases: ['bike', 'cycling', 'دراجة', 'سايكل'] },
-  { id: 'elliptical', en: 'Elliptical', ar: 'الجهاز الإهليلجي', category: 'cardio', type: 'distance_time', aliases: ['elliptical', 'أوربتراك'] },
-  { id: 'rowing', en: 'Rowing Machine', ar: 'جهاز التجديف', category: 'cardio', type: 'distance_time', aliases: ['rowing', 'rower', 'جهاز تجديف'] },
+  // MET values follow the Compendium of Physical Activities. Anything done on
+  // foot carries paceModel so its burn comes from real pace — without it a
+  // slow walk out-scores a hard run over the same distance (see paceMet).
+  { id: 'treadmill', en: 'Treadmill', ar: 'جهاز المشي', category: 'cardio', type: 'distance_time', met: 9.8, paceModel: 'foot', aliases: ['treadmill', 'جهاز مشي'] },
+  { id: 'cycling', en: 'Stationary Bike', ar: 'الدراجة الثابتة', category: 'cardio', type: 'distance_time', met: 7.0, aliases: ['bike', 'cycling', 'دراجة', 'سايكل'] },
+  { id: 'elliptical', en: 'Elliptical', ar: 'الجهاز الإهليلجي', category: 'cardio', type: 'distance_time', met: 5.0, aliases: ['elliptical', 'أوربتراك'] },
+  { id: 'rowing', en: 'Rowing Machine', ar: 'جهاز التجديف', category: 'cardio', type: 'distance_time', met: 7.0, aliases: ['rowing', 'rower', 'جهاز تجديف'] },
+  { id: 'running-outdoor', en: 'Running (outdoor)', ar: 'الجري', category: 'cardio', type: 'distance_time', met: 9.8, paceModel: 'foot', aliases: ['running', 'run', 'jog', 'jogging', 'جري', 'ركض', 'هرولة'] },
+  { id: 'walking', en: 'Walking', ar: 'المشي', category: 'cardio', type: 'distance_time', met: 3.5, paceModel: 'foot', aliases: ['walking', 'walk', 'مشي'] },
+  { id: 'hiking', en: 'Hiking', ar: 'المشي في الطبيعة', category: 'cardio', type: 'distance_time', met: 6.0, paceModel: 'foot', aliases: ['hiking', 'trail', 'هايكنج', 'تسلق المشي'] },
+  { id: 'swimming', en: 'Swimming', ar: 'السباحة', category: 'cardio', type: 'distance_time', met: 8.3, aliases: ['swimming', 'swim', 'سباحة'] },
+  { id: 'jump-rope', en: 'Jump Rope', ar: 'نط الحبل', category: 'cardio', type: 'time', met: 12.3, aliases: ['jump rope', 'skipping', 'skip rope', 'نط حبل', 'حبل'] },
+  { id: 'stair-climber', en: 'Stair Climber', ar: 'جهاز الدرج', category: 'cardio', type: 'time', met: 9.0, aliases: ['stair climber', 'stairmaster', 'جهاز درج', 'ستيرماستر'] },
+  { id: 'assault-bike', en: 'Assault / Air Bike', ar: 'دراجة الهواء', category: 'cardio', type: 'time', met: 8.0, aliases: ['assault bike', 'air bike', 'echo bike', 'دراجة هواء'] },
+  { id: 'padel', en: 'Padel', ar: 'البادل', category: 'cardio', type: 'time', met: 7.0, aliases: ['padel', 'paddle tennis', 'بادل'] },
+  { id: 'tennis', en: 'Tennis', ar: 'التنس', category: 'cardio', type: 'time', met: 7.3, aliases: ['tennis', 'تنس'] },
+  { id: 'football', en: 'Football', ar: 'كرة القدم', category: 'cardio', type: 'time', met: 7.0, aliases: ['football', 'soccer', 'كرة قدم', 'فوتبول'] },
+  { id: 'basketball', en: 'Basketball', ar: 'كرة السلة', category: 'cardio', type: 'time', met: 6.5, aliases: ['basketball', 'كرة سلة'] },
+  { id: 'boxing-bag', en: 'Boxing (heavy bag)', ar: 'الملاكمة (كيس)', category: 'cardio', type: 'time', met: 6.0, aliases: ['boxing', 'heavy bag', 'punching bag', 'ملاكمة', 'كيس ملاكمة'] },
+  { id: 'battle-ropes', en: 'Battle Ropes', ar: 'حبال المقاومة', category: 'cardio', type: 'time', met: 8.0, aliases: ['battle ropes', 'battle rope', 'حبال', 'حبال قتالية'] },
+  { id: 'sled-push', en: 'Sled Push', ar: 'دفع الزحافة', category: 'cardio', type: 'time', met: 8.0, aliases: ['sled push', 'prowler', 'زحافة', 'دفع زحافة'] },
+
+  // ── Full body ──────────────────────────────────────────
+  // This category exists for movements that genuinely work the whole body.
+  // It is NOT a place to put an exercise we could not classify.
+  { id: 'burpee', en: 'Burpee', ar: 'البيربي', category: 'fullBody', primaryMuscles: ['quads', 'chest', 'abs'], secondaryMuscles: ['triceps', 'front_delts', 'glutes'], type: 'bodyweight_reps', met: 8.0, aliases: ['burpee', 'burpees', 'بيربي'] },
+  { id: 'kettlebell-swing', en: 'Kettlebell Swing', ar: 'أرجحة الكيتل بيل', category: 'fullBody', primaryMuscles: ['glutes', 'hamstrings', 'lower_back'], secondaryMuscles: ['abs', 'front_delts', 'forearms'], met: 8.0, aliases: ['kettlebell swing', 'kb swing', 'كيتل بيل', 'أرجحة كيتل'] },
+  { id: 'clean-and-press', en: 'Clean and Press', ar: 'النتر والضغط', category: 'fullBody', primaryMuscles: ['front_delts', 'quads', 'traps'], secondaryMuscles: ['glutes', 'triceps', 'lower_back'], met: 6.0, aliases: ['clean and press', 'clean & press', 'نتر وضغط'] },
+  { id: 'thruster', en: 'Thruster', ar: 'الثراستر', category: 'fullBody', primaryMuscles: ['quads', 'front_delts'], secondaryMuscles: ['glutes', 'triceps', 'abs'], met: 8.0, aliases: ['thruster', 'thrusters', 'ثراستر'] },
+  { id: 'farmers-walk', en: "Farmer's Walk", ar: 'مشية المزارع', category: 'fullBody', primaryMuscles: ['forearms', 'traps'], secondaryMuscles: ['abs', 'glutes', 'quads'], type: 'time', met: 6.0, aliases: ["farmer's walk", 'farmers walk', 'farmer carry', 'مشية المزارع'] },
 
   // ── Added library (Calgym request) ─────────────────────
   // Chest
@@ -163,6 +194,8 @@ export const BUILTIN_EXERCISES: Exercise[] = SEEDS.map((s) => ({
   primaryMuscles: s.primaryMuscles,
   secondaryMuscles: s.secondaryMuscles,
   type: s.type ?? 'weight_reps',
+  met: s.met,
+  paceModel: s.paceModel,
   aliases: s.aliases,
   source: 'builtin',
 }));
@@ -205,27 +238,72 @@ export const MUSCLE_COLORS: Record<MuscleGroup, string> = {
  * region reads the same color whether you're browsing the library by
  * category or looking at one exercise's precise target.
  */
-export const MUSCLE_ID_COLORS: Record<MuscleId, string> = {
-  chest: MUSCLE_COLORS.chest,
-  front_delts: MUSCLE_COLORS.shoulders,
-  side_delts: MUSCLE_COLORS.shoulders,
-  rear_delts: MUSCLE_COLORS.shoulders,
-  biceps: MUSCLE_COLORS.biceps,
-  triceps: MUSCLE_COLORS.triceps,
-  forearms: MUSCLE_COLORS.forearms,
-  abs: MUSCLE_COLORS.core,
-  obliques: MUSCLE_COLORS.core,
-  lats: MUSCLE_COLORS.back,
-  traps: MUSCLE_COLORS.back,
-  rhomboids: MUSCLE_COLORS.back,
-  lower_back: MUSCLE_COLORS.back,
-  glutes: MUSCLE_COLORS.glutes,
-  quads: MUSCLE_COLORS.legs,
-  hamstrings: MUSCLE_COLORS.legs,
-  adductors: MUSCLE_COLORS.legs,
-  hip_flexors: MUSCLE_COLORS.legs,
-  calves: MUSCLE_COLORS.calves,
+/**
+ * Which coarse group each precise muscle belongs to. One source of truth for
+ * both the map's colors and, more importantly, working out which category an
+ * exercise belongs in from the muscles a scan identified — so a scanned
+ * machine gets filed where it actually belongs instead of dumped somewhere
+ * generic.
+ */
+export const GROUP_BY_MUSCLE_ID: Record<MuscleId, MuscleGroup> = {
+  chest: 'chest',
+  front_delts: 'shoulders',
+  side_delts: 'shoulders',
+  rear_delts: 'shoulders',
+  biceps: 'biceps',
+  triceps: 'triceps',
+  forearms: 'forearms',
+  abs: 'core',
+  obliques: 'core',
+  lats: 'back',
+  traps: 'back',
+  rhomboids: 'back',
+  lower_back: 'back',
+  glutes: 'glutes',
+  quads: 'legs',
+  hamstrings: 'legs',
+  adductors: 'legs',
+  hip_flexors: 'legs',
+  calves: 'calves',
 };
+
+export const MUSCLE_ID_COLORS: Record<MuscleId, string> = Object.fromEntries(
+  (Object.keys(GROUP_BY_MUSCLE_ID) as MuscleId[]).map((id) => [id, MUSCLE_COLORS[GROUP_BY_MUSCLE_ID[id]]]),
+) as Record<MuscleId, string>;
+
+/**
+ * The single category that best describes a set of targeted muscles — the
+ * group most of them belong to, ties broken by whichever muscle was listed
+ * first (the model lists the main target first).
+ *
+ * Returns null when there is nothing to go on, which is the ONLY case where
+ * a caller should fall back to asking the person. 'fullBody' is reserved for
+ * movements that genuinely work the whole body and is never a way of saying
+ * "not sure" — that is exactly how a recognisable chin/dip machine ended up
+ * filed under Full body with no muscle map.
+ */
+export function categoryForMuscles(muscles: MuscleId[] | undefined): MuscleGroup | null {
+  if (!muscles?.length) return null;
+  const tally = new Map<MuscleGroup, number>();
+  for (const m of muscles) {
+    const group = GROUP_BY_MUSCLE_ID[m];
+    if (group) tally.set(group, (tally.get(group) ?? 0) + 1);
+  }
+  if (tally.size === 0) return null;
+  // Four or more distinct groups is a whole-body movement, not an upper-back
+  // exercise that happens to mention legs.
+  if (tally.size >= 4) return 'fullBody';
+  const first = GROUP_BY_MUSCLE_ID[muscles[0]];
+  let best: MuscleGroup | null = null;
+  let bestCount = 0;
+  for (const [group, count] of tally) {
+    if (count > bestCount || (count === bestCount && group === first)) {
+      best = group;
+      bestCount = count;
+    }
+  }
+  return best;
+}
 
 /**
  * Icon for an exercise row. Cardio reads as movement rather than iron — a
@@ -290,13 +368,23 @@ export function matchExerciseByName(
       .map((c) => normalize(c as string));
     if (candidates.some((c) => c === q)) return ex;
   }
-  // 2) containment either direction (e.g. "seated lat pulldown" ⊃ "lat pulldown")
+  // 2) containment either direction (e.g. "seated lat pulldown" ⊃ "lat pulldown").
+  //    The LONGEST matching alias wins rather than whichever exercise happens to
+  //    sit earlier in the library: "assisted chin up dip" contains both "chin up"
+  //    and "assisted chin up", and only the longer one is the right machine.
+  let best: Exercise | undefined;
+  let bestLen = 0;
   for (const ex of pool) {
     const candidates = [ex.name, ex.nameEn, ex.nameAr, ...(ex.aliases ?? [])]
       .filter(Boolean)
       .map((c) => normalize(c as string))
       .filter((c) => c.length >= 4);
-    if (candidates.some((c) => q.includes(c) || c.includes(q))) return ex;
+    for (const c of candidates) {
+      if ((q.includes(c) || c.includes(q)) && c.length > bestLen) {
+        best = ex;
+        bestLen = c.length;
+      }
+    }
   }
-  return undefined;
+  return best;
 }

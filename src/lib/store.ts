@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { findExercise } from './exercises';
+import { categoryForMuscles, findExercise } from './exercises';
 import { dailyTargets } from './tdee';
 import type {
   ActiveSession,
@@ -10,6 +10,7 @@ import type {
   CoachReferenceDoc,
   DailyTargets,
   Exercise,
+  ExerciseType,
   FastingProtocol,
   FastingSession,
   FoodItem,
@@ -451,6 +452,7 @@ export const useAppStore = create<AppState>()(
                         bodyKg,
                         exercise.category,
                         elapsedMinutes(existing.at, when),
+                        exercise,
                       ),
                     }
                   : w,
@@ -468,7 +470,7 @@ export const useAppStore = create<AppState>()(
                 exerciseName: exercise.name,
                 type: exercise.type,
                 sets,
-                caloriesBurned: burnForSets(sets, bodyKg, exercise.category),
+                caloriesBurned: burnForSets(sets, bodyKg, exercise.category, undefined, exercise),
               },
               ...s.workouts,
             ],
@@ -482,12 +484,13 @@ export const useAppStore = create<AppState>()(
               if (w.id !== workoutId) return w;
               const sets = w.sets.map((st, i) => (i === index ? { ...st, ...patch } : st));
               const updatedAt = at ?? w.updatedAt;
-              const category = findExercise(w.exerciseId, s.exercises)?.category;
+              const ex = findExercise(w.exerciseId, s.exercises);
+              const category = ex?.category;
               return {
                 ...w,
                 sets: markPRs(sets, w.type),
                 updatedAt,
-                caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, updatedAt)),
+                caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, updatedAt), ex),
               };
             }),
           };
@@ -503,11 +506,12 @@ export const useAppStore = create<AppState>()(
             }
             const sets = w.sets.filter((_, i) => i !== index);
             if (sets.length === 0) continue; // drop the empty workout
-            const category = findExercise(w.exerciseId, s.exercises)?.category;
+            const ex = findExercise(w.exerciseId, s.exercises);
+            const category = ex?.category;
             workouts.push({
               ...w,
               sets: markPRs(sets, w.type),
-              caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt)),
+              caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt), ex),
             });
           }
           return { workouts };
@@ -521,11 +525,12 @@ export const useAppStore = create<AppState>()(
             workouts: s.workouts.map((w) => {
               if (w.id !== workoutId) return w;
               const sets = w.sets.map((st) => ({ ...st, done: trained }));
-              const category = findExercise(w.exerciseId, s.exercises)?.category;
+              const ex = findExercise(w.exerciseId, s.exercises);
+              const category = ex?.category;
               return {
                 ...w,
                 sets,
-                caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt)),
+                caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt), ex),
               };
             }),
           };
@@ -926,7 +931,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 10,
+      version: 11,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -1144,6 +1149,36 @@ function migrateStore(persisted: unknown, version: number): unknown {
     });
   }
 
+  // v10 → v11: timed and distance work is now burned by its own clock and
+  // pace rather than by a set count (see burnForSets). Without this, a padel
+  // match or a run logged before the change keeps the old figure — a 90-minute
+  // match frozen at the ~20 kcal that two assumed minutes produced.
+  // Additive: recomputes an existing field, adds none, so a rollback to v10
+  // reads this state unchanged.
+  if (version < 11 && Array.isArray(state.workouts)) {
+    const bodyKg = (state.profile as { weightKg?: number } | null | undefined)?.weightKg ?? 75;
+    // Scans used to be filed under Full body no matter what they were, so a
+    // recognisable back machine sits in the wrong group with no muscle map.
+    // The muscles were saved correctly all along, so re-file from those —
+    // only moving entries that are demonstrably somewhere else, never the
+    // genuine whole-body movements.
+    if (Array.isArray(state.exercises)) {
+      state.exercises = (state.exercises as Exercise[]).map((e) => {
+        if (e.category !== 'fullBody') return e;
+        const derived = categoryForMuscles(e.primaryMuscles);
+        return derived && derived !== 'fullBody' ? { ...e, category: derived } : e;
+      });
+    }
+    const custom: Exercise[] = Array.isArray(state.exercises) ? (state.exercises as Exercise[]) : [];
+    state.workouts = (state.workouts as LoggedWorkout[]).map((w) => {
+      const ex = findExercise(w.exerciseId, custom);
+      return {
+        ...w,
+        caloriesBurned: burnForSets(w.sets, bodyKg, ex?.category, elapsedMinutes(w.at, w.updatedAt), ex),
+      };
+    });
+  }
+
   if (version >= 2) return state;
 
   const oldWorkouts = Array.isArray(state.workouts) ? state.workouts : [];
@@ -1295,14 +1330,41 @@ export function elapsedMinutes(atIso: string, updatedAtIso?: string): number | u
  * 2-min-per-set assumption. Replaced by real data once a wearable is
  * connected.
  */
+/**
+ * MET from actual pace, for anything done on foot, via the ACSM metabolic
+ * equations. Below roughly 6.4 km/h a person walks; above it they run, and
+ * running costs about twice as much oxygen per metre. This is what stops a
+ * 45-minute stroll out-scoring a 15-minute run over the same distance.
+ */
+export function paceMet(meters: number, seconds: number): number | null {
+  if (meters <= 0 || seconds <= 0) return null;
+  const metresPerMin = meters / (seconds / 60);
+  // Sanity bound: faster than world-record pace means the entry is wrong.
+  if (metresPerMin > 400) return null;
+  const vo2 = metresPerMin >= 107 ? 0.2 * metresPerMin + 3.5 : 0.1 * metresPerMin + 3.5;
+  return vo2 / 3.5;
+}
+
+/** Total done-set seconds and metres in a session. */
+function loggedTotals(sets: WorkoutSet[]): { seconds: number; meters: number } {
+  let seconds = 0;
+  let meters = 0;
+  for (const s of sets) {
+    if (!s.done) continue;
+    seconds += s.seconds ?? 0;
+    meters += s.distanceM ?? 0;
+  }
+  return { seconds, meters };
+}
+
 export function workoutBurn(
   setCount: number,
   bodyKg: number,
   category: MuscleGroup = 'core',
   minutes?: number,
+  met = MET_BY_CATEGORY[category] ?? 5.0,
 ): number {
   if (setCount <= 0) return 0;
-  const met = MET_BY_CATEGORY[category] ?? 5.0;
   // Real elapsed time is only a duration when it spans at least two sets.
   // A single set has no measurable length, and `updatedAt` is the last
   // *edit*, not the last work: log one set (2 min → 14 kcal), add a second
@@ -1325,13 +1387,41 @@ export function workoutBurn(
  * the burn from the length of the list and quietly credited work nobody had
  * claimed to do. Reading the flag makes the two paths agree.
  */
+/**
+ * Calories for a session. How the work is measured decides how it is counted,
+ * because "how many sets" means three different things:
+ *
+ * - Lifting (weight_reps, bodyweight_reps): the SET is the unit of work, so
+ *   the count drives it. Ten sets is genuinely twice five sets.
+ * - Holds and activities (time): the CLOCK is the unit of work. Three sets of
+ *   a 60-second plank is three minutes of plank — the count only tells us how
+ *   many durations to add up, it does not multiply anything. Counting sets
+ *   here is what would have logged a 90-minute padel match as two minutes.
+ * - Distance work (distance_time): pace decides the intensity, so the MET is
+ *   derived from metres and seconds rather than assumed. See paceMet.
+ */
 export function burnForSets(
   sets: WorkoutSet[],
   bodyKg: number,
   category: MuscleGroup = 'core',
   minutes?: number,
+  exercise?: { type?: ExerciseType; met?: number; paceModel?: 'foot' },
 ): number {
-  return workoutBurn(sets.filter((s) => s.done).length, bodyKg, category, minutes);
+  const done = sets.filter((s) => s.done);
+  if (done.length === 0) return 0;
+  const baseMet = exercise?.met ?? MET_BY_CATEGORY[category] ?? 5.0;
+  const type = exercise?.type;
+
+  if (type === 'time' || type === 'distance_time') {
+    const { seconds, meters } = loggedTotals(done);
+    // Nothing timed yet (a bare checkmark) — fall back to the set assumption
+    // rather than claiming zero for work that was actually done.
+    if (seconds <= 0) return workoutBurn(done.length, bodyKg, category, minutes, baseMet);
+    const met = (exercise?.paceModel === 'foot' ? paceMet(meters, seconds) : null) ?? baseMet;
+    return Math.round(((met * 3.5 * bodyKg) / 200) * (seconds / 60));
+  }
+
+  return workoutBurn(done.length, bodyKg, category, minutes, baseMet);
 }
 
 export function burnedForDay(workouts: LoggedWorkout[], day: Date): number {
