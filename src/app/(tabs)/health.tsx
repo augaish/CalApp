@@ -4,10 +4,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { TrendLine } from '@/components/charts';
-import { ConnectionRow, WhoopConnectionRow, connectionStyles } from '@/components/connections';
-import { Button, Card, Screen, Title } from '@/components/ui';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { BrandHeader } from '@/components/brand-header';
+import { MetricTrend } from '@/components/charts';
+import { useWhoopStatus } from '@/components/connections';
+import { Chip, IconTile, RowGroup, SettingsRow } from '@/components/system';
+import { Button, Screen } from '@/components/ui';
+import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { buildExport } from '@/lib/account';
 import { useAppStore } from '@/lib/store';
@@ -30,7 +32,7 @@ function latestWith<K extends keyof WeightEntry>(weights: WeightEntry[], key: K)
 }
 
 /**
- * Health — the home for body data (S03).
+ * S03 Health — the home for body data.
  *
  * Every number here shows the date it was measured and where it came from,
  * because a reading shown today is not a reading taken today. Missing values
@@ -49,26 +51,23 @@ export default function Health() {
   // `weights` is kept newest-first by the store (see logWeight).
   const weights = useAppStore((s) => s.weights);
   const [range, setRange] = useState<(typeof RANGES)[number]>(30);
+  const [pickingRange, setPickingRange] = useState(false);
+  const [whoop] = useWhoopStatus();
 
   const now = new Date();
   const latest = weights[0];
   const series = inRange(weights, range, now);
   // Change over the window, from the first reading inside it, not from an
-  // arbitrary "previous" — the range chip states exactly what the delta is.
+  // arbitrary "previous" — the pill states exactly what the delta is.
   const first = series[0];
   const delta = latest && first && first.at !== latest.at ? latest.kg - first.kg : undefined;
 
   const measured = latestWith(weights, 'measurementsCm');
   const composition = weights.find((w) => w.bodyFatPercent != null || w.skeletalMuscleMassKg != null);
 
-  const dateOf = (iso: string) =>
-    new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+  const dateOf = (iso: string) => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const sourceOf = (w: WeightEntry) =>
-    w.source === 'scan'
-      ? w.reportLabel
-        ? t('health.sourceScanNamed', { device: w.reportLabel })
-        : t('health.sourceScan')
-      : t('health.sourceManual');
+    w.source === 'scan' ? (w.reportLabel ? t('health.sourceScanNamed', { device: w.reportLabel }) : t('health.sourceScan')) : t('health.sourceManual');
 
   const exportData = async () => {
     try {
@@ -79,166 +78,145 @@ export default function Health() {
   };
 
   return (
-    <Screen>
-      <Title>{t('health.title')}</Title>
-      <Text style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>{t('health.subtitle')}</Text>
-
+    <Screen header={<BrandHeader title={t('health.title')} />}>
       {/* Range: independent of the diary's selected date (section 3). */}
-      <View style={styles.ranges}>
-        {RANGES.map((d) => {
-          const on = range === d;
-          return (
-            <Pressable
-              key={d}
-              onPress={() => setRange(d)}
-              accessibilityRole="button"
-              accessibilityState={{ selected: on }}
-              style={[styles.chip, { backgroundColor: on ? theme.primary : theme.cardSubtle }]}
-            >
-              <Text style={{ color: on ? theme.onPrimary : theme.textSecondary, fontSize: 12, fontWeight: '700' }}>
-                {t('health.lastDays', { days: d })}
-              </Text>
-            </Pressable>
-          );
-        })}
+      <View style={styles.titleRow}>
+        <Text style={[Type.section, { color: theme.text, flex: 1 }]}>{t('health.trendsTitle')}</Text>
+        <Pressable
+          onPress={() => setPickingRange((v) => !v)}
+          accessibilityRole="button"
+          accessibilityLabel={t('health.lastDays', { days: range })}
+          style={({ pressed }) => [styles.rangePill, { backgroundColor: theme.card, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
+        >
+          <Ionicons name="calendar-outline" size={16} color={theme.primary} />
+          <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{t('health.lastDays', { days: range })}</Text>
+          <Ionicons name={pickingRange ? 'chevron-up' : 'chevron-down'} size={14} color={theme.textTertiary} />
+        </Pressable>
       </View>
+      {pickingRange && (
+        <View style={styles.ranges}>
+          {RANGES.map((d) => (
+            <Chip
+              key={d}
+              label={t('health.lastDays', { days: d })}
+              selected={range === d}
+              onPress={() => {
+                setRange(d);
+                setPickingRange(false);
+              }}
+            />
+          ))}
+        </View>
+      )}
 
       {/* Weight */}
-      <Card>
+      <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
         <View style={styles.rowHead}>
-          <Ionicons name="scale-outline" size={18} color={theme.primary} />
-          <Text style={[styles.rowTitle, { color: theme.textSecondary }]}>{t('health.weight')}</Text>
+          <IconTile icon="scale-outline" size={32} />
+          <Text style={{ color: theme.textSecondary, fontSize: 15, fontWeight: '600', flex: 1 }}>{t('health.weight')}</Text>
+          {delta != null && (
+            // Neutral ink on purpose: a change is a fact, not a verdict.
+            <View style={[styles.deltaPill, { backgroundColor: theme.surfaceTint }]}>
+              <Text style={{ color: theme.primaryDark, fontSize: 13 }}>
+                <Text style={{ fontWeight: '800' }}>
+                  {delta > 0 ? '+' : delta < 0 ? '−' : ''}
+                  {Math.abs(delta).toFixed(1)} {t('progress.kg')}
+                </Text>{' '}
+                {t('health.since', { date: dateOf(first.at) })}
+              </Text>
+            </View>
+          )}
         </View>
         {latest ? (
           <>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-              <Text style={[styles.big, { color: theme.text }]}>{latest.kg}</Text>
-              <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('progress.kg')}</Text>
-              {delta != null && (
-                // Neutral ink on purpose: a change is a fact, not a verdict.
-                <Text style={{ color: theme.textSecondary, fontSize: 13, marginStart: 8 }}>
-                  {t('health.sinceFirst', {
-                    delta: `${delta > 0 ? '+' : ''}${delta.toFixed(1)}`,
-                    date: dateOf(first.at),
-                  })}
-                </Text>
-              )}
-            </View>
-            <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>
+            <Text style={{ color: theme.text, marginTop: 6 }}>
+              <Text style={styles.big}>{latest.kg}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.textSecondary }}> {t('progress.kg')}</Text>
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 14, marginTop: 2 }}>
               {dateOf(latest.at)} · {sourceOf(latest)}
             </Text>
             {series.length >= 2 ? (
               <View style={{ marginTop: Spacing.sm }}>
-                <TrendLine
+                <MetricTrend
                   values={series.map((w) => w.kg)}
                   labels={series.map((w) => dateOf(w.at))}
                   color={theme.primary}
-                  width={width - Spacing.md * 4}
+                  width={width - Spacing.page * 2 - Spacing.md * 2}
                 />
-                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                  {t('health.readingsInRange', { n: series.length })}
-                </Text>
+                <Pressable onPress={() => router.push('/measurements?metric=weight')} accessibilityRole="button" hitSlop={6} style={styles.historyLink}>
+                  <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('health.readingsInRange', { n: series.length })}</Text>
+                  <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>{t('bodyReading.history')}</Text>
+                  <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+                </Pressable>
               </View>
             ) : (
-              <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: Spacing.sm }}>
-                {t('health.needTwoForTrend')}
-              </Text>
+              <Text style={{ color: theme.textTertiary, fontSize: 13, marginTop: Spacing.sm }}>{t('health.needTwoForTrend')}</Text>
             )}
           </>
         ) : (
-          <Text style={{ color: theme.textSecondary, marginTop: 4 }}>{t('health.noReadings')}</Text>
+          <Text style={{ color: theme.textSecondary, marginTop: 6 }}>{t('health.noReadings')}</Text>
         )}
-        <Button
-          label={t('health.addReading')}
-          icon="add"
-          onPress={() => router.push('/body-reading')}
-          style={{ marginTop: Spacing.md }}
+        <Button label={t('health.addReading')} icon="add" onPress={() => router.push('/body-reading')} style={{ marginTop: Spacing.md }} />
+      </View>
+
+      <RowGroup>
+        <SettingsRow
+          icon="resize-outline"
+          title={t('health.measurements')}
+          subtitle={
+            measured?.measurementsCm?.waist != null
+              ? `${t('health.waist')} · ${measured.measurementsCm.waist} cm · ${dateOf(measured.at)}`
+              : t('health.noReadingYet')
+          }
+          onPress={() => router.push(measured ? '/measurements?metric=waist' : '/body-reading')}
         />
-      </Card>
-
-      {/* Measurements */}
-      <Pressable onPress={() => router.push('/body-reading')} accessibilityRole="button">
-        <Card style={styles.linkRow}>
-          <Ionicons name="resize-outline" size={20} color={theme.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>{t('health.measurements')}</Text>
-            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-              {measured?.measurementsCm?.waist != null
-                ? `${t('health.waist')} · ${measured.measurementsCm.waist} cm · ${dateOf(measured.at)}`
-                : t('health.noReadingYet')}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-        </Card>
-      </Pressable>
-
-      {/* Body composition */}
-      <Pressable onPress={() => router.push('/body-reading')} accessibilityRole="button">
-        <Card style={styles.linkRow}>
-          <Ionicons name="body-outline" size={20} color={theme.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>{t('health.composition')}</Text>
-            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-              {composition
-                ? [
-                    composition.bodyFatPercent != null ? `${t('health.bodyFat')} ${composition.bodyFatPercent}%` : null,
-                    composition.skeletalMuscleMassKg != null
-                      ? `${t('health.muscle')} ${composition.skeletalMuscleMassKg} ${t('progress.kg')}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ') + ` · ${dateOf(composition.at)}`
-                : t('health.noReadingYet')}
-            </Text>
-          </View>
-          {composition ? (
-            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-          ) : (
-            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('health.add')}</Text>
-          )}
-        </Card>
-      </Pressable>
-
-      {/* Connections */}
-      <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>
-        {t('profile.connections')}
-      </Text>
-      <Card>
-        <WhoopConnectionRow />
-        <View style={[connectionStyles.divider, { backgroundColor: theme.border }]} />
-        <ConnectionRow icon="watch-outline" label={t('profile.appleHealth')} />
-      </Card>
-
-      {/* Review + export */}
-      <Pressable onPress={() => router.push('/review')} accessibilityRole="button">
-        <Card style={styles.linkRow}>
-          <Ionicons name="stats-chart-outline" size={20} color={theme.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>{t('review.title')}</Text>
-            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('health.reviewHint')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-        </Card>
-      </Pressable>
-      <Pressable onPress={exportData} accessibilityRole="button">
-        <Card style={styles.linkRow}>
-          <Ionicons name="download-outline" size={20} color={theme.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '700' }}>{t('legal.exportData')}</Text>
-            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('health.exportHint')}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
-        </Card>
-      </Pressable>
+        <SettingsRow
+          icon="body-outline"
+          title={t('health.composition')}
+          subtitle={
+            composition
+              ? [
+                  composition.bodyFatPercent != null ? `${t('health.bodyFat')} ${composition.bodyFatPercent}%` : null,
+                  composition.skeletalMuscleMassKg != null ? `${t('health.muscle')} ${composition.skeletalMuscleMassKg} ${t('progress.kg')}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') + ` · ${dateOf(composition.at)}`
+              : t('health.noReadingYet')
+          }
+          onPress={() => router.push(composition ? '/measurements?metric=fat' : '/body-reading')}
+          chevron={!!composition}
+          right={
+            composition ? undefined : (
+              <View style={[styles.addPill, { backgroundColor: theme.surfaceTint }]}>
+                <Text style={{ color: theme.primaryDark, fontWeight: '700', fontSize: 13 }}>{t('health.add')}</Text>
+              </View>
+            )
+          }
+        />
+        <SettingsRow
+          icon="link-outline"
+          title={t('profile.connections')}
+          subtitle={`${t('profile.whoop')} · ${
+            whoop === 'connected' ? t('profile.whoopConnected') : whoop === 'loading' ? t('common.loading') : t('health.notConnected')
+          }`}
+          onPress={() => router.push('/connections')}
+        />
+        <SettingsRow icon="stats-chart-outline" title={t('review.title')} subtitle={t('health.reviewShort')} onPress={() => router.push('/review')} />
+        <SettingsRow icon="document-text-outline" title={t('legal.exportData')} subtitle={t('health.exportShort')} onPress={exportData} last />
+      </RowGroup>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  ranges: { flexDirection: 'row', gap: 6, marginBottom: Spacing.md },
-  chip: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: Radius.full },
-  rowHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  rowTitle: { fontSize: 13, fontWeight: '600' },
-  big: { fontSize: 34, fontWeight: '800' },
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
+  rangePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 40, borderRadius: Radius.control, borderWidth: 1 },
+  ranges: { flexDirection: 'row', gap: 6, marginBottom: Spacing.md, flexWrap: 'wrap' },
+  card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
+  rowHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  deltaPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.control },
+  addPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.control },
+  big: { fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
+  historyLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, minHeight: 32 },
 });

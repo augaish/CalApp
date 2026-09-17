@@ -101,6 +101,118 @@ export function WeekBars({
   );
 }
 
+/**
+ * C08 Metric trend — the Health chart: a light grid with unit ticks, dated
+ * points, the latest one emphasised. Direction is neutral; the reading's
+ * date and source are printed by the caller. Fewer than two points renders
+ * nothing (the caller says why).
+ */
+export function MetricTrend({
+  values,
+  labels,
+  color,
+  width,
+  height = 150,
+  unit,
+}: {
+  values: number[];
+  labels: string[];
+  color: string;
+  width: number;
+  height?: number;
+  unit?: string;
+}) {
+  const t = useTheme();
+  if (values.length < 2 || width <= 0) return null;
+  const padL = 30;
+  const padR = 14;
+  const padT = 18;
+  const padB = 22;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  // Round the axis outwards to whole units so ticks are readable numbers.
+  const lo = Math.floor(min - 0.5);
+  const hi = Math.ceil(max + 0.5);
+  const span = hi - lo || 1;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+  const x = (i: number) => padL + (i / (values.length - 1)) * plotW;
+  const y = (v: number) => padT + (1 - (v - lo) / span) * plotH;
+  // Whole-unit ticks while they fit; otherwise four evenly spaced ones.
+  const ticks = span <= 6 ? span : 4;
+  const tickVals = Array.from({ length: ticks + 1 }, (_, i) => lo + (span * i) / ticks);
+  const fmt = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(1));
+  // Only a handful of x labels fit; always keep the first and last.
+  const every = Math.max(1, Math.ceil(labels.length / 5));
+  const showX = (i: number) => i === 0 || i === labels.length - 1 || i % every === 0;
+  return (
+    <View style={{ width, height }}>
+      <Svg width={width} height={height}>
+        {tickVals.map((v, i) => (
+          <Polyline
+            key={`g${i}`}
+            points={`${padL},${y(v)} ${width - padR},${y(v)}`}
+            stroke={t.border}
+            strokeWidth={1}
+            fill="none"
+          />
+        ))}
+        <Polyline
+          points={values.map((v, i) => `${x(i)},${y(v)}`).join(' ')}
+          fill="none"
+          stroke={color}
+          strokeWidth={2.5}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {values.map((v, i) => (
+          <Circle
+            key={i}
+            cx={x(i)}
+            cy={y(v)}
+            r={i === values.length - 1 ? 5 : 3.5}
+            fill={i === values.length - 1 ? color : t.card}
+            stroke={color}
+            strokeWidth={2}
+          />
+        ))}
+      </Svg>
+      <View style={{ position: 'absolute', left: 0, top: 0, width, height }} pointerEvents="none">
+        {tickVals.map((v, i) => (
+          <Text
+            key={`t${i}`}
+            style={{ position: 'absolute', left: 0, top: y(v) - 7, width: padL - 6, textAlign: 'right', fontSize: 10, color: t.textTertiary }}
+          >
+            {fmt(v)}
+          </Text>
+        ))}
+        {labels.map((l, i) =>
+          showX(i) ? (
+            <Text
+              key={`x${i}`}
+              numberOfLines={1}
+              style={{
+                position: 'absolute',
+                top: height - padB + 6,
+                left: Math.min(Math.max(0, x(i) - 28), width - 56),
+                width: 56,
+                textAlign: i === 0 ? 'left' : i === labels.length - 1 ? 'right' : 'center',
+                fontSize: 10,
+                color: t.textTertiary,
+              }}
+            >
+              {l}
+            </Text>
+          ) : null,
+        )}
+        {!!unit && (
+          <Text style={{ position: 'absolute', right: 0, top: 0, fontSize: 10, color: t.textTertiary }}>{unit}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
 /** Line chart with value labels on each point and day labels on the x-axis. */
 export function TrendLine({
   values,

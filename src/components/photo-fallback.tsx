@@ -18,6 +18,21 @@ const GLYPH: Record<FoodIllustration, keyof typeof Ionicons.glyphMap> = {
   generic: 'restaurant-outline',
 };
 
+const KEYWORDS: [FoodIllustration, RegExp][] = [
+  ['drink', /\b(juice|smoothie|shake|coffee|tea|latte|water|milk|عصير|قهوة|شاي|حليب|مشروب)\b/i],
+  ['sandwich', /\b(sandwich|wrap|burger|toast|shawarma|manakish|ساندويتش|شاورما|برجر|لفافة|توست)\b/i],
+  ['fruit', /\b(fruit|apple|banana|berry|berries|dates|mango|salad|فواكه|فاكهة|تمر|موز|تفاح|سلطة)\b/i],
+  ['packaged', /\b(bar|chips|biscuit|cereal|yogurt|yoghurt|بسكويت|زبادي|شيبس|حبوب)\b/i],
+  ['bowl', /\b(soup|stew|bowl|porridge|oats|lentil|harees|شوربة|يخنة|عدس|هريس|شوفان|طبق)\b/i],
+];
+
+/** A bundled category for a dish name — a stable, language-independent key. */
+export function illustrationFor(name: string | undefined): FoodIllustration {
+  if (!name) return 'generic';
+  for (const [kind, re] of KEYWORDS) if (re.test(name)) return kind;
+  return 'plate';
+}
+
 /**
  * A photo when there is one, a bundled category illustration when there is
  * not (C09). Same geometry either way, so a list never reflows when an image

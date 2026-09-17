@@ -28,6 +28,14 @@ export const Colors = {
     gradientEnd: '#7FB89B',
     onGradient: '#FFFFFF',
     water: '#38BDF8',
+    // Handoff v1.1 surfaces and text-safe status inks. The brand purple and
+    // gradient above are the authentic Calgym values and stay; these are the
+    // neutral surfaces and the darker status variants the boards use for
+    // small text, where the bright success/danger fills would not pass 4.5:1.
+    surfaceTint: '#EEE9F7',
+    successText: '#256647',
+    errorText: '#A32F3D',
+    warningText: '#795017',
   },
   dark: {
     text: '#F1EEF8',
@@ -51,41 +59,64 @@ export const Colors = {
     gradientEnd: '#5E9E80',
     onGradient: '#FFFFFF',
     water: '#38BDF8',
+    surfaceTint: 'rgba(167,139,224,0.18)',
+    successText: '#7ED9A4',
+    errorText: '#F49AA0',
+    warningText: '#F2C879',
   },
 } as const;
 
 export type ThemeColors = Record<keyof typeof Colors.light, string>;
 
-/** Max 4 sizes, 3 weights — hierarchy by size + weight + opacity. */
+/**
+ * Handoff v1.1 hierarchy: main title 28, section 20, body 16, secondary 14,
+ * supporting 12. Weight and opacity do the rest; no further sizes.
+ */
 export const Type = {
   display: { fontSize: 40, fontWeight: '800', letterSpacing: -1 } as TextStyle,
-  title: { fontSize: 24, fontWeight: '700', letterSpacing: -0.4 } as TextStyle,
+  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 } as TextStyle,
+  section: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 } as TextStyle,
   body: { fontSize: 16, fontWeight: '400' } as TextStyle,
+  secondary: { fontSize: 14, fontWeight: '500' } as TextStyle,
   caption: { fontSize: 13, fontWeight: '600' } as TextStyle,
+  /** Small uppercase eyebrow above a card title ("TRAINING", "PLANNED LUNCH"). */
+  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' } as TextStyle,
 };
+
+/** Standard transitions (ms); reduced motion should skip them entirely. */
+export const Motion = { fast: 150, standard: 200, max: 250 } as const;
 
 export const Fonts = Platform.select({
   ios: { sans: 'system-ui', rounded: 'ui-rounded', mono: 'ui-monospace' },
   default: { sans: 'normal', rounded: 'normal', mono: 'monospace' },
 });
 
-/** 4/8-point grid only. */
+/** 4/8-point grid; `page` is the 20dp outer margin every root screen keeps. */
 export const Spacing = {
   xs: 4,
   sm: 8,
+  ms: 12,
   md: 16,
+  page: 20,
   lg: 24,
   xl: 32,
   xxl: 48,
 } as const;
 
+/** control 12 · module 20 · pill. `md`/`xl` remain for existing sheets. */
 export const Radius = {
   sm: 12,
+  control: 12,
   md: 16,
   lg: 20,
+  module: 20,
   xl: 28,
   full: 999,
+  pill: 999,
 } as const;
+
+/** Minimum touch target from the accessibility contract. */
+export const TOUCH = 48;
 
 /** Soft tinted shadow — never harsh gray on colored backgrounds. */
 export function cardShadow(shadowColor: string): ViewStyle {

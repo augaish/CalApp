@@ -6,8 +6,10 @@ import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
-import { Button, Card, Screen } from '@/components/ui';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { BrandHeader, HeaderPill } from '@/components/brand-header';
+import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
+import { Button, Screen } from '@/components/ui';
+import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchWhoopDayBurn, fetchWhoopHistory } from '@/lib/api';
 import { useCelebrate } from '@/lib/celebrate';
@@ -26,21 +28,14 @@ import {
   setScore,
   useAppStore,
   whoopCalibrationFactor,
-  whoopKcalForWorkout,
-  workoutDays,
   workoutFor,
 } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
 /** How many trailing days (including today) get a live WHOOP refetch on
- * every Training tab focus, to catch up on WHOOP's own scoring lag without
- * waiting on the slower 60-day backfill's daily retry. */
+ * every Training tab focus, to catch up on WHOOP's own scoring lag. */
 const RECENT_WHOOP_DAYS = 3;
-
-/** How many follow-up checks a just-logged workout gets, and how far apart
- * — a budget for catching WHOOP finishing scoring without waiting on the
- * user to reopen the tab. 6 × 45s ≈ 4.5 minutes of coverage past whenever
- * something was last checked off, comfortably past typical scoring lag. */
+/** Follow-up checks a just-logged workout gets; 6 × 45s ≈ 4.5 minutes. */
 const WHOOP_POLL_ATTEMPTS = 6;
 const WHOOP_POLL_INTERVAL_MS = 45_000;
 
@@ -54,15 +49,15 @@ function toMin(seconds: number | undefined): number {
   return Math.round((seconds ?? 0) / 60);
 }
 
-/** WHOOP's sport names are lowercase/underscored ("functional_fitness") — just clean them up for display. */
-function formatSportName(sportName: string): string {
-  const spaced = sportName.replace(/_/g, ' ');
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+/** A rough session length from its shape: roughly nine minutes per exercise
+ * of three sets with rest — a planning aid, labelled "about", never a record. */
+export function estimateMinutes(exerciseCount: number, setsTotal: number): number {
+  if (exerciseCount === 0) return 0;
+  const sets = setsTotal > 0 ? setsTotal : exerciseCount * 3;
+  return Math.max(10, Math.round((sets * 2.5 + exerciseCount * 2) / 5) * 5);
 }
 
-/** How long ago the WHOOP burn card's numbers were actually fetched — so a
- * stale-looking number (WHOOP still scoring, or just no new fetch since you
- * last opened this tab) reads as stale instead of silently wrong. */
+/** How long ago the WHOOP numbers were actually fetched. */
 function syncedAgoLabel(iso: string, t: (key: string, options?: Record<string, unknown>) => string): string {
   const minutes = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
   if (minutes < 1) return t('training.syncedJustNow');
@@ -72,14 +67,9 @@ function syncedAgoLabel(iso: string, t: (key: string, options?: Record<string, u
   return t('training.syncedDaysAgo', { count: Math.floor(hours / 24) });
 }
 
-/**
- * One set as it reads on the day's card: the number you are about to lift.
- * Weight first because that is what you set on the machine.
- */
+/** One set as it reads on the day's card: the number you are about to lift. */
 function setChipLabel(s: WorkoutSet, type: ExerciseType, kg: string, min: string): string {
-  if (type === 'weight_reps') {
-    return s.weightKg ? `${s.weightKg}${kg} × ${s.reps ?? 0}` : `× ${s.reps ?? 0}`;
-  }
+  if (type === 'weight_reps') return s.weightKg ? `${s.weightKg}${kg} × ${s.reps ?? 0}` : `× ${s.reps ?? 0}`;
   if (type === 'bodyweight_reps') return `× ${s.reps ?? 0}`;
   if (type === 'time') return `${s.seconds ?? 0}s`;
   const parts = [`${toMin(s.seconds)} ${min}`];
@@ -87,7 +77,7 @@ function setChipLabel(s: WorkoutSet, type: ExerciseType, kg: string, min: string
   return parts.join(' · ');
 }
 
-/** Short label of a record set, for the "Max" line under an exercise. */
+/** Short label of a record set, for the "Best" line under an exercise. */
 function bestSetLabel(best: WorkoutSet, type: ExerciseType, kg: string): string {
   if (type === 'weight_reps') return `${best.weightKg ?? 0} ${kg} × ${best.reps ?? 0}`;
   if (type === 'bodyweight_reps') return `× ${best.reps ?? 0}`;
@@ -95,19 +85,23 @@ function bestSetLabel(best: WorkoutSet, type: ExerciseType, kg: string): string 
   return `${((best.distanceM ?? 0) / 1000).toFixed(1)} km`;
 }
 
-/** Short one-line summary of a logged exercise: sets · top load. */
-function summarize(w: LoggedWorkout, sets: string, top: string, kg: string): string {
-  const parts = [`${w.sets.length} ${sets}`];
-  if (w.type === 'weight_reps') {
-    const best = Math.max(0, ...w.sets.map((s) => s.weightKg ?? 0));
-    if (best > 0) parts.push(`${top} ${best} ${kg}`);
-  } else if (w.type === 'bodyweight_reps') {
-    const best = Math.max(0, ...w.sets.map((s) => s.reps ?? 0));
-    if (best > 0) parts.push(`${top} ${best}`);
+/** "3 sets · 10 reps" when the rows agree on reps, else the chips speak. */
+function shapeLabel(rows: WorkoutSet[], type: ExerciseType, t: (k: string, o?: Record<string, unknown>) => string): string | null {
+  if (rows.length === 0) return null;
+  if (type === 'weight_reps' || type === 'bodyweight_reps') {
+    const reps = new Set(rows.map((r) => r.reps ?? 0));
+    if (reps.size === 1) return t('training.setsReps', { sets: rows.length, reps: [...reps][0] });
+    return t('training.setsOnly', { count: rows.length });
   }
-  return parts.join(' · ');
+  return t('training.setsOnly', { count: rows.length });
 }
 
+/**
+ * S05 Training — the active schedule's name and today's actual progress.
+ * Start becomes Resume for an unfinished session and Review workout once
+ * every planned exercise is done; adding more training stays secondary.
+ * Planned targets are labelled and never rendered as completed records.
+ */
 export default function Training() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -126,7 +120,8 @@ export default function Training() {
   const setWhoopLastFetchedAt = useAppStore((s) => s.setWhoopLastFetchedAt);
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
-  const copyDayTo = useAppStore((s) => s.copyDayTo);
+  const savedSchedules = useAppStore((s) => s.savedSchedules);
+  const activeScheduleId = useAppStore((s) => s.activeScheduleId);
   const dayOrder = useAppStore((s) => s.dayOrder);
   const setDayOrder = useAppStore((s) => s.setDayOrder);
   const saveDayToSchedule = useAppStore((s) => s.saveDayToSchedule);
@@ -146,77 +141,31 @@ export default function Training() {
   const scheduledIds = plan ? plan.exerciseIds.filter((id) => !skippedIds.includes(id)) : [];
   const skippedPlanIds = plan ? plan.exerciseIds.filter((id) => skippedIds.includes(id)) : [];
 
-  // Anything logged on this day that the weekly schedule does not know about —
-  // duplicated from another day, scanned in, or picked from the library. The
-  // card has to show what was actually done, not only what was planned, or
-  // those exercises exist in the data with nowhere to appear.
+  // Anything logged on this day that the weekly schedule does not know about
+  // — duplicated from another day, scanned in, or picked from the library.
   const selectedDayWorkouts = workouts.filter((w) => isSameDay(w.at, selected));
   const loggedTodayCount = selectedDayWorkouts.length;
-  const unplannedIds = [
-    ...new Set(
-      workouts.filter((w) => isSameDay(w.at, selected)).map((w) => w.exerciseId),
-    ),
-  ].filter((id) => !scheduledIds.includes(id));
-  const visiblePlanIds = applyOrder(
-    [...scheduledIds, ...unplannedIds],
-    dayOrder[dateKey(selected)],
-  );
+  const unplannedIds = [...new Set(selectedDayWorkouts.map((w) => w.exerciseId))].filter((id) => !scheduledIds.includes(id));
+  const visiblePlanIds = applyOrder([...scheduledIds, ...unplannedIds], dayOrder[dateKey(selected)]);
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = actualBurnedForDay(workouts, whoopBurnByDay, whoopWorkoutsByDay, selected);
   const whoopDayTotal = whoopBurnByDay[dateKey(selected)] ?? null;
-  const whoopWorkouts = whoopWorkoutsByDay[dateKey(selected)] ?? [];
-  // The same factor `actualBurnedForDay` used above for the day total, fed
-  // into every per-exercise formula fallback below too — otherwise the day
-  // card shows a WHOOP-calibrated number while the rows under it silently
-  // fall back to the uncalibrated formula, and the two can never add up.
+  // The same factor `actualBurnedForDay` used for the day total, fed into
+  // every per-exercise fallback too, so the rows always add up to the card.
   const calibration = whoopCalibrationFactor(workouts, whoopWorkoutsByDay);
   const whoopCalibrated = whoopDayTotal == null && calibration !== 1;
-  // Guarantees the "Today's workout" rows can never sum to more than
-  // whoopDayTotal itself — see dayBurnAllocation.
-  const selectedDayAllocation = dayBurnAllocation(
-    workouts,
-    selected,
-    whoopBurnByDay,
-    whoopWorkoutsByDay,
-    calibration,
-  );
-  const groups = workoutDays(workouts, selected);
+  const selectedDayAllocation = dayBurnAllocation(workouts, selected, whoopBurnByDay, whoopWorkoutsByDay, calibration);
   const kg = t('progress.kg');
   const min = t('track.min');
+  const activeSchedule = savedSchedules.find((s) => s.id === activeScheduleId);
+  const scheduleName = activeSchedule ? activeSchedule.name || t('schedules.defaultName') : t('today.myPlan');
 
-  // Diagnostic state from the last day-burn fetch — not persisted, since
-  // it's only meaningful for right-now's "today" check, not history: lets
-  // the subtitle actually say why there's no WHOOP number yet (never
-  // connected / token expired vs. WHOOP recorded something but hasn't
-  // scored it vs. genuinely nothing today) instead of one vague fallback
-  // label covering all three.
   const [whoopConnected, setWhoopConnected] = useState<boolean | null>(null);
   const [whoopPending, setWhoopPending] = useState(false);
-
-  // Every WHOOP fetch this screen issues — on focus, after logging
-  // something, and the post-training poll below — goes through this one
-  // function, tagged with a monotonically increasing generation number.
-  // Requests can resolve out of order (a slow focus-refresh finishing after
-  // a faster poll tick that was issued later), and applying whichever one
-  // happens to land LAST used to let a stale response overwrite a newer,
-  // correct one — the connected/pending state (and therefore the "WHOOP
-  // isn't connected" message) would flicker between a real result and a
-  // stale one for no reason a person watching the screen could see. Only
-  // the response from the most RECENTLY ISSUED request is ever applied.
+  // Only the response from the most recently issued request is ever applied.
   const whoopRequestGen = useRef(0);
 
-  // Pull WHOOP's real numbers for the last few days — not just "today", and
-  // not gated by which day is currently selected. This is about catching up
-  // on WHOOP's own scoring lag (a workout can take a while after it ends
-  // before WHOOP finishes scoring it), which has nothing to do with what's
-  // on screen right now: a workout logged yesterday that was still unscored
-  // when the one-time 60-day backfill (below) first ran would otherwise
-  // stay stuck on the formula estimate for up to 24h — the backfill's own
-  // retry cadence — since it only re-runs that seldom. Refreshing the last
-  // few days closes that gap without waiting on the backfill's slower
-  // schedule. Returns whether today is still pending scoring, so the poller
-  // below knows whether to keep checking.
   const refreshWhoopRecent = useCallback((): Promise<boolean> => {
     const gen = ++whoopRequestGen.current;
     const fetches: Promise<void>[] = [];
@@ -229,19 +178,17 @@ export default function Training() {
       const end = new Date(day);
       end.setHours(23, 59, 59, 999);
       fetches.push(
-        fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(
-          ({ totalKcal, workouts: w, connected, pending }) => {
-            if (gen !== whoopRequestGen.current) return; // superseded by a newer request
-            setWhoopDayBurn(day, totalKcal);
-            setWhoopDayWorkouts(day, w);
-            if (i === 0) {
-              setWhoopLastFetchedAt(new Date().toISOString());
-              setWhoopConnected(connected ?? null);
-              setWhoopPending(!!pending);
-              todayPending = !!pending;
-            }
-          },
-        ),
+        fetchWhoopDayBurn(start.toISOString(), end.toISOString()).then(({ totalKcal, workouts: w, connected, pending }) => {
+          if (gen !== whoopRequestGen.current) return;
+          setWhoopDayBurn(day, totalKcal);
+          setWhoopDayWorkouts(day, w);
+          if (i === 0) {
+            setWhoopLastFetchedAt(new Date().toISOString());
+            setWhoopConnected(connected ?? null);
+            setWhoopPending(!!pending);
+            todayPending = !!pending;
+          }
+        }),
       );
     }
     return Promise.all(fetches).then(() => todayPending);
@@ -254,15 +201,8 @@ export default function Training() {
     }, [refreshWhoopRecent]),
   );
 
-  // After logging something today, WHOOP's own scoring can lag the workout
-  // ending by a few minutes — poll a handful of times instead of leaving
-  // the number stuck until this tab happens to be reopened. Runs in the
-  // background even if you switch tabs (a plain effect, not useFocusEffect
-  // — the whole point is not requiring the screen stay open), and stops
-  // itself the moment WHOOP gives a definitive answer: either a real
-  // number, or confirmation nothing's pending, rather than polling for the
-  // full budget regardless. Reuses refreshWhoopRecent for every check, so
-  // it shares the same generation guard instead of racing it.
+  // After logging something today, poll a handful of times for WHOOP's own
+  // scoring instead of leaving the number stuck until the tab is reopened.
   useEffect(() => {
     if (!selectedIsToday || loggedTodayCount === 0) return;
     let cancelled = false;
@@ -273,9 +213,7 @@ export default function Training() {
       refreshWhoopRecent().then((stillPending) => {
         if (cancelled) return;
         attempt += 1;
-        if (stillPending && attempt < WHOOP_POLL_ATTEMPTS) {
-          timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
-        }
+        if (stillPending && attempt < WHOOP_POLL_ATTEMPTS) timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
       });
     };
     timer = setTimeout(poll, WHOOP_POLL_INTERVAL_MS);
@@ -285,11 +223,7 @@ export default function Training() {
     };
   }, [loggedTodayCount, selectedIsToday, refreshWhoopRecent]);
 
-  // One-time (then daily-refreshed) backfill: someone connecting WHOOP after
-  // months of using it shouldn't start the burn calibration from nothing.
-  // Only a run that actually finds workouts marks it done — "not connected
-  // yet" costs the server a single fast lookup, so it's fine to keep retrying
-  // that for free until a connection actually exists.
+  // One-time (then daily-refreshed) backfill of WHOOP history.
   useEffect(() => {
     const last = whoopBackfilledAt ? new Date(whoopBackfilledAt).getTime() : 0;
     if (Date.now() - last < 24 * 3600_000) return;
@@ -306,10 +240,7 @@ export default function Training() {
         const [y, m, d] = localDate.split('-').map(Number);
         const day = new Date(y, m - 1, d);
         setWhoopDayBurn(day, dayEntries.reduce((sum, e) => sum + e.kcal, 0));
-        setWhoopDayWorkouts(
-          day,
-          dayEntries.map(({ localDate: _localDate, ...w }) => w),
-        );
+        setWhoopDayWorkouts(day, dayEntries.map(({ localDate: _localDate, ...w }) => w));
       }
       setWhoopBackfilledAt(new Date().toISOString());
     });
@@ -319,30 +250,12 @@ export default function Training() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Past days start collapsed — history is for looking something up, not for
-  // scrolling past on the way to today.
-  const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
-  const toggleDay = (key: string) => setOpenDays((o) => ({ ...o, [key]: !o[key] }));
   const [pickingWeekday, setPickingWeekday] = useState(false);
-  // While a row is held, the set chips collapse away: nine exercises at full
-  // height means dragging against constant auto-scroll, where the compact list
-  // mostly fits on one screen.
+  // While a row is held, the set chips collapse away so the list fits.
   const [dragging, setDragging] = useState(false);
   const pageRef = useAnimatedRef<ScrollView>();
 
-  // Resolve a logged exercise's display name live (localized) when it still
-  // exists in the library; fall back to the snapshot taken at log time.
-  const nameOf = (w: LoggedWorkout): string => {
-    const ex = findExercise(w.exerciseId, custom);
-    return ex ? exerciseName(ex, lang) : w.exerciseName;
-  };
-
-  // Tapping a History row should land on that read-only past-sessions list
-  // (each one frozen at log time), not the "Track" tab — which always edits
-  // *today's* sets regardless of which day's row was tapped, and looked like
-  // history had changed simply because today's edit was visible there too.
-  const openExercise = (id: string, tab?: 'history') =>
-    router.push(`/exercise-detail?id=${encodeURIComponent(id)}${tab ? `&tab=${tab}` : ''}`);
+  const openExercise = (id: string) => router.push(`/exercise-detail?id=${encodeURIComponent(id)}`);
 
   const confirmDeleteWorkout = (id: string) =>
     Alert.alert(t('training.deleteWorkoutConfirm'), undefined, [
@@ -350,35 +263,7 @@ export default function Training() {
       { text: t('common.delete'), style: 'destructive', onPress: () => removeWorkout(id) },
     ]);
 
-  // Re-run a past day on the day being viewed. Copied as targets, not as work
-  // already done, so nothing counts as burned until it is ticked off.
-  const copyDay = (from: Date) => {
-    const label = from.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' });
-    const to = selectedIsToday
-      ? t('home.today')
-      : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-    Alert.alert(t('training.copyDayTitle'), t('training.copyDayBody', { from: label, to }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('training.copyDayCta'),
-        onPress: () => {
-          const n = copyDayTo(from, selected);
-          if (n === 0) {
-            Alert.alert(t('training.copyNothing'));
-            return;
-          }
-          successHaptic();
-          Alert.alert(t('training.repeated', { count: n }));
-        },
-      },
-    ]);
-  };
-
-  /**
-   * Turn what was trained today into a weekday of the weekly schedule. A
-   * weekday that already has exercises asks first, because replacing a plan
-   * and adding to it are both things people genuinely mean.
-   */
+  /** Turn what was trained today into a weekday of the weekly schedule. */
   const saveToWeekday = (weekday: number) => {
     setPickingWeekday(false);
     const label = weekdayLabel(weekday, locale);
@@ -389,10 +274,7 @@ export default function Training() {
       successHaptic();
       Alert.alert(t('training.savedToSchedule', { count: n, day: label }));
     };
-    if (existing.length === 0) {
-      commit('replace');
-      return;
-    }
+    if (existing.length === 0) return commit('replace');
     Alert.alert(t('training.scheduleExists', { day: label }), t('training.scheduleExistsBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('training.scheduleMerge'), onPress: () => commit('merge') },
@@ -400,10 +282,7 @@ export default function Training() {
     ]);
   };
 
-  // Done/undone toggle for the checkbox — never navigates and never loses your
-  // numbers. First check logs the session (seeded from your best prior record).
-  // Unchecking KEEPS the same record but marks it not-trained (no calories);
-  // re-checking marks it trained again. Reps are edited via the name/arrow.
+  // Done/undone toggle — never navigates and never loses your numbers.
   const checkOff = (exId: string) => {
     const existing = workoutFor(workouts, exId, selected);
     if (existing) {
@@ -416,712 +295,329 @@ export default function Training() {
       return;
     }
     const ex = findExercise(exId, custom);
-    markExerciseDone(
-      {
-        id: exId,
-        name: ex ? exerciseName(ex, lang) : exId,
-        type: ex?.type ?? 'weight_reps',
-        category: ex?.category,
-      },
-      selected,
-    );
+    markExerciseDone({ id: exId, name: ex ? exerciseName(ex, lang) : exId, type: ex?.type ?? 'weight_reps', category: ex?.category }, selected);
     successHaptic();
     useCelebrate.getState().celebrate(t('celebrate.workoutDone'));
   };
 
-  return (
-    <Screen
-      scrollRef={pageRef}
-      footer={
-        <View style={styles.footerRow}>
-          <Button
-            label={t('training.addExercise')}
-            icon="add"
-            onPress={() => router.push('/exercise-library')}
-            style={{ flex: 1 }}
-          />
-          <Button
-            label={t('training.scanCta')}
-            icon="barbell"
-            variant="secondary"
-            onPress={() => router.push('/scan?mode=gym')}
-            style={{ flex: 1 }}
-          />
+  // Today's shape for the card: how many done, and a length estimate.
+  const doneIds = new Set(selectedDayWorkouts.filter((w) => w.sets.some((s) => s.done)).map((w) => w.exerciseId));
+  const doneCount = visiblePlanIds.filter((id) => doneIds.has(id)).length;
+  const allDone = visiblePlanIds.length > 0 && doneCount >= visiblePlanIds.length;
+  const plannedSetsTotal = visiblePlanIds.reduce((sum, id) => sum + (plan?.plans?.[id]?.length ?? 0), 0);
+  const sessionIsToday = activeSession?.dayKey === dateKey(new Date());
+  const dateLine = selectedIsToday
+    ? `${t('home.today')}, ${selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}`
+    : selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const header = (
+    <BrandHeader title={t('common.appName')}>
+      <View style={styles.dateRow}>
+        <View style={{ flex: 1 }}>
+          <Text style={[Type.title, { color: theme.onGradient }]}>{t('tabs.training')}</Text>
+          <Pressable onPress={() => router.push('/calendar')} accessibilityRole="button" accessibilityLabel={dateLine} hitSlop={6}>
+            <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '500' }}>{dateLine}</Text>
+          </Pressable>
         </View>
-      }
-    >
-      <View style={styles.headerRow}>
-        <Ionicons name="barbell" size={22} color={theme.text} />
-        <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('tabs.training')}</Text>
-        <View style={styles.dayNavGroup}>
-          <Pressable onPress={() => shift(-1)} hitSlop={10} style={styles.arrow}>
-            <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
+        <View style={[styles.arrows, { direction: 'ltr' }]}>
+          <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.arrow}>
+            <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
           </Pressable>
-          <Pressable onPress={() => router.push('/calendar')} hitSlop={6}>
-            <Text style={[styles.dayLabel, { color: theme.text }]}>
-              {selectedIsToday
-                ? t('home.today')
-                : selected.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-            </Text>
-          </Pressable>
-          <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} style={styles.arrow}>
-            <Ionicons
-              name="chevron-forward"
-              size={22}
-              color={selectedIsToday ? theme.border : theme.textSecondary}
-            />
+          <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('common.next')} style={styles.arrow}>
+            <Ionicons name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
           </Pressable>
         </View>
       </View>
-
-      <Card>
-        <View style={styles.burnCard}>
-          <View style={[styles.burnIcon, { backgroundColor: 'rgba(245,166,35,0.15)' }]}>
-            <Ionicons name="flame" size={26} color={theme.carbs} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.burnValue, { color: theme.text }]}>
-              {burned} <Text style={styles.burnUnit}>{t('common.kcal')}</Text>
-            </Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-              {t('training.burned')} ·{' '}
-              {whoopDayTotal != null
-                ? t('training.fromWhoop')
-                : selectedIsToday && whoopConnected === false
-                  ? t('training.whoopNotConnected')
-                  : selectedIsToday && whoopPending
-                    ? t('training.whoopPending')
-                    : whoopCalibrated
-                      ? t('training.adjustedFromWhoop')
-                      : t('training.estimated')}
-            </Text>
-            {selectedIsToday && whoopConnected === false && (
-              <Pressable onPress={() => router.push('/profile')} hitSlop={8}>
-                <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '600', marginTop: 2 }}>
-                  {t('training.whoopReconnect')}
-                </Text>
-              </Pressable>
-            )}
-            {/* Only once WHOOP has actually answered "connected" — the fetch
-                timestamp alone gets set even when the reply was "not
-                connected", which read as "Synced just now" on a phone that
-                has never linked a wearable. */}
-            {selectedIsToday && whoopConnected === true && whoopLastFetchedAt && (
-              <Pressable onPress={refreshWhoopRecent} hitSlop={8} style={styles.syncRow}>
-                <Ionicons name="refresh" size={11} color={theme.textTertiary} />
-                <Text style={{ color: theme.textTertiary, fontSize: 11 }}>
-                  {t('training.lastSynced', { time: syncedAgoLabel(whoopLastFetchedAt, t) })}
-                </Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-        {whoopWorkouts.length > 0 && (
-          <View style={[styles.whoopBreakdown, { borderTopColor: theme.border }]}>
-            <Text style={[styles.whoopBreakdownTitle, { color: theme.textSecondary }]}>
-              {t('training.whoopBreakdown')}
-            </Text>
-            {whoopWorkouts.map((w, i) => (
-              <View key={`${w.start}-${i}`} style={styles.whoopBreakdownRow}>
-                <Text style={{ color: theme.text, fontSize: 14, flex: 1 }} numberOfLines={1}>
-                  {formatSportName(w.sportName)}
-                </Text>
-                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                  {new Date(w.start).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-                <Text style={{ color: theme.primary, fontSize: 14, fontWeight: '700' }}>
-                  {w.kcal} {t('common.kcal')}
-                </Text>
-              </View>
-            ))}
-          </View>
-        )}
-      </Card>
-
-      {/* One fixed way into the planning model, whether or not today has a
-          plan — previously this lived inside the day card and so came and went
-          with it. */}
       <Pressable
-        onPress={() => router.push('/schedule')}
-        style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+        onPress={() => router.push('/schedules')}
+        accessibilityRole="button"
+        accessibilityLabel={`${scheduleName} · ${t('training.change')}`}
+        style={({ pressed }) => [styles.schedulePill, { backgroundColor: 'rgba(255,255,255,0.92)' }, pressed && { opacity: 0.85 }]}
       >
-        <Card style={styles.scheduleRow}>
-          <View style={[styles.scheduleIcon, { backgroundColor: theme.cardSubtle }]}>
-            <Ionicons name="calendar" size={19} color={theme.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
-              {t('training.weeklySchedule')}
-            </Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-              {t('training.weeklyScheduleHint')}
-            </Text>
-          </View>
-          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-        </Card>
+        <Ionicons name="barbell" size={16} color={theme.primary} />
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
+          {activeSchedule ? t('training.activeSchedule', { name: scheduleName }) : t('training.noSavedSchedule')}
+        </Text>
+        <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>{t('training.change')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={theme.primary} />
       </Pressable>
+    </BrandHeader>
+  );
 
-      {/* Follow today's list as a session — one exercise at a time, with rest
-          timers — instead of checking exercises off after the fact. A session
-          left open (the app was closed mid-workout, or it's from another day)
-          is offered back first, since its sets are already logged. */}
-      {activeSession ? (
-        <Button
-          label={
-            activeSession.dayKey === dateKey(new Date())
-              ? t('session.resume')
-              : t('session.finishUnfinished', {
-                  date: (() => {
-                    const [y, m, d] = activeSession.dayKey.split('-').map(Number);
-                    return new Date(y, m, d).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-                  })(),
-                })
-          }
-          icon="play"
-          onPress={() => router.push('/session')}
-          style={styles.sessionBtn}
-        />
-      ) : selectedIsToday && visiblePlanIds.length > 0 ? (
-        <Button
-          label={t('session.start')}
-          icon="play"
-          onPress={() => {
-            startSession(selected, visiblePlanIds);
-            router.push('/session');
-          }}
-          style={styles.sessionBtn}
-        />
-      ) : null}
+  return (
+    <Screen
+      header={header}
+      scrollRef={pageRef}
+      footer={
+        <View style={styles.footerRow}>
+          <Button label={t('training.addExercise')} icon="add" variant="secondary" onPress={() => router.push('/exercise-library')} style={{ flex: 1 }} />
+          <Button label={t('training.scanCta')} icon="scan-outline" variant="secondary" onPress={() => router.push('/scan?mode=gym')} style={{ flex: 1 }} />
+        </View>
+      }
+    >
+      <SectionTitle style={{ marginTop: Spacing.xs }}>{selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}</SectionTitle>
 
-      {/* The day itself: the weekly plan plus anything else logged today. */}
       {visiblePlanIds.length > 0 ? (
-        <Card>
-          <View style={styles.routineHead}>
-            <Ionicons name="calendar" size={18} color={theme.primary} />
-            <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
-              {selectedIsToday
-                ? t('training.todaysWorkout')
-                : selected.toLocaleDateString(locale, {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-            </Text>
+        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[styles.planTitle, { color: theme.text }]}>{plan?.title || t('training.todaysWorkout')}</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 14, marginTop: 2 }}>
+            {t('training.exerciseCount', { count: visiblePlanIds.length })}
+            {doneCount > 0 ? ` · ${t('today.doneOf', { done: doneCount, total: visiblePlanIds.length })}` : ` · ${t('training.aboutMinutes', { n: estimateMinutes(visiblePlanIds.length, plannedSetsTotal) })}`}
+          </Text>
+
+          <View style={{ marginTop: Spacing.ms }}>
+            {activeSession ? (
+              <Button
+                label={
+                  sessionIsToday
+                    ? t('session.resume')
+                    : t('session.finishUnfinished', {
+                        date: (() => {
+                          const [y, m, d] = activeSession.dayKey.split('-').map(Number);
+                          return new Date(y, m, d).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+                        })(),
+                      })
+                }
+                icon="play"
+                onPress={() => router.push('/session')}
+              />
+            ) : allDone ? (
+              <View style={[styles.doneBar, { backgroundColor: theme.surfaceTint }]}>
+                <Ionicons name="checkmark-circle" size={18} color={theme.successText} />
+                <Text style={{ color: theme.successText, fontWeight: '700', flex: 1 }}>{t('today.workoutDone')}</Text>
+                <Pressable onPress={() => router.push('/workout-history')} accessibilityRole="button" hitSlop={6}>
+                  <Text style={{ color: theme.primary, fontWeight: '700' }}>{t('training.reviewWorkout')}</Text>
+                </Pressable>
+              </View>
+            ) : selectedIsToday ? (
+              <Button
+                label={t('session.start')}
+                icon="play"
+                onPress={() => {
+                  startSession(selected, visiblePlanIds);
+                  router.push('/session');
+                }}
+              />
+            ) : null}
           </View>
-          <View style={{ marginTop: Spacing.sm }}>
+
+          <View style={[styles.list, { borderColor: theme.border }]}>
             <Sortable.Grid
               columns={1}
               rowGap={0}
               data={visiblePlanIds}
               keyExtractor={(exId) => exId}
-              // A press-and-hold, so tapping a row, its checkbox or its × still
-              // works and the page keeps scrolling normally.
               dragActivationDelay={220}
               hapticsEnabled
-              // Lets the page scroll itself when a drag reaches either edge.
               scrollableRef={pageRef}
               onDragStart={() => setDragging(true)}
               onDragEnd={({ data }) => {
                 setDragging(false);
-                // Written against this date only. The weekday's plan is
-                // untouched, so every other occurrence of it stays as it was.
+                // Written against this date only; the weekday's plan is untouched.
                 setDayOrder(selected, data);
               }}
-              renderItem={({ item: exId }) => {
-              const ex = findExercise(exId, custom);
-              const wToday = workoutFor(workouts, exId, selected);
-              const doneToday = !!wToday && wToday.sets.some((s) => s.done);
-              const planned = plan?.plans?.[exId] ?? [];
-              const type = ex?.type ?? 'weight_reps';
-              const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
-              // Every set for this day, right on the card. No tapping through
-              // to find out what you are meant to lift.
-              //
-              // Falls back to your last session before it falls back to the
-              // plan, because the plan is a copy of some earlier session that
-              // never moves while you get stronger — and because opening the
-              // exercise seeds the day from that same last session anyway. The
-              // card used to show the stale plan until you went in, and then
-              // silently changed to real numbers when you came back out, which
-              // made navigating look like it had edited your workout.
-              //
-              // Sorted lightest to heaviest so the strip reads the same way
-              // whether the sets were logged warming up or dropping down, and
-              // the day's best lands at the end. This is a display copy only:
-              // Exercise Detail keeps the real logged order, because its rows
-              // are numbered and edited by index.
-              const lastSession = lastSessionBefore(workouts, exId, selected);
-              const source: 'today' | 'last' | 'plan' = wToday?.sets.length
-                ? 'today'
-                : lastSession?.sets.length
-                  ? 'last'
-                  : 'plan';
-              const rows: WorkoutSet[] = (
-                source === 'today'
-                  ? [...wToday!.sets]
-                  : source === 'last'
-                    ? lastSession!.sets.map((s) => ({ ...s, done: false }))
-                    : planned.map((p) => ({ ...p, done: false }))
-              ).sort((a, b) => setScore(a, type) - setScore(b, type));
-              // Your heaviest completed set, kept as the reference to beat —
-              // the same ranking the session screen and the trophy use.
-              const best = bestSetEver(workouts, exId);
-              const maxLabel = best ? bestSetLabel(best.set, best.type, kg) : '';
-              const wTodayCalories = wToday ? selectedDayAllocation.get(wToday.id) : undefined;
-              return (
-                <View key={exId} style={styles.planItem}>
-                  <View style={styles.planRow}>
-                    <Pressable onPress={() => checkOff(exId)} hitSlop={8}>
-                      <View
-                        style={[
-                          styles.checkBox,
-                          doneToday
-                            ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                            : { borderColor: theme.border },
-                        ]}
-                      >
-                        {doneToday && <Ionicons name="checkmark" size={15} color={theme.onPrimary} />}
+              renderItem={({ item: exId, index }) => {
+                const ex = findExercise(exId, custom);
+                const wToday = workoutFor(workouts, exId, selected);
+                const doneToday = !!wToday && wToday.sets.some((s) => s.done);
+                const planned = plan?.plans?.[exId] ?? [];
+                const type = ex?.type ?? 'weight_reps';
+                const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
+                // Today's sets, else last time's, else the plan — and the
+                // strip says which, so the numbers never look invented.
+                const lastSession = lastSessionBefore(workouts, exId, selected);
+                const source: 'today' | 'last' | 'plan' = wToday?.sets.length ? 'today' : lastSession?.sets.length ? 'last' : 'plan';
+                const rows: WorkoutSet[] = (
+                  source === 'today' ? [...wToday!.sets] : source === 'last' ? lastSession!.sets.map((s) => ({ ...s, done: false })) : planned.map((p) => ({ ...p, done: false }))
+                ).sort((a, b) => setScore(a, type) - setScore(b, type));
+                const best = bestSetEver(workouts, exId);
+                const wTodayCalories = wToday ? selectedDayAllocation.get(wToday.id) : undefined;
+                const shape = shapeLabel(rows, type, t);
+                return (
+                  <View key={exId} style={[styles.exRow, index > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
+                    <Pressable
+                      onPress={() => checkOff(exId)}
+                      hitSlop={8}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: doneToday }}
+                      accessibilityLabel={ex ? exerciseName(ex, lang) : exId}
+                    >
+                      <View style={[styles.numBadge, doneToday ? { backgroundColor: theme.primary } : { backgroundColor: theme.surfaceTint }]}>
+                        {doneToday ? (
+                          <Ionicons name="checkmark" size={16} color={theme.onPrimary} />
+                        ) : (
+                          <Text style={{ color: theme.primaryDark, fontWeight: '800', fontSize: 14 }}>{index + 1}</Text>
+                        )}
                       </View>
                     </Pressable>
-                    <Pressable
-                      style={({ pressed }) => [styles.planTap, pressed && { opacity: 0.6 }]}
-                      onPress={() => openExercise(exId)}
-                    >
-                      <View style={[styles.rowIcon, { backgroundColor: accent + '22' }]}>
-                        <Ionicons
-                          name={ex ? exerciseIcon(ex) : 'barbell-outline'}
-                          size={15}
-                          color={accent}
-                        />
-                      </View>
+                    <Pressable style={({ pressed }) => [styles.exTap, pressed && { opacity: 0.6 }]} onPress={() => openExercise(exId)} accessibilityRole="button">
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16 }} numberOfLines={1}>
                           {ex ? exerciseName(ex, lang) : exId}
                         </Text>
-                        {maxLabel ? (
-                          <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                            {t('training.max')}: {maxLabel}
+                        {!!shape && (
+                          <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
+                            {source !== 'today' ? `${t(source === 'last' ? 'training.lastTime' : 'training.planned')} · ` : ''}
+                            {shape}
+                            {wTodayCalories ? ` · ${wTodayCalories} ${t('common.kcal')}` : ''}
                           </Text>
-                        ) : null}
+                        )}
+                        {best && (
+                          <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                            {t('training.best')} {bestSetLabel(best.set, best.type, kg)}
+                          </Text>
+                        )}
+                        {rows.length > 0 && !dragging && (
+                          <View style={styles.setStrip}>
+                            {rows.map((s, i) => {
+                              const top = i === bestSetIndex(rows, type);
+                              return (
+                                <View key={i} style={[styles.setChip, top ? { backgroundColor: accent + '22', borderColor: accent + '55' } : { backgroundColor: theme.surfaceTint, borderColor: 'transparent' }]}>
+                                  <Text style={{ color: top ? accent : theme.textSecondary, fontSize: 11, fontWeight: top ? '800' : '600' }}>{setChipLabel(s, type, kg, min)}</Text>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
                       </View>
-                      {!!wTodayCalories && (
-                        <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12, marginEnd: 6 }}>
-                          {wTodayCalories} {t('common.kcal')}
-                        </Text>
-                      )}
-                      <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                      <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
                     </Pressable>
                     <Pressable
-                      onPress={() =>
-                        // Skipping hides a scheduled exercise for today only.
-                        // One that was never scheduled has nothing to skip, so
-                        // the × removes what was logged instead.
-                        scheduledIds.includes(exId)
-                          ? skipPlanToday(selected, exId)
-                          : wToday && confirmDeleteWorkout(wToday.id)
-                      }
+                      onPress={() => (scheduledIds.includes(exId) ? skipPlanToday(selected, exId) : wToday && confirmDeleteWorkout(wToday.id))}
                       hitSlop={8}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('common.delete')}
                       style={styles.skipBtn}
                     >
                       <Ionicons name="close" size={18} color={theme.textTertiary} />
                     </Pressable>
                   </View>
-                  {rows.length > 0 && !dragging && (
-                    <View style={styles.setStrip}>
-                      {/* Says which numbers these are. Without it, last
-                          time's sets and today's look identical, and the
-                          strip changing after you log reads as the app
-                          having invented figures. */}
-                      {source !== 'today' && (
-                        <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '700' }}>
-                          {t(source === 'last' ? 'training.lastTime' : 'training.planned')}
-                        </Text>
-                      )}
-                      {rows.map((s, i) => {
-                        // The heaviest set of the row, always — whether it is
-                        // a target or already lifted. The two signals stay
-                        // separate: the checkmark means trained, the colour
-                        // means top set. Tying the colour to this set's own
-                        // done flag made it vanish on rows whose flags were
-                        // mixed, which is unexplainable from the outside.
-                        const top = i === bestSetIndex(rows, type);
-                        return (
-                          <View
-                            key={i}
-                            style={[
-                              styles.setChip,
-                              top
-                                ? { backgroundColor: accent + '22', borderColor: accent + '55' }
-                                : { backgroundColor: theme.cardSubtle, borderColor: theme.border },
-                            ]}
-                          >
-                            <Text
-                              style={{
-                                color: top ? accent : theme.textSecondary,
-                                fontSize: 12,
-                                fontWeight: top ? '800' : '700',
-                              }}
-                            >
-                              {setChipLabel(s, type, kg, min)}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
-              );
+                );
               }}
             />
           </View>
+
           {skippedPlanIds.length > 0 && (
-            <View style={[styles.skippedWrap, { borderTopColor: theme.border }]}>
-              <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: 6 }}>
-                {t('training.skippedToday')}
-              </Text>
+            <View style={{ marginTop: Spacing.sm }}>
+              <Text style={{ color: theme.textTertiary, fontSize: 12, marginBottom: 6 }}>{t('training.skippedToday')}</Text>
               <View style={styles.chipWrap}>
                 {skippedPlanIds.map((exId) => {
                   const ex = findExercise(exId, custom);
-                  return (
-                    <Pressable
-                      key={exId}
-                      onPress={() => restorePlanToday(selected, exId)}
-                      style={({ pressed }) => [
-                        styles.chip,
-                        { backgroundColor: theme.cardSubtle },
-                        pressed && { transform: [{ scale: 0.95 }] },
-                      ]}
-                    >
-                      <Ionicons name="arrow-undo" size={13} color={theme.primary} />
-                      <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
-                        {ex ? exerciseName(ex, lang) : exId}
-                      </Text>
-                    </Pressable>
-                  );
+                  return <Chip key={exId} label={ex ? exerciseName(ex, lang) : exId} icon="arrow-undo" selected={false} onPress={() => restorePlanToday(selected, exId)} />;
                 })}
               </View>
             </View>
           )}
 
-          {/* Make today repeatable: the session just trained becomes a weekday
-              of the schedule, targets and all. Only offered once something is
-              actually logged — an untouched plan is already the schedule. */}
+          <Pressable
+            onPress={() => router.push(`/schedule-plan?weekday=${selected.getDay()}`)}
+            accessibilityRole="button"
+            style={({ pressed }) => [styles.editPlan, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.8 }]}
+          >
+            <Ionicons name="pencil-outline" size={16} color={theme.primary} />
+            <Text style={{ color: theme.primaryDark, fontWeight: '700', flex: 1 }}>{t('training.editTodaysPlan')}</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+          </Pressable>
+
           {loggedTodayCount > 0 && (
-            <View style={[styles.saveWrap, { borderTopColor: theme.border }]}>
-              <Pressable
-                onPress={() => setPickingWeekday((v) => !v)}
-                style={({ pressed }) => [styles.saveDayBtn, pressed && { opacity: 0.6 }]}
-              >
-                <Ionicons
-                  name={pickingWeekday ? 'chevron-down' : 'calendar-outline'}
-                  size={16}
-                  color={theme.primary}
-                />
-                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>
-                  {t('training.saveAsScheduleDay')}
-                </Text>
+            <View style={{ marginTop: Spacing.sm }}>
+              <Pressable onPress={() => setPickingWeekday((v) => !v)} accessibilityRole="button" style={({ pressed }) => [styles.saveDayBtn, pressed && { opacity: 0.6 }]}>
+                <Ionicons name={pickingWeekday ? 'chevron-down' : 'calendar-outline'} size={16} color={theme.primary} />
+                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>{t('training.saveAsScheduleDay')}</Text>
               </Pressable>
               {pickingWeekday && (
                 <>
-                  <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 6 }}>
-                    {t('training.pickWeekday')}
-                  </Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 6 }}>{t('training.pickWeekday')}</Text>
                   <View style={styles.chipWrap}>
-                    {[0, 1, 2, 3, 4, 5, 6].map((wd) => {
-                      const has = (schedule[wd]?.exerciseIds.length ?? 0) > 0;
-                      return (
-                        <Pressable
-                          key={wd}
-                          onPress={() => saveToWeekday(wd)}
-                          style={({ pressed }) => [
-                            styles.chip,
-                            { backgroundColor: theme.cardSubtle },
-                            pressed && { transform: [{ scale: 0.95 }] },
-                          ]}
-                        >
-                          {/* A dot marks a weekday that already has a plan, so
-                              the "replace or add?" question is not a surprise. */}
-                          {has && <View style={[styles.chipDot, { backgroundColor: theme.primary }]} />}
-                          <Text
-                            style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }}
-                          >
-                            {weekdayLabel(wd, locale)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                    {[0, 1, 2, 3, 4, 5, 6].map((wd) => (
+                      <Chip key={wd} label={weekdayLabel(wd, locale)} selected={(schedule[wd]?.exerciseIds.length ?? 0) > 0} onPress={() => saveToWeekday(wd)} />
+                    ))}
                   </View>
                 </>
               )}
             </View>
           )}
-        </Card>
-      ) : (
-        // A day with nothing planned and nothing logged. Says so plainly rather
-        // than repeating the schedule link that sits directly above.
-        <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="bed-outline" size={32} color={theme.textTertiary} />
-          <Text style={{ color: theme.text, fontWeight: '700' }}>
-            {selectedIsToday ? t('training.restDay') : t('training.nothingLogged')}
-          </Text>
-          <Text style={{ color: theme.textSecondary, textAlign: 'center', fontSize: 13 }}>
-            {t('training.restDayHint')}
-          </Text>
         </View>
+      ) : (
+        <EmptyState
+          icon="bed-outline"
+          title={selectedIsToday ? t('training.restDay') : t('training.nothingLogged')}
+          body={t('training.restDayHint')}
+          action={{ label: t('training.addExercise'), icon: 'add', onPress: () => router.push('/exercise-library') }}
+          secondary={{ label: t('training.editTodaysPlan'), icon: 'pencil-outline', onPress: () => router.push(`/schedule-plan?weekday=${selected.getDay()}`) }}
+        />
       )}
 
-      {/* History grouped by day */}
-      <Text style={[styles.sectionTitle, { color: theme.text }]}>{t('training.history')}</Text>
-      {groups.length === 0 ? (
-        <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="barbell-outline" size={36} color={theme.textTertiary} />
-          <Text style={{ color: theme.textSecondary, textAlign: 'center', lineHeight: 22 }}>
-            {t('progress.noWorkouts')}
+      {/* Energy — its source is always stated (WHOOP, calibrated estimate, or formula). */}
+      <View style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+        <IconTile icon="flame" color={theme.carbs} />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>
+            {burned} {t('common.kcal')}
+            <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}> · {t('training.burned')}</Text>
           </Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+            {whoopDayTotal != null
+              ? t('training.fromWhoop')
+              : selectedIsToday && whoopConnected === false
+                ? t('training.whoopNotConnected')
+                : selectedIsToday && whoopPending
+                  ? t('training.whoopPending')
+                  : whoopCalibrated
+                    ? t('training.adjustedFromWhoop')
+                    : t('training.estimated')}
+          </Text>
+          {selectedIsToday && whoopConnected === true && whoopLastFetchedAt && (
+            <Pressable onPress={refreshWhoopRecent} hitSlop={8} style={styles.syncRow} accessibilityRole="button">
+              <Ionicons name="refresh" size={11} color={theme.textTertiary} />
+              <Text style={{ color: theme.textTertiary, fontSize: 11 }}>{t('training.lastSynced', { time: syncedAgoLabel(whoopLastFetchedAt, t) })}</Text>
+            </Pressable>
+          )}
         </View>
-      ) : (
-        groups.map((g) => {
-          const dayAllocation = dayBurnAllocation(workouts, g.date, whoopBurnByDay, whoopWorkoutsByDay, calibration);
-          const dayBurn = g.items.reduce((s, w) => s + (dayAllocation.get(w.id) ?? 0), 0);
-          const open = !!openDays[g.key];
-          return (
-            <Card key={g.key}>
-              <Pressable
-                onPress={() => toggleDay(g.key)}
-                style={({ pressed }) => [styles.groupHead, pressed && { opacity: 0.6 }]}
-              >
-                <Ionicons
-                  name={open ? 'chevron-down' : 'chevron-forward'}
-                  size={18}
-                  color={theme.textSecondary}
-                />
-                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flex: 1 }}>
-                  {g.date.toLocaleDateString(locale, {
-                    weekday: 'long',
-                    day: 'numeric',
-                    month: 'short',
-                  })}
-                </Text>
-                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                  {t('training.exerciseCount', { count: g.items.length })}
-                </Text>
-                <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
-                  {dayBurn} {t('common.kcal')}
-                </Text>
-              </Pressable>
-              {open &&
-                g.items.map((w) => {
-                  const ex = findExercise(w.exerciseId, custom);
-                  const accent = ex ? MUSCLE_COLORS[ex.category] : theme.primary;
-                  const wCalories = dayAllocation.get(w.id) ?? 0;
-                  const wFromWhoop = whoopKcalForWorkout(w, g.items, whoopWorkoutsByDay[g.key] ?? []) != null;
-                  return (
-                    <View key={w.id} style={styles.workoutRow}>
-                      <Pressable
-                        onPress={() => openExercise(w.exerciseId, 'history')}
-                        style={({ pressed }) => [styles.workoutTap, pressed && { opacity: 0.6 }]}
-                      >
-                        <View style={[styles.workoutIcon, { backgroundColor: accent + '22' }]}>
-                          <Ionicons
-                            name={ex ? exerciseIcon(ex) : 'barbell-outline'}
-                            size={16}
-                            color={accent}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
-                            {nameOf(w)}
-                          </Text>
-                          <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                            {summarize(w, t('training.sets'), t('training.top'), kg)}
-                          </Text>
-                        </View>
-                        {!!wCalories && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            {wFromWhoop && <Ionicons name="watch-outline" size={11} color={theme.carbs} />}
-                            <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12 }}>
-                              {wCalories} {t('common.kcal')}
-                            </Text>
-                          </View>
-                        )}
-                      </Pressable>
-                      <Pressable
-                        onPress={() => confirmDeleteWorkout(w.id)}
-                        hitSlop={8}
-                        style={({ pressed }) => [styles.deleteBtn, pressed && { opacity: 0.5 }]}
-                      >
-                        <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
-                      </Pressable>
-                    </View>
-                  );
-                })}
-              {open && (
-                <Pressable
-                  onPress={() => copyDay(g.date)}
-                  style={({ pressed }) => [
-                    styles.copyDayBtn,
-                    { borderColor: theme.primary },
-                    pressed && { opacity: 0.6 },
-                  ]}
-                >
-                  <Ionicons name="copy-outline" size={16} color={theme.primary} />
-                  <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>
-                    {selectedIsToday
-                      ? t('training.duplicateToToday')
-                      : t('training.duplicateTo', {
-                          day: selected.toLocaleDateString(locale, {
-                            day: 'numeric',
-                            month: 'short',
-                          }),
-                        })}
-                  </Text>
-                </Pressable>
-              )}
-            </Card>
-          );
-        })
-      )}
+        {selectedIsToday && whoopConnected === false && <ActionButton label={t('profile.connect')} variant="secondary" onPress={() => router.push('/connections')} />}
+        {activeSession && sessionIsToday && <StatusPill label={t('today.inProgress')} tone="active" icon="play" />}
+      </View>
+
+      <RowGroup>
+        <SettingsRow icon="time-outline" title={t('training.workoutHistory')} subtitle={t('training.workoutHistoryHint')} onPress={() => router.push('/workout-history')} />
+        <SettingsRow icon="calendar-outline" title={t('schedules.title')} subtitle={activeSchedule ? t('training.activeSchedule', { name: scheduleName }) : t('schedules.subtitle')} onPress={() => router.push('/schedules')} last />
+      </RowGroup>
     </Screen>
   );
 }
 
+/** Kept for the history screen, which summarises a logged exercise the same way. */
+export function summarize(w: LoggedWorkout, sets: string, top: string, kg: string): string {
+  const parts = [`${w.sets.length} ${sets}`];
+  if (w.type === 'weight_reps') {
+    const best = Math.max(0, ...w.sets.map((s) => s.weightKg ?? 0));
+    if (best > 0) parts.push(`${top} ${best} ${kg}`);
+  } else if (w.type === 'bodyweight_reps') {
+    const best = Math.max(0, ...w.sets.map((s) => s.reps ?? 0));
+    if (best > 0) parts.push(`${top} ${best}`);
+  }
+  return parts.join(' · ');
+}
+
 const styles = StyleSheet.create({
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  dayNavGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.xs,
-    // Fixed LTR order: prevents RN's RTL row-mirroring from pointing the
-    // static chevron glyphs the wrong way. See Overview headerCenter.
-    direction: 'ltr',
-  },
-  arrow: { padding: 4 },
-  dayLabel: { fontSize: 15, fontWeight: '700', minWidth: 60, textAlign: 'center' },
-  burnCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
-  syncRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  sessionBtn: { marginBottom: Spacing.md },
-  burnIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  burnValue: { fontSize: 26, fontWeight: '800' },
-  burnUnit: { fontSize: 14, fontWeight: '600' },
-  whoopBreakdown: { marginTop: Spacing.md, paddingTop: Spacing.md, borderTopWidth: StyleSheet.hairlineWidth },
-  whoopBreakdownTitle: { fontSize: 12, fontWeight: '700', marginBottom: Spacing.xs },
-  whoopBreakdownRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 },
-  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.sm },
-  routineHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  planItem: { paddingVertical: 4 },
-  planRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 6 },
-  planTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  // Indented to sit under the exercise name, clear of the checkbox column.
-  setStrip: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginStart: 34 + Spacing.sm,
-    marginBottom: 4,
-  },
-  setChip: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
+  dateRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, marginTop: Spacing.sm, marginBottom: Spacing.ms },
+  arrows: { flexDirection: 'row', gap: 2 },
+  arrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  schedulePill: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.ms, minHeight: 44 },
+  card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
+  rowCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
+  planTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  doneBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.md, minHeight: 48 },
+  list: { marginTop: Spacing.ms, borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.control, paddingHorizontal: Spacing.sm },
+  exRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.ms },
+  exTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  numBadge: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  setStrip: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
+  setChip: { borderWidth: StyleSheet.hairlineWidth, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   skipBtn: { padding: 4 },
-  skippedWrap: {
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  checkBox: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scheduleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  scheduleIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  saveWrap: {
-    marginTop: Spacing.sm,
-    paddingTop: Spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  saveDayBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    marginBottom: 4,
-  },
-  chipDot: { width: 7, height: 7, borderRadius: 3.5 },
+  editPlan: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.md, minHeight: 48, marginTop: Spacing.ms },
+  saveDayBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, marginBottom: 4, minHeight: 44 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  sectionTitle: { fontSize: 18, fontWeight: '700', marginBottom: Spacing.sm, marginTop: Spacing.xs },
-  empty: {
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderRadius: 20,
-    padding: Spacing.lg,
-    gap: Spacing.sm,
-  },
-  groupHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.sm,
-  },
-  workoutRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: 8,
-  },
-  workoutTap: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 },
-  deleteBtn: { padding: 4 },
-  copyDayBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: Spacing.sm,
-    paddingVertical: 11,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  workoutIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  syncRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   footerRow: { flexDirection: 'row', gap: Spacing.sm },
 });

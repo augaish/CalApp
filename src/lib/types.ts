@@ -164,6 +164,11 @@ export interface WeightEntry {
   segmentalLeanMassStatus?: SegmentalStatus;
   segmentalFatMassStatus?: SegmentalStatus;
   source?: 'manual' | 'scan';
+  /** Free text the person attached to this reading (S04 "Notes"). */
+  note?: string;
+  /** Set when an older reading was revised later; `at` stays the measured
+   * date, so "latest" still means the newest measurement (AT24). */
+  editedAt?: string;
   /** Device/brand read off a scanned report, e.g. "InBody 270" — display only. */
   reportLabel?: string;
 }

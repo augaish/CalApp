@@ -29,12 +29,15 @@ import type { MetricTrend } from '@/lib/store';
 export function Screen({
   children,
   footer,
+  header,
   scroll = true,
   style,
   scrollRef,
 }: {
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /** A BrandHeader/PageHeader pinned above the scroll; it owns the top inset. */
+  header?: React.ReactNode;
   scroll?: boolean;
   style?: StyleProp<ViewStyle>;
   /**
@@ -47,8 +50,8 @@ export function Screen({
   const insets = useSafeAreaInsets();
   const content: ViewStyle = {
     flexGrow: 1,
-    paddingHorizontal: Spacing.md,
-    paddingTop: insets.top + Spacing.md,
+    paddingHorizontal: Spacing.page,
+    paddingTop: header ? Spacing.md : insets.top + Spacing.md,
     paddingBottom: footer ? Spacing.md : insets.bottom + Spacing.xl,
   };
   return (
@@ -62,6 +65,7 @@ export function Screen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={{ flex: 1, backgroundColor: t.background }}>
+        {header}
         {scroll ? (
           <ScrollView
             ref={scrollRef}
@@ -78,7 +82,7 @@ export function Screen({
         {footer ? (
           <View
             style={{
-              paddingHorizontal: Spacing.md,
+              paddingHorizontal: Spacing.page,
               paddingTop: Spacing.sm,
               paddingBottom: insets.bottom + Spacing.md,
               backgroundColor: t.background,

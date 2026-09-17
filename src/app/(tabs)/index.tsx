@@ -1,30 +1,26 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  type StyleProp,
-  Text,
-  useWindowDimensions,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BodyMap, zoneIntensityFromSegmental, zoneStatusFromSegmental } from '@/components/body-map';
+import { BrandHeader } from '@/components/brand-header';
 import { WeekBars } from '@/components/charts';
 import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
-import { Ring } from '@/components/ring';
 import { SponsorCard } from '@/components/sponsor-card';
+import {
+  ActionButton,
+  DayStrip,
+  IconTile,
+  IllustrationTile,
+  MacroRow,
+  ProgressTrack,
+  SectionTitle,
+  SettingsRow,
+} from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
-import { MetricRow } from '@/components/ui';
-import { Radius, Spacing, cardShadow } from '@/constants/theme';
+import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchWhoopDayBurn } from '@/lib/api';
 import { useViewDay } from '@/lib/day';
@@ -37,7 +33,6 @@ import {
   isSameDay,
   mealTypeForNow,
   mealTypesLogged,
-  overviewBodyStats,
   plannedMealFor,
   programProgress,
   streakDays,
@@ -51,45 +46,9 @@ import type { MealType } from '@/lib/types';
 
 const MAIN_MEALS: MealType[] = ['breakfast', 'lunch', 'dinner'];
 
-/** A compact pill for the half-width Today cards — the shared Button is sized
- * for full-width primary actions and two of them don't fit side by side. */
-function MiniBtn({
-  label,
-  icon,
-  onPress,
-  variant = 'primary',
-  style,
-}: {
-  label: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  onPress: () => void;
-  variant?: 'primary' | 'secondary';
-  style?: StyleProp<ViewStyle>;
-}) {
-  const theme = useTheme();
-  const bg = variant === 'primary' ? theme.primary : theme.cardSubtle;
-  const fg = variant === 'primary' ? theme.onPrimary : theme.primary;
-  return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.miniBtn,
-        { backgroundColor: bg },
-        pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
-        style,
-      ]}
-    >
-      <Ionicons name={icon} size={16} color={fg} />
-      <Text style={{ color: fg, fontSize: 14, fontWeight: '700' }} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 /**
- * The meal slot the Today card should point at: the first main meal not yet
- * logged, counting from the slot the clock says it is. Skipping earlier
+ * The meal slot the next-step card should point at: the first main meal not
+ * yet logged, counting from the slot the clock says it is. Skipping earlier
  * unlogged slots is deliberate — at 8pm, nudging someone to log breakfast
  * reads as nagging about the past rather than helping with dinner. Once the
  * clock is past dinner (or every main meal is in) there's nothing to chase,
@@ -113,6 +72,12 @@ function sevenDaysEnding(end: Date): Date[] {
   return days;
 }
 
+/**
+ * S01 Overview — the selected day's actual progress and the next useful
+ * actions. Reads diary totals, completed workouts, the active plan and the
+ * most recent reading with its real date; writes nothing itself. Every
+ * action here opens the screen that owns the write.
+ */
 export default function Overview() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -131,6 +96,8 @@ export default function Overview() {
   const weights = useAppStore((s) => s.weights);
   const activeProgram = useAppStore((s) => s.activeProgram);
   const schedule = useAppStore((s) => s.schedule);
+  const savedSchedules = useAppStore((s) => s.savedSchedules);
+  const activeScheduleId = useAppStore((s) => s.activeScheduleId);
   const skips = useAppStore((s) => s.skips);
   const dayOrder = useAppStore((s) => s.dayOrder);
   const exercises = useAppStore((s) => s.exercises);
@@ -146,10 +113,9 @@ export default function Overview() {
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
   const setWhoopDayWorkouts = useAppStore((s) => s.setWhoopDayWorkouts);
   // Starts already-flagged when there's a mismatch coming INTO this mount —
-  // not only one created by logging a weight during this visit (see
-  // submitWeight below, and body-reading's own save) — so profile.weightKg
-  // drifting stale from an earlier session still gets caught once you're
-  // back, instead of silently staying wrong until the next fresh log.
+  // not only one created by logging a weight during this visit — so
+  // profile.weightKg drifting stale from an earlier session still gets caught
+  // once you're back, instead of silently staying wrong until the next log.
   const [pendingWeightKg, setPendingWeightKg] = useState<number | null>(() => {
     if (!profile || weights.length === 0) return null;
     const latest = weights[0];
@@ -161,24 +127,15 @@ export default function Overview() {
   const shift = useViewDay((s) => s.shift);
 
   // Coach-tour hooks must run before the early return below (rules of hooks).
-  const ringRef = useRef<View>(null);
+  const nutritionRef = useRef<View>(null);
   const weekRef = useRef<View>(null);
   const [tourSteps, setTourSteps] = useState<TourStep[] | null>(null);
   const [tourIndex, setTourIndex] = useState(0);
 
-  // Same WHOOP refresh as the Training tab (see its effect for why): Overview
-  // is often the first screen opened, so it shouldn't need a Training visit
-  // to pick up today's real burn.
-  //
-  // This used to only keep `totalKcal`, discarding the per-workout
-  // breakdown the same response already carries — Training tab's identical
-  // call does store it (setWhoopDayWorkouts). That gap is exactly why
-  // Overview's day total and a per-exercise row on Training/exercise-detail
-  // could disagree: the total here was already WHOOP-real, but the rows
-  // elsewhere had no per-workout WHOOP data to split it by until Training
-  // happened to be opened too, so they were still on the plain formula
-  // estimate. Storing both from the one call Overview already makes closes
-  // that gap without a second request.
+  // Same WHOOP refresh as the Training tab: Overview is often the first
+  // screen opened, so it shouldn't need a Training visit to pick up today's
+  // real burn. Stores both the total and the per-workout split from the one
+  // call so this screen and the exercise rows never disagree.
   useEffect(() => {
     if (!isSameDay(new Date().toISOString(), selected)) return;
     const start = new Date(selected);
@@ -208,6 +165,7 @@ export default function Overview() {
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const streak = streakDays(meals);
   const programGlance = activeProgram ? programProgress(activeProgram) : null;
+  const num = (n: number) => Math.round(n).toLocaleString(locale);
 
   // Today block — the same "what's on today" list the Training tab shows
   // (weekly plan minus skips, in the user's order), so starting a session
@@ -215,17 +173,12 @@ export default function Overview() {
   const todayPlan = schedule[selected.getDay()];
   const todaySkips = skips[dateKey(selected)] ?? [];
   const todayDoneIds = new Set(
-    workouts
-      .filter((w) => isSameDay(w.at, selected) && w.sets.some((s) => s.done))
-      .map((w) => w.exerciseId),
+    workouts.filter((w) => isSameDay(w.at, selected) && w.sets.some((s) => s.done)).map((w) => w.exerciseId),
   );
   // Scheduled exercises PLUS anything actually trained today that the
-  // schedule does not know about — the same merge the Training tab does.
-  // Reading only the plan meant that switching to a schedule with nothing on
-  // today turned a finished workout into "Rest day / Nothing planned" on this
-  // screen while Training still showed the sets: two roots disagreeing about
-  // whether you had trained. What was done takes precedence over what a plan
-  // happens to say. (S01: completed workout over a newly selected rest day.)
+  // schedule does not know about. What was done takes precedence over what a
+  // plan happens to say (S01: completed workout over a newly selected rest
+  // day) — two roots must never disagree about whether you trained.
   const scheduledIds = todayPlan ? todayPlan.exerciseIds.filter((id) => !todaySkips.includes(id)) : [];
   const unplannedDoneIds = [...todayDoneIds].filter((id) => !scheduledIds.includes(id));
   const todayIds = applyOrder([...scheduledIds, ...unplannedDoneIds], dayOrder[dateKey(selected)]);
@@ -235,20 +188,15 @@ export default function Overview() {
     const ex = findExercise(id, exercises);
     return ex ? exerciseName(ex, locale) : id;
   });
+  const activeScheduleName = savedSchedules.find((s) => s.id === activeScheduleId)?.name || t('today.myPlan');
   const sessionIsToday = activeSession?.dayKey === dateKey(new Date());
   const mealsLogged = mealTypesLogged(meals, selected);
   const nextMeal = nextMealSlot(mealsLogged);
   const nextPlanned = nextMeal
-    ? plannedMealFor(
-        activeProgram?.mealPlan,
-        selected,
-        nextMeal,
-        mealPlanSwaps,
-        mealPlanRecipes,
-        recipes,
-        activeProgram?.id,
-      )
+    ? plannedMealFor(activeProgram?.mealPlan, selected, nextMeal, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id)
     : undefined;
+  const nextPlannedKcal = nextPlanned ? nextPlanned.items.reduce((sum, i) => sum + i.calories, 0) : 0;
+  const nextPlannedPortion = nextPlanned?.items.length === 1 ? nextPlanned.items[0].portion : undefined;
   const openMealEntry = (slot: MealType, via: 'scan' | 'menu') => {
     usePending.getState().setMealTypeHint(slot);
     router.push(via === 'scan' ? '/scan?mode=meal' : '/add-menu?scope=food');
@@ -256,25 +204,17 @@ export default function Overview() {
 
   // The strip shows the current week (ending today) whenever the selected day
   // is still inside it, so tapping a day in view never reshuffles the row.
-  // Only once you arrow back past that window does it start following you —
-  // otherwise there'd be no way to see where you are.
+  // Only once you arrow back past that window does it start following you.
   const thisWeek = sevenDaysEnding(new Date());
   const days = thisWeek.some((d) => isSameDay(d.toISOString(), selected)) ? thisWeek : sevenDaysEnding(selected);
   const chartLabels = days.map((d) => d.toLocaleDateString(locale, { weekday: 'narrow' }));
   const calValues = days.map((d) => Math.round(totalsForDay(meals, d).calories));
   // "As of" the day currently being viewed — the most recent reading on or
   // before it, not always the single latest one, so scrubbing days with the
-  // week strip actually changes what this card shows.
+  // strip actually changes what this card shows.
   const selectedEnd = new Date(selected);
   selectedEnd.setHours(23, 59, 59, 999);
-  const weightsAsOf = weights.filter((w) => new Date(w.at).getTime() <= selectedEnd.getTime());
-  const latestWeight = weightsAsOf[0];
-  // Body-map coloring should keep showing the last known scan even when the
-  // most recent log on/before this day was just a bare weigh-in.
-  const latestScan = weightsAsOf.find((w) => w.segmentalLeanMassKg && zoneIntensityFromSegmental(w.segmentalLeanMassKg));
-  const zoneIntensity = zoneIntensityFromSegmental(latestScan?.segmentalLeanMassKg);
-  const zoneStatus = zoneStatusFromSegmental(latestScan?.segmentalLeanMassStatus);
-  const stats = profile ? overviewBodyStats(weightsAsOf, selected, profile) : undefined;
+  const latestWeight = weights.find((w) => new Date(w.at).getTime() <= selectedEnd.getTime());
 
   // First-run activation checklist — derived from real data, auto-hides once complete.
   const checklist = [
@@ -291,13 +231,11 @@ export default function Overview() {
     new Promise<TourRect | null>((resolve) => {
       const node = ref.current;
       if (!node) return resolve(null);
-      node.measureInWindow((x, y, w, h) =>
-        resolve(w ? { x, y, width: w, height: h } : null),
-      );
+      node.measureInWindow((x, y, w, h) => resolve(w ? { x, y, width: w, height: h } : null));
     });
 
   const startTour = async () => {
-    const ring = await measureRect(ringRef);
+    const ring = await measureRect(nutritionRef);
     const week = await measureRect(weekRef);
     // The center + FAB sits bottom-centre, straddling the tab bar's top edge.
     const fab: TourRect = { x: width / 2 - 34, y: height - insets.bottom - 82, width: 68, height: 68 };
@@ -320,363 +258,205 @@ export default function Overview() {
     else endTour();
   };
 
+  const dateLine = selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
+  const trainingTitle = activeSession
+    ? sessionIsToday
+      ? todayPlan?.title || t('today.inProgress')
+      : t('session.finishUnfinished', {
+          date: (() => {
+            const [y, m, d] = activeSession.dayKey.split('-').map(Number);
+            return new Date(y, m, d).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+          })(),
+        })
+    : todayIds.length > 0
+      ? todayPlan?.title || t('training.todaysWorkout')
+      : t('today.restDay');
+  const trainingSub = activeSession
+    ? t('session.progress', {
+        current: Math.min(activeSession.index + 1, activeSession.exerciseIds.length),
+        total: activeSession.exerciseIds.length,
+      })
+    : todayIds.length > 0
+      ? todayDoneCount > 0
+        ? `${t('today.doneOf', { done: todayDoneCount, total: todayIds.length })}${burned > 0 ? ` · ${t('today.burnedLine', { kcal: burned })}` : ''}`
+        : `${activeScheduleName} · ${t('today.exercises', { count: todayIds.length })}`
+      : t('today.restDayHint');
+
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <LinearGradient
-        colors={[theme.gradientStart, theme.gradientEnd]}
-        start={{ x: 0, y: 0.4 }}
-        end={{ x: 1, y: 0.6 }}
-        style={[styles.gradient, { paddingTop: insets.top + Spacing.sm }]}
-      >
-        {/* Brand row */}
-        <View style={styles.brandRow}>
-          <Image
-            source={require('../../../assets/images/logo-tile.png')}
-            style={styles.brandLogo}
-            contentFit="contain"
-          />
-          <View style={{ flex: 1 }} />
+      <BrandHeader title={t('common.appName')}>
+        {/* Day context: chevrons are locked LTR because the glyphs don't mirror. */}
+        <View style={styles.dateRow}>
+          <View style={{ flex: 1 }}>
+            <Pressable onPress={() => router.push('/calendar')} hitSlop={8} accessibilityRole="button" accessibilityLabel={dateLine} style={styles.dateTap}>
+              <Text style={[Type.title, { color: theme.onGradient }]}>
+                {selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.9)" />
+            </Pressable>
+            <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '500' }}>{dateLine}</Text>
+          </View>
           <Pressable
-            onPress={() =>
-              Alert.alert(t('home.streakTitle', { count: streak }), t('home.streakBody'))
-            }
-            style={[styles.streakBadge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-          >
-            <Ionicons name="flame" size={16} color="#FFD166" />
-            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 14 }}>
-              {streak}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => router.push('/coach')}
+            onPress={() => Alert.alert(t('home.streakTitle', { count: streak }), t('home.streakBody'))}
             accessibilityRole="button"
-            accessibilityLabel={t('tabs.ai')}
-            style={[styles.aiPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+            accessibilityLabel={t('home.streakTitle', { count: streak })}
+            style={[styles.streak, { backgroundColor: 'rgba(33,27,46,0.22)' }]}
           >
-            <Ionicons name="sparkles" size={15} color={theme.onGradient} />
-            <Text style={{ color: theme.onGradient, fontWeight: '700', fontSize: 12 }}>{t('tabs.ai')}</Text>
+            <Ionicons name="flame" size={15} color="#FFD166" />
+            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 13 }}>{streak}</Text>
           </Pressable>
-          <Pressable
-            onPress={() => router.push('/profile')}
-            accessibilityRole="button"
-            accessibilityLabel={t('profile.title')}
-            style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-          >
-            <Ionicons name="person" size={18} color={theme.onGradient} />
-          </Pressable>
-        </View>
-
-        {/* Day navigation */}
-        <View style={styles.headerCenter}>
-          <Pressable onPress={() => shift(-1)} hitSlop={12}>
-            <Ionicons name="chevron-back" size={22} color="rgba(255,255,255,0.9)" />
-          </Pressable>
-          <Pressable onPress={() => router.push('/calendar')} hitSlop={8} style={styles.headerDate}>
-            <Text style={[styles.headerTitle, { color: theme.onGradient }]}>
-              {selectedIsToday
-                ? t('home.today')
-                : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
-            </Text>
-            <Ionicons name="chevron-down" size={13} color="rgba(255,255,255,0.9)" />
-          </Pressable>
-          <Pressable onPress={() => shift(1)} hitSlop={12} disabled={selectedIsToday}>
-            <Ionicons
-              name="chevron-forward"
-              size={22}
-              color={selectedIsToday ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.9)'}
-            />
-          </Pressable>
-        </View>
-
-        <View ref={weekRef} collapsable={false} style={styles.weekRow}>
-          {days.map((day) => {
-            const active = isSameDay(day.toISOString(), selected);
-            return (
-              <Pressable
-                key={day.toDateString()}
-                onPress={() => setDay(day)}
-                style={[
-                  styles.dayPill,
-                  { backgroundColor: active ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.18)' },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.dayName,
-                    { color: active ? theme.gradientEnd : 'rgba(255,255,255,0.85)' },
-                  ]}
-                >
-                  {day.toLocaleDateString(locale, { weekday: 'narrow' })}
-                </Text>
-                <Text
-                  style={[styles.dayNum, { color: active ? theme.gradientEnd : theme.onGradient }]}
-                >
-                  {day.toLocaleDateString(locale, { day: 'numeric' })}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        <View style={styles.heroRow}>
-          <View style={styles.heroSide}>
-            <Text style={[styles.heroSideValue, { color: theme.onGradient }]}>
-              {Math.round(totals.calories)}
-            </Text>
-            <Text style={styles.heroSideLabel}>{t('home.eaten')}</Text>
-          </View>
-
-          <View ref={ringRef} collapsable={false}>
-            <Ring
-              size={150}
-              strokeWidth={11}
-              progress={targets.calories > 0 ? totals.calories / targets.calories : 0}
-              color="rgba(255,255,255,0.95)"
-              trackColor="rgba(255,255,255,0.25)"
-            >
-              <View style={{ alignItems: 'center' }}>
-                <Text style={[styles.ringValue, { color: theme.onGradient }]}>
-                  {Math.abs(Math.round(remaining))}
-                </Text>
-                <Text style={styles.heroSideLabel}>
-                  {over ? `${t('common.kcal')} ${t('home.overTarget')}` : t('home.kcalLeft')}
-                </Text>
-              </View>
-            </Ring>
-          </View>
-
-          <View style={styles.heroSide}>
-            <Text style={[styles.heroSideValue, { color: theme.onGradient }]}>
-              {targets.calories}
-            </Text>
-            <Text style={styles.heroSideLabel}>{t('home.goal')}</Text>
+          <View style={[styles.arrows, { direction: 'ltr' }]}>
+            <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.arrow}>
+              <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
+            </Pressable>
+            <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('common.next')} style={styles.arrow}>
+              <Ionicons name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
+            </Pressable>
           </View>
         </View>
-      </LinearGradient>
+        <View ref={weekRef} collapsable={false}>
+          <DayStrip days={days} selected={selected} onSelect={setDay} locale={locale} onGradient disabledAfter={new Date()} />
+        </View>
+      </BrandHeader>
 
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ padding: Spacing.md, paddingBottom: insets.bottom + Spacing.xl }}
+        contentContainerStyle={{ paddingHorizontal: Spacing.page, paddingTop: Spacing.sm, paddingBottom: insets.bottom + Spacing.xl }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Optional spotlight tour invite */}
         {!tourSeen && !tourSteps && (
           <Pressable
             onPress={startTour}
-            style={({ pressed }) => [
-              styles.tourBanner,
-              { backgroundColor: theme.cardSubtle, borderColor: theme.primary },
-              pressed && { opacity: 0.8 },
-            ]}
+            style={({ pressed }) => [styles.tourBanner, { backgroundColor: theme.surfaceTint, borderColor: theme.primary }, pressed && { opacity: 0.8 }]}
           >
             <Ionicons name="sparkles" size={18} color={theme.primary} />
             <Text style={{ color: theme.primary, fontWeight: '700', flex: 1 }}>{t('tour.banner')}</Text>
-            <Pressable onPress={setTourSeen} hitSlop={8}>
+            <Pressable onPress={setTourSeen} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.close')}>
               <Ionicons name="close" size={18} color={theme.textTertiary} />
             </Pressable>
           </Pressable>
         )}
 
-        {/* Today: the two things to do next — train and log the next meal —
-            as actions, not just numbers. Only for today: past days are for
-            reading, not acting, and the cards below already cover them. */}
+        {/* Your next steps — train and eat, as equal cards with one action
+            each. Only for today: a past day is for reading, not acting. */}
         {selectedIsToday && (
-          <View style={styles.halfRow}>
-            {/* Workout */}
-            <View style={[styles.card, styles.half, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-              <View style={styles.halfHead}>
-                <Ionicons name="barbell" size={18} color={theme.primary} />
-                <Text style={[styles.halfTitle, { color: theme.text }]}>{t('today.workout')}</Text>
-                {activeSession && (
-                  <View style={[styles.liveDot, { backgroundColor: theme.primary }]} />
+          <>
+            <SectionTitle style={{ marginTop: Spacing.sm }}>{t('today.nextSteps')}</SectionTitle>
+
+            <View style={[styles.stepCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.eyebrowRow}>
+                  <Ionicons name="barbell" size={15} color={theme.primary} />
+                  <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('today.trainingLabel')}</Text>
+                </View>
+                <Text style={[styles.stepTitle, { color: theme.text }]} numberOfLines={2}>
+                  {trainingTitle}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
+                  {trainingSub}
+                </Text>
+                {todayIds.length > 0 && todayDoneCount === 0 && !activeSession && (
+                  <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                    {todayNames.join(' · ')}
+                  </Text>
+                )}
+                <View style={styles.stepAction}>
+                  {activeSession ? (
+                    <ActionButton label={t('session.resume')} icon="play" onPress={() => router.push('/session')} />
+                  ) : todayIds.length > 0 ? (
+                    todayDoneCount >= todayIds.length ? (
+                      <View style={[styles.doneRow, { backgroundColor: theme.surfaceTint }]}>
+                        <Ionicons name="checkmark-circle" size={16} color={theme.successText} />
+                        <Text style={{ color: theme.successText, fontWeight: '700', fontSize: 13 }}>{t('today.workoutDone')}</Text>
+                      </View>
+                    ) : (
+                      <ActionButton
+                        label={t('today.startWorkout')}
+                        icon="play"
+                        onPress={() => {
+                          startSession(selected, todayIds);
+                          router.push('/session');
+                        }}
+                      />
+                    )
+                  ) : (
+                    <ActionButton label={t('today.addExercise')} icon="add" variant="secondary" onPress={() => router.push('/exercise-library')} />
+                  )}
+                </View>
+                {todayOnlyUnplanned && todayDoneCount >= todayIds.length && (
+                  <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 6 }}>{t('today.noFurtherPlanned')}</Text>
                 )}
               </View>
-              {activeSession ? (
-                <>
-                  <Text style={[styles.todayMain, { color: theme.text }]} numberOfLines={1}>
-                    {sessionIsToday
-                      ? (todayPlan?.title || t('today.inProgress'))
-                      : t('session.finishUnfinished', {
-                          date: (() => {
-                            const [y, m, d] = activeSession.dayKey.split('-').map(Number);
-                            return new Date(y, m, d).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
-                          })(),
-                        })}
-                  </Text>
-                  <Text style={[styles.todaySub, { color: theme.textSecondary }]} numberOfLines={1}>
-                    {t('session.progress', {
-                      current: Math.min(activeSession.index + 1, activeSession.exerciseIds.length),
-                      total: activeSession.exerciseIds.length,
-                    })}
-                  </Text>
-                  <MiniBtn label={t('session.resume')} icon="play" onPress={() => router.push('/session')} style={styles.todayBtn} />
-                </>
-              ) : todayIds.length > 0 ? (
-                <>
-                  <Text style={[styles.todayMain, { color: theme.text }]} numberOfLines={1}>
-                    {todayPlan?.title || t('training.todaysWorkout')}
-                  </Text>
-                  <View style={styles.todaySubBox}>
-                    <Text style={[styles.todaySubLine, { color: theme.textSecondary }]} numberOfLines={1}>
-                      {todayDoneCount > 0
-                        ? t('today.doneOf', { done: todayDoneCount, total: todayIds.length })
-                        : t('today.exercises', { count: todayIds.length })}
-                    </Text>
-                    <Text style={[styles.todaySubLine, { color: theme.textTertiary }]} numberOfLines={1}>
-                      {todayNames.join(' · ')}
-                    </Text>
-                  </View>
-                  {todayDoneCount >= todayIds.length ? (
-                    <>
-                      <View style={[styles.todayDone, { backgroundColor: theme.cardSubtle }]}>
-                        <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
-                        <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
-                          {t('today.workoutDone')}
-                        </Text>
-                      </View>
-                      {/* The plan's own state is still worth a line — as the
-                          secondary fact, under what actually happened. */}
-                      {todayOnlyUnplanned && (
-                        <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 4 }}>
-                          {t('today.noFurtherPlanned')}
-                        </Text>
-                      )}
-                    </>
-                  ) : (
-                    <MiniBtn
-                      label={t('session.start')}
-                      icon="play"
-                      onPress={() => {
-                        startSession(selected, todayIds);
-                        router.push('/session');
-                      }}
-                      style={styles.todayBtn}
-                    />
-                  )}
-                </>
-              ) : (
-                <>
-                  <Text style={[styles.todayMain, { color: theme.text }]}>{t('today.restDay')}</Text>
-                  <Text style={[styles.todaySub, { color: theme.textSecondary }]} numberOfLines={3}>
-                    {t('today.restDayHint')}
-                  </Text>
-                  <MiniBtn
-                    label={t('today.addExercise')}
-                    icon="add"
-                    variant="secondary"
-                    onPress={() => router.push('/exercise-library')}
-                    style={styles.todayBtn}
-                  />
-                </>
-              )}
+              <IllustrationTile icon="barbell" />
             </View>
 
-            {/* Next meal */}
-            <View style={[styles.card, styles.half, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-              <View style={styles.halfHead}>
-                <Ionicons name="restaurant" size={18} color={theme.carbs} />
-                <Text style={[styles.halfTitle, { color: theme.text }]}>{t('today.nextMeal')}</Text>
-              </View>
-              <Text style={[styles.todayMain, { color: theme.text }]} numberOfLines={1}>
-                {nextMeal ? t(`home.mealTypes.${nextMeal}`) : t('today.allLogged')}
-              </Text>
-              {nextPlanned && (
-                <Text style={[styles.todaySubLine, { color: theme.textSecondary }]} numberOfLines={1}>
-                  {nextPlanned.name}
-                </Text>
-              )}
-              {nextMeal && nextPlanned?.items[0]?.recipeId && (
-                <MiniBtn
-                  label={t('mealPlan.viewRecipe')}
-                  icon="restaurant"
-                  variant="secondary"
-                  onPress={() =>
-                    router.push(
-                      `/recipe?id=${encodeURIComponent(nextPlanned.items[0].recipeId as string)}&day=${dateKey(selected)}&slot=${nextMeal}`,
-                    )
-                  }
-                  style={styles.todayBtn}
-                />
-              )}
-              <View style={styles.mealDots}>
-                {MAIN_MEALS.map((m) => (
-                  <View
-                    key={m}
-                    style={[
-                      styles.mealDot,
-                      mealsLogged.has(m)
-                        ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                        : { borderColor: theme.border },
-                    ]}
-                  >
-                    {mealsLogged.has(m) && <Ionicons name="checkmark" size={10} color={theme.onPrimary} />}
-                  </View>
-                ))}
-                <Text style={[styles.todaySub, { color: theme.textSecondary, marginTop: 0 }]}>
-                  {t('today.doneOf', {
-                    done: MAIN_MEALS.filter((m) => mealsLogged.has(m)).length,
-                    total: MAIN_MEALS.length,
-                  })}
-                </Text>
-              </View>
-              {nextMeal ? (
-                <View style={styles.mealBtns}>
-                  <MiniBtn label={t('today.scan')} icon="camera" onPress={() => openMealEntry(nextMeal, 'scan')} style={styles.mealBtn} />
-                  <MiniBtn label={t('today.log')} icon="add" variant="secondary" onPress={() => openMealEntry(nextMeal, 'menu')} style={styles.mealBtn} />
+            <View style={[styles.stepCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.eyebrowRow}>
+                  <Ionicons name="restaurant" size={15} color={theme.carbs} />
+                  <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>
+                    {nextMeal
+                      ? nextPlanned
+                        ? t('today.plannedMeal', { meal: t(`home.mealTypes.${nextMeal}`) })
+                        : t('today.nextMealLabel')
+                      : t('today.nextMealLabel')}
+                  </Text>
                 </View>
-              ) : (
-                <MiniBtn
-                  label={t('today.addSnack')}
-                  icon="add"
-                  variant="secondary"
-                  onPress={() => openMealEntry('snack', 'menu')}
-                  style={styles.todayBtn}
-                />
-              )}
+                <Text style={[styles.stepTitle, { color: theme.text }]} numberOfLines={2}>
+                  {nextMeal ? (nextPlanned ? nextPlanned.name : t(`home.mealTypes.${nextMeal}`)) : t('today.allLogged')}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
+                  {nextPlanned
+                    ? `${nextPlannedPortion ? `${nextPlannedPortion} · ` : ''}${num(nextPlannedKcal)} ${t('common.kcal')}`
+                    : nextMeal
+                      ? t('today.doneOf', { done: MAIN_MEALS.filter((m) => mealsLogged.has(m)).length, total: MAIN_MEALS.length })
+                      : t('today.allLoggedHint')}
+                </Text>
+                <View style={styles.stepAction}>
+                  {nextMeal && nextPlanned?.items[0]?.recipeId ? (
+                    <ActionButton
+                      label={t('mealPlan.viewRecipe')}
+                      variant="secondary"
+                      onPress={() =>
+                        router.push(
+                          `/recipe?id=${encodeURIComponent(nextPlanned.items[0].recipeId as string)}&day=${dateKey(selected)}&slot=${nextMeal}`,
+                        )
+                      }
+                    />
+                  ) : nextMeal ? (
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <ActionButton label={t('today.scan')} icon="camera" onPress={() => openMealEntry(nextMeal, 'scan')} style={{ flex: 1 }} />
+                      <ActionButton label={t('today.log')} icon="add" variant="secondary" onPress={() => openMealEntry(nextMeal, 'menu')} style={{ flex: 1 }} />
+                    </View>
+                  ) : (
+                    <ActionButton label={t('today.addSnack')} icon="add" variant="secondary" onPress={() => openMealEntry('snack', 'menu')} />
+                  )}
+                </View>
+              </View>
+              <IllustrationTile icon="restaurant" />
             </View>
-          </View>
+          </>
         )}
 
-        {/* First-run getting-started checklist */}
         {showChecklist && (
           <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
             <View style={styles.checklistHead}>
               <Ionicons name="rocket" size={18} color={theme.primary} />
-              <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
-                {t('checklist.title')}
-              </Text>
+              <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>{t('checklist.title')}</Text>
               <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '700' }}>
                 {t('checklist.progress', { done: checklistDone, total: checklist.length })}
               </Text>
-              <Pressable onPress={dismissChecklist} hitSlop={8} style={{ padding: 2 }}>
+              <Pressable onPress={dismissChecklist} hitSlop={8} style={{ padding: 2 }} accessibilityRole="button" accessibilityLabel={t('common.close')}>
                 <Ionicons name="close" size={18} color={theme.textTertiary} />
               </Pressable>
             </View>
             <View style={{ marginTop: Spacing.sm }}>
               {checklist.map((item) => (
-                <Pressable
-                  key={item.key}
-                  onPress={item.onPress}
-                  style={({ pressed }) => [styles.checklistRow, pressed && { opacity: 0.6 }]}
-                >
-                  <View
-                    style={[
-                      styles.checkCircle,
-                      item.done
-                        ? { backgroundColor: theme.primary, borderColor: theme.primary }
-                        : { borderColor: theme.border },
-                    ]}
-                  >
+                <Pressable key={item.key} onPress={item.onPress} accessibilityRole="button" style={({ pressed }) => [styles.checklistRow, pressed && { opacity: 0.6 }]}>
+                  <View style={[styles.checkCircle, item.done ? { backgroundColor: theme.primary, borderColor: theme.primary } : { borderColor: theme.border }]}>
                     {item.done && <Ionicons name="checkmark" size={14} color={theme.onPrimary} />}
                   </View>
-                  <Text
-                    style={{
-                      flex: 1,
-                      color: item.done ? theme.textTertiary : theme.text,
-                      fontWeight: '600',
-                      textDecorationLine: item.done ? 'line-through' : 'none',
-                    }}
-                  >
+                  <Text style={{ flex: 1, color: item.done ? theme.textTertiary : theme.text, fontWeight: '600', textDecorationLine: item.done ? 'line-through' : 'none' }}>
                     {t(`checklist.${item.key}`)}
                   </Text>
                   {!item.done && <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />}
@@ -686,116 +466,85 @@ export default function Overview() {
           </View>
         )}
 
-        {/* Macros */}
-        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <View style={styles.macroRow}>
-            <MacroCol letterColor={theme.protein} label={t('home.protein')} value={totals.proteinG} target={targets.proteinG} />
-            <MacroCol letterColor={theme.carbs} label={t('home.carbs')} value={totals.carbsG} target={targets.carbsG} />
-            <MacroCol letterColor={theme.fat} label={t('home.fat')} value={totals.fatG} target={targets.fatG} />
+        {/* Nutrition today — actual diary entries only; planned food is not here. */}
+        <View ref={nutritionRef} collapsable={false} style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 6 }]}>{t('today.nutritionToday')}</Text>
+          <View style={styles.kcalRow}>
+            <Text style={{ color: theme.text }}>
+              <Text style={{ fontSize: 26, fontWeight: '800' }}>{num(totals.calories)}</Text>
+              <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textSecondary }}> {t('today.kcalEatenOf', { target: num(targets.calories) })}</Text>
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+              {over ? t('today.overBy', { n: num(-remaining) }) : t('today.left', { n: num(remaining) })}
+            </Text>
           </View>
+          <ProgressTrack value={totals.calories} max={targets.calories} />
+          <MacroRow
+            values={totals}
+            targets={targets}
+            labels={{ protein: t('home.protein'), carbs: t('home.carbs'), fat: t('home.fat') }}
+            unit={t('common.grams')}
+          />
         </View>
 
-        {/* Water + burned side by side */}
-        <View style={styles.halfRow}>
-          <Pressable
-            onPress={() => router.push('/water')}
-            disabled={!selectedIsToday}
-            style={({ pressed }) => [
-              styles.card,
-              styles.half,
-              { backgroundColor: theme.card },
-              cardShadow(theme.shadow),
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <View style={styles.halfHead}>
-              <Ionicons name="water" size={18} color={theme.water} />
-              <Text style={[styles.halfTitle, { color: theme.text }]}>{t('home.water')}</Text>
-              {selectedIsToday && (
-                <View style={[styles.halfAdd, { backgroundColor: theme.cardSubtle }]}>
-                  <Ionicons name="add" size={16} color={theme.primary} />
-                </View>
-              )}
-            </View>
-            <Text style={[styles.halfValue, { color: theme.text }]}>
-              {waterMl}
-              <Text style={[styles.halfTarget, { color: theme.textTertiary }]}>
-                /{waterTarget} {t('home.ml')}
-              </Text>
-            </Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => router.push('/(tabs)/training')}
-            style={({ pressed }) => [
-              styles.card,
-              styles.half,
-              { backgroundColor: theme.card },
-              cardShadow(theme.shadow),
-              pressed && { transform: [{ scale: 0.98 }] },
-            ]}
-          >
-            <View style={styles.halfHead}>
-              <Ionicons name="flame" size={18} color={theme.carbs} />
-              <Text style={[styles.halfTitle, { color: theme.text }]}>
-                {t('training.burned')}
-              </Text>
-            </View>
-            <Text style={[styles.halfValue, { color: theme.text }]}>
-              {burned}
-              <Text style={[styles.halfTarget, { color: theme.textTertiary }]}>
-                {' '}
-                {t('common.kcal')}
-              </Text>
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* AI program glance */}
-        <Pressable
-          onPress={() => router.push('/program')}
-          style={({ pressed }) => [
-            styles.card,
-            { backgroundColor: theme.card },
-            cardShadow(theme.shadow),
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          {activeProgram ? (
-            <>
-              <View style={styles.programHead}>
-                <Ionicons name="sparkles" size={18} color={theme.primary} />
-                <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>
-                  {t('program.title')}
+        {/* Latest weight — read-only. A reading shown today is not a reading
+            taken today, so it carries its own date and source (S01). */}
+        <View style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <IconTile icon="scale-outline" size={40} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('today.latestWeight')}</Text>
+            {latestWeight ? (
+              <>
+                <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>
+                  {latestWeight.kg} {t('progress.kg')}
                 </Text>
-                <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-              </View>
-              <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
-                {t('program.weekProgress', { current: programGlance!.weekNumber, total: activeProgram.durationWeeks })}
-                {' · '}
-                {t('program.daysLeft', { count: programGlance!.daysLeft })}
-              </Text>
-              <View style={[styles.programTrack, { backgroundColor: theme.border }]}>
-                <View
-                  style={[
-                    styles.programTrackFill,
-                    { backgroundColor: theme.primary, width: `${programGlance!.pct}%` },
-                  ]}
-                />
-              </View>
-            </>
+                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                  {new Date(latestWeight.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+                  {' · '}
+                  {latestWeight.source === 'scan' ? t('health.sourceScan') : t('health.sourceManual')}
+                </Text>
+              </>
+            ) : (
+              <Text style={{ color: theme.text, fontSize: 15, fontWeight: '700' }}>{t('today.noReadingYet')}</Text>
+            )}
+          </View>
+          {latestWeight ? (
+            <ActionButton label={t('progress.viewHealth')} icon="chevron-forward" variant="secondary" onPress={() => router.push('/health')} />
           ) : (
-            <View style={styles.programHead}>
-              <Ionicons name="sparkles-outline" size={18} color={theme.primary} />
-              <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flex: 1 }}>
-                {t('program.introTitle')}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-            </View>
+            <ActionButton label={t('health.addReading')} icon="add" variant="secondary" onPress={() => router.push('/body-reading')} />
           )}
-        </Pressable>
+        </View>
 
-        {/* Calories week chart */}
+        {/* Water — the row reads; the sheet (S24) writes. */}
+        <View style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <IconTile icon="water" size={40} color={theme.water} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('home.water')}</Text>
+            <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>
+              {(waterMl / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })}
+              <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+                {' '}/ {(waterTarget / 1000).toLocaleString(locale, { maximumFractionDigits: 1 })} {t('today.litre')}
+              </Text>
+            </Text>
+          </View>
+          {selectedIsToday && <ActionButton label={t('today.addWater')} icon="add" variant="secondary" onPress={() => router.push('/water')} />}
+        </View>
+
+        {/* AI program — a row, not a hero: drafts are reviewed in their own screen. */}
+        <View style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <SettingsRow
+            icon="sparkles-outline"
+            title={activeProgram ? t('program.title') : t('program.introTitle')}
+            subtitle={
+              activeProgram && programGlance
+                ? `${t('program.weekProgress', { current: programGlance.weekNumber, total: activeProgram.durationWeeks })} · ${t('program.daysLeft', { count: programGlance.daysLeft })}`
+                : undefined
+            }
+            onPress={() => router.push('/program')}
+            last
+          />
+        </View>
+
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.calories7d')}</Text>
           <WeekBars
@@ -808,83 +557,10 @@ export default function Overview() {
           />
         </View>
 
-        {/* Weight */}
-        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <View style={styles.weightHead}>
-            <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, flex: 1 }]}>
-              {t('progress.weight')}
-            </Text>
-            <Pressable onPress={() => router.push('/health')} hitSlop={8} accessibilityRole="button">
-              <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
-                {t('progress.viewHealth')}
-              </Text>
-            </Pressable>
-          </View>
-          {latestWeight && stats ? (
-            <Pressable
-              onPress={() => router.push('/health')}
-              style={({ pressed }) => [styles.compositionRow, pressed && { opacity: 0.85 }]}
-            >
-              <BodyMap
-                view="front"
-                zoneIntensity={zoneIntensity ?? undefined}
-                zoneStatus={zoneStatus ?? undefined}
-                size={80}
-              />
-              <View style={{ flex: 1, gap: 5 }}>
-                <MetricRow
-                  label={t('progress.weight')}
-                  value={`${stats.weightKg} ${t('progress.kg')}`}
-                  delta={stats.weightDelta}
-                  trend={stats.weightTrend}
-                />
-                <MetricRow label={t('progress.bmi')} value={stats.bmi.toFixed(1)} delta={stats.bmiDelta} trend={stats.bmiTrend} />
-                {stats.bodyFatPercent != null && (
-                  <MetricRow
-                    label={t('bodyReading.bodyFat')}
-                    value={`${stats.bodyFatPercent}%`}
-                    delta={stats.bodyFatDelta}
-                    trend={stats.bodyFatTrend}
-                  />
-                )}
-                {stats.musclePercent != null && (
-                  <MetricRow
-                    label={t('progress.musclePercent')}
-                    value={`${stats.musclePercent.toFixed(0)}%`}
-                    delta={stats.muscleDelta}
-                    trend={stats.muscleTrend}
-                  />
-                )}
-                {/* A reading shown today is not a reading taken today (S01). */}
-                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                  {new Date(latestWeight.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                  {' · '}
-                  {latestWeight.source === 'scan' ? t('health.sourceScan') : t('health.sourceManual')}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
-            </Pressable>
-          ) : (
-            <Text style={{ color: theme.textSecondary, marginBottom: Spacing.sm }}>
-              {t('progress.noWeights')}
-            </Text>
-          )}
-          {/* Writes belong to Add reading (S04); this tile only reads. */}
-          <MiniBtn
-            label={t('health.addReading')}
-            icon="add"
-            variant="secondary"
-            onPress={() => router.push('/body-reading')}
-            style={{ alignSelf: 'flex-start' }}
-          />
-        </View>
-
         <SponsorCard />
       </ScrollView>
 
-      {tourSteps && (
-        <CoachTour steps={tourSteps} index={tourIndex} onNext={advanceTour} onSkip={endTour} />
-      )}
+      {tourSteps && <CoachTour steps={tourSteps} index={tourIndex} onNext={advanceTour} onSkip={endTour} />}
 
       <TargetUpdateModal
         visible={pendingWeightKg != null}
@@ -901,175 +577,33 @@ export default function Overview() {
   );
 }
 
-function MacroCol({
-  letterColor,
-  label,
-  value,
-  target,
-}: {
-  letterColor: string;
-  label: string;
-  value: number;
-  target: number;
-}) {
-  const theme = useTheme();
-  const pct = target > 0 ? Math.min(1, value / target) : 0;
-  return (
-    <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: 14, marginBottom: 6 }}>
-        <Text style={{ color: letterColor, fontWeight: '800' }}>{label.charAt(0)}</Text>
-        <Text style={{ color: theme.text, fontWeight: '800' }}> {Math.round(value)}</Text>
-        <Text style={{ color: theme.textTertiary }}>/{target}</Text>
-      </Text>
-      <View style={[styles.macroTrack, { backgroundColor: theme.border }]}>
-        <View style={[styles.macroFill, { backgroundColor: letterColor, width: `${pct * 100}%` }]} />
-      </View>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  gradient: {
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Spacing.lg,
-    borderBottomLeftRadius: Radius.xl,
-    borderBottomRightRadius: Radius.xl,
-  },
-  brandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  brandLogo: { width: 36, height: 36, borderRadius: 9 },
-  headerCenter: {
-    flexDirection: 'row',
-    // Fixed LTR order: RN auto-mirrors 'row' for RTL, but the chevron glyphs
-    // are static and don't flip with it, which points them the wrong way.
-    // Locking this row to ltr keeps prev/next glyphs matching their meaning
-    // in both languages.
-    direction: 'ltr',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-    marginBottom: Spacing.md,
-  },
-  headerDate: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  aiPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderRadius: 17, marginEnd: 8 },
-  headerBtn: {
-    minWidth: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  streakBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    height: 36,
-    borderRadius: 18,
-    paddingHorizontal: 12,
-  },
-  headerTitle: { fontSize: 17, fontWeight: '700', textAlign: 'center' },
-  weekRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 6,
-    marginBottom: Spacing.lg,
-  },
-  dayPill: { flex: 1, alignItems: 'center', borderRadius: Radius.md, paddingVertical: 8, gap: 2 },
-  dayName: { fontSize: 11, fontWeight: '600' },
-  dayNum: { fontSize: 15, fontWeight: '700' },
-  heroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.sm,
-  },
-  heroSide: { alignItems: 'center', width: 80 },
-  heroSideValue: { fontSize: 24, fontWeight: '800' },
-  heroSideLabel: { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
-  ringValue: { fontSize: 34, fontWeight: '800' },
-  card: { borderRadius: Radius.lg, padding: Spacing.md, marginBottom: Spacing.md },
-  cardTitle: { fontSize: 16, fontWeight: '700', marginBottom: Spacing.md },
-  programHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
-  programTrack: { height: 5, borderRadius: 2.5, marginTop: Spacing.sm, overflow: 'hidden' },
-  programTrackFill: { height: 5, borderRadius: 2.5 },
-  macroRow: { flexDirection: 'row', gap: Spacing.md },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.sm, marginBottom: Spacing.ms },
+  dateTap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  streak: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 32, borderRadius: Radius.pill, paddingHorizontal: 10 },
+  arrows: { flexDirection: 'row', gap: 2 },
+  arrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
+  groupCard: { borderRadius: Radius.module, paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
+  rowCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },
+  cardTitle: { fontSize: 16, fontWeight: '800', marginBottom: Spacing.md },
+  stepCard: { flexDirection: 'row', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
+  stepTitle: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3 },
+  stepAction: { marginTop: Spacing.ms, alignSelf: 'stretch' },
+  doneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: Radius.control, minHeight: 44 },
+  kcalRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 8 },
   tourBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-    borderRadius: Radius.md,
+    borderRadius: Radius.control,
     borderWidth: 1,
     paddingHorizontal: Spacing.md,
     paddingVertical: 12,
-    marginBottom: Spacing.md,
+    marginTop: Spacing.sm,
   },
   checklistHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   checklistRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 9 },
-  checkCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  macroTrack: { height: 5, borderRadius: 3, overflow: 'hidden' },
-  macroFill: { height: 5, borderRadius: 3 },
-  halfRow: { flexDirection: 'row', gap: Spacing.sm },
-  half: { flex: 1 },
-  halfHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  halfTitle: { fontSize: 13, fontWeight: '700', flex: 1 },
-  halfAdd: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  halfValue: { fontSize: 20, fontWeight: '800' },
-  halfTarget: { fontSize: 12, fontWeight: '600' },
-  liveDot: { width: 8, height: 8, borderRadius: 4 },
-  todayMain: { fontSize: 15, fontWeight: '800' },
-  todaySub: { fontSize: 12, fontWeight: '600', marginTop: 2, minHeight: 32 },
-  todaySubBox: { marginTop: 2, minHeight: 32 },
-  todaySubLine: { fontSize: 12, fontWeight: '600', lineHeight: 16 },
-  todayBtn: { marginTop: Spacing.sm },
-  todayDone: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: Radius.md,
-    paddingVertical: 10,
-    marginTop: Spacing.sm,
-  },
-  mealDots: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4, minHeight: 32 },
-  mealDot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mealBtns: { flexDirection: 'row', gap: 6, marginTop: Spacing.sm },
-  mealBtn: { flex: 1 },
-  miniBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 5,
-    borderRadius: Radius.full,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    minHeight: 40,
-  },
-  weightHead: { flexDirection: 'row', alignItems: 'center' },
-  compositionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.md },
-  weightRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm },
-  weightBtn: { minWidth: 54, marginBottom: Spacing.md },
+  checkCircle: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
 });

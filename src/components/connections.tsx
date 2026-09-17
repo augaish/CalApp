@@ -36,24 +36,17 @@ export function ConnectionRow({
   );
 }
 
+export type WhoopStatus = 'loading' | 'connected' | 'disconnected';
+
 /**
- * WHOOP only needs an OAuth round trip through a browser, so it gets a real,
- * working row. Lived on Profile until Health became a destination; it is the
- * same row in both places, so the state and the confirmation copy are shared
- * rather than duplicated.
+ * The true connection state, re-read whenever the screen regains focus.
+ * Coming back to the screen — not the auth promise resolving — is the one
+ * signal that reliably fires whether the browser closed itself via the
+ * calapp:// redirect or the user just switched back to the app manually.
  */
-export function WhoopConnectionRow() {
-  const { t } = useTranslation();
-  const theme = useTheme();
-  const [status, setStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
-  const [busy, setBusy] = useState(false);
-
+export function useWhoopStatus(): [WhoopStatus, () => Promise<void>] {
+  const [status, setStatus] = useState<WhoopStatus>('loading');
   const refresh = () => fetchWhoopStatus().then((s) => setStatus(s?.connected ? 'connected' : 'disconnected'));
-
-  // The connect button opens a system browser session, so coming back to this
-  // screen — not the openAuthSessionAsync promise resolving — is the one
-  // signal that reliably fires whether the browser closed itself via the
-  // calapp:// redirect or the user just switched back to the app manually.
   useFocusEffect(
     useCallback(() => {
       let alive = true;
@@ -63,6 +56,20 @@ export function WhoopConnectionRow() {
       };
     }, []),
   );
+  return [status, refresh];
+}
+
+/**
+ * WHOOP only needs an OAuth round trip through a browser, so it gets a real,
+ * working row. Lived on Profile until Health became a destination; it is the
+ * same row in both places, so the state and the confirmation copy are shared
+ * rather than duplicated.
+ */
+export function WhoopConnectionRow() {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const [status, refresh] = useWhoopStatus();
+  const [busy, setBusy] = useState(false);
 
   const connect = async () => {
     if (busy) return;
@@ -100,7 +107,7 @@ export function WhoopConnectionRow() {
           setBusy(false);
           if (ok) {
             lightHaptic();
-            setStatus('disconnected');
+            await refresh();
           }
         },
       },

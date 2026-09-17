@@ -1,26 +1,16 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import {
-  BodyMap,
-  BodyMapIntensityHint,
-  BodyMapMetricSwitch,
-  BodyMapStatusLegend,
-  BodyMapViewSwitch,
-  zoneIntensityFromSegmental,
-  zoneStatusFromSegmental,
-  type BodyMapMetric,
-  type BodyMapView,
-} from '@/components/body-map';
-import { TrendLine } from '@/components/charts';
+import { PageHeader } from '@/components/brand-header';
 import { DatePickerModal } from '@/components/date-picker';
 import { ProgressBar } from '@/components/progress-bar';
+import { IconTile, InfoLine, Segmented } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
-import { Button, Card, Field, Screen, Title } from '@/components/ui';
+import { Button, Field, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
@@ -30,29 +20,12 @@ import { successHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
 import { targetsNeedUpdate } from '@/lib/tdee';
-import {
-  bmiFor,
-  bmiTrend,
-  bodyFatTrend,
-  bodyStatsFor,
-  type MetricTrend,
-  muscleTrend,
-  useAppStore,
-  weightTrend,
-} from '@/lib/store';
+import { useAppStore } from '@/lib/store';
 import type { BodyMeasurements, BodyReadingAnalysis, SegmentalStatus, WeightEntry } from '@/lib/types';
 
 type DimensionKey = keyof BodyMeasurements;
-const DIMENSION_KEYS: DimensionKey[] = [
-  'waist',
-  'chest',
-  'hips',
-  'neck',
-  'leftArm',
-  'rightArm',
-  'leftThigh',
-  'rightThigh',
-];
+const DIMENSION_KEYS: DimensionKey[] = ['waist', 'chest', 'hips', 'neck', 'leftArm', 'rightArm', 'leftThigh', 'rightThigh'];
+const MORE_DIMENSIONS = DIMENSION_KEYS.filter((k) => k !== 'waist');
 const EMPTY_DIMENSIONS: Record<DimensionKey, string> = {
   waist: '',
   chest: '',
@@ -63,16 +36,18 @@ const EMPTY_DIMENSIONS: Record<DimensionKey, string> = {
   leftThigh: '',
   rightThigh: '',
 };
+type SegKey = 'leftArm' | 'rightArm' | 'trunk' | 'leftLeg' | 'rightLeg';
+const SEG_KEYS: SegKey[] = ['leftArm', 'rightArm', 'trunk', 'leftLeg', 'rightLeg'];
+const EMPTY_SEG: Record<SegKey, string> = { leftArm: '', rightArm: '', trunk: '', leftLeg: '', rightLeg: '' };
 
 /** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
 function ymd(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** How many days back a saved-at timestamp is from right now. A plain
- * module-level function, not inlined in the component, because it reads the
- * clock — which the React Compiler's purity check only allows outside the
- * component body (same reason food.tsx extracts fastingCardLabel). */
+/** How many days back a saved-at timestamp is from right now. Module-level
+ * because it reads the clock, which the React Compiler's purity check only
+ * allows outside the component body. */
 function daysSince(iso: string): number {
   return Math.round((Date.now() - new Date(iso).getTime()) / 86400000);
 }
@@ -87,47 +62,25 @@ function isoFromDateInput(v: string): string {
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
-/** A single centered fat%/muscle% readout under the composition map — not
- * MetricRow's label-left/value-right list layout, which reads like a copy
- * of Overview's compact card rather than this page's own detail view. */
-function CompositionStat({
-  label,
-  value,
-  delta,
-  trend,
-  theme,
-}: {
-  label: string;
-  value: string;
-  delta?: number;
-  trend: MetricTrend;
-  theme: ReturnType<typeof useTheme>;
-}) {
-  const color = trend === 'good' ? theme.success : trend === 'bad' ? theme.danger : theme.warning;
-  return (
-    <View style={{ alignItems: 'center' }}>
-      <Text style={{ fontSize: 11, color: theme.textSecondary }}>{label}</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-        <Text style={{ fontSize: 16, fontWeight: '800', color: theme.text }}>{value}</Text>
-        {delta != null && Math.abs(delta) > 0.01 && (
-          <Ionicons name={delta > 0 ? 'caret-up' : 'caret-down'} size={12} color={color} />
-        )}
-      </View>
-    </View>
-  );
-}
+const segToText = (seg?: Partial<Record<SegKey, number | undefined>>): Record<SegKey, string> =>
+  Object.fromEntries(SEG_KEYS.map((k) => [k, seg?.[k] != null ? String(seg[k]) : ''])) as Record<SegKey, string>;
+const hasAny = (o: Record<string, string>) => Object.values(o).some((v) => v.trim() !== '');
 
-/** Manual entry and scan-review in one screen: a scan just pre-fills these
- * same editable fields rather than jumping to a separate confirm screen —
- * numbers feeding future targets/programs always get a human look before
- * they're saved, never auto-committed from OCR. */
+/**
+ * S04 Add/edit reading — the one place a body measurement is written.
+ *
+ * Only the date and at least one metric are required; blank optional fields
+ * stay null, never zero. A photo or PDF fills these same editable fields for
+ * a human check rather than saving on its own. Saving a date that already
+ * has a reading revises that reading in place: `at` keeps the measured date,
+ * so an older reading edited today never becomes "the latest" (AT24).
+ */
 export default function BodyReading() {
-  const { fromScan } = useLocalSearchParams<{ fromScan?: string }>();
+  const { fromScan, date: dateParam } = useLocalSearchParams<{ fromScan?: string; date?: string }>();
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const { width } = useWindowDimensions();
-  const locale = i18n.language === 'ar' ? 'ar-SA' : 'en-US';
+  const locale = i18n.language === 'ar' ? 'ar' : 'en';
 
   const language = useAppStore((s) => s.language) ?? 'en';
   const profile = useAppStore((s) => s.profile);
@@ -140,156 +93,57 @@ export default function BodyReading() {
   const clearPending = usePending((s) => s.clear);
 
   // A fresh scan hands off exactly one BodyReadingAnalysis before landing
-  // here, so the form's own initial state is the right place to consume it
-  // — a route param never changes after mount, so a lazy initializer covers
-  // it without an effect.
+  // here; a `date` param opens an existing reading for revision. Both are
+  // consumed by the form's initial state — route params never change after
+  // mount, so lazy initializers cover them without an effect.
   const scanned = fromScan === '1' ? bodyReading : null;
-  const scannedSeg = scanned?.segmentalLeanMassKg;
-  const hasScannedSeg = !!scannedSeg && Object.values(scannedSeg).some((v) => v != null);
-  const scannedFatSeg = scanned?.segmentalFatMassKg;
-  const hasScannedFatSeg = !!scannedFatSeg && Object.values(scannedFatSeg).some((v) => v != null);
+  const existingForParam = dateParam ? weights.find((w) => ymd(new Date(w.at)) === dateParam) : undefined;
+  const initial = existingForParam;
 
-  const [kg, setKg] = useState(scanned?.weightKg != null ? String(scanned.weightKg) : '');
-  const [bodyFat, setBodyFat] = useState(scanned?.bodyFatPercent != null ? String(scanned.bodyFatPercent) : '');
+  const [mode, setMode] = useState<'manual' | 'photo'>(scanned ? 'photo' : 'manual');
+  const [kg, setKg] = useState(scanned?.weightKg != null ? String(scanned.weightKg) : initial ? String(initial.kg) : '');
+  const [bodyFat, setBodyFat] = useState(
+    scanned?.bodyFatPercent != null ? String(scanned.bodyFatPercent) : initial?.bodyFatPercent != null ? String(initial.bodyFatPercent) : '',
+  );
   const [muscleMass, setMuscleMass] = useState(
-    scanned?.skeletalMuscleMassKg != null ? String(scanned.skeletalMuscleMassKg) : '',
+    scanned?.skeletalMuscleMassKg != null
+      ? String(scanned.skeletalMuscleMassKg)
+      : initial?.skeletalMuscleMassKg != null
+        ? String(initial.skeletalMuscleMassKg)
+        : '',
   );
-  const [segmental, setSegmental] = useState<Record<'leftArm' | 'rightArm' | 'trunk' | 'leftLeg' | 'rightLeg', string>>(
-    () => ({
-      leftArm: scannedSeg?.leftArm != null ? String(scannedSeg.leftArm) : '',
-      rightArm: scannedSeg?.rightArm != null ? String(scannedSeg.rightArm) : '',
-      trunk: scannedSeg?.trunk != null ? String(scannedSeg.trunk) : '',
-      leftLeg: scannedSeg?.leftLeg != null ? String(scannedSeg.leftLeg) : '',
-      rightLeg: scannedSeg?.rightLeg != null ? String(scannedSeg.rightLeg) : '',
-    }),
+  const [segmental, setSegmental] = useState<Record<SegKey, string>>(() => segToText(scanned?.segmentalLeanMassKg ?? initial?.segmentalLeanMassKg));
+  const [segmentalFat, setSegmentalFat] = useState<Record<SegKey, string>>(() => segToText(scanned?.segmentalFatMassKg ?? initial?.segmentalFatMassKg));
+  const [dimensions, setDimensions] = useState<Record<DimensionKey, string>>(() => ({
+    ...EMPTY_DIMENSIONS,
+    ...Object.fromEntries(DIMENSION_KEYS.map((k) => [k, initial?.measurementsCm?.[k] != null ? String(initial.measurementsCm[k]) : ''])),
+  }));
+  const [showMore, setShowMore] = useState(
+    () => hasAny(segToText(scanned?.segmentalLeanMassKg ?? initial?.segmentalLeanMassKg)) || !!initial?.skeletalMuscleMassKg || !!scanned?.skeletalMuscleMassKg,
   );
-  const [showSegmental, setShowSegmental] = useState(hasScannedSeg);
-  const [segmentalFat, setSegmentalFat] = useState<Record<'leftArm' | 'rightArm' | 'trunk' | 'leftLeg' | 'rightLeg', string>>(
-    () => ({
-      leftArm: scannedFatSeg?.leftArm != null ? String(scannedFatSeg.leftArm) : '',
-      rightArm: scannedFatSeg?.rightArm != null ? String(scannedFatSeg.rightArm) : '',
-      trunk: scannedFatSeg?.trunk != null ? String(scannedFatSeg.trunk) : '',
-      leftLeg: scannedFatSeg?.leftLeg != null ? String(scannedFatSeg.leftLeg) : '',
-      rightLeg: scannedFatSeg?.rightLeg != null ? String(scannedFatSeg.rightLeg) : '',
-    }),
-  );
-  const [showSegmentalFat, setShowSegmentalFat] = useState(hasScannedFatSeg);
-  // Tape-measure circumferences — manual only, never filled by a scan (no
-  // report prints these), so this always starts blank unless a past entry
-  // with dimensions is loaded via the date picker below.
-  const [dimensions, setDimensions] = useState<Record<DimensionKey, string>>(EMPTY_DIMENSIONS);
-  const [showDimensions, setShowDimensions] = useState(false);
+  const [showSegmental, setShowSegmental] = useState(() => hasAny(segToText(scanned?.segmentalLeanMassKg ?? initial?.segmentalLeanMassKg)));
+  const [showSegmentalFat, setShowSegmentalFat] = useState(() => hasAny(segToText(scanned?.segmentalFatMassKg ?? initial?.segmentalFatMassKg)));
+  const [showNotes, setShowNotes] = useState(!!initial?.note);
+  const [note, setNote] = useState(initial?.note ?? '');
   // Purely descriptive — never user-edited, since we have no reference
   // range to recompute it from ourselves. Only ever set from a report's own
-  // printed classification (a fresh scan, or loading a past saved reading).
-  const [segmentalStatus, setSegmentalStatus] = useState<SegmentalStatus | undefined>(scanned?.segmentalLeanMassStatus);
-  const [segmentalFatStatus, setSegmentalFatStatus] = useState<SegmentalStatus | undefined>(scanned?.segmentalFatMassStatus);
-  const [mapView, setMapView] = useState<BodyMapView>('front');
-  const [metric, setMetric] = useState<BodyMapMetric>('muscle');
-  const [deviceLabel, setDeviceLabel] = useState(scanned?.deviceLabel);
-  const [source, setSource] = useState<'manual' | 'scan'>(scanned ? 'scan' : 'manual');
+  // printed classification (a fresh scan, or a past saved reading).
+  const [segmentalStatus, setSegmentalStatus] = useState<SegmentalStatus | undefined>(scanned?.segmentalLeanMassStatus ?? initial?.segmentalLeanMassStatus);
+  const [segmentalFatStatus, setSegmentalFatStatus] = useState<SegmentalStatus | undefined>(scanned?.segmentalFatMassStatus ?? initial?.segmentalFatMassStatus);
+  const [deviceLabel, setDeviceLabel] = useState(scanned?.deviceLabel ?? initial?.reportLabel);
+  const [source, setSource] = useState<'manual' | 'scan'>(scanned ? 'scan' : (initial?.source ?? 'manual'));
   const [lowConfidence, setLowConfidence] = useState(scanned != null && scanned.confidence < 0.5);
   // Defaults to today; a fresh scan can override it with the date actually
-  // printed on the report, and it stays freely editable either way — the
-  // whole point of importing an old PDF is that it isn't today's reading.
-  const [date, setDate] = useState(scanned?.testDate ?? ymd(new Date()));
-  // Set only when a PDF (not the camera) produced the current fields, so the
-  // confirmation card can show a document icon instead of a photo thumbnail.
+  // printed on the report, and it stays freely editable either way.
+  const [date, setDate] = useState(scanned?.testDate ?? dateParam ?? ymd(new Date()));
   const [pdfName, setPdfName] = useState<string | undefined>(undefined);
   const [uploadStage, setUploadStage] = useState<'idle' | 'picking' | 'analyzing' | 'done' | 'error'>('idle');
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  // The `at` of the reading saved during this visit, so the list below can
-  // pin it even when its date puts it far outside the newest six.
-  const [justSavedAt, setJustSavedAt] = useState<string | null>(null);
-  const recent = useMemo(() => {
-    const top = weights.slice(0, 6);
-    if (!justSavedAt || top.some((w) => w.at === justSavedAt)) return top;
-    const saved = weights.find((w) => w.at === justSavedAt);
-    return saved ? [...top, saved] : top;
-  }, [weights, justSavedAt]);
-  // Trend charts are "as of" whatever date is currently loaded on the form
-  // — scrubbing to a past date via the date picker should visibly change
-  // what the charts show, same as the composition map above already does.
-  const asOfTime = useMemo(() => new Date(isoFromDateInput(date)).getTime(), [date]);
-  const visibleWeights = useMemo(() => weights.filter((w) => new Date(w.at).getTime() <= asOfTime), [weights, asOfTime]);
-  const trendSeries = useMemo(() => [...visibleWeights].slice(0, 8).reverse(), [visibleWeights]);
-  const weightSeries = trendSeries.map((w) => w.kg);
-  const weightLabels = trendSeries.map((w) =>
-    new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' }),
-  );
-  const dateLabel = (at: string) => new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'numeric' });
-  const bmiSeries = profile ? trendSeries.map((w) => bmiFor(w.kg, profile.heightCm)) : [];
-  const bodyFatPoints = useMemo(
-    () => [...visibleWeights].filter((w) => w.bodyFatPercent != null).slice(0, 8).reverse(),
-    [visibleWeights],
-  );
-  const bodyFatSeries = bodyFatPoints.map((w) => w.bodyFatPercent!);
-  const bodyFatLabels = bodyFatPoints.map((w) => dateLabel(w.at));
-  const musclePoints = useMemo(
-    () => [...visibleWeights].filter((w) => w.skeletalMuscleMassKg != null && w.kg > 0).slice(0, 8).reverse(),
-    [visibleWeights],
-  );
-  const muscleSeries = musclePoints.map((w) => (w.skeletalMuscleMassKg! / w.kg) * 100);
-  const muscleLabels = musclePoints.map((w) => dateLabel(w.at));
-
-  // Each chart's line is colored by whether the whole visible window is
-  // trending the right way — first point vs. last point, not just the last
-  // two (which can read as flat even when the chart clearly isn't, e.g. two
-  // identical back-to-back weigh-ins) — green/amber/red, same read as the
-  // Overview card's arrows, rather than one flat brand color that says
-  // nothing about direction.
-  const trendColor = (trend: MetricTrend) =>
-    trend === 'good' ? theme.success : trend === 'bad' ? theme.danger : theme.warning;
-  const weightLineTrend: MetricTrend =
-    profile && weightSeries.length >= 2 ? weightTrend(weightSeries.at(-1)! - weightSeries[0], profile.goal) : 'neutral';
-  const bmiLineTrend: MetricTrend =
-    profile && bmiSeries.length >= 2 ? bmiTrend(bmiSeries.at(-1)! - bmiSeries[0], profile.goal) : 'neutral';
-  const bodyFatLineTrend: MetricTrend =
-    bodyFatSeries.length >= 2 ? bodyFatTrend(bodyFatSeries.at(-1)! - bodyFatSeries[0]) : 'neutral';
-  const muscleLineTrend: MetricTrend =
-    muscleSeries.length >= 2 ? muscleTrend(muscleSeries.at(-1)! - muscleSeries[0]) : 'neutral';
-
-  // Builds a chat-ready summary of the latest reading (with deltas vs the
-  // one before it, when there is one) and hands it to the coach as an
-  // opening question — the coach already gets the bare latest numbers with
-  // every message (see coach-context.ts), but the trend deltas here aren't
-  // part of that, and reading them out loud in the chat gives the user
-  // something concrete to follow along with.
-  const askCoach = () => {
-    const latest = weights[0];
-    if (!latest) return;
-    const previous = weights[1];
-    const delta = (value: number | undefined, decimals = 1) => {
-      if (value == null || Math.abs(value) < 0.05) return '';
-      return ` (${value > 0 ? '↑' : '↓'}${Math.abs(value).toFixed(decimals)})`;
-    };
-    const lines = [
-      `${t('progress.weight')}: ${latest.kg} ${t('progress.kg')}${delta(previous ? latest.kg - previous.kg : undefined)}`,
-    ];
-    if (profile) {
-      const bmiNow = bmiFor(latest.kg, profile.heightCm);
-      const bmiPrev = previous ? bmiFor(previous.kg, profile.heightCm) : undefined;
-      lines.push(`${t('progress.bmi')}: ${bmiNow.toFixed(1)}${delta(bmiPrev != null ? bmiNow - bmiPrev : undefined)}`);
-    }
-    if (latest.bodyFatPercent != null) {
-      const prevFat = previous?.bodyFatPercent;
-      lines.push(
-        `${t('bodyReading.bodyFat')}: ${latest.bodyFatPercent}%${delta(prevFat != null ? latest.bodyFatPercent - prevFat : undefined)}`,
-      );
-    }
-    if (latest.skeletalMuscleMassKg != null) {
-      const musclePct = (latest.skeletalMuscleMassKg / latest.kg) * 100;
-      const prevMusclePct =
-        previous?.skeletalMuscleMassKg != null && previous.kg ? (previous.skeletalMuscleMassKg / previous.kg) * 100 : undefined;
-      lines.push(
-        `${t('progress.musclePercent')}: ${musclePct.toFixed(0)}%${delta(prevMusclePct != null ? musclePct - prevMusclePct : undefined)}`,
-      );
-    }
-    if (profile) lines.push(`${t('onboarding.goalTitle')} ${t(`onboarding.goals.${profile.goal}`)}`);
-    const message = `${t('bodyReading.coachPromptIntro')}\n\n${lines.join('\n')}\n\n${t('bodyReading.coachPromptQuestion')}`;
-    router.push(`/coach?prompt=${encodeURIComponent(message)}`);
+  const [dirty, setDirty] = useState(false);
+  const touch = <T,>(setter: (v: T) => void) => (v: T) => {
+    setDirty(true);
+    setter(v);
   };
 
   const num = (v: string) => {
@@ -297,142 +151,47 @@ export default function BodyReading() {
     return Number.isFinite(n) && n > 0 ? n : undefined;
   };
 
-  // The composition map prefers whatever segmental numbers are on screen
-  // right now (fresh scan, or mid manual entry) and falls back to the most
-  // recent saved reading that had a segmental breakdown, so a return visit
-  // with a blank form still shows something.
-  const liveSeg = {
-    leftArm: num(segmental.leftArm),
-    rightArm: num(segmental.rightArm),
-    trunk: num(segmental.trunk),
-    leftLeg: num(segmental.leftLeg),
-    rightLeg: num(segmental.rightLeg),
-  };
-  const latestSavedSeg = weights.find((w) => w.segmentalLeanMassKg && zoneIntensityFromSegmental(w.segmentalLeanMassKg));
-  const compositionSeg = Object.values(liveSeg).some((v) => v != null) ? liveSeg : latestSavedSeg?.segmentalLeanMassKg;
-  const zoneIntensity = zoneIntensityFromSegmental(compositionSeg);
-
-  // Same idea, for the separate fat-mass-by-zone breakdown some fuller
-  // reports also print — its own diagram on the report, its own toggle here.
-  const liveFatSeg = {
-    leftArm: num(segmentalFat.leftArm),
-    rightArm: num(segmentalFat.rightArm),
-    trunk: num(segmentalFat.trunk),
-    leftLeg: num(segmentalFat.leftLeg),
-    rightLeg: num(segmentalFat.rightLeg),
-  };
-  const latestSavedFatSeg = weights.find((w) => w.segmentalFatMassKg && zoneIntensityFromSegmental(w.segmentalFatMassKg));
-  const compositionFatSeg = Object.values(liveFatSeg).some((v) => v != null) ? liveFatSeg : latestSavedFatSeg?.segmentalFatMassKg;
-  const fatZoneIntensity = zoneIntensityFromSegmental(compositionFatSeg);
-  const hasFatComposition = fatZoneIntensity != null;
-  // Falls back to whichever of the two actually has data when the preferred
-  // one doesn't — e.g. a reading with only a fat breakdown still shows it
-  // by default instead of an empty card.
-  const activeMetric: BodyMapMetric = zoneIntensity == null && hasFatComposition ? 'fat' : metric;
-  const activeZoneIntensity = activeMetric === 'fat' ? fatZoneIntensity : zoneIntensity;
-  const activeSeg = activeMetric === 'fat' ? compositionFatSeg : compositionSeg;
-  const zoneLabels = activeSeg
-    ? {
-        leftArm: activeSeg.leftArm != null ? `${activeSeg.leftArm.toFixed(1)}kg` : undefined,
-        rightArm: activeSeg.rightArm != null ? `${activeSeg.rightArm.toFixed(1)}kg` : undefined,
-        trunk: activeSeg.trunk != null ? `${activeSeg.trunk.toFixed(1)}kg` : undefined,
-        leftLeg: activeSeg.leftLeg != null ? `${activeSeg.leftLeg.toFixed(1)}kg` : undefined,
-        rightLeg: activeSeg.rightLeg != null ? `${activeSeg.rightLeg.toFixed(1)}kg` : undefined,
-      }
-    : undefined;
-
-  // Status follows whichever kg source is actually being shown — the report's
-  // own live/loaded status when the live numbers are what's on screen, else
-  // the same fallback entry's own status (so the two never mismatch).
-  const statusSource = Object.values(liveSeg).some((v) => v != null) ? segmentalStatus : latestSavedSeg?.segmentalLeanMassStatus;
-  const fatStatusSource = Object.values(liveFatSeg).some((v) => v != null) ? segmentalFatStatus : latestSavedFatSeg?.segmentalFatMassStatus;
-  const zoneStatus = zoneStatusFromSegmental(statusSource);
-  const fatZoneStatus = zoneStatusFromSegmental(fatStatusSource);
-  const activeZoneStatus = activeMetric === 'fat' ? fatZoneStatus : zoneStatus;
-
-  // Weight/BMI/fat/muscle for whatever's currently on screen — a fresh
-  // draft, or a past reading loaded via the date picker — against the
-  // closest saved entry strictly before it (not necessarily weights[1]. if
-  // we're viewing history rather than the latest). A blank draft (opened
-  // without a fresh scan) falls back to the latest saved entry, same as the
-  // composition map already does above, instead of showing nothing.
-  const currentWeightNum = num(kg);
-  const currentTimestamp = isoFromDateInput(date);
-  const currentEntry: WeightEntry | undefined = currentWeightNum
-    ? { at: currentTimestamp, kg: currentWeightNum, bodyFatPercent: num(bodyFat), skeletalMuscleMassKg: num(muscleMass) }
-    : weights[0];
-  const previousEntry = currentWeightNum
-    ? weights.find((w) => new Date(w.at).getTime() < new Date(currentTimestamp).getTime())
-    : weights[1];
-  const stats = currentEntry && profile ? bodyStatsFor(currentEntry, previousEntry, profile) : undefined;
-
-  // Picking an existing date loads that day's saved reading into the whole
-  // form — the date picker doubles as a way to browse history, not just tag
-  // a new entry.
+  // Picking a date that already has a reading loads it — the date picker
+  // doubles as the way to revise history, not just tag a new entry.
   const loadReading = (entry: WeightEntry) => {
     setKg(String(entry.kg));
     setBodyFat(entry.bodyFatPercent != null ? String(entry.bodyFatPercent) : '');
     setMuscleMass(entry.skeletalMuscleMassKg != null ? String(entry.skeletalMuscleMassKg) : '');
-    const seg = entry.segmentalLeanMassKg;
-    setSegmental({
-      leftArm: seg?.leftArm != null ? String(seg.leftArm) : '',
-      rightArm: seg?.rightArm != null ? String(seg.rightArm) : '',
-      trunk: seg?.trunk != null ? String(seg.trunk) : '',
-      leftLeg: seg?.leftLeg != null ? String(seg.leftLeg) : '',
-      rightLeg: seg?.rightLeg != null ? String(seg.rightLeg) : '',
-    });
-    setShowSegmental(!!seg && Object.values(seg).some((v) => v != null));
-    const fatSeg = entry.segmentalFatMassKg;
-    setSegmentalFat({
-      leftArm: fatSeg?.leftArm != null ? String(fatSeg.leftArm) : '',
-      rightArm: fatSeg?.rightArm != null ? String(fatSeg.rightArm) : '',
-      trunk: fatSeg?.trunk != null ? String(fatSeg.trunk) : '',
-      leftLeg: fatSeg?.leftLeg != null ? String(fatSeg.leftLeg) : '',
-      rightLeg: fatSeg?.rightLeg != null ? String(fatSeg.rightLeg) : '',
-    });
-    setShowSegmentalFat(!!fatSeg && Object.values(fatSeg).some((v) => v != null));
+    setSegmental(segToText(entry.segmentalLeanMassKg));
+    setShowSegmental(hasAny(segToText(entry.segmentalLeanMassKg)));
+    setSegmentalFat(segToText(entry.segmentalFatMassKg));
+    setShowSegmentalFat(hasAny(segToText(entry.segmentalFatMassKg)));
     setSegmentalStatus(entry.segmentalLeanMassStatus);
     setSegmentalFatStatus(entry.segmentalFatMassStatus);
     const dim = entry.measurementsCm;
-    setDimensions({
-      ...EMPTY_DIMENSIONS,
-      ...Object.fromEntries(DIMENSION_KEYS.map((k) => [k, dim?.[k] != null ? String(dim[k]) : ''])),
-    });
-    setShowDimensions(!!dim && Object.values(dim).some((v) => v != null));
+    setDimensions({ ...EMPTY_DIMENSIONS, ...Object.fromEntries(DIMENSION_KEYS.map((k) => [k, dim?.[k] != null ? String(dim[k]) : ''])) });
+    setShowMore(entry.skeletalMuscleMassKg != null || hasAny(segToText(entry.segmentalLeanMassKg)) || MORE_DIMENSIONS.some((k) => dim?.[k] != null));
+    setNote(entry.note ?? '');
+    setShowNotes(!!entry.note);
     setDeviceLabel(entry.reportLabel);
     setSource(entry.source ?? 'manual');
     setLowConfidence(false);
     setPdfName(undefined);
   };
 
-  // Fills the form from a freshly-analyzed report — used by the PDF upload
-  // below (an in-place update, unlike the camera scan's route-param prefill
-  // above, since there's no navigation involved).
+  // Fills the form from a freshly-analyzed report (PDF upload) — an in-place
+  // update, unlike the camera scan's route-param prefill above.
   const applyAnalysis = (a: BodyReadingAnalysis) => {
     if (a.weightKg != null) setKg(String(a.weightKg));
     if (a.bodyFatPercent != null) setBodyFat(String(a.bodyFatPercent));
-    if (a.skeletalMuscleMassKg != null) setMuscleMass(String(a.skeletalMuscleMassKg));
-    const seg = a.segmentalLeanMassKg;
-    if (seg && Object.values(seg).some((v) => v != null)) {
-      setSegmental({
-        leftArm: seg.leftArm != null ? String(seg.leftArm) : '',
-        rightArm: seg.rightArm != null ? String(seg.rightArm) : '',
-        trunk: seg.trunk != null ? String(seg.trunk) : '',
-        leftLeg: seg.leftLeg != null ? String(seg.leftLeg) : '',
-        rightLeg: seg.rightLeg != null ? String(seg.rightLeg) : '',
-      });
-      setShowSegmental(true);
+    if (a.skeletalMuscleMassKg != null) {
+      setMuscleMass(String(a.skeletalMuscleMassKg));
+      setShowMore(true);
     }
-    const fatSeg = a.segmentalFatMassKg;
-    if (fatSeg && Object.values(fatSeg).some((v) => v != null)) {
-      setSegmentalFat({
-        leftArm: fatSeg.leftArm != null ? String(fatSeg.leftArm) : '',
-        rightArm: fatSeg.rightArm != null ? String(fatSeg.rightArm) : '',
-        trunk: fatSeg.trunk != null ? String(fatSeg.trunk) : '',
-        leftLeg: fatSeg.leftLeg != null ? String(fatSeg.leftLeg) : '',
-        rightLeg: fatSeg.rightLeg != null ? String(fatSeg.rightLeg) : '',
-      });
+    if (a.segmentalLeanMassKg && Object.values(a.segmentalLeanMassKg).some((v) => v != null)) {
+      setSegmental(segToText(a.segmentalLeanMassKg));
+      setShowSegmental(true);
+      setShowMore(true);
+    }
+    if (a.segmentalFatMassKg && Object.values(a.segmentalFatMassKg).some((v) => v != null)) {
+      setSegmentalFat(segToText(a.segmentalFatMassKg));
       setShowSegmentalFat(true);
+      setShowMore(true);
     }
     setSegmentalStatus(a.segmentalLeanMassStatus);
     setSegmentalFatStatus(a.segmentalFatMassStatus);
@@ -440,6 +199,7 @@ export default function BodyReading() {
     setSource('scan');
     setLowConfidence(a.confidence < 0.5);
     if (a.testDate) setDate(a.testDate);
+    setDirty(true);
   };
 
   const uploadPdf = async () => {
@@ -458,12 +218,10 @@ export default function BodyReading() {
     }
     setUploadStage('analyzing');
     try {
-      const payload =
-        picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64, imageMediaType: picked.mimeType };
+      const payload = picked.kind === 'pdf' ? { pdf: picked.base64 } : { image: picked.base64, imageMediaType: picked.mimeType };
       const analysis = await analyzeBodyReading(payload, language);
       useEntitlement.getState().spend();
-      // Let the bar be seen completing before the fields fill in and it
-      // disappears, rather than vanishing mid-climb.
+      // Let the bar be seen completing before the fields fill in.
       setUploadStage('done');
       await new Promise((resolve) => setTimeout(resolve, 420));
       applyAnalysis(analysis);
@@ -493,64 +251,81 @@ export default function BodyReading() {
     }
   };
 
-  const confirmDeleteReading = (at: string) =>
-    Alert.alert(t('bodyReading.deleteReadingConfirm'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.delete'), style: 'destructive', onPress: () => deleteWeight(at) },
+  const leave = () => (router.canGoBack() ? router.back() : router.replace('/health'));
+
+  /** Cancel with unsaved edits offers Keep editing / Discard (S04). */
+  const cancel = () => {
+    if (!dirty) return leave();
+    Alert.alert(t('bodyReading.discardTitle'), t('bodyReading.discardBody'), [
+      { text: t('bodyReading.keepEditing'), style: 'cancel' },
+      { text: t('bodyReading.discard'), style: 'destructive', onPress: leave },
     ]);
+  };
+
+  const weightValue = num(kg);
+  const bodyFatValue = num(bodyFat);
+  const anyMetric = !!weightValue || !!bodyFatValue || !!num(muscleMass) || hasAny(dimensions) || hasAny(segmental) || hasAny(segmentalFat);
 
   const save = () => {
-    const weightKg = num(kg);
-    if (!weightKg) return;
-    // How far back the form's date is. A scanned report fills this in from
-    // the date PRINTED on the sheet, which is often not today — an imported
-    // old printout, or a demo sheet from years back.
-    const daysOld = daysSince(isoFromDateInput(date));
-    // Saving under an old printed date is correct for a genuine import, but
-    // it files the reading behind every newer one — out of the recent list,
-    // out of the trend charts, and leaving the screen looking untouched.
-    // That reads as "Save did nothing", so ask rather than guess.
-    if (daysOld > 7) {
-      const printed = new Date(isoFromDateInput(date)).toLocaleDateString(locale, {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric',
-      });
-      Alert.alert(t('bodyReading.oldDateTitle'), t('bodyReading.oldDateBody', { date: printed }), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('bodyReading.oldDateUseToday'), onPress: () => commitSave(weightKg, ymd(new Date())) },
-        { text: t('bodyReading.oldDateUseReport', { date: printed }), onPress: () => commitSave(weightKg, date) },
+    if (!anyMetric) return;
+    // Unusual but finite values get a review prompt from product limits, not
+    // a diagnosis: nothing here decides what a body should weigh.
+    const unusual =
+      weightValue && (weightValue < 25 || weightValue > 350)
+        ? { value: `${weightValue} ${t('progress.kg')}`, field: t('bodyReading.weight') }
+        : bodyFatValue && (bodyFatValue < 2 || bodyFatValue > 70)
+          ? { value: `${bodyFatValue}%`, field: t('bodyReading.bodyFat') }
+          : null;
+    if (unusual) {
+      Alert.alert(t('bodyReading.unusualTitle'), t('bodyReading.unusualBody', unusual), [
+        { text: t('bodyReading.keepEditing'), style: 'cancel' },
+        { text: t('bodyReading.saveAnyway'), onPress: () => saveDated() },
       ]);
       return;
     }
-    commitSave(weightKg, date);
+    saveDated();
   };
 
-  /** Files the reading and makes sure the user can see that it happened. */
-  const commitSave = (weightKg: number, onDate: string) => {
-    const at = isoFromDateInput(onDate);
-    const seg = {
-      leftArm: num(segmental.leftArm),
-      rightArm: num(segmental.rightArm),
-      trunk: num(segmental.trunk),
-      leftLeg: num(segmental.leftLeg),
-      rightLeg: num(segmental.rightLeg),
-    };
+  const saveDated = () => {
+    // A scanned report fills the date from the sheet, which is often not
+    // today. Filing under an old date is right for a genuine import, but it
+    // files the reading behind newer ones — ask rather than guess.
+    const daysOld = daysSince(isoFromDateInput(date));
+    if (daysOld > 7 && !existingForParam) {
+      const printed = new Date(isoFromDateInput(date)).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
+      Alert.alert(t('bodyReading.oldDateTitle'), t('bodyReading.oldDateBody', { date: printed }), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('bodyReading.oldDateUseToday'), onPress: () => commitSave(ymd(new Date())) },
+        { text: t('bodyReading.oldDateUseReport', { date: printed }), onPress: () => commitSave(date) },
+      ]);
+      return;
+    }
+    commitSave(date);
+  };
+
+  /** Files the reading (or revises the one on that date) and makes sure the user can see that it happened. */
+  const commitSave = (onDate: string) => {
+    const existing = weights.find((w) => ymd(new Date(w.at)) === onDate);
+    // Revision keeps the measured timestamp; only the content changes.
+    const at = existing ? existing.at : isoFromDateInput(onDate);
+    const seg = Object.fromEntries(SEG_KEYS.map((k) => [k, num(segmental[k])])) as Record<SegKey, number | undefined>;
+    const fatSeg = Object.fromEntries(SEG_KEYS.map((k) => [k, num(segmentalFat[k])])) as Record<SegKey, number | undefined>;
     const hasSeg = Object.values(seg).some((v) => v != null);
-    const fatSeg = {
-      leftArm: num(segmentalFat.leftArm),
-      rightArm: num(segmentalFat.rightArm),
-      trunk: num(segmentalFat.trunk),
-      leftLeg: num(segmentalFat.leftLeg),
-      rightLeg: num(segmentalFat.rightLeg),
-    };
     const hasFatSeg = Object.values(fatSeg).some((v) => v != null);
     const dim = Object.fromEntries(DIMENSION_KEYS.map((k) => [k, num(dimensions[k])])) as BodyMeasurements;
     const hasDim = Object.values(dim).some((v) => v != null);
+    // Weight is the one field the trend needs; a measurement-only reading
+    // keeps the previous weight on that date rather than inventing one.
+    const kgToSave = weightValue ?? existing?.kg ?? weights.find((w) => new Date(w.at).getTime() <= new Date(at).getTime())?.kg;
+    if (!kgToSave) {
+      Alert.alert(t('bodyReading.unusualTitle'), t('bodyReading.weightNeededFirst'));
+      return;
+    }
+    if (existing) deleteWeight(existing.at);
     logBodyReading({
-      kg: weightKg,
+      kg: kgToSave,
       at,
-      bodyFatPercent: num(bodyFat),
+      bodyFatPercent: bodyFatValue,
       skeletalMuscleMassKg: num(muscleMass),
       measurementsCm: hasDim ? dim : undefined,
       segmentalLeanMassKg: hasSeg ? seg : undefined,
@@ -559,47 +334,79 @@ export default function BodyReading() {
       segmentalFatMassStatus: hasFatSeg ? segmentalFatStatus : undefined,
       source,
       reportLabel: deviceLabel,
+      note: note.trim() || undefined,
+      editedAt: existing ? new Date().toISOString() : undefined,
     });
     clearPending();
     successHaptic();
-    setJustSavedAt(at);
-    setDate(onDate);
-    // A reading filed in the past sorts behind every newer one, so nothing
-    // on screen changes and leaving immediately looks exactly like a save
-    // that failed. Stay put and say plainly what was filed and when — the
-    // history list below pins it too (see `recent`).
+    setDirty(false);
     const savedOld = daysSince(at) > 7;
-    if (savedOld) {
+    if (savedOld && !existing) {
+      // Filed in the past it sits behind newer readings, so say plainly what was filed and when.
       Alert.alert(
         t('bodyReading.savedTitle'),
-        t('bodyReading.savedOldBody', {
-          date: new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }),
-        }),
+        t('bodyReading.savedOldBody', { date: new Date(at).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' }) }),
+        [{ text: t('common.done'), onPress: leave }],
       );
       return;
     }
     // A weight change big enough to matter gets a chance to update the
-    // calorie goal before leaving — the same window Overview's quick
-    // weigh-in shows, blocking the back-navigation until it's handled so it
-    // isn't shown on a screen that's already gone.
-    if (profile && targetsNeedUpdate(profile, weightKg)) {
-      setPendingWeightKg(weightKg);
+    // calorie goal before leaving — never silently.
+    if (profile && weightValue && targetsNeedUpdate(profile, weightValue) && weights[0]?.at === at) {
+      setPendingWeightKg(weightValue);
     } else {
-      router.back();
+      leave();
     }
   };
 
+  const dateLabel = new Date(isoFromDateInput(date)).toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+
   return (
     <Screen
+      header={<PageHeader title={existingForParam ? t('bodyReading.editTitle') : t('health.addReading')} onBack={cancel} />}
       footer={
-        <View>
-          <Button label={t('bodyReading.save')} onPress={save} disabled={!num(kg)} />
+        <View style={{ gap: Spacing.xs }}>
+          <Button label={t('bodyReading.save')} onPress={save} disabled={!anyMetric} />
+          <Button label={t('common.cancel')} variant="ghost" onPress={cancel} />
+        </View>
+      }
+    >
+      <Segmented
+        options={[
+          { key: 'manual', label: t('bodyReading.enterManually') },
+          { key: 'photo', label: t('bodyReading.readFromPhoto') },
+        ]}
+        value={mode}
+        onChange={setMode}
+        style={{ marginBottom: Spacing.md }}
+      />
+
+      {mode === 'photo' && (
+        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          {source === 'scan' ? (
+            <View style={styles.scanBadge}>
+              {photoUri ? (
+                <Image source={{ uri: photoUri }} style={styles.thumb} contentFit="cover" />
+              ) : (
+                <IconTile icon={pdfName ? 'document-text-outline' : 'camera-outline'} size={44} />
+              )}
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14 }}>
+                  {deviceLabel ? t('bodyReading.deviceLabel', { device: deviceLabel }) : t('bodyReading.scannedBadge')}
+                </Text>
+                <Text style={{ color: lowConfidence ? theme.warningText : theme.textSecondary, fontSize: 12, marginTop: 2 }}>
+                  {lowConfidence ? t('bodyReading.lowConfidence') : t('bodyReading.scannedBadge')}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: Spacing.sm }}>{t('bodyReading.photoIntro')}</Text>
+          )}
           <Button
-            label={source === 'scan' ? t('bodyReading.rescan') : t('bodyReading.scanReport')}
+            label={source === 'scan' ? t('bodyReading.rescan') : t('bodyReading.photographReport')}
             variant="secondary"
             icon="camera-outline"
             onPress={() => router.push('/scan?mode=body')}
-            style={{ marginTop: Spacing.xs }}
           />
           {documentPickerAvailable && (
             <>
@@ -615,294 +422,157 @@ export default function BodyReading() {
             </>
           )}
         </View>
-      }
-    >
-      <View style={styles.header}>
-        <Title>{t('bodyReading.title')}</Title>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+      )}
+
+      <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+        <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>{t('bodyReading.date')}</Text>
+        <Pressable
+          onPress={() => setShowDatePicker(true)}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('bodyReading.date')}: ${dateLabel}`}
+          style={({ pressed }) => [styles.dateRow, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
+        >
+          <Ionicons name="calendar-outline" size={18} color={theme.primary} />
+          <Text style={{ color: theme.text, fontWeight: '600', fontSize: 16, flex: 1 }}>{dateLabel}</Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
         </Pressable>
-      </View>
-      <Text style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>
-        {t('bodyReading.subtitle')}
-      </Text>
+        <DatePickerModal
+          visible={showDatePicker}
+          value={new Date(isoFromDateInput(date))}
+          maxDate={new Date()}
+          onChange={(d) => {
+            const newDate = ymd(d);
+            setDate(newDate);
+            setDirty(true);
+            const existing = weights.find((w) => ymd(new Date(w.at)) === newDate);
+            if (existing) loadReading(existing);
+          }}
+          onClose={() => setShowDatePicker(false)}
+        />
 
-      {source === 'scan' && (
-        <Card style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md }}>
-          {photoUri ? (
-            <Image source={{ uri: photoUri }} style={styles.thumb} contentFit="cover" />
-          ) : pdfName ? (
-            <View style={[styles.thumb, styles.pdfThumb, { backgroundColor: theme.cardSubtle }]}>
-              <Ionicons name="document-text-outline" size={22} color={theme.textSecondary} />
-            </View>
-          ) : null}
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
-              {deviceLabel ? t('bodyReading.deviceLabel', { device: deviceLabel }) : t('bodyReading.scannedBadge')}
-            </Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
-              {lowConfidence ? t('bodyReading.lowConfidence') : t('bodyReading.scannedBadge')}
-            </Text>
-          </View>
-        </Card>
-      )}
-
-      <View>
+        <View style={{ height: Spacing.md }} />
+        <Field label={t('bodyReading.weight')} value={kg} onChangeText={touch((v: string) => setKg(normalizeDigits(v)))} keyboardType="decimal-pad" maxLength={5} suffix={t('progress.kg')} />
         <Field
-          label={t('bodyReading.date')}
-          value={date}
-          editable={false}
-          placeholder="YYYY-MM-DD"
+          label={`${t('bodyReading.waist')} ${t('bodyReading.optional')}`}
+          value={dimensions.waist}
+          onChangeText={touch((v: string) => setDimensions((s) => ({ ...s, waist: normalizeDigits(v) })))}
+          keyboardType="decimal-pad"
+          maxLength={5}
+          suffix="cm"
         />
-        {/* A non-editable TextInput can still swallow the tap itself on some
-            platforms rather than letting it bubble to a wrapping Pressable —
-            an overlay guarantees the tap is actually caught. */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowDatePicker(true)} />
+        <Field
+          label={`${t('bodyReading.bodyFat')} ${t('bodyReading.optional')}`}
+          value={bodyFat}
+          onChangeText={touch((v: string) => setBodyFat(normalizeDigits(v)))}
+          keyboardType="decimal-pad"
+          maxLength={4}
+          suffix="%"
+        />
+
+        <View style={[styles.divider, { backgroundColor: theme.border }]} />
+        <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>{t('bodyReading.source')}</Text>
+        <View style={[styles.sourceRow, { backgroundColor: theme.surfaceTint }]}>
+          <Ionicons name={source === 'scan' ? 'scan-outline' : 'pencil-outline'} size={16} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
+            {source === 'scan' ? (deviceLabel ? t('health.sourceScanNamed', { device: deviceLabel }) : t('health.sourceScan')) : t('health.sourceManual')}
+          </Text>
+        </View>
+        <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 6 }}>{t('bodyReading.onlyEntered')}</Text>
       </View>
-      <DatePickerModal
-        visible={showDatePicker}
-        value={new Date(isoFromDateInput(date))}
-        maxDate={new Date()}
-        onChange={(d) => {
-          const newDate = ymd(d);
-          setDate(newDate);
-          const existing = weights.find((w) => ymd(new Date(w.at)) === newDate);
-          if (existing) loadReading(existing);
-        }}
-        onClose={() => setShowDatePicker(false)}
-      />
 
-      {(zoneIntensity || fatZoneIntensity) && (
-        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.sm, textAlign: 'center' }]}>
-            {activeMetric === 'fat' ? t('bodyReading.compositionFat') : t('bodyReading.composition')}
-          </Text>
-          {stats && (stats.bodyFatPercent != null || stats.musclePercent != null) && (
-            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: Spacing.xl, marginBottom: Spacing.sm }}>
-              {stats.bodyFatPercent != null && (
-                <CompositionStat
-                  label={t('bodyReading.bodyFat')}
-                  value={`${stats.bodyFatPercent}%`}
-                  delta={stats.bodyFatDelta}
-                  trend={stats.bodyFatTrend}
-                  theme={theme}
-                />
-              )}
-              {stats.musclePercent != null && (
-                <CompositionStat
-                  label={t('progress.musclePercent')}
-                  value={`${stats.musclePercent.toFixed(0)}%`}
-                  delta={stats.muscleDelta}
-                  trend={stats.muscleTrend}
-                  theme={theme}
-                />
-              )}
-            </View>
-          )}
-          <View style={{ alignItems: 'center' }}>
-            <BodyMap
-              view={mapView}
-              zoneIntensity={activeZoneIntensity ?? undefined}
-              zoneStatus={activeZoneStatus ?? undefined}
-              zoneColor={activeMetric === 'fat' ? theme.fat : theme.primary}
-              zoneLabels={zoneLabels}
-              size={150}
-            />
-          </View>
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'center',
-              alignItems: 'center',
-              gap: Spacing.lg,
-              marginTop: Spacing.sm,
-            }}
-          >
-            {zoneIntensity && fatZoneIntensity && (
-              <BodyMapMetricSwitch metric={activeMetric} onChange={setMetric} />
-            )}
-            <BodyMapViewSwitch view={mapView} onChange={setMapView} />
-          </View>
-          <View style={{ marginTop: Spacing.sm }}>
-            {activeZoneStatus ? <BodyMapStatusLegend /> : <BodyMapIntensityHint />}
-          </View>
-        </View>
-      )}
-
-      {weightSeries.length >= 2 && (
-        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-            {t('bodyReading.trend')}
-          </Text>
-          <TrendLine values={weightSeries} labels={weightLabels} color={trendColor(weightLineTrend)} width={width - Spacing.md * 4} />
-        </View>
-      )}
-
-      {bmiSeries.length >= 2 && (
-        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-            {t('progress.bmi')}
-          </Text>
-          <TrendLine values={bmiSeries} labels={weightLabels} color={trendColor(bmiLineTrend)} width={width - Spacing.md * 4} />
-        </View>
-      )}
-
-      {bodyFatSeries.length >= 2 && (
-        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-            {t('bodyReading.bodyFat')}
-          </Text>
-          <TrendLine values={bodyFatSeries} labels={bodyFatLabels} color={trendColor(bodyFatLineTrend)} width={width - Spacing.md * 4} />
-        </View>
-      )}
-
-      {muscleSeries.length >= 2 && (
-        <View style={[styles.trendCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: Spacing.xs }]}>
-            {t('progress.musclePercent')}
-          </Text>
-          <TrendLine values={muscleSeries} labels={muscleLabels} color={trendColor(muscleLineTrend)} width={width - Spacing.md * 4} />
-        </View>
-      )}
-
-      {weights.length > 0 && (
-        <Button
-          label={t('bodyReading.askCoach')}
-          variant="ghost"
-          icon="sparkles-outline"
-          onPress={askCoach}
-          style={{ marginBottom: Spacing.md }}
-        />
-      )}
-
-      <Field
-        label={t('bodyReading.weight')}
-        value={kg}
-        onChangeText={(v) => setKg(normalizeDigits(v))}
-        keyboardType="decimal-pad"
-        maxLength={5}
-        suffix={t('progress.kg')}
-      />
-      <Field
-        label={t('bodyReading.bodyFat')}
-        value={bodyFat}
-        onChangeText={(v) => setBodyFat(normalizeDigits(v))}
-        keyboardType="decimal-pad"
-        maxLength={4}
-        suffix="%"
-      />
-      <Field
-        label={t('bodyReading.muscleMass')}
-        value={muscleMass}
-        onChangeText={(v) => setMuscleMass(normalizeDigits(v))}
-        keyboardType="decimal-pad"
-        maxLength={5}
-        suffix={t('progress.kg')}
-      />
-
-      <Pressable onPress={() => setShowSegmental((v) => !v)} style={styles.segmentalToggle}>
-        <Ionicons name={showSegmental ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
-        <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>
-          {t('bodyReading.segmental')}
-        </Text>
+      {/* Notes */}
+      <Pressable
+        onPress={() => setShowNotes((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showNotes }}
+        style={({ pressed }) => [styles.toggleCard, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.8 }]}
+      >
+        <IconTile icon="document-text-outline" />
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, flex: 1 }}>{t('bodyReading.notes')}</Text>
+        <Ionicons name={showNotes ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
       </Pressable>
-      {showSegmental && (
-        <View>
-          {(['leftArm', 'rightArm', 'trunk', 'leftLeg', 'rightLeg'] as const).map((key) => (
+      {showNotes && (
+        <View style={[styles.card, { backgroundColor: theme.card, marginTop: -Spacing.sm }, cardShadow(theme.shadow)]}>
+          <TextInput
+            value={note}
+            onChangeText={touch(setNote)}
+            placeholder={t('bodyReading.notesPlaceholder')}
+            placeholderTextColor={theme.textTertiary}
+            multiline
+            style={[styles.notes, { color: theme.text, borderColor: theme.border }]}
+            accessibilityLabel={t('bodyReading.notes')}
+          />
+        </View>
+      )}
+
+      {/* More measurements: composition, segmental breakdowns, other tape measures. */}
+      <Pressable
+        onPress={() => setShowMore((v) => !v)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showMore }}
+        style={({ pressed }) => [styles.toggleCard, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.8 }]}
+      >
+        <IconTile icon={showMore ? 'remove' : 'add'} />
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, flex: 1 }}>{showMore ? t('bodyReading.fewer') : t('bodyReading.addMore')}</Text>
+        <Ionicons name={showMore ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.textTertiary} />
+      </Pressable>
+      {showMore && (
+        <View style={[styles.card, { backgroundColor: theme.card, marginTop: -Spacing.sm }, cardShadow(theme.shadow)]}>
+          <Field
+            label={`${t('bodyReading.muscleMass')} ${t('bodyReading.optional')}`}
+            value={muscleMass}
+            onChangeText={touch((v: string) => setMuscleMass(normalizeDigits(v)))}
+            keyboardType="decimal-pad"
+            maxLength={5}
+            suffix={t('progress.kg')}
+          />
+          {MORE_DIMENSIONS.map((key) => (
             <Field
               key={key}
-              label={t(`bodyReading.${key}`)}
-              value={segmental[key]}
-              onChangeText={(v) => setSegmental((s) => ({ ...s, [key]: normalizeDigits(v) }))}
-              keyboardType="decimal-pad"
-              maxLength={5}
-              suffix={t('progress.kg')}
-            />
-          ))}
-        </View>
-      )}
-
-      <Pressable onPress={() => setShowSegmentalFat((v) => !v)} style={styles.segmentalToggle}>
-        <Ionicons name={showSegmentalFat ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
-        <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>
-          {t('bodyReading.segmentalFat')}
-        </Text>
-      </Pressable>
-      {showSegmentalFat && (
-        <View>
-          {(['leftArm', 'rightArm', 'trunk', 'leftLeg', 'rightLeg'] as const).map((key) => (
-            <Field
-              key={key}
-              label={t(`bodyReading.${key}`)}
-              value={segmentalFat[key]}
-              onChangeText={(v) => setSegmentalFat((s) => ({ ...s, [key]: normalizeDigits(v) }))}
-              keyboardType="decimal-pad"
-              maxLength={5}
-              suffix={t('progress.kg')}
-            />
-          ))}
-        </View>
-      )}
-
-      <Pressable onPress={() => setShowDimensions((v) => !v)} style={styles.segmentalToggle}>
-        <Ionicons name={showDimensions ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
-        <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>
-          {t('bodyReading.dimensions')}
-        </Text>
-      </Pressable>
-      {showDimensions && (
-        <View>
-          {DIMENSION_KEYS.map((key) => (
-            <Field
-              key={key}
-              label={t(`bodyReading.${key}`)}
+              label={`${t(`bodyReading.${key}`)} ${t('bodyReading.optional')}`}
               value={dimensions[key]}
-              onChangeText={(v) => setDimensions((s) => ({ ...s, [key]: normalizeDigits(v) }))}
+              onChangeText={touch((v: string) => setDimensions((s) => ({ ...s, [key]: normalizeDigits(v) })))}
               keyboardType="decimal-pad"
               maxLength={5}
               suffix="cm"
             />
           ))}
+          <Pressable onPress={() => setShowSegmental((v) => !v)} style={styles.subToggle} accessibilityRole="button" accessibilityState={{ expanded: showSegmental }}>
+            <Ionicons name={showSegmental ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
+            <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>{t('bodyReading.segmental')}</Text>
+          </Pressable>
+          {showSegmental &&
+            SEG_KEYS.map((key) => (
+              <Field
+                key={key}
+                label={t(`bodyReading.${key}`)}
+                value={segmental[key]}
+                onChangeText={touch((v: string) => setSegmental((s) => ({ ...s, [key]: normalizeDigits(v) })))}
+                keyboardType="decimal-pad"
+                maxLength={5}
+                suffix={t('progress.kg')}
+              />
+            ))}
+          <Pressable onPress={() => setShowSegmentalFat((v) => !v)} style={styles.subToggle} accessibilityRole="button" accessibilityState={{ expanded: showSegmentalFat }}>
+            <Ionicons name={showSegmentalFat ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
+            <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>{t('bodyReading.segmentalFat')}</Text>
+          </Pressable>
+          {showSegmentalFat &&
+            SEG_KEYS.map((key) => (
+              <Field
+                key={key}
+                label={t(`bodyReading.${key}`)}
+                value={segmentalFat[key]}
+                onChangeText={touch((v: string) => setSegmentalFat((s) => ({ ...s, [key]: normalizeDigits(v) })))}
+                keyboardType="decimal-pad"
+                maxLength={5}
+                suffix={t('progress.kg')}
+              />
+            ))}
         </View>
       )}
 
-      {recent.length > 0 && (
-        <>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: Spacing.sm }]}>
-            {t('bodyReading.recent')}
-          </Text>
-          <View style={[styles.historyCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-            {recent.map((w, i) => (
-              <View
-                key={w.at}
-                style={[
-                  styles.historyRow,
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-                ]}
-              >
-                <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>
-                  {new Date(w.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
-                </Text>
-                <Text style={{ color: theme.text }}>
-                  {w.kg} {t('progress.kg')}
-                </Text>
-                {w.bodyFatPercent != null && (
-                  <Text style={{ color: theme.textSecondary, marginStart: Spacing.sm }}>
-                    {w.bodyFatPercent}%
-                  </Text>
-                )}
-                <Pressable
-                  onPress={() => confirmDeleteReading(w.at)}
-                  hitSlop={10}
-                  style={{ marginStart: Spacing.sm }}
-                >
-                  <Ionicons name="trash-outline" size={16} color={theme.textTertiary} />
-                </Pressable>
-              </View>
-            ))}
-          </View>
-        </>
-      )}
+      <InfoLine>{t('bodyReading.revisionNote')}</InfoLine>
 
       {profile && (
         <TargetUpdateModal
@@ -916,7 +586,7 @@ export default function BodyReading() {
           }}
           onDismiss={() => {
             setPendingWeightKg(null);
-            router.back();
+            leave();
           }}
         />
       )}
@@ -924,49 +594,24 @@ export default function BodyReading() {
   );
 }
 
-/** Horizontal step row shown while an uploaded report is being read and
- * analyzed, so the wait isn't just a spinner — and on failure, the actual
- * reason instead of a generic alert. */
-function UploadProgress({
-  stage,
-  error,
-}: {
-  stage: 'picking' | 'analyzing' | 'done' | 'error';
-  error: string | null;
-}) {
+/** Progress while an uploaded report is read and analysed — and on failure,
+ * the actual reason instead of a generic alert. */
+function UploadProgress({ stage, error }: { stage: 'picking' | 'analyzing' | 'done' | 'error'; error: string | null }) {
   const theme = useTheme();
   const { t } = useTranslation();
-
   if (stage === 'error') {
     return (
-      <View
-        style={[
-          styles.uploadProgress,
-          { backgroundColor: theme.cardSubtle, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-        ]}
-      >
-        <Ionicons name="alert-circle" size={16} color={theme.danger} />
-        <Text style={{ color: theme.danger, fontSize: 12, flex: 1 }}>{error}</Text>
+      <View style={[styles.uploadProgress, { backgroundColor: theme.surfaceTint, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }]}>
+        <Ionicons name="alert-circle" size={16} color={theme.errorText} />
+        <Text style={{ color: theme.errorText, fontSize: 12, flex: 1 }}>{error}</Text>
       </View>
     );
   }
-
-  // Reading the file is near-instant; the AI call is the wait, and it
-  // reports nothing until it answers — so the bar climbs and slows rather
-  // than pretending to measure, and only completes once the reply is in
-  // (see ProgressBar). "picking" and "analyzing" share one continuous bar
-  // so it never restarts halfway through the same upload.
   return (
-    <View style={[styles.uploadProgress, { backgroundColor: theme.cardSubtle }]}>
+    <View style={[styles.uploadProgress, { backgroundColor: theme.surfaceTint }]}>
       <ProgressBar
         done={stage === 'done'}
-        label={
-          stage === 'done'
-            ? t('bodyReading.stepDone')
-            : stage === 'picking'
-              ? t('bodyReading.stepReading')
-              : t('bodyReading.stepAnalyzing')
-        }
+        label={stage === 'done' ? t('bodyReading.stepDone') : stage === 'picking' ? t('bodyReading.stepReading') : t('bodyReading.stepAnalyzing')}
         trackColor={theme.border}
         fillColor={theme.primary}
         textColor={theme.text}
@@ -976,16 +621,14 @@ function UploadProgress({
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
+  toggleCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.ms, marginBottom: Spacing.md, minHeight: 56 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.control, paddingHorizontal: Spacing.md, minHeight: 48 },
+  sourceRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.control, paddingHorizontal: Spacing.md, minHeight: 44 },
+  divider: { height: StyleSheet.hairlineWidth, marginBottom: Spacing.md },
+  scanBadge: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.sm },
   thumb: { width: 44, height: 44, borderRadius: Radius.sm },
-  pdfThumb: { alignItems: 'center', justifyContent: 'center' },
-  trendCard: { borderRadius: Radius.md, padding: Spacing.md, marginBottom: Spacing.md },
-  segmentalToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
-  historyCard: { borderRadius: Radius.md, overflow: 'hidden' },
-  historyRow: { flexDirection: 'row', alignItems: 'center', padding: Spacing.md },
-  uploadProgress: {
-    borderRadius: Radius.md,
-    padding: Spacing.sm,
-    marginTop: Spacing.xs,
-  },
+  notes: { borderWidth: 1, borderRadius: Radius.control, padding: Spacing.ms, minHeight: 80, fontSize: 15, textAlignVertical: 'top' },
+  subToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm, minHeight: 40 },
+  uploadProgress: { borderRadius: Radius.control, padding: Spacing.sm, marginTop: Spacing.xs },
 });

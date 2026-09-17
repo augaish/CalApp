@@ -4,8 +4,10 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, Screen, Title } from '@/components/ui';
-import { Radius, Spacing, Type } from '@/constants/theme';
+import { PageHeader } from '@/components/brand-header';
+import { ActionButton, Chip, EmptyState, IconTile, Segmented, SettingsRow } from '@/components/system';
+import { Button, Screen } from '@/components/ui';
+import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { servingCountLabel, servingPluralCount } from '@/lib/recipes';
@@ -30,6 +32,16 @@ function defaultRange(days: number): { fromKey: string; toKey: string } {
 }
 
 const RANGES = [3, 7, 14] as const;
+const AISLE_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  produce: 'leaf-outline',
+  meat: 'fish-outline',
+  dairy: 'water-outline',
+  bakery: 'cafe-outline',
+  pantry: 'basket-outline',
+  frozen: 'snow-outline',
+  spices: 'flask-outline',
+  other: 'cube-outline',
+};
 
 /** A dateKey is "year-monthIndex-day" and is not something to show a person. */
 function readableDate(key: string, locale: string): string {
@@ -38,12 +50,13 @@ function readableDate(key: string, locale: string): string {
 }
 
 /**
- * One shopping trip, built from the recipes standing on the plan.
+ * S12 Shopping — one trip, built from the recipes standing on the plan.
  *
- * Only decisions are stored; every quantity is recomputed from the plan each
- * time this opens. That is what lets the plan change underneath without
- * throwing away an afternoon's ticking — and what makes it possible to say
- * "300 g more needed" instead of quietly treating a grown amount as bought.
+ * Only decisions are stored (bought amounts, have-at-home, batch groups);
+ * every quantity is recomputed from the plan each time this opens. That is
+ * what lets the plan change underneath without throwing away an afternoon's
+ * ticking — and what makes it possible to say "300 g more needed" instead of
+ * quietly treating a grown amount as bought.
  */
 export default function Shopping() {
   const { t, i18n } = useTranslation();
@@ -63,37 +76,34 @@ export default function Shopping() {
 
   const [rangeDays, setRangeDays] = useState<number>(7);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [view, setView] = useState<'buy' | 'have'>('buy');
+  const [showBatch, setShowBatch] = useState(false);
+  const [pickingRange, setPickingRange] = useState(false);
 
   // The trip in progress, or the default window until one is started.
   const range = shopping ?? defaultRange(rangeDays);
 
   const { meals, plannedTotal } = useMemo(
-    () =>
-      plannedRecipeMealsBetween(
-        range.fromKey,
-        range.toKey,
-        mealPlanRecipes,
-        recipes,
-        mealPlan,
-        activeProgramId,
-      ),
+    () => plannedRecipeMealsBetween(range.fromKey, range.toKey, mealPlanRecipes, recipes, mealPlan, activeProgramId),
     [range.fromKey, range.toKey, mealPlanRecipes, recipes, mealPlan, activeProgramId],
   );
 
-  const plans = useMemo(
-    () => cookPlans(meals, shopping?.oneBatch ?? {}),
-    [meals, shopping?.oneBatch],
-  );
+  const plans = useMemo(() => cookPlans(meals, shopping?.oneBatch ?? {}), [meals, shopping?.oneBatch]);
   const lines = useMemo(() => buildShoppingLines(plans), [plans]);
   const groups = useMemo(() => byAisle(lines), [lines]);
 
   const checkedAt = shopping?.checkedAt ?? {};
   const have = shopping?.have ?? {};
   const statusOf = (line: ShoppingLine) => lineStatus(line, have, checkedAt);
-  const toBuy = lines.filter((l) => {
-    const s = statusOf(l);
-    return s.kind === 'todo' || s.kind === 'shortfall';
-  });
+  const isOpen = (line: ShoppingLine) => {
+    const s = statusOf(line).kind;
+    return s === 'todo' || s === 'shortfall';
+  };
+  const toBuy = lines.filter(isOpen);
+  const bought = lines.filter((l) => !isOpen(l));
+  const shownGroups = groups
+    .map((g) => ({ aisle: g.aisle, lines: g.lines.filter((l) => (view === 'buy' ? isOpen(l) : !isOpen(l))) }))
+    .filter((g) => g.lines.length > 0);
 
   const share = () => {
     const text = shoppingListText(
@@ -105,12 +115,22 @@ export default function Shopping() {
   };
 
   const started = !!shopping;
+  const missing = plannedTotal - meals.length;
+  const rangeLabel = t('shopping.rangeLabel', { from: readableDate(range.fromKey, locale), to: readableDate(range.toKey, locale) });
 
   return (
     <Screen
+      header={<PageHeader title={t('shopping.title')} />}
       footer={
         started ? (
-          <Button label={t('shopping.share')} icon="share-outline" variant="secondary" onPress={share} />
+          <Button label={t('shopping.share')} icon="share-outline" onPress={share} />
+        ) : meals.length === 0 ? (
+          // With nothing to shop for, the primary action is the prerequisite.
+          <Button
+            label={plannedTotal === 0 ? t('shopping.planMeals') : t('shopping.addRecipes', { n: missing })}
+            icon="calendar-outline"
+            onPress={() => router.push('/food?tab=plan')}
+          />
         ) : (
           <Button
             label={t('shopping.create')}
@@ -120,263 +140,248 @@ export default function Shopping() {
               startShopping(r.fromKey, r.toKey);
               successHaptic();
             }}
-            disabled={meals.length === 0}
           />
         )
       }
     >
-      <Title>{t('shopping.title')}</Title>
-
-      {/* Which dates, and what that actually covers. */}
-      <Card style={{ gap: Spacing.sm }}>
-        <Text style={[Type.caption, { color: theme.textSecondary }]}>{t('shopping.dates')}</Text>
-        {started ? (
-          <Text style={{ color: theme.text, fontWeight: '700' }}>
-            {t('shopping.rangeLabel', {
-              from: readableDate(range.fromKey, locale),
-              to: readableDate(range.toKey, locale),
-            })}
-          </Text>
-        ) : (
-          <View style={styles.chips}>
-            {RANGES.map((d) => {
-              const active = rangeDays === d;
-              return (
-                <Pressable
-                  key={d}
-                  onPress={() => {
-                    lightHaptic();
-                    setRangeDays(d);
-                  }}
-                  style={[
-                    styles.chip,
-                    {
-                      backgroundColor: active ? theme.primary : theme.cardSubtle,
-                      borderColor: active ? theme.primary : theme.border,
-                    },
-                  ]}
-                >
-                  <Text style={{ color: active ? theme.onPrimary : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
-                    {t('shopping.nextDays', { count: d })}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-        {/* What is and is not covered — a list is only trustworthy if you know
-            which meals it actually came from. */}
-        <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-          {t('shopping.coverage', { withRecipe: meals.length, planned: plannedTotal })}
-        </Text>
-        {plannedTotal > meals.length && (
-          <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('shopping.coverageHint')}</Text>
-        )}
-        {/* One next action for the state you are in (S12/J05): with no plan,
-            plan; with meals that lack recipes, add them. A disabled Create
-            button on its own is a dead end. */}
-        {plannedTotal === 0 ? (
-          <Button label={t('shopping.planMeals')} variant="secondary" icon="calendar" onPress={() => router.push('/food?tab=plan')} />
-        ) : plannedTotal > meals.length ? (
-          <Button
-            label={t('shopping.addRecipes', { n: plannedTotal - meals.length })}
-            variant="secondary"
-            icon="restaurant"
-            onPress={() => router.push('/food?tab=plan')}
-          />
-        ) : null}
-      </Card>
-
-      {/* How much of each recipe is being cooked, before anything is bought. */}
-      {plans.length > 0 && (
-        <>
-          <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>
-            {t('shopping.cooking')}
-          </Text>
-          <Card style={{ paddingVertical: Spacing.xs }}>
-            {plans.map((plan, i) => (
-              <View
-                key={plan.recipeId}
-                style={[
-                  styles.cookRow,
-                  i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
-                ]}
-              >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
-                    {plan.recipeName}
-                  </Text>
-                  <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                    {t('shopping.acrossMeals', { count: plan.meals.length })}
-                    {' · '}
-                    {t('shopping.cookServings', {
-                      count: servingPluralCount(plan.servingsCooked),
-                      amount: servingCountLabel(plan.servingsCooked),
-                    })}
-                  </Text>
-                </View>
-                {plan.meals.length > 1 && (
-                  // Repeating a recipe usually means cooking it again. Only
-                  // this says otherwise, and it changes what you buy.
-                  <Pressable
-                    onPress={() => {
-                      lightHaptic();
-                      setShoppingOneBatch(plan.recipeId, !plan.oneBatch);
-                    }}
-                    style={[
-                      styles.batchChip,
-                      {
-                        backgroundColor: plan.oneBatch ? theme.primary : theme.cardSubtle,
-                        borderColor: plan.oneBatch ? theme.primary : theme.border,
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={{
-                        color: plan.oneBatch ? theme.onPrimary : theme.textSecondary,
-                        fontWeight: '700',
-                        fontSize: 12,
-                      }}
-                    >
-                      {t('shopping.oneBatch')}
-                    </Text>
-                  </Pressable>
-                )}
-              </View>
-            ))}
-          </Card>
-        </>
-      )}
-
-      {started && lines.length > 0 && (
-        <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>
-          {t('shopping.toBuy', { count: toBuy.length })}
-        </Text>
-      )}
-
-      {started &&
-        groups.map((group) => (
-          <View key={group.aisle} style={{ marginBottom: Spacing.sm }}>
-            <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '700', marginBottom: 4 }}>
-              {t(`shopping.aisles.${group.aisle}`).toUpperCase()}
-            </Text>
-            <Card style={{ paddingVertical: 0 }}>
-              {group.lines.map((line, i) => {
-                const status = statusOf(line);
-                const done = status.kind === 'done';
-                const owned = status.kind === 'have';
-                const open = expanded === line.key;
-                return (
-                  <View
-                    key={line.key}
-                    style={[i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}
-                  >
-                    <View style={styles.itemRow}>
-                      <Pressable
-                        onPress={() => {
-                          lightHaptic();
-                          setShoppingChecked(line.key, done || owned ? null : line.amount);
-                        }}
-                        hitSlop={8}
-                        style={styles.checkbox}
-                      >
-                        <Ionicons
-                          name={done ? 'checkbox' : 'square-outline'}
-                          size={26}
-                          color={done ? theme.primary : theme.textTertiary}
-                        />
-                      </Pressable>
-                      <Pressable style={{ flex: 1 }} onPress={() => setExpanded(open ? null : line.key)}>
-                        <Text
-                          style={{
-                            color: done || owned ? theme.textTertiary : theme.text,
-                            fontWeight: '600',
-                            textDecorationLine: done || owned ? 'line-through' : 'none',
-                          }}
-                        >
-                          {line.name}
-                        </Text>
-                        <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                          {shoppingAmountLabel(line)}
-                          {line.state === 'cooked' ? ` · ${t('shopping.cooked')}` : ''}
-                        </Text>
-                        {status.kind === 'shortfall' && (
-                          // Ticked, but the plan has grown. Saying so is the
-                          // whole point — otherwise you get home short.
-                          <Text style={{ color: theme.warning, fontSize: 12, fontWeight: '700' }}>
-                            {t('shopping.moreNeeded', {
-                              amount: shoppingAmountLabel({ amount: status.extra, unit: line.unit }),
-                            })}
-                          </Text>
-                        )}
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          lightHaptic();
-                          setShoppingHave(line.key, !owned);
-                        }}
-                        hitSlop={8}
-                        style={styles.haveBtn}
-                      >
-                        <Ionicons
-                          name={owned ? 'home' : 'home-outline'}
-                          size={18}
-                          color={owned ? theme.primary : theme.textTertiary}
-                        />
-                      </Pressable>
-                    </View>
-                    {open && (
-                      <View style={styles.contributors}>
-                        {line.from.map((c, j) => (
-                          <Text key={j} style={{ color: theme.textTertiary, fontSize: 12 }}>
-                            {c.recipeName} · {shoppingAmountLabel({ amount: c.amount, unit: line.unit })}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                );
-              })}
-            </Card>
-          </View>
-        ))}
-
-      {meals.length === 0 && (
-        <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="cart-outline" size={30} color={theme.textTertiary} />
-          <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>{t('shopping.empty')}</Text>
+      {/* Which dates. Before a list starts the range is a choice; after, a fact. */}
+      <Pressable
+        onPress={() => !started && setPickingRange((v) => !v)}
+        disabled={started}
+        accessibilityRole={started ? undefined : 'button'}
+        style={({ pressed }) => [styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.8 }]}
+      >
+        <IconTile icon="calendar-outline" />
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, flex: 1 }}>{rangeLabel}</Text>
+        {!started && <Ionicons name={pickingRange ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />}
+      </Pressable>
+      {!started && pickingRange && (
+        <View style={styles.chips}>
+          {RANGES.map((d) => (
+            <Chip
+              key={d}
+              label={t('shopping.nextDays', { count: d })}
+              selected={rangeDays === d}
+              onPress={() => {
+                lightHaptic();
+                setRangeDays(d);
+                setPickingRange(false);
+              }}
+            />
+          ))}
         </View>
       )}
 
-      {started && (
-        <Button
-          label={t('shopping.startOver')}
-          variant="ghost"
-          icon="refresh"
-          onPress={() => useAppStore.getState().clearShopping()}
-          style={{ marginTop: Spacing.sm }}
-        />
+      {/* Coverage — a list is only trustworthy if you know which meals it came from. */}
+      {meals.length > 0 && (
+      <View style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+        <IconTile icon="document-text-outline" />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
+            {t('shopping.coverageShort', { withRecipe: meals.length, planned: plannedTotal })}
+          </Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 2 }}>
+            {plannedTotal === 0 ? t('shopping.empty') : missing > 0 ? t('shopping.addRecipesHint', { n: missing }) : t('shopping.coverageComplete')}
+          </Text>
+        </View>
+        {/* One next action for the state you are in (S12/J05). */}
+        {plannedTotal === 0 ? (
+          <Pressable onPress={() => router.push('/food?tab=plan')} accessibilityRole="button" hitSlop={6}>
+            <Text style={styles.link(theme.primary)}>{t('shopping.planMeals')}</Text>
+          </Pressable>
+        ) : missing > 0 ? (
+          <Pressable onPress={() => router.push('/food?tab=plan')} accessibilityRole="button" hitSlop={6}>
+            <Text style={styles.link(theme.primary)}>{t('shopping.addRecipes', { n: missing })}</Text>
+          </Pressable>
+        ) : null}
+      </View>
       )}
+
+      {meals.length === 0 ? (
+        <EmptyState
+          icon="cart-outline"
+          title={t('shopping.emptyTitle')}
+          body={t('shopping.empty')}
+          action={{ label: plannedTotal === 0 ? t('shopping.planMeals') : t('shopping.addRecipes', { n: missing }), icon: 'calendar-outline', onPress: () => router.push('/food?tab=plan') }}
+        />
+      ) : (
+        <>
+          {started && (
+            <Segmented
+              options={[
+                { key: 'buy', label: `${t('shopping.toBuyTab')}${toBuy.length ? ` · ${toBuy.length}` : ''}` },
+                { key: 'have', label: `${t('shopping.haveTab')}${bought.length ? ` · ${bought.length}` : ''}` },
+              ]}
+              value={view}
+              onChange={setView}
+              style={{ marginBottom: Spacing.md }}
+            />
+          )}
+
+          {started &&
+            shownGroups.map((group) => (
+              <View key={group.aisle} style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+                <View style={[styles.groupHead, { borderBottomColor: theme.border }]}>
+                  <Ionicons name={AISLE_ICON[group.aisle] ?? 'cube-outline'} size={18} color={theme.primary} />
+                  <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{t(`shopping.aisles.${group.aisle}`)}</Text>
+                </View>
+                {group.lines.map((line, i) => {
+                  const status = statusOf(line);
+                  const done = status.kind === 'done';
+                  const owned = status.kind === 'have';
+                  const open = expanded === line.key;
+                  const boughtFor = checkedAt[line.key];
+                  return (
+                    <View key={line.key} style={[i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
+                      <View style={styles.itemRow}>
+                        <Pressable
+                          onPress={() => {
+                            lightHaptic();
+                            setShoppingChecked(line.key, done || owned ? null : line.amount);
+                          }}
+                          hitSlop={8}
+                          accessibilityRole="checkbox"
+                          accessibilityState={{ checked: done || owned }}
+                          accessibilityLabel={line.name}
+                          style={styles.checkbox}
+                        >
+                          <Ionicons name={done || owned ? 'checkbox' : 'square-outline'} size={26} color={done || owned ? theme.primary : theme.textTertiary} />
+                        </Pressable>
+                        <Pressable style={{ flex: 1 }} onPress={() => setExpanded(open ? null : line.key)} accessibilityRole="button">
+                          <Text
+                            style={{
+                              color: done || owned ? theme.textTertiary : theme.text,
+                              fontWeight: '700',
+                              fontSize: 15,
+                              textDecorationLine: owned ? 'line-through' : 'none',
+                            }}
+                          >
+                            {line.name}
+                            {line.state === 'cooked' ? ` · ${t('shopping.cooked')}` : ''}
+                          </Text>
+                          {status.kind === 'shortfall' ? (
+                            // Ticked, but the plan has grown. Saying so is the
+                            // whole point — otherwise you get home short.
+                            <>
+                              <Text style={{ color: theme.warningText, fontSize: 13, fontWeight: '700' }}>
+                                {t('shopping.moreNeeded', { amount: shoppingAmountLabel({ amount: status.extra, unit: line.unit }) })}
+                              </Text>
+                              <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                                {t('shopping.boughtRequired', {
+                                  bought: shoppingAmountLabel({ amount: boughtFor ?? 0, unit: line.unit }),
+                                  required: shoppingAmountLabel(line),
+                                })}
+                              </Text>
+                            </>
+                          ) : (
+                            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                              {done
+                                ? t('shopping.boughtRequired', { bought: shoppingAmountLabel({ amount: boughtFor ?? line.amount, unit: line.unit }), required: shoppingAmountLabel(line) })
+                                : owned
+                                  ? t('shopping.haveAtHome')
+                                  : t('shopping.required', { amount: shoppingAmountLabel(line) })}
+                            </Text>
+                          )}
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            lightHaptic();
+                            setShoppingHave(line.key, !owned);
+                          }}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel={t('shopping.haveAtHome')}
+                          accessibilityState={{ selected: owned }}
+                          style={styles.haveBtn}
+                        >
+                          <Ionicons name={owned ? 'home' : 'home-outline'} size={18} color={owned ? theme.primary : theme.textTertiary} />
+                        </Pressable>
+                        <Ionicons name={open ? 'chevron-up' : 'chevron-forward'} size={16} color={theme.textTertiary} />
+                      </View>
+                      {open && (
+                        <View style={styles.contributors}>
+                          {line.from.map((c, j) => (
+                            <Text key={j} style={{ color: theme.textTertiary, fontSize: 12 }}>
+                              {c.recipeName} · {shoppingAmountLabel({ amount: c.amount, unit: line.unit })}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ))}
+
+          {started && shownGroups.length === 0 && (
+            <Text style={{ color: theme.textSecondary, textAlign: 'center', marginVertical: Spacing.md }}>
+              {view === 'buy' ? t('shopping.toBuy', { count: 0 }) : t('shopping.nothingBought')}
+            </Text>
+          )}
+
+          {/* How much of each recipe is being cooked — batch decisions change what you buy. */}
+          <View style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+            <SettingsRow
+              icon="restaurant-outline"
+              title={t('shopping.batchCooking')}
+              subtitle={t('shopping.batchHint')}
+              onPress={() => setShowBatch((v) => !v)}
+              right={<Ionicons name={showBatch ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.textTertiary} />}
+              chevron={false}
+              last
+            />
+            {showBatch &&
+              plans.map((plan) => (
+                <View key={plan.recipeId} style={[styles.cookRow, { borderTopColor: theme.border }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
+                      {plan.recipeName}
+                    </Text>
+                    <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                      {t('shopping.acrossMeals', { count: plan.meals.length })}
+                      {' · '}
+                      {t('shopping.cookServings', { count: servingPluralCount(plan.servingsCooked), amount: servingCountLabel(plan.servingsCooked) })}
+                    </Text>
+                  </View>
+                  {plan.meals.length > 1 && (
+                    // Repeating a recipe usually means cooking it again. Only
+                    // this says otherwise, and it changes what you buy.
+                    <Chip
+                      label={t('shopping.oneBatch')}
+                      selected={!!plan.oneBatch}
+                      onPress={() => {
+                        lightHaptic();
+                        setShoppingOneBatch(plan.recipeId, !plan.oneBatch);
+                      }}
+                    />
+                  )}
+                </View>
+              ))}
+          </View>
+        </>
+      )}
+
+      {started && (
+        <View style={{ alignItems: 'center', marginTop: Spacing.sm }}>
+          <ActionButton label={t('shopping.startOver')} icon="refresh" variant="secondary" onPress={() => useAppStore.getState().clearShopping()} />
+        </View>
+      )}
+      <Text style={[Type.caption, { color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.md }]}>{t('shopping.shareNote')}</Text>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: { borderWidth: 1.5, borderRadius: Radius.full, paddingHorizontal: 14, paddingVertical: 8 },
-  cookRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 11 },
-  batchChip: { borderWidth: 1.5, borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 6 },
-  itemRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 12 },
-  checkbox: { padding: 2 },
-  haveBtn: { padding: 4 },
-  contributors: { paddingBottom: Spacing.sm, paddingStart: 40, gap: 2 },
-  empty: {
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderRadius: Radius.sm,
-    padding: Spacing.lg,
-    alignItems: 'center',
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-});
+const styles = {
+  ...StyleSheet.create({
+    rowCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },
+    groupCard: { borderRadius: Radius.module, paddingHorizontal: Spacing.md, marginBottom: Spacing.ms },
+    groupHead: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: Spacing.ms, borderBottomWidth: StyleSheet.hairlineWidth },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: Spacing.ms },
+    cookRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 11, borderTopWidth: StyleSheet.hairlineWidth },
+    itemRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 12 },
+    checkbox: { padding: 2 },
+    haveBtn: { padding: 4 },
+    contributors: { paddingBottom: Spacing.sm, paddingStart: 40, gap: 2 },
+  }),
+  link: (color: string) => ({ color, fontWeight: '700' as const, fontSize: 13, textDecorationLine: 'underline' as const }),
+};

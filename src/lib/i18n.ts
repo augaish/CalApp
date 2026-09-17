@@ -1,7 +1,7 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import { getLocales } from 'expo-localization';
-import { I18nManager } from 'react-native';
+import { I18nManager, Platform } from 'react-native';
 
 import { en } from './locales/en';
 import { ar } from './locales/ar';
@@ -37,6 +37,12 @@ export function isRTL(language: Language): boolean {
  */
 export function applyRTL(language: Language): boolean {
   const rtl = isRTL(language);
+  // Native mirrors through I18nManager. On web nothing reads that flag for
+  // layout — flex rows follow the CSS `direction`, which only the document's
+  // `dir` sets — so without this the web build mirrored text but not layout.
+  if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    document.documentElement.dir = rtl ? 'rtl' : 'ltr';
+  }
   I18nManager.allowRTL(rtl);
   if (I18nManager.isRTL !== rtl) {
     I18nManager.forceRTL(rtl);
