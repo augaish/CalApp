@@ -49,6 +49,9 @@ import {
   recordTokens,
   resolveRef,
   saveWhoopOAuthState,
+  recentAiFailures,
+  recordAiFailure,
+  aiFailureSummary,
   reviewBarcode,
   setCachedBarcode,
   submissionsToday,
@@ -76,6 +79,7 @@ import {
   type FoodItem,
   type MealAnalysis,
 } from './parse.js';
+import { classifyAiError, describeAiError } from './ai-failure.js';
 import {
   buildAuthorizeUrl,
   exchangeCodeForToken,
@@ -761,9 +765,24 @@ async function textCall(prompt: string, maxTokens = 1500, track?: Track): Promis
  * the user retries).
  */
 function aiFailure(c: Context, err: unknown, fallbackCode: string) {
-  return isInsufficientCreditError(err)
-    ? c.json({ error: 'ai_credits_exhausted' }, 503)
-    : c.json({ error: fallbackCode }, 502);
+  // isInsufficientCreditError only recognises Anthropic's wording; classify
+  // covers DeepSeek's too, plus the seven other things that actually go wrong.
+  const failure = isInsufficientCreditError(err)
+    ? ({ code: 'ai_credits_exhausted', httpStatus: 503, retryable: false } as const)
+    : classifyAiError(err);
+  const code = failure.code || fallbackCode;
+  // Recorded before responding, and never allowed to fail the response: a
+  // problem with the failure log must not become a second failure. Without
+  // this the only trace of a production outage was a console line on a host
+  // nobody is watching, which is why "generation failed" could be reported
+  // for two days with no way to find out why.
+  void recordAiFailure({
+    route: new URL(c.req.url).pathname,
+    code,
+    detail: describeAiError(err),
+  }).catch((logErr) => console.error('recordAiFailure failed:', logErr));
+  console.error(`AI failure on ${new URL(c.req.url).pathname} [${code}]:`, describeAiError(err));
+  return c.json({ error: code, retryable: failure.retryable }, failure.httpStatus);
 }
 
 /**
@@ -2288,6 +2307,14 @@ app.post('/admin/api/weights', async (c) => {
 app.get('/admin/api/barcode-queue', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   return c.json({ queue: await barcodeQueue(50) });
+});
+
+/** Why AI calls have been failing. The summary answers "is everything broken
+ * for one reason" at a glance; the rows carry the provider's own words. */
+app.get('/admin/api/ai-failures', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const [summary, recent] = await Promise.all([aiFailureSummary(24), recentAiFailures(15)]);
+  return c.json({ summary, recent });
 });
 
 /** Publish a checked product to everyone, or reject it. Publishing stamps

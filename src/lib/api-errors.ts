@@ -38,6 +38,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Codes that mean the AI service failed, not the request. The server names
+ * these from the provider's own status; see server/src/ai-failure.ts.
+ */
+const AI_SERVICE_CODES = [
+  'ai_unauthorized',
+  'ai_model_unavailable',
+  'ai_rate_limited',
+  'ai_overloaded',
+  'ai_timeout',
+  'ai_bad_request',
+  'ai_provider_error',
+];
+
+/** The subset worth waiting out rather than reporting. */
+const RETRYABLE_CODES = ['ai_rate_limited', 'ai_overloaded', 'ai_timeout'];
+
 export type AiFailureAction =
   /** Nothing to explain in a dialog: the upgrade screen states the case. */
   | { kind: 'upgrade'; reason: 'quota' | 'coach' }
@@ -78,8 +95,23 @@ export function aiFailureAction(
     };
   }
 
-  // The model answered but the answer was unusable. The server releases the
-  // reservation on this path, so the copy may promise the allowance is intact.
+  // The service itself is down or misconfigured: a dead key, a model that is
+  // no longer available, a rate limit, a timeout, a request the provider
+  // rejected. None of these are caused by what the person typed, and telling
+  // them to reword it — as this screen did — sends them chasing a fault that
+  // is not theirs. A tester typed the simplest dish name there is, twice.
+  if (AI_SERVICE_CODES.includes(err.code)) {
+    return {
+      kind: 'alert',
+      titleKey: 'common.aiDownTitle',
+      bodyKey: RETRYABLE_CODES.includes(err.code) ? 'common.aiDownBusy' : 'common.aiDownBody',
+    };
+  }
+
+  // Only here did the model actually answer with something we could not use,
+  // which is the one case where suggesting a simpler request is honest. The
+  // server releases the reservation on this path, so the copy may also promise
+  // the allowance is intact.
   if (err.code === 'analysis_failed') {
     return { kind: 'alert', titleKey: unusable.titleKey, bodyKey: unusable.bodyKey };
   }

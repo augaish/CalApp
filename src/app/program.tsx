@@ -9,7 +9,8 @@ import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card'
 import { Button, Card, MacroTile, Screen, Title } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, FeatureLockedError, generateProgram, isMockMode, QuotaError } from '@/lib/api';
+import { generateProgram, isMockMode } from '@/lib/api';
+import { aiFailureAction } from '@/lib/api-errors';
 import { buildCoachContext } from '@/lib/coach-context';
 import { resolveCoachSchedule } from '@/lib/coach-schedule';
 import { useEntitlement } from '@/lib/entitlement';
@@ -55,16 +56,20 @@ export default function ProgramScreen() {
       useEntitlement.getState().spend();
       setPreview(result);
     } catch (err) {
-      if (err instanceof QuotaError || err instanceof FeatureLockedError) {
+      // Was "Something went wrong. Please try again." for everything except
+      // an empty Anthropic account — which is what a tester saw, with no way
+      // to tell a dead key from a bad reply. Same rule as every other AI
+      // screen now, and the same one the server can actually justify.
+      const action = aiFailureAction(err, {
+        titleKey: 'program.unusableTitle',
+        bodyKey: 'program.unusableBody',
+      });
+      if (action.kind === 'upgrade') {
         useEntitlement.getState().refresh();
-        router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        router.push(`/upgrade?reason=${action.reason}`);
         return;
       }
-      if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
-        Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
-      } else {
-        Alert.alert(t('common.error'));
-      }
+      Alert.alert(t(action.titleKey), t(action.bodyKey, action.values));
     } finally {
       setBusy(false);
     }

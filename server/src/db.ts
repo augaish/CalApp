@@ -98,6 +98,22 @@ export async function initDb(): Promise<void> {
   await pool.query(
     `CREATE INDEX IF NOT EXISTS barcode_submissions_ref_idx ON barcode_submissions (ref, created_at)`,
   );
+  // Why AI calls failed, so an outage can be read instead of reproduced. Kept
+  // small on purpose: the newest few hundred rows answer "what is wrong right
+  // now", which is the only question this table exists for, and pruneAiFailures
+  // drops the rest rather than growing a log nobody reads.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS ai_failures (
+      id         BIGSERIAL PRIMARY KEY,
+      route      TEXT NOT NULL,
+      code       TEXT NOT NULL,
+      detail     TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(
+    `CREATE INDEX IF NOT EXISTS ai_failures_created_idx ON ai_failures (created_at DESC)`,
+  );
   // Real token counts and their estimated USD cost (see pricing.ts), summed
   // onto the same row `reserve()` already creates — added after the fact via
   // ALTER so an existing deployment's counters keep their count history.
@@ -961,6 +977,95 @@ export async function submissionsToday(ref: string): Promise<number> {
   } catch (err) {
     console.error('submissionsToday failed:', err);
     return 0;
+  }
+}
+
+/** How many recent AI failures the dashboard shows, and how many rows are kept. */
+const AI_FAILURE_KEEP = 300;
+
+export interface AiFailureRow {
+  route: string;
+  code: string;
+  detail: string;
+  createdAt: string;
+}
+
+/**
+ * Record why an AI call failed.
+ *
+ * Swallows its own errors and never throws: this runs inside a catch block
+ * that is already handling one failure, and turning a logging problem into a
+ * second failure would lose the response as well as the reason.
+ */
+export async function recordAiFailure(row: {
+  route: string;
+  code: string;
+  detail: string;
+}): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO ai_failures (route, code, detail) VALUES ($1, $2, $3)`,
+      [row.route.slice(0, 120), row.code.slice(0, 60), row.detail.slice(0, 400)],
+    );
+    // Trimmed on write rather than on a schedule, so there is no cron to
+    // forget about and the table cannot grow while nobody is looking.
+    await pool.query(
+      `DELETE FROM ai_failures WHERE id < (
+         SELECT MIN(id) FROM (SELECT id FROM ai_failures ORDER BY id DESC LIMIT $1) keep
+       )`,
+      [AI_FAILURE_KEEP],
+    );
+  } catch (err) {
+    console.error('recordAiFailure failed:', err);
+  }
+}
+
+/** The most recent AI failures, newest first, for the dashboard. */
+export async function recentAiFailures(limit = 40): Promise<AiFailureRow[]> {
+  if (!pool) return [];
+  try {
+    const res = await pool.query(
+      `SELECT route, code, detail, created_at FROM ai_failures
+        ORDER BY id DESC LIMIT $1`,
+      [Math.min(limit, AI_FAILURE_KEEP)],
+    );
+    return res.rows.map((r) => ({
+      route: String(r.route),
+      code: String(r.code),
+      detail: String(r.detail ?? ''),
+      createdAt: new Date(r.created_at).toISOString(),
+    }));
+  } catch (err) {
+    console.error('recentAiFailures failed:', err);
+    return [];
+  }
+}
+
+/**
+ * Failures grouped by code over a window, so the dashboard can lead with
+ * "everything is failing for one reason" instead of a list to read down.
+ */
+export async function aiFailureSummary(
+  hours = 24,
+): Promise<{ code: string; count: number; lastAt: string }[]> {
+  if (!pool) return [];
+  try {
+    const res = await pool.query(
+      `SELECT code, COUNT(*)::int AS n, MAX(created_at) AS last_at
+         FROM ai_failures
+        WHERE created_at > now() - ($1 || ' hours')::interval
+        GROUP BY code ORDER BY n DESC`,
+      [String(hours)],
+    );
+    return res.rows.map((r) => ({
+      code: String(r.code),
+      count: r.n ?? 0,
+      lastAt: new Date(r.last_at).toISOString(),
+    }));
+  } catch (err) {
+    console.error('aiFailureSummary failed:', err);
+    return [];
   }
 }
 

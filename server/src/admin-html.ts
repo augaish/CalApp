@@ -98,6 +98,14 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
+      <b>AI failures</b>
+      <div class="sub" style="margin:4px 0 10px">Why AI calls have been failing, in the provider's own words. Every route used to answer the app with one generic code, so an outage looked the same as a bad request and could only be guessed at. If one code dominates the last 24 hours, that is the outage.</div>
+      <div id="aif_empty" class="muted">No AI failures recorded.</div>
+      <div id="aif_summary"></div>
+      <div id="aif_recent"></div>
+    </div>
+
+    <div class="card">
       <b>Product review queue</b>
       <div class="sub" style="margin:4px 0 10px">Products read from a label photo are served back to whoever added them, and to nobody else until checked here. Compare the readings — two people reading the same label differently is the signal something is wrong — then publish the right one to everyone, or reject it.</div>
       <div id="queue_empty" class="muted">Nothing waiting.</div>
@@ -268,6 +276,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('lim_pro').value = data.limits.pro;
     document.getElementById('lim_proplus').value = data.limits.proPlus;
     loadQueue();
+    loadAiFailures();
     var W = data.weights || {};
     WEIGHT_KINDS.forEach(function (k) {
       var el = document.getElementById('w_' + k);
@@ -575,6 +584,70 @@ export const ADMIN_HTML = `<!doctype html>
 
       host.appendChild(box);
     });
+  }
+  // Built with DOM APIs, never interpolated markup: these strings come
+  // straight from a provider's error body and must never be able to run as
+  // HTML in the dashboard. (The queue renderer below learned this the hard
+  // way — an escaped quote inside a template literal collapsed to a bare one
+  // and broke every control on the page.)
+  function renderAiFailures(summary, recent) {
+    var sumHost = document.getElementById('aif_summary');
+    var recHost = document.getElementById('aif_recent');
+    sumHost.innerHTML = '';
+    recHost.innerHTML = '';
+    document.getElementById('aif_empty').style.display = recent.length ? 'none' : '';
+    if (!recent.length) return;
+
+    summary.forEach(function (row) {
+      var line = document.createElement('div');
+      line.style.margin = '2px 0';
+      var code = document.createElement('b');
+      code.textContent = row.code;
+      var rest = document.createElement('span');
+      rest.className = 'muted';
+      rest.textContent = '  \u00d7' + row.count + ' in 24h \u00b7 last ' + new Date(row.lastAt).toLocaleString();
+      line.appendChild(code);
+      line.appendChild(rest);
+      sumHost.appendChild(line);
+    });
+
+    var head = document.createElement('div');
+    head.className = 'sub';
+    head.style.margin = '12px 0 4px';
+    head.textContent = 'Most recent';
+    recHost.appendChild(head);
+
+    recent.forEach(function (row) {
+      var box = document.createElement('div');
+      box.style.borderTop = '1px solid #eee';
+      box.style.padding = '6px 0';
+
+      var top = document.createElement('div');
+      var code = document.createElement('b');
+      code.textContent = row.code;
+      var where = document.createElement('span');
+      where.className = 'muted';
+      where.textContent = '  ' + row.route + ' \u00b7 ' + new Date(row.createdAt).toLocaleString();
+      top.appendChild(code);
+      top.appendChild(where);
+
+      var detail = document.createElement('div');
+      detail.className = 'muted';
+      detail.style.fontFamily = 'monospace';
+      detail.style.fontSize = '12px';
+      detail.style.wordBreak = 'break-word';
+      detail.textContent = row.detail;
+
+      box.appendChild(top);
+      box.appendChild(detail);
+      recHost.appendChild(box);
+    });
+  }
+  function loadAiFailures() {
+    fetch('/admin/api/ai-failures', { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderAiFailures(d.summary || [], d.recent || []); })
+      .catch(function () {});
   }
   function loadQueue() {
     fetch('/admin/api/barcode-queue', { headers: { 'x-admin-token': tok() } })

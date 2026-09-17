@@ -17,6 +17,11 @@ export const en = {
     aiDisclaimer: 'AI estimates can be inaccurate. Values are guidance, not medical advice.',
     aiCreditsExhaustedTitle: 'AI credits are out',
     offlineTitle: 'No connection',
+    aiDownTitle: 'The AI service is unavailable',
+    aiDownBody:
+      "This is a fault on our side, not with what you asked for — rewording it will not help. Nothing was saved and your allowance was not charged. It has been reported; please try again later.",
+    aiDownBusy:
+      'The AI service is busy or slow right now. Nothing was saved and your allowance was not charged. Try again in a minute.',
     offlineBody: "This needs the internet. Your saved recipes still open without it.",
     errorCode: 'The server could not complete this ({{code}}).',
     aiCreditsExhausted:
@@ -1161,6 +1166,9 @@ export const en = {
       "Reading results pages from a QR code needs the next app update. For now, open the QR code's link yourself, screenshot the results, and upload that screenshot as a report file.",
   },
   program: {
+    unusableTitle: "That didn't come back usable",
+    unusableBody:
+      'The programme came back incomplete, so nothing was saved and your allowance was not charged. Trying again usually works.',
     title: 'AI program',
     introTitle: 'One program, built for you',
     introBody: 'Calorie and macro targets plus a weekly schedule, designed together from your data — your WHOOP recovery and body readings included, when you have them.',
