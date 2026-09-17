@@ -15,7 +15,9 @@ import { fetchWhoopDayBurn, fetchWhoopHistory } from '@/lib/api';
 import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
-import { successHaptic } from '@/lib/feedback';
+import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { keyToDate, pendingOccurrences, resolvePlan } from '@/lib/occurrences';
+import { usePending } from '@/lib/pending';
 import {
   actualBurnedForDay,
   applyOrder,
@@ -136,7 +138,18 @@ export default function Training() {
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
 
-  const plan = schedule[selected.getDay()];
+  const occurrences = useAppStore((s) => s.occurrences);
+  const applyOccurrenceMoves = useAppStore((s) => s.applyOccurrenceMoves);
+  const undoOccurrenceOp = useAppStore((s) => s.undoOccurrenceOp);
+  const lastOp = usePending((s) => s.lastOccurrenceOp);
+  const setLastOp = usePending((s) => s.setLastOccurrenceOp);
+  // S42: the dated occurrence layer over the weekly template.
+  const resolved = resolvePlan(schedule, occurrences, selected);
+  const plan = resolved?.day;
+  const planWeekday = resolved?.weekday ?? selected.getDay();
+  const ownOccurrence = occurrences[dateKey(selected)];
+  const pending = pendingOccurrences(schedule, occurrences, workouts, skips, new Date());
+  const nextPending = pending[0];
   const skippedIds = skips[dateKey(selected)] ?? [];
   const scheduledIds = plan ? plan.exerciseIds.filter((id) => !skippedIds.includes(id)) : [];
   const skippedPlanIds = plan ? plan.exerciseIds.filter((id) => skippedIds.includes(id)) : [];
@@ -355,7 +368,78 @@ export default function Training() {
         </View>
       }
     >
+      {lastOp && (
+        <View style={[styles.undoBar, { backgroundColor: theme.surfaceTint }]}>
+          <Ionicons name="swap-horizontal" size={16} color={theme.primaryDark} />
+          <Text style={{ color: theme.primaryDark, fontSize: 13, flex: 1 }} numberOfLines={2}>
+            {lastOp.label}
+          </Text>
+          <Pressable
+            onPress={() => {
+              if (!undoOccurrenceOp(lastOp.opId)) Alert.alert(t('reschedule.undoFailedTitle'), t('reschedule.undoFailedBody'));
+              setLastOp(null);
+            }}
+            accessibilityRole="button"
+            hitSlop={6}
+          >
+            <Text style={{ color: theme.primary, fontWeight: '800' }}>{t('reschedule.undo')}</Text>
+          </Pressable>
+          <Pressable onPress={() => setLastOp(null)} accessibilityRole="button" accessibilityLabel={t('common.close')} hitSlop={6}>
+            <Ionicons name="close" size={16} color={theme.textTertiary} />
+          </Pressable>
+        </View>
+      )}
+
+      {/* S42: a pending past workout is a calm next step, never a failure. */}
+      {selectedIsToday && nextPending && !activeSession && (
+        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.ms }}>
+            <IconTile icon="time-outline" size={44} />
+            <View style={{ flex: 1 }}>
+              <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('reschedule.nextWorkout')}</Text>
+              <Text style={{ color: theme.text, fontWeight: '800', fontSize: 17 }}>{nextPending.day.title || t('training.todaysWorkout')}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
+                {t('reschedule.plannedFor', { date: keyToDate(nextPending.scheduledDate).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' }) })} · {t('training.exerciseCount', { count: nextPending.exerciseIds.length })}
+              </Text>
+            </View>
+          </View>
+          <ActionButton label={t('reschedule.doToday')} icon="play" onPress={() => router.push(`/reschedule?date=${nextPending.originalDate}&to=${dateKey(new Date())}`)} style={{ marginTop: Spacing.ms }} />
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
+            <ActionButton label={t('reschedule.move')} icon="calendar-outline" variant="secondary" onPress={() => router.push(`/reschedule?date=${nextPending.originalDate}`)} style={{ flex: 1 }} />
+            <ActionButton
+              label={t('reschedule.skip')}
+              variant="secondary"
+              onPress={() => {
+                lightHaptic();
+                const opId = `op:${Date.now()}`;
+                const ok = applyOccurrenceMoves([{ originalDate: nextPending.originalDate, weekday: nextPending.weekday, to: null }], { [nextPending.originalDate]: occurrences[nextPending.originalDate]?.revision ?? 0 }, opId);
+                if (ok) setLastOp({ opId, label: t('reschedule.skippedLabel', { name: nextPending.day.title || t('training.todaysWorkout') }) });
+              }}
+              style={{ flex: 1 }}
+            />
+          </View>
+        </View>
+      )}
+
       <SectionTitle style={{ marginTop: Spacing.xs }}>{selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}</SectionTitle>
+      {resolved?.movedFrom && (
+        <View style={{ marginBottom: Spacing.sm, alignSelf: 'flex-start' }}>
+          <StatusPill label={t('reschedule.movedFrom', { date: keyToDate(resolved.movedFrom).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' }) })} tone="planned" icon="swap-horizontal" />
+        </View>
+      )}
+      {!resolved && ownOccurrence && (
+        <View style={{ marginBottom: Spacing.sm, alignSelf: 'flex-start' }}>
+          <StatusPill
+            label={
+              ownOccurrence.state === 'skipped'
+                ? t('reschedule.skippedPill')
+                : t('reschedule.movedTo', { date: keyToDate(ownOccurrence.scheduledDate!).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' }) })
+            }
+            tone="neutral"
+            icon="swap-horizontal"
+          />
+        </View>
+      )}
 
       {visiblePlanIds.length > 0 ? (
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
@@ -510,7 +594,7 @@ export default function Training() {
           )}
 
           <Pressable
-            onPress={() => router.push(`/schedule-plan?weekday=${selected.getDay()}`)}
+            onPress={() => router.push(`/schedule-plan?weekday=${planWeekday}`)}
             accessibilityRole="button"
             style={({ pressed }) => [styles.editPlan, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.8 }]}
           >
@@ -544,7 +628,7 @@ export default function Training() {
           title={selectedIsToday ? t('training.restDay') : t('training.nothingLogged')}
           body={t('training.restDayHint')}
           action={{ label: t('training.addExercise'), icon: 'add', onPress: () => router.push('/exercise-library') }}
-          secondary={{ label: t('training.editTodaysPlan'), icon: 'pencil-outline', onPress: () => router.push(`/schedule-plan?weekday=${selected.getDay()}`) }}
+          secondary={{ label: t('training.editTodaysPlan'), icon: 'pencil-outline', onPress: () => router.push(`/schedule-plan?weekday=${planWeekday}`) }}
         />
       )}
 
@@ -607,6 +691,7 @@ const styles = StyleSheet.create({
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
   planTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  undoBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.ms, minHeight: 44, marginTop: Spacing.xs, marginBottom: Spacing.sm },
   doneBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.md, minHeight: 48 },
   list: { marginTop: Spacing.ms, borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.control, paddingHorizontal: Spacing.sm },
   exRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.ms },

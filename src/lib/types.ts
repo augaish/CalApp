@@ -600,6 +600,9 @@ export interface LoggedWorkout {
   sets: WorkoutSet[];
   /** Rough estimate, kcal */
   caloriesBurned?: number;
+  /** The dated occurrence this was performed for, when the session was
+   * started from a moved one — `at` stays the actual performed time. */
+  occurrenceId?: string;
 }
 
 /**
@@ -618,6 +621,25 @@ export interface ActiveSession {
   /** ISO time the current rest ends, or null when not resting. */
   restEndsAt: string | null;
   restSeconds: number;
+  /** Set when this session performs a moved occurrence (S42). */
+  occurrenceId?: string;
+}
+
+/**
+ * S42 — a dated instance of a template weekday, recorded only once it was
+ * moved or skipped. Keyed in the store by `originalDate`.
+ */
+export interface WorkoutOccurrence {
+  id: string;
+  /** dateKey of the date the template put it on. Never changes. */
+  originalDate: string;
+  /** The template weekday it takes exercises and targets from. */
+  weekday: number;
+  /** Where it sits now; null once skipped. */
+  scheduledDate: string | null;
+  state: 'scheduled' | 'skipped';
+  revision: number;
+  moveHistory: { opId: string; from: string | null; to: string | null; at: string; revisionAfter: number }[];
 }
 
 /** One workout WHOOP detected on a given day (real heart-rate-based numbers, not an estimate). */

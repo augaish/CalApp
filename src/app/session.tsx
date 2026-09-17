@@ -11,6 +11,7 @@ import { ActionButton, Chip, IconTile } from '@/components/system';
 import { Button, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { resolvePlan } from '@/lib/occurrences';
 import { useCelebrate } from '@/lib/celebrate';
 import { calendarDaysBetween, timestampFor } from '@/lib/day';
 import { exerciseName, findExercise, logStyleFor } from '@/lib/exercises';
@@ -62,6 +63,7 @@ export default function SessionScreen() {
   const workouts = useAppStore((s) => s.workouts);
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
+  const occurrences = useAppStore((s) => s.occurrences);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const logSet = useAppStore((s) => s.logSet);
@@ -84,7 +86,7 @@ export default function SessionScreen() {
   const exId = session?.exerciseIds[index];
   const ex = exId ? findExercise(exId, custom) : undefined;
   const type: ExerciseType = ex?.type ?? 'weight_reps';
-  const dayPlan = schedule[day.getDay()];
+  const dayPlan = resolvePlan(schedule, occurrences, day)?.day;
   const planned: PlannedSet[] = (exId && dayPlan?.plans?.[exId]) || [];
   const todayWorkout = exId ? workoutFor(workouts, exId, day) : undefined;
   const doneSets = todayWorkout?.sets.filter((s) => s.done) ?? [];

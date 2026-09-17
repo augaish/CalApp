@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Tabs, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { Tabs, usePathname, useRouter } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 
@@ -27,6 +27,20 @@ export default function TabLayout() {
   // Fasting's own alert is one-off (see reminders.ts), so starting/ending it
   // needs the same resync the others get — the fast's id changes on both.
   const activeFastId = useAppStore((s) => s.activeFast?.id);
+
+  // S41 route resolution: a deep link wins, then restored context. A cold
+  // start that lands on Overview with a session still in progress reopens
+  // that session once — nothing is completed or submitted by restoring it.
+  const pathname = usePathname();
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    const session = useAppStore.getState().activeSession;
+    const atRoot = pathname === '/' || pathname === '' || pathname === '/index';
+    if (session && atRoot) router.push('/session');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // First launch: request permission once and schedule everything. If denied,
   // reflect the reminder toggles as off. Users manage them in Profile after.

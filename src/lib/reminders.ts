@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import i18n from './i18n';
 import { isSameDay, streakDays, useAppStore, workoutStreakDays } from './store';
 import type { MealType } from './types';
@@ -13,6 +15,8 @@ let cached: NotificationsModule | null | undefined;
 
 function notifications(): NotificationsModule | null {
   if (cached !== undefined) return cached;
+  // The web build has no scheduling API; every caller already treats null as "not available".
+  if (Platform.OS === 'web') return (cached = null);
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('expo-notifications') as NotificationsModule;

@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { categoryForMuscles, findExercise } from './exercises';
 import { perServing, roundMacros, scaleMacros, servingCountLabel } from './recipes';
 import type { PlannedRecipeMeal } from './shopping';
+import { applyMoves, resolvePlan, undoOp, type OccurrenceMove } from './occurrences';
 import { dailyTargets } from './tdee';
 import type {
   ActiveSession,
@@ -13,6 +14,7 @@ import type {
   CoachShare,
   FocusArea,
   Units,
+  WorkoutOccurrence,
   DailyTargets,
   Exercise,
   ExerciseType,
@@ -202,6 +204,8 @@ interface AppState {
   fastingHistory: FastingSession[];
   /** The workout being followed right now, if any — see ActiveSession. */
   activeSession: ActiveSession | null;
+  /** S42 dated occurrences moved or skipped off the weekly template, by original date. */
+  occurrences: Record<string, WorkoutOccurrence>;
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -356,7 +360,11 @@ interface AppState {
     slot: MealType,
     value: { recipeId: string; servings: number; batchId?: string } | null,
   ) => void;
-  startSession: (day: Date, exerciseIds: string[]) => void;
+  startSession: (day: Date, exerciseIds: string[], occurrenceId?: string) => void;
+  /** Atomic, version-checked; false when the preview went stale. */
+  applyOccurrenceMoves: (moves: OccurrenceMove[], expected: Record<string, number>, opId: string) => boolean;
+  /** Reverses one operation while its occurrences are unchanged and unstarted; false when nothing could be reversed. */
+  undoOccurrenceOp: (opId: string) => boolean;
   updateSession: (patch: Partial<ActiveSession>) => void;
   endSession: () => void;
   setRemindMeals: (on: boolean) => void;
@@ -483,6 +491,7 @@ export const useAppStore = create<AppState>()(
       activeFast: null,
       fastingHistory: [],
       activeSession: null,
+      occurrences: {},
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -697,6 +706,9 @@ export const useAppStore = create<AppState>()(
             };
           }
           const sets = markPRs([stamped], exercise.type);
+          // A session started for a moved occurrence links its actual records
+          // to that occurrence; `at` is still the real performed time.
+          const occ = s.activeSession?.occurrenceId && s.activeSession.dayKey === dateKey(new Date(when)) ? s.activeSession.occurrenceId : undefined;
           return {
             workouts: [
               {
@@ -708,6 +720,7 @@ export const useAppStore = create<AppState>()(
                 type: exercise.type,
                 sets,
                 caloriesBurned: burnForSets(sets, bodyKg, full.category, undefined, full),
+                ...(occ ? { occurrenceId: occ } : {}),
               },
               ...s.workouts,
             ],
@@ -999,7 +1012,7 @@ export const useAppStore = create<AppState>()(
         const bodyKg = state.profile?.weightKg ?? 75;
         // Seed order: your last session → else the sets planned for this
         // weekday → else a single empty done set.
-        const planned = state.schedule[day.getDay()]?.plans?.[exercise.id];
+        const planned = resolvePlan(state.schedule, state.occurrences, day)?.day.plans?.[exercise.id];
         const base: WorkoutSet[] = src
           ? src.sets.map((st) => ({ ...st, done: trained, isPR: false }))
           : planned && planned.length > 0
@@ -1123,7 +1136,7 @@ export const useAppStore = create<AppState>()(
           else day[slot] = fromWeekday;
           return { mealPlanSwaps: { ...s.mealPlanSwaps, [dayKey]: day } };
         }),
-      startSession: (day, exerciseIds) =>
+      startSession: (day, exerciseIds, occurrenceId) =>
         set({
           activeSession: {
             startedAt: new Date().toISOString(),
@@ -1132,8 +1145,22 @@ export const useAppStore = create<AppState>()(
             index: 0,
             restEndsAt: null,
             restSeconds: 90,
+            ...(occurrenceId ? { occurrenceId } : {}),
           },
         }),
+      applyOccurrenceMoves: (moves, expected, opId) => {
+        const next = applyMoves(get().occurrences, moves, expected, opId, new Date().toISOString());
+        if (!next) return false;
+        set({ occurrences: next });
+        return true;
+      },
+      undoOccurrenceOp: (opId) => {
+        const s = get();
+        const next = undoOp(s.occurrences, s.schedule, s.workouts, opId);
+        if (!next) return false;
+        set({ occurrences: next });
+        return true;
+      },
       updateSession: (patch) =>
         set((s) => (s.activeSession ? { activeSession: { ...s.activeSession, ...patch } } : {})),
       endSession: () => set({ activeSession: null }),
@@ -1288,6 +1315,7 @@ export const useAppStore = create<AppState>()(
         activeFast,
         fastingHistory,
         activeSession,
+        occurrences,
       }) => ({
         account,
         language,
@@ -1331,6 +1359,7 @@ export const useAppStore = create<AppState>()(
         activeFast,
         fastingHistory,
         activeSession,
+        occurrences,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },

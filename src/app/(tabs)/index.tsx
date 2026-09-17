@@ -22,6 +22,7 @@ import {
 import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { resolvePlan } from '@/lib/occurrences';
 import { formatWeight } from '@/lib/units';
 import { fetchWhoopDayBurn } from '@/lib/api';
 import { useViewDay } from '@/lib/day';
@@ -99,6 +100,7 @@ export default function Overview() {
   const weights = useAppStore((s) => s.weights);
   const activeProgram = useAppStore((s) => s.activeProgram);
   const schedule = useAppStore((s) => s.schedule);
+  const occurrences = useAppStore((s) => s.occurrences);
   const savedSchedules = useAppStore((s) => s.savedSchedules);
   const activeScheduleId = useAppStore((s) => s.activeScheduleId);
   const skips = useAppStore((s) => s.skips);
@@ -173,7 +175,7 @@ export default function Overview() {
   // Today block — the same "what's on today" list the Training tab shows
   // (weekly plan minus skips, in the user's order), so starting a session
   // from here and from there walk through identical exercises.
-  const todayPlan = schedule[selected.getDay()];
+  const todayPlan = resolvePlan(schedule, occurrences, selected)?.day;
   const todaySkips = skips[dateKey(selected)] ?? [];
   const todayDoneIds = new Set(
     workouts.filter((w) => isSameDay(w.at, selected) && w.sets.some((s) => s.done)).map((w) => w.exerciseId),

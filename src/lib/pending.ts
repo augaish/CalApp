@@ -26,6 +26,8 @@ interface PendingState {
   catalogueConsent: boolean;
   /** A food picked from search (S29 entry), consumed once by the manual form. */
   foodDraft: FoodItem | null;
+  /** The last S42 move/skip, so Training can offer Undo until it is started or changed. */
+  lastOccurrenceOp: { opId: string; label: string } | null;
   setMeal: (meal: MealAnalysis, photoUri: string | null) => void;
   setEquipment: (equipment: EquipmentAnalysis, photoUri: string | null) => void;
   setBodyReading: (reading: BodyReadingAnalysis, photoUri: string | null) => void;
@@ -36,6 +38,7 @@ interface PendingState {
   consumeCatalogueConsent: () => boolean;
   setFoodDraft: (item: FoodItem | null) => void;
   consumeFoodDraft: () => FoodItem | null;
+  setLastOccurrenceOp: (op: { opId: string; label: string } | null) => void;
   clear: () => void;
 }
 
@@ -48,6 +51,7 @@ export const usePending = create<PendingState>((set, get) => ({
   mealTypeHint: null,
   catalogueConsent: false,
   foodDraft: null,
+  lastOccurrenceOp: null,
   setMeal: (meal, photoUri) => set({ meal, photoUri, equipment: null, bodyReading: null }),
   setEquipment: (equipment, photoUri) => set({ equipment, photoUri, meal: null, bodyReading: null }),
   setBodyReading: (bodyReading, photoUri) => set({ bodyReading, photoUri, meal: null, equipment: null }),
@@ -65,6 +69,7 @@ export const usePending = create<PendingState>((set, get) => ({
     return on;
   },
   setFoodDraft: (item) => set({ foodDraft: item }),
+  setLastOccurrenceOp: (op) => set({ lastOccurrenceOp: op }),
   consumeFoodDraft: () => {
     const item = get().foodDraft;
     if (item) set({ foodDraft: null });
