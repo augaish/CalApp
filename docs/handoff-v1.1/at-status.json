@@ -33,7 +33,7 @@
   "id": "AT06",
   "screens": "S06,S21",
   "status": "Passed (browser analogue) · Not tested (native process kill)",
-  "evidence": "E5: context dropped and reopened at root → session restored at Set 2 of 2, one set, no duplicate. Native termination not run."
+  "evidence": "E5: context dropped and reopened at the root → session restored at Set 2 of 2 with one set, no duplicate. A native process kill was not run; this is supporting evidence only."
  },
  {
   "id": "AT07",
@@ -81,7 +81,7 @@
   "id": "AT14",
   "screens": "S14",
   "status": "Passed (browser)",
-  "evidence": "handoff-browser S14: no write before Apply; planned day 0 → 515; one override on Apply"
+  "evidence": "E10: planned lunch 390 replaced by a 480 kcal serving; preview shows +90 and planned day 1,890 → 1,980; Cancel writes nothing; Apply writes one override stamped with the programme; eaten totals unchanged; the plan view then shows the stew and 1,980."
  },
  {
   "id": "AT15",
@@ -129,7 +129,7 @@
   "id": "AT22",
   "screens": "S28,S31",
   "status": "Blocked",
-  "evidence": "No ANTHROPIC_API_KEY in this sandbox and Railway is unreachable through the proxy; live recipe/program generation (F1/F2) could not be exercised. Error mapping covered by ai-errors-test / ai-failure-test."
+  "evidence": "No AI key in this environment and Railway is unreachable through the sandbox proxy, so live recipe/program generation and its quota/service error branches were not exercised. The client error mapping is unit-tested (ai-errors-test, ai-failure-test). Needs an authorised test environment."
  },
  {
   "id": "AT23",
@@ -158,14 +158,14 @@
  {
   "id": "AT27",
   "screens": "S16",
-  "status": "Failed (unit, fresh database) · Passed (barcode source)",
-  "evidence": "barcode-source-test passes. catalogue-test shows 4 failures on a fresh Postgres (a submitted reading is returned as published, not pending; review queue empty). The server catalogue code was not changed by this work; flagged for a separate investigation before the catalogue share is relied on."
+  "status": "Passed (unit, server, fresh database)",
+  "evidence": "catalogue-test on an isolated Postgres: a contribution starts pending and private to its contributor, a disagreeing reading is queued not dropped, a retried identical submission is not duplicated (new dedupe in submitBarcode), only a person publishes, reports pull a product back. The earlier failure was two suites sharing one data directory, not a product defect."
  },
  {
   "id": "AT28",
   "screens": "S13,S04,S06",
   "status": "Passed (browser)",
-  "evidence": "E4: three taps write one entry; Undo removes exactly it. Session Complete set is one write per tap (E6)."
+  "evidence": "E4: three taps on Log eaten write one entry and Undo removes exactly it. E11: two taps on Save reading leave one reading for the day at the new value; two taps on Add food write one diary entry. The session Complete set is one write per tap (E6)."
  },
  {
   "id": "AT29",
@@ -176,14 +176,14 @@
  {
   "id": "AT30",
   "screens": "S01,S02,S03,S06,S13",
-  "status": "Passed (browser)",
-  "evidence": "E9 + handoff-browser AT30: Arabic renders on every new screen with mirrored layout and no raw keys; i18n coverage ALL PASS"
+  "status": "Passed (browser) · Not tested (native)",
+  "evidence": "E13: Arabic-Indic digits parse (٣٠٠ → 300 kcal, ٢ → 2 g, ٧٦٫٥ → 76.5 kg), Arabic month names and units render, the dual plural form appears for two training days, the pending workout card renders in Arabic; E9 + handoff suite: no raw keys on any new screen. Native keyboards not tested."
  },
  {
   "id": "AT31",
   "screens": "S01,S02,S03,S20",
   "status": "Partially passed",
-  "evidence": "Every icon control carries an accessibilityLabel/role and status is text, never colour alone (code review); screen-reader announcement order not tested without a device."
+  "evidence": "Every icon control carries a name and role; status is text, never colour alone; helper text tokens were darkened in this pass. Contrast ratios and screen-reader order were not measured on a device."
  },
  {
   "id": "AT32",
@@ -194,8 +194,8 @@
  {
   "id": "AT33",
   "screens": "S18",
-  "status": "Passed (browser)",
-  "evidence": "F8: a food question sends only the allowed context (share switches honoured in buildCoachContext); drafts need an explicit Review + Add"
+  "status": "Passed (browser, client path) · Blocked (live model)",
+  "evidence": "E14: a coach reply carrying a recipe draft shows Review recipe draft; nothing is planned or logged by the draft; review → Looks right → Log eaten writes one entry by the person; the card then reads Reviewed · ready. The context sent honours the sharing switches. The live write_recipe tool call on the server is not exercised here (see AT22)."
  },
  {
   "id": "AT34",
@@ -206,8 +206,8 @@
  {
   "id": "AT35",
   "screens": "S26",
-  "status": "Passed (browser)",
-  "evidence": "F4 Connections screen shows true WHOOP state; reauthorisation flow itself not exercised (no WHOOP account)"
+  "status": "Partially passed",
+  "evidence": "The Connections screen shows the true WHOOP state and source. Reauthorisation, cancel and de-duplication were not exercised (no WHOOP account available)."
  },
  {
   "id": "AT36",
@@ -231,7 +231,7 @@
   "id": "AT39",
   "screens": "S28",
   "status": "Passed (browser)",
-  "evidence": "E2: manual recipe saved without AI; unknown ingredient stays unknown through recipe, Log eaten and the diary row (Incomplete)"
+  "evidence": "E2: a hand-written recipe saves without AI; blanks are unknown per nutrient (rice: macros unknown; saffron: all unknown) and stay unknown through recipe, Log eaten, the diary row (Incomplete), Eaten today and Overview (≥ known subtotal, dash where nothing is known, remaining as an upper bound) and after a portion correction."
  },
  {
   "id": "AT40",
@@ -267,13 +267,13 @@
   "id": "AT45",
   "screens": "S09,S10",
   "status": "Passed (browser)",
-  "evidence": "F6: editing/favouriting a Calgym original makes a private copy under the same id; the bundled original is unchanged"
+  "evidence": "E12: favouriting a Calgym original stores a reference only (no copy); editing it creates a separate private copy with a new id and source custom; the Calgym collection still lists the untouched original and My recipes lists the copy. Another account’s isolation is by construction (favourites and copies live in the local store) and was not tested across accounts."
  },
  {
   "id": "AT46",
   "screens": "S09,S28",
-  "status": "Passed (browser)",
-  "evidence": "E1/E2: drafts stay identified; incomplete data flagged through to the diary; Not saved path covered by ai-failure-test"
+  "status": "Partially passed",
+  "evidence": "E1/E2: a draft stays identified until reviewed and an incomplete recipe stays a known subtotal through recipe, Log eaten, the diary row and every summary. An invalid generated draft is rejected server-side (sanitizeRecipe, sanitize-test). The Not saved / Retry save path was not exercised in this run."
  },
  {
   "id": "AT47",

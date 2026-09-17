@@ -144,7 +144,7 @@ await page.getByText('Add ingredient', { exact: true }).click(); await page.wait
 await page.getByPlaceholder('Ingredient', { exact: true }).nth(1).fill('Saffron');
 await page.getByPlaceholder('Amount', { exact: true }).nth(1).fill('1');
 b = await body(page);
-check('  blank nutrition is called unknown before saving', /1 ingredients without nutrition/.test(b), b.match(/\d+ ingredients without nutrition[^.]*/)?.[0]);
+check('  blank nutrition is called unknown before saving (rice: macros blank, saffron: all blank)', /2 ingredients without nutrition/.test(b), b.match(/\d+ ingredients without nutrition[^.]*/)?.[0]);
 await page.getByText('Save recipe', { exact: true }).click(); await page.waitForTimeout(1800);
 check('saving opens the recipe', /\/recipe\?id=/.test(page.url()), page.url().replace(BASE, ''));
 let st = await store(page);
@@ -153,7 +153,7 @@ check('  stored as custom and ready', mine?.source === 'custom' && mine?.reviewS
 check('  the blank ingredient is flagged unknown, not zeroed silently', mine?.ingredients[1]?.macrosUnknown === true);
 check('  its key resolves through the shared table', mine?.ingredients[0]?.key === 'rice_basmati', mine?.ingredients[0]?.key);
 b = await body(page); await page.screenshot({ path: `${OUT}/recipe-manual.png`, fullPage: true });
-check('  the recipe says its totals are incomplete', /1 ingredients without nutrition/.test(b));
+check('  the recipe says its totals are incomplete', /2 ingredients without nutrition/.test(b));
 // The recipes list stays mounted beneath on web, so test the banner's own copy.
 check('  a hand-written recipe has no review banner', !/written by AI and saved as a draft/.test(b));
 check('  Add to plan and Log eaten are offered', /Add to plan/.test(b) && /Log eaten/.test(b));

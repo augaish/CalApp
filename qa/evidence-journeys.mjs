@@ -72,21 +72,36 @@ await page.getByText('Add ingredient', { exact: true }).click(); await page.wait
 await page.getByPlaceholder('Ingredient', { exact: true }).nth(1).fill('Saffron');
 await page.getByPlaceholder('Amount', { exact: true }).nth(1).fill('1');
 b = await body(page);
-check('E2 the editor names the unknown ingredient before saving', /1 ingredients without nutrition/.test(b));
+check('E2 the editor names both ingredients with unknown values before saving (rice: macros blank; saffron: all blank)', /2 ingredients without nutrition/.test(b));
 await page.getByText('Save recipe', { exact: true }).click(); await page.waitForTimeout(1800);
 st = await store(page); const mine = st.recipes.find((r) => r.name.includes('soup'));
 check('E2 saved with the ingredient flagged unknown, not zeroed silently', mine?.ingredients[1]?.macrosUnknown === true);
 b = await body(page); await shot(page, 'E2-recipe-incomplete');
-check('E2 the recipe says its totals are incomplete', /1 ingredients without nutrition/.test(b));
+check('E2 the recipe says its totals are incomplete', /2 ingredients without nutrition/.test(b));
 await page.getByText('Log eaten', { exact: true }).first().click(); await page.waitForTimeout(1500);
 b = await body(page); await shot(page, 'E2-log-portion-incomplete');
-check('E2 Log eaten repeats that the totals are incomplete', /1 ingredients without nutrition/.test(b));
+check('E2 Log eaten repeats that the totals are incomplete', /2 ingredients without nutrition/.test(b));
 await page.getByText(/^Add to (Breakfast|Lunch|Dinner|Snacks)$/).click(); await page.waitForTimeout(800);
 st = await store(page);
 check('E2 the diary entry carries the incomplete marker', st.meals.length === 1 && st.meals[0].items[0].nutritionIncomplete === true, JSON.stringify(st.meals[0]?.items[0]?.nutritionIncomplete));
 await page.goto(`${BASE}/food`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
 b = await body(page); await shot(page, 'E2-food-incomplete-row');
 check('E2 the Food diary shows Incomplete on that row, not Logged', /Grandma’s soup.{0,80}Incomplete/.test(b), b.match(/Grandma’s soup.{0,80}/)?.[0]);
+const perServ = Math.round(1400 / mine.servings);
+check('E2 Eaten today is a known subtotal (≥), remaining is an upper bound', new RegExp(`≥${perServ}`).test(b) && /up to [\d,]+ left/.test(b), b.match(/≥[\d,]+.{0,40}/)?.[0]);
+check('E2 macros nobody entered show a dash, not 0', /Protein\s*—/.test(b), b.match(/Protein.{0,12}/)?.[0]);
+check('E2 the disclosure explains ≥ and that unknown is never zero', /known subtotal/.test(b) && /never counted as zero/.test(b));
+await page.goto(`${BASE}/`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+b = await body(page); await shot(page, 'E2-overview-incomplete');
+check('E2 Overview Nutrition today says the same', new RegExp(`≥${perServ}`).test(b) && /Incomplete/.test(b) && /up to [\d,]+ left/.test(b));
+const soup = st.meals[0];
+await page.goto(`${BASE}/edit-portion?id=${soup.id}&index=0`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+await page.getByText('2', { exact: true }).first().click(); await page.waitForTimeout(400);
+b = await body(page);
+check('E2 the portion editor keeps the subtotal marked', new RegExp(`Becomes 2 servings · ≥${perServ * 2} kcal`).test(b), b.match(/Becomes[^.]*kcal/)?.[0]);
+await page.getByText('Save correction', { exact: true }).click(); await page.waitForTimeout(900);
+st = await store(page);
+check('E2 the corrected entry still carries its unknown nutrients', st.meals[0].items[0].incompleteNutrients?.includes('proteinG') && st.meals[0].items[0].incompleteNutrients?.includes('calories') && st.meals[0].items[0].calories === perServ * 2, JSON.stringify(st.meals[0].items[0].incompleteNutrients));
 await close(ctx, page);
 
 // ═══ E3: edit an older logged portion from its snapshot after the recipe changed (AT10 / AT11) ═══
@@ -246,6 +261,126 @@ for (const path of ['/coach', '/review', '/profile', '/food-search', '/product-n
   check(`E9 ${path} renders in Arabic without raw keys`, /[؀-ۿ]/.test(b) && !raw, raw || '');
   await ctx.close();
 }
+
+// ═══ E10: AT14 — replace a planned meal: 390 → 480, +90, planned day 1,890 → 1,980 ═══
+console.log('\n=== E10 Plan replacement (AT14) ===');
+const fi = (name, kcal) => ({ name, calories: kcal, proteinG: 20, carbsG: 40, fatG: 10, portion: '1 plate' });
+const program = { id: 'prog-a', createdAt: at(3), goal: 'maintain', durationWeeks: 4, summary: 'Maintain', targets: { calories: 2000, proteinG: 150, carbsG: 200, fatG: 60 }, schedule: { days: [] },
+  mealPlan: { days: [{ weekday: today.getDay(), meals: [{ slot: 'breakfast', name: 'Oats', items: [fi('Oats', 500)] }, { slot: 'lunch', name: 'Chicken salad', items: [fi('Chicken salad', 390)] }, { slot: 'dinner', name: 'Grilled fish', items: [fi('Grilled fish', 1000)] }] }] } };
+const stew480 = recipe('r2', 'Lentil stew', { reviewStatus: 'ready', source: 'custom', ingredients: [ing('Lentils', 400, 1320), ing('Tomatoes', 300, 600)] }); // 1,920 / 4 = 480
+({ ctx, page } = await open({ ...base(), activeProgram: program, recipes: [stew480], meals: [{ id: 'm-eaten', at: at(0, 8), mealType: 'breakfast', items: [fi('Toast', 300)] }] }, '/plan-meal?recipeId=r2&slot=lunch', 'E10-plan-replacement'));
+b = await body(page); await shot(page, 'E10-preview');
+check('E10 Before is the planned lunch at 390', /Chicken salad\s*390 kcal/.test(b), b.match(/Chicken salad.{0,20}/)?.[0]);
+check('E10 After is one serving at 480', /1 serving · 480 kcal/.test(b));
+check('E10 Difference +90, planned day 1,890 → 1,980', /\+90 kcal/.test(b) && /1,890 → 1,980 kcal/.test(b), b.match(/Planned day.{0,30}/)?.[0]);
+await page.getByText('Cancel', { exact: true }).click(); await page.waitForTimeout(700);
+st = await store(page);
+check('E10 Cancel writes nothing', Object.keys(st.mealPlanRecipes).length === 0 && st.meals.length === 1);
+await page.goto(`${BASE}/plan-meal?recipeId=r2&slot=lunch`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+await page.getByText('Apply change', { exact: true }).click(); await page.waitForTimeout(900);
+st = await store(page);
+const ov = st.mealPlanRecipes[key(today)]?.lunch;
+check('E10 Apply writes one override for today’s lunch, stamped with the programme', ov?.recipeId === 'r2' && ov?.servings === 1 && ov?.programId === 'prog-a', JSON.stringify(ov));
+check('E10 eaten totals are unchanged (300 kcal breakfast only)', st.meals.length === 1 && st.meals[0].items[0].calories === 300);
+await page.goto(`${BASE}/food?tab=plan`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+b = await body(page); await shot(page, 'E10-plan-after');
+check('E10 the plan view now shows the stew at lunch and 1,980 planned', /Lentil stew/.test(b) && /1,980/.test(b), b.match(/Planned[^E]{0,30}/)?.[0]);
+await close(ctx, page);
+
+// ═══ E11: AT28 — Save twice on Add reading and on manual food entry commits exactly one operation ═══
+console.log('\n=== E11 Double save (AT28) ===');
+({ ctx, page } = await open(base(), '/body-reading', 'E11-double-save-reading'));
+await page.locator('input[inputmode="decimal"]').first().fill('76');
+const saveBtn = page.getByText('Save reading', { exact: true });
+await saveBtn.click(); await saveBtn.click().catch(() => {}); await page.waitForTimeout(1200);
+st = await store(page);
+check('E11 two taps on Save reading leave exactly one reading for today, at 76 kg', st.weights.length === 1 && st.weights[0].kg === 76, `${st.weights.length} readings, ${st.weights[0]?.kg} kg`);
+await close(ctx, page);
+({ ctx, page } = await open(base(), '/food-edit', 'E11-double-save-food'));
+await page.getByPlaceholder('e.g. Watermelon').fill('Banana');
+await page.locator('input[inputmode="numeric"]').nth(0).fill('90');
+const addFood = page.getByText('Add food', { exact: true }).last();
+await addFood.click(); await addFood.click().catch(() => {}); await page.waitForTimeout(1200);
+st = await store(page);
+check('E11 two taps on Add food write exactly one diary entry', st.meals.length === 1 && st.meals[0].items[0].calories === 90, String(st.meals.length));
+await close(ctx, page);
+
+// ═══ E12: AT45 — favourite is a reference; customisation is a separate private copy ═══
+console.log('\n=== E12 Favourite reference and private copy (AT45) ===');
+({ ctx, page } = await open(base(), '/recipes', 'E12-favourite-copy'));
+await page.getByLabel('Keep in favourites').first().click(); await page.waitForTimeout(500);
+st = await store(page);
+check('E12 favouriting a Calgym original stores a reference, not a copy', st.recipes.length === 0 && st.favoriteIds.length === 1 && st.favoriteIds[0].startsWith('calgym:'), JSON.stringify(st.favoriteIds));
+await page.getByText('Favourites', { exact: true }).click(); await page.waitForTimeout(500);
+b = await body(page);
+const favName = st.favoriteIds[0] === 'calgym:chicken-kabsa' ? 'Chicken kabsa' : null;
+check('E12 the Favourites filter lists it', /Chicken kabsa|Home-style lentil stew|Egg & labneh wrap/.test(b));
+await page.goto(`${BASE}/recipe-edit?id=calgym%3Achicken-kabsa`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+await page.getByPlaceholder(/machboos/i).fill('My kabsa');
+await page.getByText('Save', { exact: true }).click(); await page.waitForTimeout(1500);
+st = await store(page);
+check('E12 editing the original creates a separate private copy', st.recipes.length === 1 && st.recipes[0].source === 'custom' && st.recipes[0].id !== 'calgym:chicken-kabsa' && st.recipes[0].name === 'My kabsa', JSON.stringify({ n: st.recipes.length, id: st.recipes[0]?.id, source: st.recipes[0]?.source }));
+check('E12 the editor opened the copy, not the original', /\/recipe\?id=/.test(page.url()) && !/calgym%3Achicken-kabsa|calgym:chicken-kabsa/.test(page.url()), page.url().replace(BASE, ''));
+await page.goto(`${BASE}/recipes`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+await page.getByText('Calgym', { exact: true }).nth(1).click().catch(() => page.getByText('Calgym', { exact: true }).first().click()); await page.waitForTimeout(500);
+b = await body(page); await shot(page, 'E12-calgym-filter');
+check('E12 the Calgym collection still holds the untouched original', /Chicken kabsa/.test(b) && !/My kabsa/.test(b.split('My recipes')[1] ?? ''), b.match(/Chicken kabsa.{0,40}/)?.[0]);
+await page.getByText('My recipes', { exact: true }).click(); await page.waitForTimeout(500);
+b = await body(page);
+check('E12 My recipes holds the private copy', /My kabsa/.test(b));
+await close(ctx, page);
+
+// ═══ E13: AT30 — Arabic input: Arabic-Indic digits, dates, units, plurals ═══
+console.log('\n=== E13 Arabic journeys (AT30) ===');
+const arWeek = { [yesterday.getDay()]: { title: 'الجزء السفلي', exerciseIds: ['builtin:squat'] }, [today.getDay()]: { title: 'الجزء العلوي', exerciseIds: ['builtin:bench-press'] } };
+const arWorkouts = [
+  { id: 'aw1', at: at(1, 18), exerciseId: 'builtin:squat', exerciseName: 'سكوات', type: 'weight_reps', sets: [{ weightKg: 80, reps: 8, done: true }] },
+  { id: 'aw2', at: at(3, 18), exerciseId: 'builtin:bench-press', exerciseName: 'ضغط بنش', type: 'weight_reps', sets: [{ weightKg: 60, reps: 10, done: true }, { weightKg: 60, reps: 10, done: true }] },
+];
+({ ctx, page } = await open({ ...base('ar'), schedule: arWeek, workouts: arWorkouts }, '/food-edit', 'E13-arabic-input'));
+await page.getByPlaceholder('مثال: بطيخ').fill('تمر');
+await page.locator('input[inputmode="numeric"]').nth(0).fill('٣٠٠');
+await page.locator('input[inputmode="numeric"]').nth(1).fill('٢');
+b = await body(page); await shot(page, 'E13-food-edit-ar');
+await page.getByText('إضافة الطعام', { exact: true }).last().click(); await page.waitForTimeout(1200);
+st = await store(page);
+check('E13 Arabic-Indic digits are parsed: ٣٠٠ → 300 kcal, ٢ → 2 g protein', st.meals[0]?.items[0]?.calories === 300 && st.meals[0]?.items[0]?.proteinG === 2, JSON.stringify(st.meals[0]?.items[0]));
+await page.goto(`${BASE}/body-reading`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+await page.locator('input[inputmode="decimal"]').first().fill('٧٦٫٥');
+await page.getByText('حفظ القراءة', { exact: true }).click(); await page.waitForTimeout(1200);
+st = await store(page);
+check('E13 an Arabic decimal reading saves as 76.5 kg', st.weights.length === 1 && st.weights[0].kg === 76.5, `${st.weights[0]?.kg}`);
+await page.goto(`${BASE}/review`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+b = await body(page); await shot(page, 'E13-review-ar');
+check('E13 the dual plural form is used for two training days', /يوما تمرين/.test(b), b.match(/.{0,10}تمرين.{0,20}/)?.[0]);
+check('E13 the review shows an Arabic month name and the kg unit', /سبتمبر|أكتوبر|أغسطس/.test(b) && /كغ/.test(b));
+await page.goto(`${BASE}/training`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+b = await body(page); await shot(page, 'E13-training-ar');
+check('E13 Training in Arabic offers the pending workout with its Arabic date', /التمرين التالي/.test(b) && /أدّه اليوم/.test(b));
+await close(ctx, page);
+
+// ═══ E14: S18 — recipe draft from AI Support → review → Log eaten (client path; the live model call is blocked here) ═══
+console.log('\n=== E14 AI Support recipe draft (client path) ===');
+const draft = recipe('r9', 'Lentil stew', { reviewStatus: 'needs_review', source: 'ai', description: 'A simple, hearty meal with lentils, vegetables and herbs.' });
+({ ctx, page } = await open({ ...base(), recipes: [draft], coachMessages: [{ role: 'user', content: 'What can I make with lentils?', at: at(0, 9), focus: 'food' }, { role: 'assistant', content: 'Try a lentil stew. You can review ingredients and portions before saving.', at: at(0, 9), recipeId: 'r9' }] }, '/coach', 'E14-recipe-draft'));
+b = await body(page); await shot(page, 'E14-coach-draft');
+check('E14 the reply carries a Recipe draft card with Review recipe draft', /Recipe draft/.test(b) && /Review recipe draft/.test(b) && /Lentil stew/.test(b));
+check('E14 the allowance line is honest (a count, checking, or unavailable — never a vague claim)', /(of \d+ (AI|AI Support)|Checking your allowance|Allowance unavailable)/.test(b) && !/Uses your AI allowance/.test(b), b.match(/AI Support.{0,60}/)?.[0]);
+check('E14 nothing was planned or logged by the draft', Object.keys((await store(page)).mealPlanRecipes).length === 0 && (await store(page)).meals.length === 0);
+await page.getByText('Review recipe draft', { exact: true }).click(); await page.waitForTimeout(1500);
+b = await body(page);
+check('E14 Review opens the recipe with the review gate', /\/recipe\?id=r9/.test(page.url()) && /Needs review/.test(b) && !/Add to plan/.test(b));
+await page.getByText('Looks right', { exact: false }).click(); await page.waitForTimeout(800);
+b = await body(page);
+check('E14 after review, Add to plan and Log eaten are offered', /Add to plan/.test(b) && /Log eaten/.test(b));
+await page.getByText('Log eaten', { exact: true }).first().click(); await page.waitForTimeout(1200);
+await page.getByText(/^Add to (Breakfast|Lunch|Dinner|Snacks)$/).click(); await page.waitForTimeout(700);
+st = await store(page);
+check('E14 Log eaten writes one entry from the reviewed draft, by the person', st.meals.length === 1 && st.meals[0].items[0].recipeId === 'r9');
+await page.goto(`${BASE}/coach`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
+b = await body(page);
+check('E14 the card now reads Reviewed · ready', /Reviewed · ready/.test(b));
+await close(ctx, page);
 
 await browser.close();
 fs.writeFileSync(`${OUT}/journeys.json`, JSON.stringify(results, null, 2));

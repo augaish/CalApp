@@ -7,7 +7,7 @@ const BASE = 'http://127.0.0.1:8099';
 const today = new Date();
 const at = (d, h = 12) => { const x = new Date(today); x.setDate(x.getDate() - d); x.setHours(h, 0, 0, 0); return x.toISOString(); };
 const ing = (name, amount, kcal, extra = {}) => ({ name, key: name.toLowerCase().replace(/\s+/g, '_'), amount, unit: 'g', state: 'raw', calories: kcal, proteinG: 10, carbsG: 20, fatG: 5, aisle: 'pantry', ...extra });
-const recipe = (id, name, over = {}) => ({ id, name, servings: 4, createdAt: at(1), language: 'en', source: 'ai', reviewStatus: 'ready', ingredients: [ing('Red lentils', 320, 1100), ing('Tomatoes', 400, 72), ing('Onion', 160, 64), ing('Olive oil', 40, 354)], steps: ['Rinse the lentils.', 'Soften the onion, then add tomatoes.', 'Add lentils and water; simmer until tender.'], prepMinutes: 25, ...over });
+const recipe = (id, name, over = {}) => ({ id, name, servings: 4, createdAt: at(1), language: 'en', source: 'ai', reviewStatus: 'ready', ingredients: [ing('Red lentils', 320, 1100, { state: 'dry' }), ing('Tomatoes', 400, 72, { aisle: 'produce' }), ing('Onion', 160, 64, { aisle: 'produce' }), ing('Olive oil', 40, 354)], steps: ['Rinse the lentils.', 'Soften the onion, then add tomatoes.', 'Add lentils and water; simmer until tender.'], prepMinutes: 25, ...over });
 const gymPlan = (n) => Array.from({ length: 3 }, () => ({ weightKg: 60, reps: n }));
 const gymDays = {
   [(today.getDay() + 6) % 7]: { title: 'Lower body', exerciseIds: ['builtin:squat', 'builtin:deadlift', 'builtin:lunge', 'builtin:seated-calf-raise'] },
@@ -15,9 +15,15 @@ const gymDays = {
   [(today.getDay() + 2) % 7]: { title: 'Core', exerciseIds: ['builtin:plank', 'builtin:crunch', 'builtin:bird-dog'] },
   [(today.getDay() + 4) % 7]: { title: 'Cardio', exerciseIds: ['builtin:treadmill', 'builtin:cycling'] },
 };
+const dk = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+const dayN = (n) => { const x = new Date(today); x.setDate(x.getDate() + n); return x; };
+// A populated week: lunches and dinners planned from saved recipes, and a
+// shopping list already created for it with one item bought.
+const plannedWeek = { [dk(dayN(0))]: { lunch: { recipeId: 'r1', servings: 1 }, dinner: { recipeId: 'r2', servings: 1 } }, [dk(dayN(1))]: { lunch: { recipeId: 'r2', servings: 1 } }, [dk(dayN(2))]: { dinner: { recipeId: 'r1', servings: 2 } } };
 const seedFile = process.env.SEED; // optional JSON override
 const base = seedFile ? JSON.parse(fs.readFileSync(seedFile, 'utf8')) : {
-  language: lang, account: process.env.NOACCOUNT ? null : { name: 'Alex', provider: 'guest' }, units: process.env.UNITS || 'metric', focusAreas: ['food', 'training'], tutorialSeen: true, tourSeen: true, checklistDismissed: true,
+  language: lang, account: process.env.NOACCOUNT ? null : { name: 'Alex', provider: 'guest' },
+  mealPlanRecipes: plannedWeek, shopping: { fromKey: dk(dayN(0)), toKey: dk(dayN(6)), checkedAt: { red_lentils: 100, tomatoes: 200 }, have: {}, oneBatch: {} }, favoriteIds: ['calgym:chicken-kabsa'], units: process.env.UNITS || 'metric', focusAreas: ['food', 'training'], tutorialSeen: true, tourSeen: true, checklistDismissed: true,
   profile: { sex: 'male', birthDate: '1990-01-01', heightCm: 178, weightKg: 74.8, activityLevel: 'moderate', goal: 'maintain' },
   targets: { calories: 2000, proteinG: 120, carbsG: 245, fatG: 60 },
   schedule: gymDays,
@@ -34,7 +40,7 @@ const base = seedFile ? JSON.parse(fs.readFileSync(seedFile, 'utf8')) : {
   ], exercises: [],
   coachMessages: process.env.COACH ? [
     { role: 'user', content: lang === 'ar' ? 'ماذا يمكنني أن أطبخ بالعدس؟' : 'What can I make with lentils?', at: at(0, 9), focus: 'food' },
-    { role: 'assistant', content: lang === 'ar' ? 'جرّب شوربة العدس. يمكنك مراجعة المكونات والحصص قبل الحفظ.' : 'Try a lentil stew. You can review ingredients and portions before saving.', at: at(0, 9) },
+    { role: 'assistant', content: lang === 'ar' ? 'جرّب شوربة العدس. يمكنك مراجعة المكونات والحصص قبل الحفظ.' : 'Try a lentil stew. You can review ingredients and portions before saving.', at: at(0, 9), recipeId: 'r3' },
     { role: 'user', content: lang === 'ar' ? 'اقترح لي جدول ثلاثة أيام' : 'Suggest a three-day schedule', at: at(0, 9), focus: 'training' },
     { role: 'assistant', content: lang === 'ar' ? 'هذه مسودة لثلاثة أيام.' : 'Here is a three-day draft.', at: at(0, 9), schedulePlan: { summary: lang === 'ar' ? 'دفع / سحب / أرجل، ثلاثة أيام في الأسبوع' : 'Push / pull / legs, three days a week', days: [ { weekday: 1, title: 'Push', exercises: [{ name: 'Barbell Bench Press', sets: 3, reps: 8 }, { name: 'Shoulder Press', sets: 3, reps: 10 }] }, { weekday: 3, title: 'Pull', exercises: [{ name: 'Lat Pulldown', sets: 3, reps: 10 }, { name: 'Seated Row', sets: 3, reps: 10 }] }, { weekday: 5, title: 'Legs', exercises: [{ name: 'Squat', sets: 4, reps: 8 }, { name: 'Lunge', sets: 3, reps: 12 }] } ] } },
   ] : [],
@@ -45,19 +51,20 @@ const base = seedFile ? JSON.parse(fs.readFileSync(seedFile, 'utf8')) : {
   ],
   water: [{ at: at(0, 9), ml: 500 }, { at: at(0, 11), ml: 700 }],
   weights: [{ at: at(0, 8), kg: 74.8, source: 'manual' }, { at: at(7, 8), kg: 75.4, source: 'manual' }, { at: at(14, 8), kg: 75.0, source: 'manual' }, { at: at(21, 8), kg: 76.1, source: 'manual' }, { at: at(28, 8), kg: 76.3, source: 'manual' }],
-  recipes: [recipe('r1', 'Home-style lentil stew'), recipe('r2', 'Chicken kabsa', { source: 'custom', favorite: true, ingredients: [ing('Basmati rice', 400, 1400), ing('Chicken', 600, 660)] }), recipe('r3', 'Egg & labneh wrap', { servings: 1, source: 'ai', reviewStatus: 'needs_review', ingredients: [ing('Eggs', 100, 155), ing('Labneh', 60, 100)] })],
-  mealPlanSwaps: {}, mealPlanRecipes: {}, shopping: null, fastingHistory: [], skips: {}, dayOrder: {}, whoopBurnByDay: {}, whoopWorkoutsByDay: {},
+  recipes: [recipe('r1', 'Home-style lentil stew'), recipe('r2', 'Chicken kabsa', { source: 'custom', favorite: true, ingredients: [ing('Basmati rice', 400, 1400, { state: 'dry' }), ing('Chicken', 600, 660, { aisle: 'meat' })] }), recipe('r3', 'Egg & labneh wrap', { servings: 1, source: 'ai', reviewStatus: 'needs_review', ingredients: [ing('Eggs', 100, 155), ing('Labneh', 60, 100)] })],
+  mealPlanSwaps: {}, fastingHistory: [], skips: {}, dayOrder: {}, whoopBurnByDay: {}, whoopWorkoutsByDay: {},
 };
 const browser = await chromium.launch();
 for (const r of routes) {
   const eq = r.indexOf('='); const [name, path] = eq > 0 ? [r.slice(0, eq), r.slice(eq + 1)] : [r.replace(/[^a-z0-9]+/gi, '_') || 'root', r];
-  const ctx = await browser.newContext({ viewport: { width: 390, height: Number(process.env.SHOT_H || 1400) }, deviceScaleFactor: 2 });
+  const fold = !!process.env.FOLD;
+  const ctx = await browser.newContext({ viewport: { width: 390, height: fold ? 844 : Number(process.env.SHOT_H || 1400) }, deviceScaleFactor: 2 });
   await ctx.addInitScript((s) => { if (!localStorage.getItem('calapp-store')) localStorage.setItem('calapp-store', JSON.stringify(s)); }, { state: base, version: 13 });
   const page = await ctx.newPage();
   const errs = []; page.on('pageerror', (e) => errs.push(String(e)));
   await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1800);
-  await page.screenshot({ path: `${outDir}/${name}-${lang}.png`, fullPage: true });
+  await page.screenshot({ path: `${outDir}/${name}-${lang}.png`, fullPage: !fold });
   console.log(`${name}-${lang}.png`, errs.length ? 'ERRORS: ' + errs.join(' | ') : 'ok');
   await ctx.close();
 }

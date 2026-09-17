@@ -2,7 +2,7 @@
 import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
 import fs from 'node:fs';
 const H = '/tmp/claude-0/-home-user-CalApp/ecae7b05-0468-5173-bf98-63d45483ae6b/scratchpad/handoff/calgym-design-handoff-v1.1/screens';
-const S = '/tmp/claude-0/-home-user-CalApp/ecae7b05-0468-5173-bf98-63d45483ae6b/scratchpad/shots18';
+const S = process.env.SHOTS || '/tmp/claude-0/-home-user-CalApp/ecae7b05-0468-5173-bf98-63d45483ae6b/scratchpad/shots19';
 const OUT = '/tmp/claude-0/-home-user-CalApp/ecae7b05-0468-5173-bf98-63d45483ae6b/scratchpad/evidence/compare';
 fs.mkdirSync(OUT, { recursive: true });
 // [screen, title, board file, side (0 left / 1 right), shot basename]
@@ -40,7 +40,7 @@ for (const [id, title, board, side, shotBase] of MAP) {
       <div style="display:flex;gap:24px;align-items:flex-start">
         <div><div style="font:600 13px system-ui;color:#4C3D7A;margin-bottom:8px">${id} · ${title} — board (reference)</div>
           <div id="board" style="width:460px;height:820px;overflow:hidden;border-radius:16px;background:#fff;box-shadow:0 2px 8px rgba(33,27,46,.12)"><img id="bimg" src="${b64(`${H}/${board}`)}" style="display:block"/></div></div>
-        <div><div style="font:600 13px system-ui;color:#4C3D7A;margin-bottom:8px">Implementation — web export, ${lang === 'ar' ? 'Arabic' : 'English'}</div>
+        <div><div style="font:600 13px system-ui;color:#4C3D7A;margin-bottom:8px">Implementation — web export, 390 × 844 viewport, ${lang === 'ar' ? 'Arabic' : 'English'}</div>
           <div style="width:460px;height:820px;overflow:hidden;border-radius:16px;background:#fff;box-shadow:0 2px 8px rgba(33,27,46,.12)"><img src="${b64(shotPath)}" style="width:460px;display:block"/></div></div>
       </div></body></html>`;
     await page.setContent(html);
