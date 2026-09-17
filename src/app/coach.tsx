@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -21,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
-import { ActionButton, Chip, IconTile, Segmented, StatusPill } from '@/components/system';
+import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeCoachAttachment, coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
@@ -39,7 +38,8 @@ import type { ChatMessage, CoachAction, CoachFocus, CoachSchedulePlan } from '@/
 import { formatWeight } from '@/lib/units';
 
 const FOCUS: CoachFocus[] = ['food', 'training', 'health'];
-const FOCUS_ICON: Record<CoachFocus, keyof typeof Ionicons.glyphMap> = { food: 'restaurant', training: 'barbell', health: 'heart-outline' };
+/** Starter questions for an empty thread — the same chip row the follow-ups use. */
+const STARTERS = ['eat', 'train', 'trend'] as const;
 
 /** Timestamp for a sent message; module-level so the clock is never read during render. */
 const nowIso = () => new Date().toISOString();
@@ -81,27 +81,18 @@ export default function Coach() {
   const referenceDocs = useAppStore((s) => s.coachReferenceDocs);
   const addCoachReferenceDoc = useAppStore((s) => s.addCoachReferenceDoc);
   const units = useAppStore((s) => s.units);
-  const [focus, setFocus] = useState<CoachFocus>(FOCUS.includes(focusParam as CoachFocus) ? (focusParam as CoachFocus) : 'food');
+  // The area AI Support was opened from (Health's "Ask coach", the Food
+  // tab's pill) travels as a hint; there is no visible filter — the question
+  // itself says what it is about, and the model sees the same data either way.
+  const focus: CoachFocus | undefined = FOCUS.includes(focusParam as CoachFocus) ? (focusParam as CoachFocus) : undefined;
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [attachStage, setAttachStage] = useState<'idle' | 'picking' | 'reading'>('idle');
   const [openDrafts, setOpenDrafts] = useState<number[]>([]);
-  // The focus chips step aside while the keyboard is up: the reply is what
-  // needs the room then, not the filter.
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   // Undo closures for actions applied in this visit, keyed message-action;
   // in state (not a ref) because whether a card offers Undo is rendered.
   const [undos, setUndos] = useState<Record<string, () => void>>({});
-
-  useEffect(() => {
-    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
 
   const send = async (override?: string) => {
     const content = (override ?? input).trim();
@@ -340,7 +331,8 @@ export default function Coach() {
             : t('coach.allowanceUnavailable');
   const canSend = !!input.trim() && !busy;
   const last = messages[messages.length - 1];
-  const chips = last?.role === 'assistant' && !busy ? (last.suggestions ?? []) : [];
+  // Starters on an empty thread, the coach's own follow-ups after a reply.
+  const chips = busy ? [] : messages.length === 0 ? STARTERS.map((k) => t(`coach.starter.${k}`)) : last?.role === 'assistant' ? (last.suggestions ?? []) : [];
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
@@ -380,16 +372,6 @@ export default function Coach() {
           <Ionicons name="create-outline" size={22} color={theme.onGradient} />
         </Pressable>
       </LinearGradient>
-      {!keyboardOpen && (
-        <View style={{ paddingHorizontal: Spacing.page, paddingTop: Spacing.sm }}>
-          <Segmented<CoachFocus>
-            options={FOCUS.map((f) => ({ key: f, label: t(`coach.focus.${f}`), icon: FOCUS_ICON[f] }))}
-            value={focus}
-            onChange={setFocus}
-          />
-        </View>
-      )}
-
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
@@ -399,8 +381,8 @@ export default function Coach() {
       >
         {messages.length === 0 && (
           <View style={{ marginBottom: Spacing.xs }}>
-            <Text style={[Type.section, { color: theme.text, fontSize: 19 }]}>{t(`coach.focusTitle.${focus}`)}</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 15, lineHeight: 21, marginTop: 2 }}>{t(`coach.focusBody.${focus}`)}</Text>
+            <Text style={[Type.section, { color: theme.text, fontSize: 19 }]}>{t('coach.emptyTitle')}</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 15, lineHeight: 21, marginTop: 2 }}>{t('coach.emptyBody')}</Text>
             <Text style={{ color: theme.textTertiary, fontSize: 13, lineHeight: 19, marginTop: Spacing.sm }}>{t('coach.canAct')}</Text>
           </View>
         )}

@@ -1160,16 +1160,12 @@ export const en = {
     attach: 'Attach a document',
     usesAllowance: 'Uses your AI allowance',
     allowanceLeft: '{{left}} of {{cap}} AI Support messages left this month',
-    focus: { food: 'Food', training: 'Training', health: 'Health' },
-    focusTitle: {
-      food: "Today's food and your preferences",
-      training: 'Your training this week',
-      health: 'Your measurements and trends',
-    },
-    focusBody: {
-      food: 'I can suggest meals, answer nutrition questions, and help tailor ideas to your preferences.',
-      training: 'I can explain your sessions, suggest a weekly schedule as a draft, and answer form questions.',
-      health: 'I can read your dated measurements and trends. Nothing is shared beyond what you allow.',
+    emptyTitle: 'Ask about your own numbers',
+    emptyBody: 'Meals, macros, training, recovery, trends — answered from what you have logged, in either language.',
+    starter: {
+      eat: 'What should I eat tonight?',
+      train: "Plan this week's training",
+      trend: 'How am I trending?',
     },
     programDraft: 'Program draft',
     recipeDraft: 'Recipe draft',

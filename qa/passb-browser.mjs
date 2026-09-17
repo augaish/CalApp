@@ -80,7 +80,7 @@ const msgs = [
 ({ ctx, page } = await open(base('en', { coachMessages: msgs }), '/coach'));
 b = await body(page); await shot(page, 'b2-coach');
 check('B2 one thin strip: a single AI Support header', (await page.locator('[role="heading"]', { hasText: 'AI Support' }).count()) === 1 && !/Back ?AI Support/.test(b));
-check('B2 focus chips present', /Food/.test(b) && /Training/.test(b) && /Health/.test(b));
+check('B2 no focus tabs: no tablist above the thread', (await page.locator('[role="tablist"]').count()) === 0);
 check('B2 no Manage shared context card in the body (moved to the strip)', !/Manage shared context/.test(b) && (await page.locator('[aria-label="Manage shared context"]').count()) === 1);
 check('B3 action cards rendered with Update the entry and Add the water', /Change Tuna sandwich/.test(b) && /520 kcal · 20g fat/.test(b) && /Update the entry/.test(b) && /500 ml water/.test(b) && /Add the water/.test(b), b.match(/Change Tuna.{0,80}/)?.[0]);
 check('B3 follow-up chips rendered', /Log it for me/.test(b) && /Recalculate without mayo/.test(b));
@@ -96,6 +96,11 @@ await page.getByText('Add the water', { exact: true }).click(); await page.waitF
 st = await store(page);
 check('B3 water action logs 500 ml', st.water.length === 1 && st.water[0].ml === 500);
 check('B2/B3 no page errors', page.errors.length === 0, page.errors.join(' | '));
+await ctx.close();
+
+({ ctx, page } = await open(base('en'), '/coach'));
+b = await body(page); await shot(page, 'b2-coach-empty');
+check('B2 empty thread shows starter chips and the intro', /What should I eat tonight\?/.test(b) && /Plan this week's training/.test(b) && /How am I trending\?/.test(b) && /Ask about your own numbers/.test(b));
 await ctx.close();
 
 // Arabic coach layout
