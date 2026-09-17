@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-import type { BodyReadingAnalysis, EquipmentAnalysis, MealAnalysis, MealType } from './types';
+import type { BodyReadingAnalysis, EquipmentAnalysis, FoodItem, MealAnalysis, MealType } from './types';
 
 /** Transient (non-persisted) hand-off between the scan screen and result screens. */
 interface PendingState {
@@ -18,12 +18,24 @@ interface PendingState {
    * add flow (e.g. the tab-bar + button, which has no slot in mind).
    */
   mealTypeHint: MealType | null;
+  /**
+   * S16 opt-in: share a product the catalogue lacked for review, once it is
+   * saved. Off by default and never submits on its own — the save that follows
+   * (label photo or manual entry) reads it. Cleared after use.
+   */
+  catalogueConsent: boolean;
+  /** A food picked from search (S29 entry), consumed once by the manual form. */
+  foodDraft: FoodItem | null;
   setMeal: (meal: MealAnalysis, photoUri: string | null) => void;
   setEquipment: (equipment: EquipmentAnalysis, photoUri: string | null) => void;
   setBodyReading: (reading: BodyReadingAnalysis, photoUri: string | null) => void;
   setCapturedPhoto: (uri: string | null) => void;
   setMealTypeHint: (hint: MealType | null) => void;
   consumeMealTypeHint: () => MealType | null;
+  setCatalogueConsent: (on: boolean) => void;
+  consumeCatalogueConsent: () => boolean;
+  setFoodDraft: (item: FoodItem | null) => void;
+  consumeFoodDraft: () => FoodItem | null;
   clear: () => void;
 }
 
@@ -34,6 +46,8 @@ export const usePending = create<PendingState>((set, get) => ({
   photoUri: null,
   capturedPhoto: null,
   mealTypeHint: null,
+  catalogueConsent: false,
+  foodDraft: null,
   setMeal: (meal, photoUri) => set({ meal, photoUri, equipment: null, bodyReading: null }),
   setEquipment: (equipment, photoUri) => set({ equipment, photoUri, meal: null, bodyReading: null }),
   setBodyReading: (bodyReading, photoUri) => set({ bodyReading, photoUri, meal: null, equipment: null }),
@@ -43,6 +57,18 @@ export const usePending = create<PendingState>((set, get) => ({
     const hint = get().mealTypeHint;
     if (hint) set({ mealTypeHint: null });
     return hint;
+  },
+  setCatalogueConsent: (on) => set({ catalogueConsent: on }),
+  consumeCatalogueConsent: () => {
+    const on = get().catalogueConsent;
+    if (on) set({ catalogueConsent: false });
+    return on;
+  },
+  setFoodDraft: (item) => set({ foodDraft: item }),
+  consumeFoodDraft: () => {
+    const item = get().foodDraft;
+    if (item) set({ foodDraft: null });
+    return item;
   },
   clear: () => set({ meal: null, equipment: null, bodyReading: null, photoUri: null }),
 }));

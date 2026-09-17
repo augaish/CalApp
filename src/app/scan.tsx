@@ -85,21 +85,11 @@ export default function Scan() {
     try {
       const found = await lookupBarcode(data);
       if (!found) {
-        Alert.alert(t('barcode.notFoundTitle'), t('barcode.notFound'), [
-          {
-            text: t('barcode.enterManually'),
-            onPress: () => router.replace('/food-edit'),
-          },
-          {
-            // Straight into the AI meal-scan flow (not the raw-capture
-            // `mode=photo`, which never reads the label at all) — carrying
-            // the barcode along so a successful read can be filed into the
-            // shared barcode cache below, for the next person to scan it.
-            text: t('barcode.usePhoto'),
-            onPress: () => router.replace(`/scan?mode=meal&barcode=${encodeURIComponent(data)}`),
-          },
-          { text: t('common.cancel'), style: 'cancel', onPress: () => setAnalyzing(false) },
-        ]);
+        // S16: the recovery screen offers the label photo (the AI meal-scan
+        // flow, carrying the barcode) or manual entry, and the catalogue
+        // share opt-in — never an alert with the choice buried in it.
+        usePending.getState().setCatalogueConsent(false);
+        router.replace(`/product-not-found?code=${encodeURIComponent(data)}`);
         return;
       }
       setMeal({ items: [found.item], confidence: 1, source: found.source ?? undefined }, null);
@@ -133,12 +123,12 @@ export default function Scan() {
     } else {
       const analysis = await analyzeMeal(saved.base64, language);
       useEntitlement.getState().spend();
-      // Arrived here from a barcode OFF didn't have — a single-item read is
-      // exactly one resolved product, worth filing into the shared cache so
-      // the next scan of this barcode (anyone's) is instant. A multi-item
-      // result means the photo wasn't just the product label, so there's no
-      // one clear answer to cache against this barcode.
-      if (barcodeParam && analysis.items.length === 1) {
+      // Arrived here from a barcode the catalogue didn't have — a single-item
+      // read is exactly one resolved product, worth filing for catalogue
+      // review so the next scan of this barcode (anyone's) is instant. Only
+      // with the S16 opt-in (off by default); a multi-item result means the
+      // photo wasn't just the product label, so there's no one clear answer.
+      if (barcodeParam && analysis.items.length === 1 && usePending.getState().consumeCatalogueConsent()) {
         void reportBarcode(barcodeParam, analysis.items[0]);
       }
       setMeal(analysis, saved.uri);

@@ -38,7 +38,6 @@ const EMPTY_DIMENSIONS: Record<DimensionKey, string> = {
 };
 type SegKey = 'leftArm' | 'rightArm' | 'trunk' | 'leftLeg' | 'rightLeg';
 const SEG_KEYS: SegKey[] = ['leftArm', 'rightArm', 'trunk', 'leftLeg', 'rightLeg'];
-const EMPTY_SEG: Record<SegKey, string> = { leftArm: '', rightArm: '', trunk: '', leftLeg: '', rightLeg: '' };
 
 /** A YYYY-MM-DD string, local time, so "today" means today regardless of UTC offset. */
 function ymd(d: Date): string {

@@ -105,7 +105,6 @@ export default function Food() {
   const recipes = useAllRecipes();
   const shopping = useAppStore((s) => s.shopping);
   const selected = useViewDay((s) => s.day);
-  const setDay = useViewDay((s) => s.setDay);
 
   const [sharing, setSharing] = useState(false);
   // Today / Meal plan are local views (S02). A deep link can open the plan

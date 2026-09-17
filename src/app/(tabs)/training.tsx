@@ -6,7 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
-import { BrandHeader, HeaderPill } from '@/components/brand-header';
+import { BrandHeader } from '@/components/brand-header';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -14,7 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { fetchWhoopDayBurn, fetchWhoopHistory } from '@/lib/api';
 import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
-import { exerciseIcon, exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
+import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
 import {
   actualBurnedForDay,
