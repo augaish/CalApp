@@ -866,6 +866,7 @@ export const ar: TranslationSchema = {
     musclePercent: 'العضلات',
     noWeights: 'سجّل وزنك لمتابعة التغير.',
     fullReading: 'القراءة الكاملة',
+    viewHealth: 'عرض الصحة',
     workouts: 'التمارين',
     noWorkouts: 'لم تسجل أي تمرين بعد. صوّر جهازاً في النادي!',
     dayStreak: 'يوم متتالي',

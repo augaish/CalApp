@@ -23,13 +23,12 @@ import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour
 import { Ring } from '@/components/ring';
 import { SponsorCard } from '@/components/sponsor-card';
 import { TargetUpdateModal } from '@/components/target-update-modal';
-import { Button, Field, MetricRow } from '@/components/ui';
+import { MetricRow } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchWhoopDayBurn } from '@/lib/api';
-import { timestampFor, useViewDay } from '@/lib/day';
+import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
-import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
 import {
   actualBurnedForDay,
@@ -144,7 +143,6 @@ export default function Overview() {
   const dismissChecklist = useAppStore((s) => s.dismissChecklist);
   const tourSeen = useAppStore((s) => s.tourSeen);
   const setTourSeen = useAppStore((s) => s.setTourSeen);
-  const logWeight = useAppStore((s) => s.logWeight);
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
   const setWhoopDayWorkouts = useAppStore((s) => s.setWhoopDayWorkouts);
   // Starts already-flagged when there's a mismatch coming INTO this mount —
@@ -161,7 +159,6 @@ export default function Overview() {
   const selected = useViewDay((s) => s.day);
   const setDay = useViewDay((s) => s.setDay);
   const shift = useViewDay((s) => s.shift);
-  const [kg, setKg] = useState('');
 
   // Coach-tour hooks must run before the early return below (rules of hooks).
   const ringRef = useRef<View>(null);
@@ -321,17 +318,6 @@ export default function Overview() {
   const advanceTour = () => {
     if (tourSteps && tourIndex < tourSteps.length - 1) setTourIndex((i) => i + 1);
     else endTour();
-  };
-
-  const submitWeight = () => {
-    const value = parseFloat(kg);
-    if (!value || value < 30 || value > 300) {
-      Alert.alert(t('onboarding.invalidInput'));
-      return;
-    }
-    logWeight(value, timestampFor(selected));
-    setKg('');
-    if (targetsNeedUpdate(profile, value)) setPendingWeightKg(value);
   };
 
   return (
@@ -599,6 +585,19 @@ export default function Overview() {
                   {nextPlanned.name}
                 </Text>
               )}
+              {nextMeal && nextPlanned?.items[0]?.recipeId && (
+                <MiniBtn
+                  label={t('mealPlan.viewRecipe')}
+                  icon="restaurant"
+                  variant="secondary"
+                  onPress={() =>
+                    router.push(
+                      `/recipe?id=${encodeURIComponent(nextPlanned.items[0].recipeId as string)}&day=${dateKey(selected)}&slot=${nextMeal}`,
+                    )
+                  }
+                  style={styles.todayBtn}
+                />
+              )}
               <View style={styles.mealDots}>
                 {MAIN_MEALS.map((m) => (
                   <View
@@ -815,15 +814,15 @@ export default function Overview() {
             <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, flex: 1 }]}>
               {t('progress.weight')}
             </Text>
-            <Pressable onPress={() => router.push('/body-reading')} hitSlop={8}>
+            <Pressable onPress={() => router.push('/health')} hitSlop={8} accessibilityRole="button">
               <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
-                {t('progress.fullReading')}
+                {t('progress.viewHealth')}
               </Text>
             </Pressable>
           </View>
           {latestWeight && stats ? (
             <Pressable
-              onPress={() => router.push('/body-reading')}
+              onPress={() => router.push('/health')}
               style={({ pressed }) => [styles.compositionRow, pressed && { opacity: 0.85 }]}
             >
               <BodyMap
@@ -856,6 +855,12 @@ export default function Overview() {
                     trend={stats.muscleTrend}
                   />
                 )}
+                {/* A reading shown today is not a reading taken today (S01). */}
+                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                  {new Date(latestWeight.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
+                  {' · '}
+                  {latestWeight.source === 'scan' ? t('health.sourceScan') : t('health.sourceManual')}
+                </Text>
               </View>
               <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
             </Pressable>
@@ -864,19 +869,14 @@ export default function Overview() {
               {t('progress.noWeights')}
             </Text>
           )}
-          <View style={styles.weightRow}>
-            <View style={{ flex: 1 }}>
-              <Field
-                label={t('progress.logWeight')}
-                value={kg}
-                onChangeText={(t) => setKg(normalizeDigits(t))}
-                keyboardType="decimal-pad"
-                maxLength={5}
-                suffix={t('progress.kg')}
-              />
-            </View>
-            <Button label="+" onPress={submitWeight} style={styles.weightBtn} />
-          </View>
+          {/* Writes belong to Add reading (S04); this tile only reads. */}
+          <MiniBtn
+            label={t('health.addReading')}
+            icon="add"
+            variant="secondary"
+            onPress={() => router.push('/body-reading')}
+            style={{ alignSelf: 'flex-start' }}
+          />
         </View>
 
         <SponsorCard />

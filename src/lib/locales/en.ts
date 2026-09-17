@@ -867,6 +867,7 @@ export const en = {
     musclePercent: 'Muscle',
     noWeights: 'Log your weight to see your trend.',
     fullReading: 'Full reading',
+    viewHealth: 'View Health',
     workouts: 'Workouts',
     noWorkouts: 'No workouts logged yet. Scan a machine at the gym!',
     dayStreak: 'day streak',
