@@ -1,13 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BrandHeader } from '@/components/brand-header';
+import { CollapsingScreen } from '@/components/collapsing-screen';
 import { WeekBars } from '@/components/charts';
-import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
 import { SponsorCard } from '@/components/sponsor-card';
 import { ActionButton, DayStrip, IconTile, IllustrationTile, MacroRow, ProgressTrack, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
@@ -35,6 +33,7 @@ import {
   waterTargetMl,
 } from '@/lib/store';
 import { targetsNeedUpdate } from '@/lib/tdee';
+import { useTour, useTourTarget } from '@/lib/tour';
 import { useAllRecipes } from '@/lib/use-recipes';
 import type { MealType } from '@/lib/types';
 
@@ -76,8 +75,6 @@ export default function Overview() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const insets = useSafeAreaInsets();
-  const { width, height } = useWindowDimensions();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
 
   const units = useAppStore((s) => s.units);
@@ -105,6 +102,7 @@ export default function Overview() {
   const checklistDismissed = useAppStore((s) => s.checklistDismissed);
   const dismissChecklist = useAppStore((s) => s.dismissChecklist);
   const tourSeen = useAppStore((s) => s.tourSeen);
+  const tourActive = useTour((s) => s.active);
   const setTourSeen = useAppStore((s) => s.setTourSeen);
   const setWhoopDayBurn = useAppStore((s) => s.setWhoopDayBurn);
   const setWhoopDayWorkouts = useAppStore((s) => s.setWhoopDayWorkouts);
@@ -122,11 +120,9 @@ export default function Overview() {
   const setDay = useViewDay((s) => s.setDay);
   const shift = useViewDay((s) => s.shift);
 
-  // Coach-tour hooks must run before the early return below (rules of hooks).
-  const nutritionRef = useRef<View>(null);
-  const weekRef = useRef<View>(null);
-  const [tourSteps, setTourSteps] = useState<TourStep[] | null>(null);
-  const [tourIndex, setTourIndex] = useState(0);
+  // Tour targets (hooks, so they run before the early return below).
+  const stepsTarget = useTourTarget('overview.steps');
+  const nutritionTarget = useTourTarget('overview.nutrition');
 
   // Same WHOOP refresh as the Training tab: Overview is often the first
   // screen opened, so it shouldn't need a Training visit to pick up today's
@@ -224,38 +220,6 @@ export default function Overview() {
   const checklistDone = checklist.filter((c) => c.done).length;
   const showChecklist = !checklistDismissed && checklistDone < checklist.length;
 
-  // Spotlight coach-tour: measure the elements we own, then walk through them.
-  const measureRect = (ref: React.RefObject<View | null>) =>
-    new Promise<TourRect | null>((resolve) => {
-      const node = ref.current;
-      if (!node) return resolve(null);
-      node.measureInWindow((x, y, w, h) => resolve(w ? { x, y, width: w, height: h } : null));
-    });
-
-  const startTour = async () => {
-    const ring = await measureRect(nutritionRef);
-    const week = await measureRect(weekRef);
-    // The center + FAB sits bottom-centre, straddling the tab bar's top edge.
-    const fab: TourRect = { x: width / 2 - 34, y: height - insets.bottom - 82, width: 68, height: 68 };
-    setTourSteps([
-      { rect: ring, title: t('tour.ring.title'), body: t('tour.ring.body') },
-      { rect: week, title: t('tour.week.title'), body: t('tour.week.body') },
-      { rect: fab, title: t('tour.add.title'), body: t('tour.add.body') },
-    ]);
-    setTourIndex(0);
-  };
-
-  const endTour = () => {
-    setTourSteps(null);
-    setTourIndex(0);
-    setTourSeen();
-  };
-
-  const advanceTour = () => {
-    if (tourSteps && tourIndex < tourSteps.length - 1) setTourIndex((i) => i + 1);
-    else endTour();
-  };
-
   const dateLine = selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
   const trainingTitle = activeSession
     ? sessionIsToday
@@ -280,11 +244,12 @@ export default function Overview() {
         : `${activeScheduleName} · ${t('today.exercises', { count: todayIds.length })}`
       : t('today.restDayHint');
 
-  return (
-    <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <BrandHeader title={t('common.appName')}>
-        {/* Day context: chevrons are locked LTR because the glyphs don't mirror. */}
-        <View style={styles.dateRow}>
+  // The band (brand row, date, day strip) scrolls with the content; the
+  // compact bar keeps the brand, AI Support and Profile reachable.
+  const header = (
+    <>
+      {/* Day context: chevrons are locked LTR because the glyphs don't mirror. */}
+      <View style={styles.dateRow}>
           <View style={{ flex: 1 }}>
             <Pressable onPress={() => router.push('/calendar')} hitSlop={8} accessibilityRole="button" accessibilityLabel={dateLine} style={styles.dateTap}>
               <Text style={[Type.title, { color: theme.onGradient }]}>
@@ -312,19 +277,16 @@ export default function Overview() {
             </Pressable>
           </View>
         </View>
-        <View ref={weekRef} collapsable={false}>
-          <DayStrip days={days} selected={selected} onSelect={setDay} locale={locale} onGradient disabledAfter={new Date()} />
-        </View>
-      </BrandHeader>
+      <DayStrip days={days} selected={selected} onSelect={setDay} locale={locale} onGradient disabledAfter={new Date()} />
+    </>
+  );
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: Spacing.page, paddingTop: Spacing.sm, paddingBottom: insets.bottom + Spacing.xl }}
-        showsVerticalScrollIndicator={false}
-      >
-        {!tourSeen && !tourSteps && (
+  return (
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <CollapsingScreen title={t('common.appName')} header={header}>
+        {!tourSeen && !tourActive && (
           <Pressable
-            onPress={startTour}
+            onPress={() => useTour.getState().start()}
             style={({ pressed }) => [styles.tourBanner, { backgroundColor: theme.surfaceTint, borderColor: theme.primary }, pressed && { opacity: 0.8 }]}
           >
             <Ionicons name="sparkles" size={18} color={theme.primary} />
@@ -341,11 +303,19 @@ export default function Overview() {
           <>
             <SectionTitle style={{ marginTop: Spacing.sm }}>{t('today.nextSteps')}</SectionTitle>
 
-            <View style={[styles.stepCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+            {/* Each Overview card is a door to its own screen; the button inside stays the shortcut. */}
+            <Pressable
+              {...stepsTarget.bind}
+              onPress={() => router.push('/training')}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('today.trainingLabel')} · ${t('tabs.training')}`}
+              style={({ pressed }) => [styles.stepCard, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.85 }]}
+            >
               <View style={{ flex: 1 }}>
                 <View style={styles.eyebrowRow}>
                   <Ionicons name="barbell" size={15} color={theme.primary} />
                   <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('today.trainingLabel')}</Text>
+                  <Ionicons name="chevron-forward" size={13} color={theme.textTertiary} />
                 </View>
                 <Text style={[styles.stepTitle, { color: theme.text }]} numberOfLines={2}>
                   {trainingTitle}
@@ -386,9 +356,14 @@ export default function Overview() {
                 )}
               </View>
               <IllustrationTile icon="barbell" />
-            </View>
+            </Pressable>
 
-            <View style={[styles.stepCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+            <Pressable
+              onPress={() => router.push('/food')}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('today.nextMealLabel')} · ${t('tabs.food')}`}
+              style={({ pressed }) => [styles.stepCard, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.85 }]}
+            >
               <View style={{ flex: 1 }}>
                 <View style={styles.eyebrowRow}>
                   <Ionicons name="restaurant" size={15} color={theme.carbs} />
@@ -399,6 +374,7 @@ export default function Overview() {
                         : t('today.nextMealLabel')
                       : t('today.nextMealLabel')}
                   </Text>
+                  <Ionicons name="chevron-forward" size={13} color={theme.textTertiary} />
                 </View>
                 <Text style={[styles.stepTitle, { color: theme.text }]} numberOfLines={2}>
                   {nextMeal ? (nextPlanned ? nextPlanned.name : t(`home.mealTypes.${nextMeal}`)) : t('today.allLogged')}
@@ -432,7 +408,7 @@ export default function Overview() {
                 </View>
               </View>
               <IllustrationTile icon="restaurant" />
-            </View>
+            </Pressable>
           </>
         )}
 
@@ -465,8 +441,17 @@ export default function Overview() {
         )}
 
         {/* Nutrition today — actual diary entries only; planned food is not here. */}
-        <View ref={nutritionRef} collapsable={false} style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 6 }]}>{t('today.nutritionToday')}</Text>
+        <Pressable
+          {...nutritionTarget.bind}
+          onPress={() => router.push('/food')}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('today.nutritionToday')} · ${t('tabs.food')}`}
+          style={({ pressed }) => [styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.85 }]}
+        >
+          <View style={styles.linkTitle}>
+            <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, flex: 1 }]}>{t('today.nutritionToday')}</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+          </View>
           <View style={styles.kcalRow}>
             <Text style={{ color: theme.text }}>
               <Text style={{ fontSize: 26, fontWeight: '800' }}>{kcalIncomplete ? '≥' : ''}{num(totals.calories)}</Text>
@@ -490,11 +475,16 @@ export default function Overview() {
               <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1, lineHeight: 17 }}>{t('food.incompleteNote')}</Text>
             </View>
           )}
-        </View>
+        </Pressable>
 
         {/* Latest weight — read-only. A reading shown today is not a reading
             taken today, so it carries its own date and source (S01). */}
-        <View style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+        <Pressable
+          onPress={() => router.push('/health')}
+          accessibilityRole="button"
+          accessibilityLabel={`${t('today.latestWeight')} · ${t('tabs.health')}`}
+          style={({ pressed }) => [styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.85 }]}
+        >
           <IconTile icon="scale-outline" size={40} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('today.latestWeight')}</Text>
@@ -518,10 +508,16 @@ export default function Overview() {
           ) : (
             <ActionButton label={t('health.addReading')} icon="add" variant="secondary" onPress={() => router.push('/body-reading')} />
           )}
-        </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+        </Pressable>
 
         {/* Water — the row reads; the sheet (S24) writes. */}
-        <View style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+        <Pressable
+          onPress={() => router.push('/water')}
+          accessibilityRole="button"
+          accessibilityLabel={t('home.water')}
+          style={({ pressed }) => [styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.85 }]}
+        >
           <IconTile icon="water" size={40} color={theme.water} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('home.water')}</Text>
@@ -533,7 +529,8 @@ export default function Overview() {
             </Text>
           </View>
           {selectedIsToday && <ActionButton label={t('today.addWater')} icon="add" variant="secondary" onPress={() => router.push('/water')} />}
-        </View>
+          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+        </Pressable>
 
         {/* AI program — a row, not a hero: drafts are reviewed in their own screen. */}
         <View style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
@@ -551,7 +548,18 @@ export default function Overview() {
         </View>
 
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <Text style={[styles.cardTitle, { color: theme.text }]}>{t('progress.calories7d')}</Text>
+          {/* The bars keep their tap-to-filter; the title is the door to the weekly review. */}
+          <Pressable
+            onPress={() => router.push('/review')}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('progress.calories7d')} · ${t('review.title')}`}
+            hitSlop={6}
+            style={({ pressed }) => [styles.linkTitle, { marginBottom: Spacing.md }, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, flex: 1 }]}>{t('progress.calories7d')}</Text>
+            <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('review.title')}</Text>
+            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+          </Pressable>
           <WeekBars
             values={calValues}
             target={targets.calories}
@@ -563,9 +571,7 @@ export default function Overview() {
         </View>
 
         <SponsorCard />
-      </ScrollView>
-
-      {tourSteps && <CoachTour steps={tourSteps} index={tourIndex} onNext={advanceTour} onSkip={endTour} />}
+      </CollapsingScreen>
 
       <TargetUpdateModal
         visible={pendingWeightKg != null}
@@ -592,6 +598,7 @@ const styles = StyleSheet.create({
   groupCard: { borderRadius: Radius.module, paddingHorizontal: Spacing.md, marginBottom: Spacing.md },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },
   cardTitle: { fontSize: 16, fontWeight: '800', marginBottom: Spacing.md },
+  linkTitle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   stepCard: { flexDirection: 'row', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   stepTitle: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3 },

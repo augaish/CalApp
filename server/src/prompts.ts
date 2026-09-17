@@ -217,6 +217,13 @@ const VOICE: Record<Language, string> = {
  */
 const RECIPE_TOOL_GUIDE = `RECIPE: If the user asks what to cook, for a recipe, a dish idea they can make, or how to prepare something, call write_recipe with one complete recipe (ingredients with grams and nutrition, numbered steps) instead of writing it as prose. The app saves it as a DRAFT the user reviews before it can be planned or logged — nothing is added to their plan or diary by you. Keep any text alongside the tool call to one short sentence. Never call it for a general nutrition question that does not ask for a dish.`;
 
+const ACTIONS_TOOL_GUIDE = `ACTING ON THEIR RECORDS: You have tools that PROPOSE changes to the user's own logs and targets — propose_food_log, propose_food_update, propose_workout_log, propose_targets, propose_water_log, propose_weight_log. The app shows each proposal as a card and writes NOTHING until the user taps it, so never say a change is done; say it is ready to apply. Use them:
+- whenever they ask you to log, add, record, save or change food, training, water, weight or targets ("log two eggs for breakfast", "add 3×10 squats", "set my protein to 160");
+- whenever your own answer implies a correction — a logged entry whose calories or portion look wrong, a target that no longer fits their goal. Say what you found in one or two sentences, then propose the fix so it is one tap away, rather than leaving them to retype it.
+For propose_food_update, mealId and itemIndex MUST be copied from recentMeals in their data; if the entry is not there, say you cannot see it and ask which meal. Give realistic nutrition for anything you log. Keep the prose beside a proposal short — the card carries the detail.
+
+FOLLOW-UPS: With EVERY reply, also call suggest_follow_ups with two or three short chips (≤ 40 characters, in the user's language, in the user's own voice) for what they might say next: a natural next question, a request for you to act ("Log it for me", "Recalculate with 150 g"), or a correction. Never list the suggestions in your prose.`;
+
 const SCHEDULE_TOOL_GUIDE = `WEEKLY SCHEDULE: If the user asks you to build, suggest, or change a training plan/schedule/split/routine, call propose_weekly_schedule instead of writing it out as prose — it renders as a card they add to their app with one tap. Base it on their goal (from their data, if you have it) and whatever day-count or frequency they mentioned. If you genuinely don't know how many days a week they want and it is not obvious from their data, ask ONE short question first rather than guessing. Keep any text alongside the tool call to one short sentence — the card shows the detail. Never call the tool for anything short of an explicit request for a plan.
 
 If their data includes a "whoop" field, weigh it when the request is about training intensity, recovery, or a schedule: recoveryScore is 0-100% (WHOOP's own bands are roughly <34 red/needs rest, 34-66 yellow/moderate, >66 green/primed) — a low score is a real reason to propose fewer or lighter days that week, not just heavy volume by default. todayStrain is WHOOP's 0-21 exertion scale (>14 is already a hard day) — do not stack another high-strain session on top of one. sleepHours and sleepPerformancePercent matter the same way. Still name the actual figure when you use it, exactly like any other piece of their data.`;
@@ -276,6 +283,8 @@ ${SCHEDULE_TOOL_GUIDE}
 
 ${RECIPE_TOOL_GUIDE}
 
+${ACTIONS_TOOL_GUIDE}
+
 One thing does NOT follow the user's message language: if you call propose_weekly_schedule, write every day "title" in ${LANGUAGE_NAME[language]}. Those titles are saved into the user's weekly schedule and shown throughout an app set to ${LANGUAGE_NAME[language]}, so they have to match it — your prose reply alongside the card still follows the rule above.`;
   if (!context) return `${base}\n\n${lock}`;
   return `${base}
@@ -305,7 +314,9 @@ the fast running right now — its startedAt plus targetHours tells you when
 its eating window opens; do not assume the user is fasting unless this field
 says so. focus, when present, names the area of the app the user opened
 AI Support from (food, training or health) — lean the reply toward that area
-unless the question is clearly about something else.
+unless the question is clearly about something else. recentMeals, when
+present, lists today's and yesterday's diary entries with their ids and item
+indexes — the only source for propose_food_update.
 
 Whenever an answer draws on this data, SAY SO EXPLICITLY by naming the actual
 figure(s) you are using (e.g. "You've logged 1,850 kcal today, 120 g

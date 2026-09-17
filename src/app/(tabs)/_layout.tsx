@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 
+import { TourOverlay } from '@/components/tour-overlay';
 import { useTheme } from '@/hooks/use-theme';
 import { usePending } from '@/lib/pending';
 import { syncReminders } from '@/lib/reminders';
@@ -73,6 +74,7 @@ export default function TabLayout() {
   }, [remindersInitialized, mealCount, workoutCount, waterCount, activeFastId]);
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -148,6 +150,9 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    {/* The guided tour spans every tab, so it lives above them all. */}
+    <TourOverlay />
+    </>
   );
 }
 

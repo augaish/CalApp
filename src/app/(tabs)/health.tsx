@@ -4,16 +4,18 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
-import { BrandHeader } from '@/components/brand-header';
+import { BodyMap, zoneIntensityFromSegmental, zoneStatusFromSegmental } from '@/components/body-map';
 import { MetricTrend } from '@/components/charts';
+import { CollapsingScreen } from '@/components/collapsing-screen';
 import { useWhoopStatus } from '@/components/connections';
 import { Chip, IconTile, RowGroup, SettingsRow } from '@/components/system';
-import { Button, Screen } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatWeight, formatWeightDelta, kgToDisplay, weightUnit } from '@/lib/units';
 import { buildExport } from '@/lib/account';
-import { useAppStore } from '@/lib/store';
+import { muscleTrend, overviewBodyStats, useAppStore, type MetricTrend as Trend } from '@/lib/store';
+import { useTourTarget } from '@/lib/tour';
 import type { WeightEntry } from '@/lib/types';
 
 const RANGES = [30, 90, 365] as const;
@@ -52,9 +54,11 @@ export default function Health() {
   // `weights` is kept newest-first by the store (see logWeight).
   const units = useAppStore((s) => s.units);
   const weights = useAppStore((s) => s.weights);
+  const profile = useAppStore((s) => s.profile);
   const [range, setRange] = useState<(typeof RANGES)[number]>(30);
   const [pickingRange, setPickingRange] = useState(false);
   const [whoop] = useWhoopStatus();
+  const heroTarget = useTourTarget('health.hero');
 
   const now = new Date();
   const latest = weights[0];
@@ -66,6 +70,19 @@ export default function Health() {
 
   const measured = latestWith(weights, 'measurementsCm');
   const composition = weights.find((w) => w.bodyFatPercent != null || w.skeletalMuscleMassKg != null);
+
+  // The hero: the body as of the latest reading. Weight and BMI from the
+  // newest entry, body fat and muscle backfilled from the newest entry that
+  // carries them, each with a goal-aware trend against the reading before.
+  const stats = profile ? overviewBodyStats(weights, now, profile) : undefined;
+  const latestSeg = weights.find((w) => w.segmentalLeanMassKg && zoneIntensityFromSegmental(w.segmentalLeanMassKg));
+  const zoneIntensity = zoneIntensityFromSegmental(latestSeg?.segmentalLeanMassKg) ?? undefined;
+  const zoneStatus = zoneStatusFromSegmental(latestSeg?.segmentalLeanMassStatus) ?? undefined;
+  const muscleEntries = weights.filter((w) => w.skeletalMuscleMassKg != null);
+  const muscleKg = muscleEntries[0]?.skeletalMuscleMassKg;
+  const muscleKgDelta = muscleEntries.length >= 2 ? muscleEntries[0].skeletalMuscleMassKg! - muscleEntries[1].skeletalMuscleMassKg! : undefined;
+  const trendColor = (tr: Trend) => (tr === 'good' ? theme.success : tr === 'bad' ? theme.danger : theme.textTertiary);
+  const signed = (n: number, digits = 1) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${Math.abs(n).toFixed(digits)}`;
 
   const dateOf = (iso: string) => new Date(iso).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   const sourceOf = (w: WeightEntry) =>
@@ -80,7 +97,45 @@ export default function Health() {
   };
 
   return (
-    <Screen header={<BrandHeader title={t('health.title')} />}>
+    <CollapsingScreen title={t('health.title')}>
+      {/* Hero: body composition as of the latest reading — the figure coloured
+          from a scanned report's per-limb lean mass, the numbers beside it. */}
+      <View {...heroTarget.bind} style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+        <View style={styles.rowHead}>
+          <IconTile icon="body-outline" size={32} />
+          <Text style={{ color: theme.textSecondary, fontSize: 15, fontWeight: '600', flex: 1 }}>{t('health.composition')}</Text>
+          {latest && (
+            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+              {dateOf(latest.at)} · {sourceOf(latest)}
+            </Text>
+          )}
+        </View>
+        <View style={styles.hero}>
+          <Pressable
+            onPress={() => router.push(latestSeg ? '/measurements?metric=muscle' : '/body-reading')}
+            accessibilityRole="button"
+            accessibilityLabel={t('health.composition')}
+            style={({ pressed }) => [styles.heroMap, pressed && { opacity: 0.8 }]}
+          >
+            <BodyMap view="front" zoneIntensity={zoneIntensity} zoneStatus={zoneStatus} size={92} />
+          </Pressable>
+          <View style={styles.heroStats}>
+            {stats ? (
+              <>
+                <HeroStat label={t('health.weight')} value={formatWeight(stats.weightKg, units, t)} delta={stats.weightDelta != null ? formatWeightDelta(stats.weightDelta, units, t) : undefined} color={trendColor(stats.weightTrend)} />
+                <HeroStat label={t('health.bodyFat')} value={stats.bodyFatPercent != null ? `${stats.bodyFatPercent}%` : '—'} delta={stats.bodyFatDelta != null ? `${signed(stats.bodyFatDelta)} pt` : undefined} color={trendColor(stats.bodyFatTrend)} />
+                <HeroStat label={t('health.muscle')} value={muscleKg != null ? formatWeight(muscleKg, units, t) : '—'} delta={muscleKgDelta != null ? formatWeightDelta(muscleKgDelta, units, t) : undefined} color={trendColor(muscleKgDelta != null ? muscleTrend(muscleKgDelta) : 'neutral')} />
+                <HeroStat label={t('progress.bmi')} value={stats.bmi.toFixed(1)} delta={stats.bmiDelta != null ? signed(stats.bmiDelta) : undefined} color={trendColor(stats.bmiTrend)} />
+              </>
+            ) : (
+              <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20 }}>{t('health.noReadings')}</Text>
+            )}
+          </View>
+        </View>
+        {!latestSeg && <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: Spacing.sm }}>{t('health.mapHint')}</Text>}
+        <Button label={t('health.addReading')} icon="add" onPress={() => router.push('/body-reading')} style={{ marginTop: Spacing.md }} />
+      </View>
+
       {/* Range: independent of the diary's selected date (section 3). */}
       <View style={styles.titleRow}>
         <Text style={[Type.section, { color: theme.text, flex: 1 }]}>{t('health.trendsTitle')}</Text>
@@ -158,7 +213,6 @@ export default function Health() {
         ) : (
           <Text style={{ color: theme.textSecondary, marginTop: 6 }}>{t('health.noReadings')}</Text>
         )}
-        <Button label={t('health.addReading')} icon="add" onPress={() => router.push('/body-reading')} style={{ marginTop: Spacing.md }} />
       </View>
 
       <RowGroup>
@@ -206,12 +260,32 @@ export default function Health() {
         <SettingsRow icon="stats-chart-outline" title={t('review.title')} subtitle={t('health.reviewShort')} onPress={() => router.push('/review')} />
         <SettingsRow icon="document-text-outline" title={t('legal.exportData')} subtitle={t('health.exportShort')} onPress={exportData} last />
       </RowGroup>
-    </Screen>
+    </CollapsingScreen>
+  );
+}
+
+/** One line of the hero's stat column: label, value, and the change since the reading before, coloured by whether it moves toward the goal. */
+function HeroStat({ label, value, delta, color }: { label: string; value: string; delta?: string; color: string }) {
+  const theme = useTheme();
+  return (
+    <View style={styles.heroStat}>
+      <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{label}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+        <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>{value}</Text>
+        {delta ? (
+          <Text style={{ color, fontSize: 12, fontWeight: '700' }}>{delta}</Text>
+        ) : null}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.sm },
+  heroMap: { width: 100, alignItems: 'center' },
+  heroStats: { flex: 1, gap: 6 },
+  heroStat: { gap: 1 },
   rangePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 40, borderRadius: Radius.control, borderWidth: 1 },
   ranges: { flexDirection: 'row', gap: 6, marginBottom: Spacing.md, flexWrap: 'wrap' },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },

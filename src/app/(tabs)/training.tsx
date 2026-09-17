@@ -6,9 +6,9 @@ import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
-import { BrandHeader } from '@/components/brand-header';
+import { CollapsingScreen } from '@/components/collapsing-screen';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
-import { Button, Screen } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchWhoopDayBurn, fetchWhoopHistory } from '@/lib/api';
@@ -18,6 +18,7 @@ import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { keyToDate, pendingOccurrences, resolvePlan } from '@/lib/occurrences';
 import { usePending } from '@/lib/pending';
+import { useTourTarget } from '@/lib/tour';
 import {
   actualBurnedForDay,
   applyOrder,
@@ -267,6 +268,8 @@ export default function Training() {
   // While a row is held, the set chips collapse away so the list fits.
   const [dragging, setDragging] = useState(false);
   const pageRef = useAnimatedRef<ScrollView>();
+  const scheduleTarget = useTourTarget('training.schedule');
+  const todayTarget = useTourTarget('training.today');
 
   const openExercise = (id: string) => router.push(`/exercise-detail?id=${encodeURIComponent(id)}`);
 
@@ -323,8 +326,10 @@ export default function Training() {
     ? `${t('home.today')}, ${selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}`
     : selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
 
+  // Everything under the brand row scrolls away with the content; the
+  // compact bar keeps the brand, AI Support and Profile within reach.
   const header = (
-    <BrandHeader title={t('common.appName')}>
+    <>
       <View style={styles.dateRow}>
         <View style={{ flex: 1 }}>
           <Text style={[Type.title, { color: theme.onGradient }]}>{t('tabs.training')}</Text>
@@ -342,6 +347,7 @@ export default function Training() {
         </View>
       </View>
       <Pressable
+        {...scheduleTarget.bind}
         onPress={() => router.push('/schedules')}
         accessibilityRole="button"
         accessibilityLabel={`${scheduleName} · ${t('training.change')}`}
@@ -354,20 +360,11 @@ export default function Training() {
         <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>{t('training.change')}</Text>
         <Ionicons name="chevron-forward" size={16} color={theme.primary} />
       </Pressable>
-    </BrandHeader>
+    </>
   );
 
   return (
-    <Screen
-      header={header}
-      scrollRef={pageRef}
-      footer={
-        <View style={styles.footerRow}>
-          <Button label={t('training.addExercise')} icon="add" variant="secondary" onPress={() => router.push('/exercise-library')} style={{ flex: 1 }} />
-          <Button label={t('training.scanCta')} icon="scan-outline" variant="secondary" onPress={() => router.push('/scan?mode=gym')} style={{ flex: 1 }} />
-        </View>
-      }
-    >
+    <CollapsingScreen title={t('common.appName')} compactTitle={t('tabs.training')} header={header} scrollRef={pageRef}>
       {lastOp && (
         <View style={[styles.undoBar, { backgroundColor: theme.surfaceTint }]}>
           <Ionicons name="swap-horizontal" size={16} color={theme.primaryDark} />
@@ -441,6 +438,7 @@ export default function Training() {
         </View>
       )}
 
+      <View {...todayTarget.bind}>
       {visiblePlanIds.length > 0 ? (
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <Text style={[styles.planTitle, { color: theme.text }]}>{plan?.title || t('training.todaysWorkout')}</Text>
@@ -631,6 +629,14 @@ export default function Training() {
           secondary={{ label: t('training.editTodaysPlan'), icon: 'pencil-outline', onPress: () => router.push(`/schedule-plan?weekday=${planWeekday}`) }}
         />
       )}
+      </View>
+
+      {/* Secondary ways in, as a slim row under the day rather than a pinned
+          footer that took a fifth of the screen from the workout itself. */}
+      <View style={styles.quickRow}>
+        <ActionButton label={t('training.addExercise')} icon="add" variant="secondary" onPress={() => router.push('/exercise-library')} style={{ flex: 1 }} />
+        <ActionButton label={t('training.scanCta')} icon="scan-outline" variant="secondary" onPress={() => router.push('/scan?mode=gym')} style={{ flex: 1 }} />
+      </View>
 
       {/* Energy — its source is always stated (WHOOP, calibrated estimate, or formula). */}
       <View style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
@@ -666,7 +672,7 @@ export default function Training() {
         <SettingsRow icon="time-outline" title={t('training.workoutHistory')} subtitle={t('training.workoutHistoryHint')} onPress={() => router.push('/workout-history')} />
         <SettingsRow icon="calendar-outline" title={t('schedules.title')} subtitle={activeSchedule ? t('training.activeSchedule', { name: scheduleName }) : t('schedules.subtitle')} onPress={() => router.push('/schedules')} last />
       </RowGroup>
-    </Screen>
+    </CollapsingScreen>
   );
 }
 
@@ -704,5 +710,5 @@ const styles = StyleSheet.create({
   saveDayBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, marginBottom: 4, minHeight: 44 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   syncRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  footerRow: { flexDirection: 'row', gap: Spacing.sm },
+  quickRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
 });

@@ -4,7 +4,8 @@ import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { BrandHeader, HeaderPill } from '@/components/brand-header';
+import { HeaderPill } from '@/components/brand-header';
+import { CollapsingScreen } from '@/components/collapsing-screen';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { weekdayLabel } from '@/components/schedule-plan-card';
 import {
@@ -21,7 +22,7 @@ import {
   StatusPill,
   Tile,
 } from '@/components/system';
-import { Button, Screen } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { timestampFor, useViewDay } from '@/lib/day';
@@ -41,6 +42,7 @@ import {
   useAppStore,
 } from '@/lib/store';
 import type { FastingSession, LoggedMeal, MealType, NutrientKey } from '@/lib/types';
+import { useTourTarget } from '@/lib/tour';
 import { useAllRecipes } from '@/lib/use-recipes';
 
 /** Xh Ym — same coarse-duration format the fasting screen itself uses. */
@@ -109,6 +111,7 @@ export default function Food() {
   const recipes = useAllRecipes();
   const shopping = useAppStore((s) => s.shopping);
   const selected = useViewDay((s) => s.day);
+  const tilesTarget = useTourTarget('food.tiles');
 
   const [sharing, setSharing] = useState(false);
   // Today / Meal plan are local views (S02). A deep link can open the plan
@@ -200,26 +203,41 @@ export default function Food() {
     [planWeek, mealPlanRecipes, recipes, mealPlan, activeProgramId],
   );
 
+  // The brand row keeps the Calgym logo, AI Support and Profile like every
+  // root screen (C02); the date control gets its own compact row beneath
+  // rather than crowding the brand out, and the whole band scrolls away.
   const header = (
-    // The brand row keeps the Calgym logo, AI Support and Profile like every
-    // root screen (C02); the date control gets its own compact row beneath
-    // rather than crowding the brand out.
-    <BrandHeader title={t('tabs.food')}>
-      <View style={styles.dateRow}>
-        <HeaderPill
-          icon="calendar-outline"
-          label={selectedIsToday ? t('home.today') : shortDate}
-          trailing="chevron-down"
-          onPress={() => router.push('/calendar')}
-          accessibilityLabel={t('food.chooseDay')}
-        />
-      </View>
-    </BrandHeader>
+    <View style={styles.dateRow}>
+      <HeaderPill
+        icon="calendar-outline"
+        label={selectedIsToday ? t('home.today') : shortDate}
+        trailing="chevron-down"
+        onPress={() => router.push('/calendar')}
+        accessibilityLabel={t('food.chooseDay')}
+      />
+    </View>
+  );
+  // Today / Meal plan live in the band and stay in the sticky bar (S02), so
+  // they can never slide under the header again.
+  const tabs = (
+    <View style={[styles.segmentWrap, { backgroundColor: theme.card }]}>
+      <Segmented
+        options={[
+          { key: 'today', label: t('food.tabToday') },
+          { key: 'plan', label: t('food.tabPlan') },
+        ]}
+        value={tab}
+        onChange={setTabOverride}
+      />
+    </View>
   );
 
   return (
-    <Screen
+    <CollapsingScreen
+      title={t('tabs.food')}
       header={header}
+      sticky={tabs}
+      stickyTourKey="food.tabs"
       footer={
         tab === 'plan' ? (
           <Button
@@ -235,18 +253,6 @@ export default function Food() {
         ) : undefined
       }
     >
-      {/* The local tabs sit on the header's lower edge, as on the board. */}
-      <View style={[styles.segmentWrap, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-        <Segmented
-          options={[
-            { key: 'today', label: t('food.tabToday') },
-            { key: 'plan', label: t('food.tabPlan') },
-          ]}
-          value={tab}
-          onChange={setTabOverride}
-        />
-      </View>
-
       {tab === 'plan' ? (
         <>
           <View style={styles.planHead}>
@@ -315,7 +321,7 @@ export default function Food() {
           </View>
 
           {/* Cooking, shopping and reviewing the week: each tile reports its state. */}
-          <View style={styles.tiles}>
+          <View style={styles.tiles} {...tilesTarget.bind}>
             <Tile
               icon="restaurant-outline"
               title={t('recipes.title')}
@@ -520,7 +526,7 @@ export default function Food() {
           </RowGroup>
         </>
       )}
-    </Screen>
+    </CollapsingScreen>
   );
 }
 
@@ -730,7 +736,7 @@ function PlanDay({
 }
 
 const styles = StyleSheet.create({
-  segmentWrap: { borderRadius: Radius.control + 6, padding: 4, marginTop: -Spacing.lg - 6, marginBottom: Spacing.md },
+  segmentWrap: { borderRadius: Radius.control + 6, padding: 4 },
   planHead: { marginBottom: Spacing.ms, gap: 2 },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },
   groupCard: { borderRadius: Radius.module, paddingHorizontal: Spacing.md, marginBottom: Spacing.ms },
@@ -742,7 +748,7 @@ const styles = StyleSheet.create({
   tiles: { flexDirection: 'row', gap: Spacing.sm },
   actions: { flexDirection: 'row', gap: 8 },
   actionStack: { gap: 8 },
-  dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm, marginBottom: Spacing.md + Spacing.xs },
+  dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm },
   loggedNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44 },
   mealRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, paddingVertical: Spacing.ms },
   addMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 44 },

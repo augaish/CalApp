@@ -100,7 +100,7 @@ console.log('\n=== Food: Today / Meal plan (S02) ===');
 ({ ctx, page } = await open(base(), '/food', 'food-today'));
 b = await body(page);
 check('Today and Meal plan are local tabs', /Today/.test(b) && /Meal plan/.test(b));
-await page.getByRole('tab', { name: 'Meal plan' }).click(); await page.waitForTimeout(800);
+await page.getByRole('tab', { name: 'Meal plan' }).first().click(); await page.waitForTimeout(800);
 b = await body(page); await page.screenshot({ path: `${OUT}/food-plan-empty.png`, fullPage: true });
 check('the plan view states planned vs eaten with the target', /Planned/.test(b) && /Eaten/.test(b) && /Daily target: 2,000 kcal/.test(b));
 check('  with no programme it offers a way forward', /No meal plan yet/.test(b) && /Plan from recipes/.test(b) && /Build with AI/.test(b));

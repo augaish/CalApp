@@ -195,7 +195,30 @@ export interface ChatMessage {
   schedulePlan?: CoachSchedulePlan;
   /** A recipe the coach wrote, saved once as a Needs review draft; the card links here. */
   recipeId?: string;
+  /** Changes to the person's own records that AI Support proposed with this reply — cards, applied only by a tap. */
+  actions?: CoachAction[];
+  /** Two or three short things the person might say next, shown as chips above the input. */
+  suggestions?: string[];
 }
+
+/**
+ * A change AI Support proposes to the person's own records. Nothing is
+ * written until they tap the card; `applied` records that they did, so the
+ * card reads as done after the conversation is reopened.
+ */
+export type CoachAction = (
+  | { kind: 'logFood'; items: FoodItem[]; mealType: MealType; date?: string }
+  | {
+      kind: 'updateFood';
+      mealId: string;
+      itemIndex: number;
+      patch: Partial<Pick<FoodItem, 'name' | 'calories' | 'proteinG' | 'carbsG' | 'fatG' | 'portion'>>;
+    }
+  | { kind: 'logWorkout'; exerciseName: string; sets: { weightKg?: number; reps?: number; seconds?: number }[]; date?: string }
+  | { kind: 'setTargets'; targets: Partial<DailyTargets> }
+  | { kind: 'logWater'; ml: number }
+  | { kind: 'logWeight'; kg: number; date?: string }
+) & { note?: string; applied?: boolean };
 
 /** S18 context tabs — which area a question is asked from. */
 export type CoachFocus = 'food' | 'training' | 'health';

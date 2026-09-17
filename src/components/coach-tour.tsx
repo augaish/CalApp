@@ -18,11 +18,16 @@ export function CoachTour({
   index,
   onNext,
   onSkip,
+  onTry,
+  tryLabel,
 }: {
   steps: TourStep[];
   index: number;
   onNext: () => void;
   onSkip: () => void;
+  /** Opens the real screen behind this step; the tour resumes on return. */
+  onTry?: () => void;
+  tryLabel?: string;
 }) {
   const t = useTranslation().t;
   const theme = useTheme();
@@ -42,7 +47,7 @@ export function CoachTour({
     : null;
 
   // Place the tooltip below the highlight when there's room, else above; centered when no rect.
-  const TOOLTIP_EST = 168;
+  const TOOLTIP_EST = 184;
   let tooltipTop: number;
   if (!hole) {
     tooltipTop = H / 2 - TOOLTIP_EST / 2;
@@ -98,6 +103,12 @@ export function CoachTour({
             <Pressable onPress={onSkip} hitSlop={8} style={styles.skip}>
               <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('tutorial.skip')}</Text>
             </Pressable>
+            <View style={{ flex: 1 }} />
+            {onTry && tryLabel && (
+              <Pressable onPress={onTry} hitSlop={8} style={[styles.next, { backgroundColor: theme.surfaceTint, marginEnd: Spacing.sm }]}>
+                <Text style={{ color: theme.primaryDark, fontWeight: '700' }}>{tryLabel}</Text>
+              </Pressable>
+            )}
             <Pressable
               onPress={onNext}
               style={({ pressed }) => [

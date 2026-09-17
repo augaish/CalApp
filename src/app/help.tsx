@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/brand-header';
 import { InfoLine, RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { useAppStore } from '@/lib/store';
+import { useTour } from '@/lib/tour';
 
 /** S20 Help & feedback — the tour, the guides and a way to reach us. */
 export default function Help() {
@@ -26,6 +27,7 @@ export default function Help() {
           subtitle={t('help.tourHint')}
           onPress={() => {
             replayTour();
+            useTour.getState().start();
             router.dismissTo('/(tabs)');
           }}
           last

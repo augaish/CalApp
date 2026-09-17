@@ -80,6 +80,7 @@ import {
   type MealAnalysis,
 } from './parse.js';
 import { classifyAiError, describeAiError } from './ai-failure.js';
+import { ACTION_TOOLS, sanitizeCoachActions } from './coach-actions.js';
 import {
   buildAuthorizeUrl,
   exchangeCodeForToken,
@@ -1390,7 +1391,8 @@ function contextText(raw: unknown): string | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   try {
     const json = JSON.stringify(raw);
-    if (json.length > 6000) return undefined;
+    // Room for two days of diary entries (recentMeals) on top of the summary.
+    if (json.length > 9000) return undefined;
     return json;
   } catch {
     return undefined;
@@ -1427,7 +1429,7 @@ app.post('/api/coach', async (c) => {
       const ds = await withOneRetry(() =>
         deepseekToolCall(
           [{ role: 'system', content: system }, ...messages],
-          [toDeepseekTool(SCHEDULE_TOOL), toDeepseekTool(RECIPE_TOOL)],
+          [toDeepseekTool(SCHEDULE_TOOL), toDeepseekTool(RECIPE_TOOL), ...ACTION_TOOLS.map(toDeepseekTool)],
           6000,
         ),
       );
@@ -1439,11 +1441,12 @@ app.post('/api/coach', async (c) => {
       const plan = call ? sanitizeSchedulePlan(call.args) : undefined;
       const recipeCall = ds.toolCalls.find((t) => t.name === 'write_recipe');
       const recipeDraft = recipeCall ? sanitizeRecipe(recipeCall.args) : undefined;
+      const { actions, suggestions } = sanitizeCoachActions(ds.toolCalls);
       // A tool-only reply has no prose; the app shows the card alone, but a
       // blank bubble above it reads as a glitch, so borrow the plan's own
       // one-line summary the way the Claude path's fallbackIntro does.
-      const reply = ds.text || (plan ? (plan.summary ?? '') : recipeDraft ? recipeDraft.name : '');
-      return c.json({ reply, schedulePlan: plan, recipeDraft });
+      const reply = ds.text || (plan ? (plan.summary ?? '') : recipeDraft ? recipeDraft.name : (actions[0]?.note ?? ''));
+      return c.json({ reply, schedulePlan: plan, recipeDraft, actions, suggestions });
     }
     const response = await anthropic.messages.create({
       model: MODEL,
@@ -1452,7 +1455,7 @@ app.post('/api/coach', async (c) => {
       max_tokens: 2000,
       system,
       messages,
-      tools: [SCHEDULE_TOOL, RECIPE_TOOL],
+      tools: [SCHEDULE_TOOL, RECIPE_TOOL, ...ACTION_TOOLS],
     });
     await trackUsage({ ref, kind: 'coach' }, MODEL, response.usage);
     const reply = replyText(response);
@@ -1468,7 +1471,11 @@ app.post('/api/coach', async (c) => {
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'write_recipe',
     );
     const recipeDraft = recipeUse ? sanitizeRecipe(recipeUse.input) : undefined;
-    return c.json({ reply, schedulePlan, recipeDraft });
+    // Proposed edits and follow-up chips: cards the app applies only on a tap.
+    const { actions, suggestions } = sanitizeCoachActions(
+      response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use').map((b) => ({ name: b.name, args: b.input })),
+    );
+    return c.json({ reply: reply || actions[0]?.note || '', schedulePlan, recipeDraft, actions, suggestions });
   } catch (err) {
     console.error('coach failed:', err);
     await release(ref, 'coach');

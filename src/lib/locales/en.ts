@@ -136,20 +136,47 @@ export const en = {
     },
   },
   tour: {
-    banner: 'New here? Take a 20-second tour',
-    ring: {
-      title: 'Your daily calories',
-      body: 'Eaten, remaining, and your goal — at a glance. Tap the date to view any day.',
-    },
-    week: {
-      title: 'Jump to any day',
-      body: 'Tap a day to view or log meals and workouts for it.',
-    },
-    add: {
-      title: 'Add anything here',
-      body: 'The center + button scans a meal or gym machine, or lets you add one manually.',
-    },
+    banner: 'New here? Take the two-minute tour',
     replay: 'Replay tour',
+    tryIt: 'Try it',
+    steps: {
+      'overview.steps': {
+        title: 'Your next steps',
+        body: 'Overview opens on what to do next — train and eat — with one tap each. Tap any card to go to its screen.',
+      },
+      'overview.nutrition': {
+        title: 'Nutrition today',
+        body: 'What you have actually eaten, against your targets. A ≥ sign means an entry has unknown nutrition; it is never counted as zero.',
+      },
+      'tabs.add': {
+        title: 'Add anything',
+        body: 'The centre button records right now: scan or describe a meal, log a set, water, or a body reading.',
+      },
+      'training.schedule': {
+        title: 'Your weekly schedule',
+        body: 'The active schedule sets every training day. Keep several — gym, home, travel — and switch with Change.',
+      },
+      'training.today': {
+        title: "Today's workout",
+        body: 'Start it as a session or check exercises off as you go. A missed day waits here to be done today, moved or skipped.',
+      },
+      'food.tabs': {
+        title: 'Today and the plan',
+        body: 'Today is your diary; Meal plan is what is planned. Planned food is never counted as eaten.',
+      },
+      'food.tiles': {
+        title: 'Recipes, shopping, review',
+        body: 'Your recipe library, a shopping list built from the planned week, and the weekly review live here.',
+      },
+      'health.hero': {
+        title: 'Your body, as of the last reading',
+        body: 'Weight, body fat, muscle and BMI with their trends. A scanned report colours the figure by limb.',
+      },
+      'header.ai': {
+        title: 'AI Support',
+        body: 'Ask about your own numbers. It can also log or fix entries for you — every change is a card you apply with one tap.',
+      },
+    },
   },
   checklist: {
     title: 'Getting started',
@@ -969,7 +996,7 @@ export const en = {
   },
   help: {
     learn: 'Learn',
-    tourHint: 'The 20-second walkthrough of Overview',
+    tourHint: 'A two-minute walk through every tab',
     contact: 'Contact',
     feedback: 'Send feedback',
     feedbackHint: 'Opens your mail app with the app version filled in',
@@ -1157,6 +1184,28 @@ export const en = {
     reviewProgramDraft: 'Review program draft',
     hideDraft: 'Hide draft',
     draftsNote: 'Suggestions stay drafts until you apply them.',
+    canAct: 'Ask me to log or change something — a meal, a set, water, your targets — and I will prepare it as a card you apply with one tap. Nothing changes until you do.',
+    suggestions: 'Suggested replies',
+    actions: {
+      proposedBy: 'Suggested by AI Support — nothing changes until you tap.',
+      logFood: 'Log it for me',
+      updateFood: 'Update the entry',
+      logWorkout: 'Log these sets',
+      setTargets: 'Apply new targets',
+      logWater: 'Add the water',
+      logWeight: 'Save the reading',
+      applied: 'Applied',
+      undo: 'Undo',
+      logFoodTitle: '{{name}} → {{meal}}',
+      updateFoodTitle: 'Change {{name}}',
+      workoutTitle: '{{name}} · {{count}} sets',
+      targetsTitle: 'New daily targets',
+      waterTitle: '{{ml}} ml water',
+      weightTitle: 'Weight {{kg}}',
+      missingEntry: 'That entry is no longer in your diary.',
+      noTargets: 'Set your daily targets first, then this can be applied.',
+      moreItems: '+{{count}} more',
+    },
     manageContext: 'Manage shared context',
     shareTitle: 'What AI Support may see',
     shareBody: 'A short summary of the data you allow is sent with each question. Turn off anything you would rather keep private.',
@@ -1640,6 +1689,7 @@ export const en = {
     reviewHint: 'Food, training and weight over the last 7 days',
     exportHint: 'A copy of your records, shared from this device',
     trendsTitle: 'Your measurements and trends',
+    mapHint: 'A scanned report with per-limb lean mass colours the figure.',
     since: 'since {{date}}',
     notConnected: 'Not connected',
     reviewShort: 'See your trends',

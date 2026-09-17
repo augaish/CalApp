@@ -1,11 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,14 +19,14 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { BrandHeader, HeaderPill } from '@/components/brand-header';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
-import { ActionButton, IconTile, RowGroup, Segmented, SettingsRow, StatusPill } from '@/components/system';
+import { ActionButton, Chip, IconTile, Segmented, StatusPill } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeCoachAttachment, coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
 import { aiFailureAction } from '@/lib/api-errors';
+import { applyCoachAction } from '@/lib/coach-actions';
 import { resolveCoachSchedule } from '@/lib/coach-schedule';
 import { buildCoachContext } from '@/lib/coach-context';
 import { useCelebrate } from '@/lib/celebrate';
@@ -33,7 +35,8 @@ import { successHaptic } from '@/lib/feedback';
 import { useEntitlement } from '@/lib/entitlement';
 import { perServing } from '@/lib/recipes';
 import { MAX_COACH_REFERENCE_DOCS, useAppStore } from '@/lib/store';
-import type { ChatMessage, CoachFocus, CoachSchedulePlan } from '@/lib/types';
+import type { ChatMessage, CoachAction, CoachFocus, CoachSchedulePlan } from '@/lib/types';
+import { formatWeight } from '@/lib/units';
 
 const FOCUS: CoachFocus[] = ['food', 'training', 'health'];
 const FOCUS_ICON: Record<CoachFocus, keyof typeof Ionicons.glyphMap> = { food: 'restaurant', training: 'barbell', health: 'heart-outline' };
@@ -77,12 +80,28 @@ export default function Coach() {
   const markCoachPlanApplied = useAppStore((s) => s.markCoachPlanApplied);
   const referenceDocs = useAppStore((s) => s.coachReferenceDocs);
   const addCoachReferenceDoc = useAppStore((s) => s.addCoachReferenceDoc);
+  const units = useAppStore((s) => s.units);
   const [focus, setFocus] = useState<CoachFocus>(FOCUS.includes(focusParam as CoachFocus) ? (focusParam as CoachFocus) : 'food');
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [attachStage, setAttachStage] = useState<'idle' | 'picking' | 'reading'>('idle');
   const [openDrafts, setOpenDrafts] = useState<number[]>([]);
+  // The focus chips step aside while the keyboard is up: the reply is what
+  // needs the room then, not the filter.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
+  // Undo closures for actions applied in this visit, keyed message-action;
+  // in state (not a ref) because whether a card offers Undo is rendered.
+  const [undos, setUndos] = useState<Record<string, () => void>>({});
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const send = async (override?: string) => {
     const content = (override ?? input).trim();
@@ -96,13 +115,25 @@ export default function Coach() {
     if (override == null) setInput('');
     setBusy(true);
     try {
-      const { reply, schedulePlan, recipeDraft } = await coachChat(next, language, await buildCoachContext(language, 7, focus));
+      const { reply, schedulePlan, recipeDraft, actions, suggestions } = await coachChat(next, language, await buildCoachContext(language, 7, focus));
       useEntitlement.getState().spend('coach');
       // A recipe the coach wrote is saved exactly once, as a draft to review;
       // nothing is planned or logged until the person does it (S18).
       const recipeId = recipeDraft ? useAppStore.getState().addRecipe({ ...recipeDraft, language, source: 'ai', reviewStatus: 'needs_review' }) : undefined;
       const text = isMockMode ? t('coach.mockReply') : reply || (schedulePlan ? t('coach.schedulePlan.fallbackIntro') : recipeDraft ? t('coach.recipeDraftIntro') : reply);
-      setMessages([...next, { role: 'assistant', content: text, schedulePlan, at: nowIso(), ...(recipeId ? { recipeId } : {}) }]);
+      setMessages([
+        ...next,
+        {
+          role: 'assistant',
+          content: text,
+          schedulePlan,
+          at: nowIso(),
+          ...(recipeId ? { recipeId } : {}),
+          // Proposals and follow-ups travel with the reply; nothing is applied here.
+          ...(actions && actions.length ? { actions } : {}),
+          ...(suggestions && suggestions.length ? { suggestions } : {}),
+        },
+      ]);
     } catch (err) {
       const action = aiFailureAction(err, { titleKey: 'common.error', bodyKey: 'common.error' });
       if (action.kind === 'upgrade') {
@@ -153,6 +184,95 @@ export default function Coach() {
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('coach.schedulePlan.overwriteCta'), style: 'destructive', onPress: commit },
     ]);
+  };
+
+  /**
+   * A proposal card's tap. The change goes through the same store actions a
+   * screen would use; the card then reads Applied and offers Undo for as
+   * long as this screen is open.
+   */
+  const applyAction = (mi: number, ai: number) => {
+    const current = useAppStore.getState().coachMessages;
+    const action = current[mi]?.actions?.[ai];
+    if (!action || action.applied) return;
+    const result = applyCoachAction(action);
+    if (!result.ok) {
+      Alert.alert(t(`coach.actions.${result.reason}`));
+      return;
+    }
+    const undo = result.undo;
+    if (undo) setUndos((u) => ({ ...u, [`${mi}-${ai}`]: undo }));
+    successHaptic();
+    useCelebrate.getState().celebrate(t('coach.actions.applied'));
+    setMessages(current.map((m, i) => (i === mi ? { ...m, actions: m.actions!.map((a, j) => (j === ai ? { ...a, applied: true } : a)) } : m)));
+  };
+  const undoAction = (mi: number, ai: number) => {
+    const undo = undos[`${mi}-${ai}`];
+    if (!undo) return;
+    undo();
+    setUndos((u) => {
+      const next = { ...u };
+      delete next[`${mi}-${ai}`];
+      return next;
+    });
+    const current = useAppStore.getState().coachMessages;
+    setMessages(current.map((m, i) => (i === mi ? { ...m, actions: m.actions!.map((a, j) => (j === ai ? { ...a, applied: false } : a)) } : m)));
+  };
+
+  /** What a proposal card says: an icon, a title, the figures, and the tap's label. */
+  const actionCopy = (a: CoachAction): { icon: keyof typeof Ionicons.glyphMap; title: string; detail: string; cta: string } => {
+    const kcal = t('common.kcal');
+    const g = t('common.grams');
+    switch (a.kind) {
+      case 'logFood': {
+        const first = a.items[0];
+        const more = a.items.length > 1 ? ` ${t('coach.actions.moreItems', { count: a.items.length - 1 })}` : '';
+        const sum = a.items.reduce((acc, i) => ({ c: acc.c + i.calories, p: acc.p + i.proteinG, cb: acc.cb + i.carbsG, f: acc.f + i.fatG }), { c: 0, p: 0, cb: 0, f: 0 });
+        return {
+          icon: 'restaurant',
+          title: t('coach.actions.logFoodTitle', { name: `${first.name}${more}`, meal: t(`home.mealTypes.${a.mealType}`) }),
+          detail: `${first.portion ? `${first.portion} · ` : ''}${t('recipe.portionMacros', { kcal: Math.round(sum.c), protein: Math.round(sum.p), carbs: Math.round(sum.cb), fat: Math.round(sum.f) })}`,
+          cta: t('coach.actions.logFood'),
+        };
+      }
+      case 'updateFood': {
+        const meal = useAppStore.getState().meals.find((m) => m.id === a.mealId);
+        const item = meal?.items[a.itemIndex];
+        const parts: string[] = [];
+        if (a.patch.calories != null) parts.push(`${a.patch.calories} ${kcal}`);
+        if (a.patch.proteinG != null) parts.push(`${a.patch.proteinG}${g} ${t('home.protein').toLowerCase()}`);
+        if (a.patch.carbsG != null) parts.push(`${a.patch.carbsG}${g} ${t('home.carbs').toLowerCase()}`);
+        if (a.patch.fatG != null) parts.push(`${a.patch.fatG}${g} ${t('home.fat').toLowerCase()}`);
+        if (a.patch.portion) parts.push(a.patch.portion);
+        return {
+          icon: 'create-outline',
+          title: t('coach.actions.updateFoodTitle', { name: a.patch.name ?? item?.name ?? '' }),
+          detail: parts.join(' · '),
+          cta: t('coach.actions.updateFood'),
+        };
+      }
+      case 'logWorkout':
+        return {
+          icon: 'barbell',
+          title: t('coach.actions.workoutTitle', { name: a.exerciseName, count: a.sets.length }),
+          detail: a.sets
+            .map((s) => [s.weightKg != null ? formatWeight(s.weightKg, units, t, 1) : null, s.reps != null ? `× ${s.reps}` : null, s.seconds != null ? `${s.seconds}s` : null].filter(Boolean).join(' '))
+            .join(' · '),
+          cta: t('coach.actions.logWorkout'),
+        };
+      case 'setTargets': {
+        const parts: string[] = [];
+        if (a.targets.calories != null) parts.push(`${a.targets.calories} ${kcal}`);
+        if (a.targets.proteinG != null) parts.push(`${a.targets.proteinG}${g} ${t('home.protein').toLowerCase()}`);
+        if (a.targets.carbsG != null) parts.push(`${a.targets.carbsG}${g} ${t('home.carbs').toLowerCase()}`);
+        if (a.targets.fatG != null) parts.push(`${a.targets.fatG}${g} ${t('home.fat').toLowerCase()}`);
+        return { icon: 'flag-outline', title: t('coach.actions.targetsTitle'), detail: parts.join(' · '), cta: t('coach.actions.setTargets') };
+      }
+      case 'logWater':
+        return { icon: 'water', title: t('coach.actions.waterTitle', { ml: a.ml }), detail: '', cta: t('coach.actions.logWater') };
+      case 'logWeight':
+        return { icon: 'scale-outline', title: t('coach.actions.weightTitle', { kg: formatWeight(a.kg, units, t) }), detail: a.date ?? '', cta: t('coach.actions.logWeight') };
+    }
   };
 
   const confirmNewConversation = () => {
@@ -219,47 +339,56 @@ export default function Coach() {
             ? t('coach.allowanceLoading')
             : t('coach.allowanceUnavailable');
   const canSend = !!input.trim() && !busy;
+  const last = messages[messages.length - 1];
+  const chips = last?.role === 'assistant' && !busy ? (last.suggestions ?? []) : [];
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
-      <BrandHeader title={t('common.appName')} right={<HeaderPill icon="sparkles" label={t('tabs.ai')} />} />
-      <View style={styles.subHeader}>
+      {/* One thin brand strip carries everything the two old rows did: the
+          brand, Back, the screen name with its allowance, shared context and
+          a new conversation — so the thread gets the height back. */}
+      <LinearGradient colors={[theme.gradientStart, theme.gradientEnd]} start={{ x: 0, y: 0.4 }} end={{ x: 1, y: 0.6 }} style={[styles.strip, { paddingTop: insets.top + Spacing.xs }]}>
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={t('common.back')}
-          style={styles.back}
+          style={styles.stripBtn}
         >
-          <Ionicons name="chevron-back" size={24} color={theme.primary} />
-          <Text style={{ color: theme.primary, fontSize: 15, fontWeight: '600' }}>{t('common.back')}</Text>
+          <Ionicons name="chevron-back" size={24} color={theme.onGradient} />
         </Pressable>
-        <View style={styles.subTitle} pointerEvents="none">
-          <Text style={[Type.section, { color: theme.text, fontSize: 20 }]} accessibilityRole="header">
+        <Image source={require('../../assets/images/logo-tile.png')} style={styles.stripLogo} contentFit="contain" accessibilityLabel="Calgym" />
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: theme.onGradient, fontSize: 17, fontWeight: '800' }} accessibilityRole="header" numberOfLines={1}>
             {t('tabs.ai')}
           </Text>
-          <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
+          <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 12 }} numberOfLines={1}>
             {allowance}
           </Text>
         </View>
+        <Pressable onPress={() => router.push('/coach-memory')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('coach.manageContext')} style={styles.stripBtn}>
+          <Ionicons name="options-outline" size={22} color={theme.onGradient} />
+        </Pressable>
         <Pressable
           onPress={confirmNewConversation}
           hitSlop={8}
           disabled={messages.length === 0}
           accessibilityRole="button"
           accessibilityLabel={t('coach.newConversation')}
-          style={styles.newChat}
+          style={[styles.stripBtn, messages.length === 0 && { opacity: 0.45 }]}
         >
-          <Ionicons name="create-outline" size={22} color={messages.length === 0 ? theme.textTertiary : theme.textSecondary} />
+          <Ionicons name="create-outline" size={22} color={theme.onGradient} />
         </Pressable>
-      </View>
-      <View style={{ paddingHorizontal: Spacing.page }}>
-        <Segmented<CoachFocus>
-          options={FOCUS.map((f) => ({ key: f, label: t(`coach.focus.${f}`), icon: FOCUS_ICON[f] }))}
-          value={focus}
-          onChange={setFocus}
-        />
-      </View>
+      </LinearGradient>
+      {!keyboardOpen && (
+        <View style={{ paddingHorizontal: Spacing.page, paddingTop: Spacing.sm }}>
+          <Segmented<CoachFocus>
+            options={FOCUS.map((f) => ({ key: f, label: t(`coach.focus.${f}`), icon: FOCUS_ICON[f] }))}
+            value={focus}
+            onChange={setFocus}
+          />
+        </View>
+      )}
 
       <ScrollView
         ref={scrollRef}
@@ -268,10 +397,13 @@ export default function Coach() {
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={{ marginBottom: Spacing.xs }}>
-          <Text style={[Type.section, { color: theme.text, fontSize: 19 }]}>{t(`coach.focusTitle.${focus}`)}</Text>
-          <Text style={{ color: theme.textSecondary, fontSize: 15, lineHeight: 21, marginTop: 2 }}>{t(`coach.focusBody.${focus}`)}</Text>
-        </View>
+        {messages.length === 0 && (
+          <View style={{ marginBottom: Spacing.xs }}>
+            <Text style={[Type.section, { color: theme.text, fontSize: 19 }]}>{t(`coach.focusTitle.${focus}`)}</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 15, lineHeight: 21, marginTop: 2 }}>{t(`coach.focusBody.${focus}`)}</Text>
+            <Text style={{ color: theme.textTertiary, fontSize: 13, lineHeight: 19, marginTop: Spacing.sm }}>{t('coach.canAct')}</Text>
+          </View>
+        )}
         {!coachUnlocked && (
           <Pressable onPress={() => router.push('/upgrade?reason=coach')} style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
             <Ionicons name="lock-closed" size={22} color={theme.primary} />
@@ -334,6 +466,42 @@ export default function Coach() {
                 )}
               </View>
             )}
+            {/* Proposed changes: one card each, written only by the tap. */}
+            {m.actions?.map((a, j) => {
+              const copy = actionCopy(a);
+              const canUndo = !!undos[`${i}-${j}`];
+              return (
+                <View key={`${i}-${j}`} style={[styles.draftWrap, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+                  <View style={styles.draftHead}>
+                    <IconTile icon={copy.icon} size={44} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15 }}>{copy.title}</Text>
+                      {!!copy.detail && (
+                        <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18 }} numberOfLines={3}>
+                          {copy.detail}
+                        </Text>
+                      )}
+                      {!!a.note && (
+                        <Text style={{ color: theme.textTertiary, fontSize: 12, lineHeight: 17, marginTop: 2 }} numberOfLines={3}>
+                          {a.note}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                  {a.applied ? (
+                    <View style={[styles.actionRow, { marginTop: Spacing.sm }]}>
+                      <StatusPill label={t('coach.actions.applied')} tone="logged" icon="checkmark" />
+                      {canUndo && <ActionButton label={t('coach.actions.undo')} icon="arrow-undo" variant="secondary" onPress={() => undoAction(i, j)} />}
+                    </View>
+                  ) : (
+                    <>
+                      <ActionButton label={copy.cta} icon="checkmark" onPress={() => applyAction(i, j)} style={{ marginTop: Spacing.sm }} />
+                      <Text style={{ color: theme.textTertiary, fontSize: 11, marginTop: 6, textAlign: 'center' }}>{t('coach.actions.proposedBy')}</Text>
+                    </>
+                  )}
+                </View>
+              );
+            })}
           </View>
         ))}
         {(busy || attachStage === 'picking' || attachStage === 'reading') && (
@@ -343,8 +511,22 @@ export default function Coach() {
         )}
       </ScrollView>
 
-      <View style={{ paddingHorizontal: Spacing.page, paddingBottom: insets.bottom + Spacing.sm, backgroundColor: theme.background }}>
-        <View style={[styles.inputBar, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <View style={{ paddingBottom: insets.bottom + Spacing.sm, backgroundColor: theme.background }}>
+        {/* Follow-ups the coach offered: one tap sends them as the next message. */}
+        {chips.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.chipRow}
+            accessibilityLabel={t('coach.suggestions')}
+          >
+            {chips.map((c) => (
+              <Chip key={c} label={c} selected={false} onPress={() => send(c)} />
+            ))}
+          </ScrollView>
+        )}
+        <View style={[styles.inputBar, { backgroundColor: theme.card, borderColor: theme.border, marginHorizontal: Spacing.page }]}>
           {documentPickerAvailable && (
             <Pressable
               onPress={attachDocument}
@@ -377,10 +559,6 @@ export default function Coach() {
             <Ionicons name="paper-plane" size={18} color={theme.onPrimary} />
           </Pressable>
         </View>
-        <Text style={{ color: theme.textSecondary, fontSize: 12, textAlign: 'center', marginTop: 6, marginBottom: Spacing.sm }}>{t('coach.draftsNote')}</Text>
-        <RowGroup style={{ marginBottom: 0 }}>
-          <SettingsRow icon="settings-outline" title={t('coach.manageContext')} onPress={() => router.push('/coach-memory')} last />
-        </RowGroup>
       </View>
     </KeyboardAvoidingView>
   );
@@ -421,10 +599,11 @@ function Bubble({ role, text, at, locale, avatarLabel }: { role: 'user' | 'assis
 }
 
 const styles = StyleSheet.create({
-  subHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.page, minHeight: TOUCH + 8, marginTop: Spacing.xs },
-  back: { flexDirection: 'row', alignItems: 'center', minHeight: TOUCH, minWidth: TOUCH, zIndex: 1 },
-  subTitle: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  newChat: { marginStart: 'auto', width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
+  strip: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingHorizontal: Spacing.sm, paddingBottom: Spacing.sm, borderBottomLeftRadius: Radius.lg, borderBottomRightRadius: Radius.lg },
+  stripBtn: { width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center' },
+  stripLogo: { width: 30, height: 30, borderRadius: 8 },
+  chipRow: { flexDirection: 'row', gap: 6, paddingHorizontal: Spacing.page, paddingBottom: Spacing.sm },
+  actionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   lockCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderWidth: 1.5, borderRadius: Radius.control, padding: Spacing.md },
   line: { maxWidth: '88%' },
   avatar: { width: 32, height: 32, borderRadius: 16 },

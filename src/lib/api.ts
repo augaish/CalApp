@@ -4,6 +4,7 @@ import { useAppStore } from './store';
 import type {
   BodyReadingAnalysis,
   ChatMessage,
+  CoachAction,
   CoachSchedulePlan,
   EquipmentAnalysis,
   FoodItem,
@@ -437,6 +438,10 @@ export interface CoachReply {
   schedulePlan?: CoachSchedulePlan;
   /** Present when the coach wrote a recipe; saved once by the app as a draft to review. */
   recipeDraft?: Omit<Recipe, 'id' | 'createdAt' | 'language' | 'source'>;
+  /** Proposed edits to the person's logs or targets — applied only when they tap. */
+  actions?: CoachAction[];
+  /** Short follow-ups the person might tap next. */
+  suggestions?: string[];
 }
 
 /** Reads an uploaded document (photo or PDF) and turns it into a compact

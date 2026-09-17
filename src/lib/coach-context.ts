@@ -4,6 +4,7 @@ import { ageFrom } from './tdee';
 import {
   actualBurnedForDay,
   fastingStreakDays,
+  isSameDay,
   streakDays,
   totalsForDay,
   useAppStore,
@@ -70,6 +71,15 @@ export interface CoachContext {
   referenceDocs?: { name: string; summary: string }[];
   /** S18: the area the person asked from — a hint, not a data source. */
   focus?: CoachFocus;
+  /** Today's and yesterday's diary entries with the ids a proposed edit
+   * (propose_food_update) has to quote back — the coach can only correct an
+   * entry it can name. */
+  recentMeals?: {
+    id: string;
+    date: string;
+    mealType: string;
+    items: { index: number; name: string; calories: number; proteinG: number; carbsG: number; fatG: number; portion?: string }[];
+  }[];
 }
 
 function ymd(d: Date): string {
@@ -164,6 +174,33 @@ export async function buildCoachContext(lang: Language, dayCount = 7, focus?: Co
         }
       : undefined;
 
+  // The entries themselves (not just the day's totals) for the last two
+  // days, so "that lunch looks low" can become a one-tap correction.
+  const twoDays = [0, 1].map((i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - i);
+    return d;
+  });
+  const recentMeals: CoachContext['recentMeals'] = share.food
+    ? s.meals
+        .filter((m) => twoDays.some((d) => isSameDay(m.at, d)))
+        .slice(0, 10)
+        .map((m) => ({
+          id: m.id,
+          date: ymd(new Date(m.at)),
+          mealType: m.mealType ?? 'snack',
+          items: m.items.slice(0, 6).map((it, index) => ({
+            index,
+            name: it.name,
+            calories: Math.round(it.calories),
+            proteinG: Math.round(it.proteinG),
+            carbsG: Math.round(it.carbsG),
+            fatG: Math.round(it.fatG),
+            ...(it.portion ? { portion: it.portion } : {}),
+          })),
+        }))
+    : undefined;
+
   const fasting: CoachContext['fasting'] =
     s.activeFast || s.fastingHistory.length > 0
       ? {
@@ -203,5 +240,6 @@ export async function buildCoachContext(lang: Language, dayCount = 7, focus?: Co
       ? s.coachReferenceDocs.map((d) => ({ name: d.name, summary: d.summary }))
       : undefined,
     focus,
+    recentMeals: recentMeals && recentMeals.length > 0 ? recentMeals : undefined,
   };
 }

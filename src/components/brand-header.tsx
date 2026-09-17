@@ -27,6 +27,7 @@ export function BrandHeader({
   extra,
   children,
   bottomRadius = true,
+  aiRef,
 }: {
   title: string;
   showLogo?: boolean;
@@ -35,10 +36,9 @@ export function BrandHeader({
   extra?: ReactNode;
   children?: ReactNode;
   bottomRadius?: boolean;
+  aiRef?: React.Ref<View>;
 }) {
-  const { t } = useTranslation();
   const theme = useTheme();
-  const router = useRouter();
   const insets = useSafeAreaInsets();
   return (
     <LinearGradient
@@ -51,44 +51,77 @@ export function BrandHeader({
         bottomRadius && { borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl },
       ]}
     >
-      <View style={styles.row}>
-        {showLogo && (
-          <Image
-            source={require('../../assets/images/logo-tile.png')}
-            style={styles.logo}
-            contentFit="contain"
-            accessibilityLabel="Calgym"
-          />
-        )}
-        <Text style={[styles.brand, { color: theme.onGradient }]} numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={{ flex: 1 }} />
-        {extra}
-        {right === 'ai' ? (
+      <BrandRow title={title} showLogo={showLogo} right={right} extra={extra} aiRef={aiRef} />
+      {children}
+    </LinearGradient>
+  );
+}
+
+/**
+ * The brand row on its own: logo tile, screen name, optional extra control,
+ * the AI Support entry and Profile. `compact` is the sticky-bar size that
+ * replaces the full band once a root screen has scrolled past it — same
+ * elements, same order, same targets, smaller.
+ */
+export function BrandRow({
+  title,
+  showLogo = true,
+  right = 'ai',
+  extra,
+  compact = false,
+  aiRef,
+}: {
+  title: string;
+  showLogo?: boolean;
+  right?: 'ai' | 'none' | ReactNode;
+  extra?: ReactNode;
+  compact?: boolean;
+  /** Lets the tour spotlight the AI Support entry. */
+  aiRef?: React.Ref<View>;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const router = useRouter();
+  const size = compact ? 30 : 36;
+  return (
+    <View style={[styles.row, compact && { minHeight: 40 }]}>
+      {showLogo && (
+        <Image
+          source={require('../../assets/images/logo-tile.png')}
+          style={[styles.logo, { width: size, height: size, borderRadius: compact ? 8 : 9 }]}
+          contentFit="contain"
+          accessibilityLabel="Calgym"
+        />
+      )}
+      <Text style={[styles.brand, compact && { fontSize: 18 }, { color: theme.onGradient }]} numberOfLines={1}>
+        {title}
+      </Text>
+      <View style={{ flex: 1 }} />
+      {extra}
+      {right === 'ai' ? (
+        <View ref={aiRef} collapsable={false}>
           <Pressable
             onPress={() => router.push('/coach')}
             accessibilityRole="button"
             accessibilityLabel={t('tabs.ai')}
-            style={({ pressed }) => [styles.pill, { backgroundColor: BACKING }, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [styles.pill, { backgroundColor: BACKING, height: size }, pressed && { opacity: 0.8 }]}
           >
             <Ionicons name="sparkles" size={15} color={theme.onGradient} />
             <Text style={[styles.pillText, { color: theme.onGradient }]}>{t('tabs.ai')}</Text>
           </Pressable>
-        ) : right === 'none' ? null : (
-          right
-        )}
-        <Pressable
-          onPress={() => router.push('/profile')}
-          accessibilityRole="button"
-          accessibilityLabel={t('profile.title')}
-          style={({ pressed }) => [styles.avatar, { backgroundColor: BACKING }, pressed && { opacity: 0.8 }]}
-        >
-          <Ionicons name="person" size={18} color={theme.onGradient} />
-        </Pressable>
-      </View>
-      {children}
-    </LinearGradient>
+        </View>
+      ) : right === 'none' ? null : (
+        right
+      )}
+      <Pressable
+        onPress={() => router.push('/profile')}
+        accessibilityRole="button"
+        accessibilityLabel={t('profile.title')}
+        style={({ pressed }) => [styles.avatar, { backgroundColor: BACKING, width: size, height: size, borderRadius: size / 2 }, pressed && { opacity: 0.8 }]}
+      >
+        <Ionicons name="person" size={compact ? 16 : 18} color={theme.onGradient} />
+      </Pressable>
+    </View>
   );
 }
 
