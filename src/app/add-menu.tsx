@@ -126,20 +126,16 @@ export default function AddMenu() {
           <Tile icon="barcode" label={t('addMenu.scanBarcode')} onPress={() => go('/scan?mode=barcode')} theme={theme} />
           <Tile icon="create" label={t('addMenu.describe')} onPress={() => go('/describe')} theme={theme} />
           <Tile icon="pencil" label={t('addMenu.manual')} onPress={() => go('/food-edit')} theme={theme} />
-          {/* Cooking is the other half of eating: a recipe is where a planned
-              meal becomes something you can actually make and then log. */}
-          <Tile icon="restaurant" label={t('addMenu.recipes')} onPress={() => go('/recipes')} theme={theme} />
-          <Tile icon="cart" label={t('addMenu.shopping')} onPress={() => go('/shopping')} theme={theme} />
         </View>
 
         {!foodOnly && (
           <>
             <SectionLabel label={t('addMenu.training')} theme={theme} />
             <View style={styles.grid}>
-              <Tile icon="barbell" label={t('addMenu.scanGym')} onPress={() => go('/scan?mode=gym')} theme={theme} />
               {/* Previously only reachable from the Training tab's footer, so
                   the same action lived in two places depending on the tab. */}
               <Tile icon="add-circle" label={t('addMenu.addExercise')} onPress={() => go('/exercise-library')} theme={theme} />
+              <Tile icon="barbell" label={t('addMenu.scanGym')} onPress={() => go('/scan?mode=gym')} theme={theme} />
             </View>
 
             {/* The button's position promises "add anything"; without this
@@ -148,8 +144,22 @@ export default function AddMenu() {
             <SectionLabel label={t('addMenu.health')} theme={theme} />
             <View style={styles.grid}>
               <Tile icon="body" label={t('addMenu.bodyReading')} onPress={() => go('/body-reading')} theme={theme} />
+              <Tile icon="scan" label={t('addMenu.readingPhoto')} onPress={() => go('/scan?mode=body')} theme={theme} />
+            </View>
+
+            <SectionLabel label={t('addMenu.daily')} theme={theme} />
+            <View style={styles.grid}>
               <Tile icon="water" label={t('addMenu.water')} onPress={() => go('/water')} theme={theme} />
               <Tile icon="timer" label={t('addMenu.startFast')} onPress={() => go('/fasting')} theme={theme} />
+            </View>
+
+            {/* Recipes and the shopping list used to be tiles here. This sheet
+                answers "what am I recording right now"; cooking on Thursday is
+                a Food question, and a tile for it in a logging sheet is how
+                two doors into the same room end up both being the wrong one. */}
+            <View style={[styles.hint, { backgroundColor: theme.cardSubtle }]}>
+              <Ionicons name="bulb-outline" size={15} color={theme.primary} />
+              <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1 }}>{t('addMenu.foodPlanningHint')}</Text>
             </View>
           </>
         )}
@@ -166,6 +176,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
   },
+  hint: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 10, borderRadius: 12, marginTop: Spacing.sm },
   grabber: {
     width: 40,
     height: 4,

@@ -1,9 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
-import * as WebBrowser from 'expo-web-browser';
-import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Pressable, Share, StyleSheet, Switch, Text, View } from 'react-native';
 
@@ -11,10 +9,9 @@ import { Card, OptionRow, Screen, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { buildExport, deleteAccount } from '@/lib/account';
-import { disconnectWhoop, fetchWhoopStatus, SERVER_URL, whoopAuthorizeUrl } from '@/lib/api';
+import { SERVER_URL } from '@/lib/api';
 import { signOutAuth } from '@/lib/auth';
 import { useEntitlement } from '@/lib/entitlement';
-import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { syncReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
@@ -264,16 +261,30 @@ export default function Profile() {
         </View>
       </Card>
 
-      <Text style={[styles.section, { color: theme.textSecondary }]}>
-        {t('profile.connections')}
-      </Text>
-      <Card>
-        <ConnectionRow icon="watch-outline" label={t('profile.appleHealth')} />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
-        <WhoopConnectionRow />
-      </Card>
+      {/* Connections moved to Health, which owns body data (S03/S26). */}
+      <Text style={[styles.section, { color: theme.textSecondary }]}>{t('profile.healthSection')}</Text>
+      <Pressable onPress={() => router.push('/(tabs)/health')}>
+        <Card style={styles.linkRow}>
+          <Ionicons name="heart-outline" size={18} color={theme.primary} />
+          <View style={{ flex: 1, marginStart: Spacing.sm }}>
+            <Text style={{ color: theme.text, fontSize: 16 }}>{t('tabs.health')}</Text>
+            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('profile.healthHint')}</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
 
       <Text style={[styles.section, { color: theme.textSecondary }]}>{t('settings.about')}</Text>
+      {/* AI Support is a labelled route, never mistaken for a human coach. */}
+      <Pressable onPress={() => router.push('/coach')}>
+        <Card style={styles.linkRow}>
+          <Ionicons name="sparkles" size={18} color={theme.primary} />
+          <Text style={{ color: theme.text, fontSize: 16, flex: 1, marginStart: Spacing.sm }}>
+            {t('tabs.ai')}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+        </Card>
+      </Pressable>
       <Pressable
         onPress={() => {
           replayTour();
@@ -349,120 +360,6 @@ export default function Profile() {
         </Card>
       </Pressable>
     </Screen>
-  );
-}
-
-function ConnectionRow({
-  icon,
-  label,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-}) {
-  const { t } = useTranslation();
-  const theme = useTheme();
-  return (
-    <View style={styles.connRow}>
-      <Ionicons name={icon} size={22} color={theme.text} />
-      <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>{label}</Text>
-      <View style={[styles.soonBadge, { backgroundColor: theme.cardSubtle }]}>
-        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
-          {t('profile.comingSoon')}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
-/**
- * The other row in this card (ConnectionRow) is still a "coming soon"
- * placeholder — Apple Health needs a native HealthKit module this app
- * doesn't have yet. WHOOP only needs an OAuth round trip through a browser,
- * so it gets a real, working row instead.
- */
-function WhoopConnectionRow() {
-  const { t } = useTranslation();
-  const theme = useTheme();
-  const [status, setStatus] = useState<'loading' | 'connected' | 'disconnected'>('loading');
-  const [busy, setBusy] = useState(false);
-
-  const refresh = () => fetchWhoopStatus().then((s) => setStatus(s?.connected ? 'connected' : 'disconnected'));
-
-  // The connect button opens a system browser session, so coming back to this
-  // screen — not the openAuthSessionAsync promise resolving — is the one
-  // signal that reliably fires whether the browser closed itself via the
-  // calapp:// redirect or the user just switched back to the app manually.
-  useFocusEffect(
-    useCallback(() => {
-      let alive = true;
-      fetchWhoopStatus().then((s) => alive && setStatus(s?.connected ? 'connected' : 'disconnected'));
-      return () => {
-        alive = false;
-      };
-    }, []),
-  );
-
-  const connect = async () => {
-    if (busy) return;
-    setBusy(true);
-    try {
-      const result = await WebBrowser.openAuthSessionAsync(whoopAuthorizeUrl(), 'calapp://whoop-callback');
-      // The confirmation page closes the browser session almost the instant
-      // it redirects here, well before anyone could read it — the reason
-      // travels in the URL instead, so a failure is visible in the app.
-      if (result.type === 'success') {
-        // Avoids the URL/URLSearchParams polyfill, which some RN engines
-        // parse unreliably for a non-http(s) custom scheme like this one.
-        const params = new URLSearchParams(result.url.split('?')[1] ?? '');
-        if (params.get('status') === 'success') {
-          successHaptic();
-        } else {
-          Alert.alert(t('profile.whoopConnectFailed'), params.get('reason') || undefined);
-        }
-      }
-    } finally {
-      setBusy(false);
-      await refresh();
-    }
-  };
-
-  const confirmDisconnect = () => {
-    Alert.alert(t('profile.whoopDisconnectConfirm'), undefined, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.disconnect'),
-        style: 'destructive',
-        onPress: async () => {
-          setBusy(true);
-          const ok = await disconnectWhoop();
-          setBusy(false);
-          if (ok) {
-            lightHaptic();
-            setStatus('disconnected');
-          }
-        },
-      },
-    ]);
-  };
-
-  return (
-    <Pressable
-      onPress={status === 'connected' ? confirmDisconnect : connect}
-      disabled={busy || status === 'loading'}
-      style={({ pressed }) => [styles.connRow, pressed && { opacity: 0.6 }]}
-    >
-      <Ionicons name="fitness-outline" size={22} color={theme.text} />
-      <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>{t('profile.whoop')}</Text>
-      <View style={[styles.soonBadge, { backgroundColor: theme.cardSubtle }]}>
-        <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
-          {status === 'loading'
-            ? t('common.loading')
-            : status === 'connected'
-              ? t('profile.whoopConnected')
-              : t('profile.connect')}
-        </Text>
-      </View>
-    </Pressable>
   );
 }
 

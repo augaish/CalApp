@@ -120,12 +120,16 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/* Health is a destination (D03): body readings, trends, connections
+          and export live together. AI Support moved off the bar to a labelled
+          route reached from Overview and Profile — it is a helper, not a
+          place you go to understand your day. */}
       <Tabs.Screen
-        name="coach"
+        name="health"
         options={{
-          title: t('tabs.ai'),
+          title: t('tabs.health'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'sparkles' : 'sparkles-outline'} size={22} color={color} />
+            <Ionicons name={focused ? 'heart' : 'heart-outline'} size={23} color={color} />
           ),
         }}
       />

@@ -362,7 +362,18 @@ export default function Overview() {
             </Text>
           </Pressable>
           <Pressable
+            onPress={() => router.push('/coach')}
+            accessibilityRole="button"
+            accessibilityLabel={t('tabs.ai')}
+            style={[styles.aiPill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+          >
+            <Ionicons name="sparkles" size={15} color={theme.onGradient} />
+            <Text style={{ color: theme.onGradient, fontWeight: '700', fontSize: 12 }}>{t('tabs.ai')}</Text>
+          </Pressable>
+          <Pressable
             onPress={() => router.push('/profile')}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.title')}
             style={[styles.headerBtn, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
           >
             <Ionicons name="person" size={18} color={theme.onGradient} />
@@ -944,6 +955,7 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   headerDate: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  aiPill: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, height: 34, borderRadius: 17, marginEnd: 8 },
   headerBtn: {
     minWidth: 36,
     height: 36,

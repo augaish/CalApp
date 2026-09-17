@@ -221,6 +221,15 @@ export default function Coach() {
     >
       <View style={{ flex: 1, paddingTop: insets.top + Spacing.md }}>
         <View style={styles.titleRow}>
+          <Pressable
+            onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel={t('common.close')}
+            style={{ marginEnd: Spacing.sm }}
+          >
+            <Ionicons name="chevron-down" size={26} color={theme.text} />
+          </Pressable>
           <Ionicons name="sparkles" size={22} color={theme.primary} />
           <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('coach.title')}</Text>
           <Pressable onPress={() => router.push('/coach-memory')} hitSlop={10} style={{ marginEnd: Spacing.md }}>
