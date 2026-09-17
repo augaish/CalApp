@@ -1085,8 +1085,16 @@ export async function submitBarcode(
 ): Promise<{ recorded: boolean; conflicting: boolean }> {
   if (!pool) return { recorded: false, conflicting: false };
   try {
+    // A retried submission (same person, same barcode, same reading) is the
+    // same contribution, not a second one — a client retry after a dropped
+    // connection must never inflate the review queue.
     await pool.query(
-      'INSERT INTO barcode_submissions (barcode, item, ref) VALUES ($1, $2, $3)',
+      `INSERT INTO barcode_submissions (barcode, item, ref)
+       SELECT $1, $2::jsonb, $3
+       WHERE NOT EXISTS (
+         SELECT 1 FROM barcode_submissions
+         WHERE barcode = $1 AND ref IS NOT DISTINCT FROM $3 AND item::text = $2::jsonb::text
+       )`,
       [barcode, JSON.stringify(item), ref],
     );
     const existing = await pool.query('SELECT item FROM barcode_cache WHERE barcode = $1', [barcode]);

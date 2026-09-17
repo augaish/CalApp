@@ -6,11 +6,14 @@ import { StyleSheet, View } from 'react-native';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
-export type FoodIllustration = 'bowl' | 'plate' | 'sandwich' | 'drink' | 'fruit' | 'packaged' | 'generic';
+export type FoodIllustration = 'bowl' | 'plate' | 'sandwich' | 'drink' | 'fruit' | 'packaged' | 'fish' | 'egg' | 'pizza' | 'generic';
 
 const GLYPH: Record<FoodIllustration, keyof typeof Ionicons.glyphMap> = {
-  bowl: 'restaurant-outline',
-  plate: 'pizza-outline',
+  bowl: 'restaurant',
+  plate: 'restaurant-outline',
+  fish: 'fish-outline',
+  egg: 'egg-outline',
+  pizza: 'pizza-outline',
   sandwich: 'fast-food-outline',
   drink: 'cafe-outline',
   fruit: 'nutrition-outline',
@@ -20,9 +23,12 @@ const GLYPH: Record<FoodIllustration, keyof typeof Ionicons.glyphMap> = {
 
 const KEYWORDS: [FoodIllustration, RegExp][] = [
   ['drink', /\b(juice|smoothie|shake|coffee|tea|latte|water|milk|عصير|قهوة|شاي|حليب|مشروب)\b/i],
-  ['sandwich', /\b(sandwich|wrap|burger|toast|shawarma|manakish|ساندويتش|شاورما|برجر|لفافة|توست)\b/i],
+  ['sandwich', /\b(sandwich|wrap|burger|toast|shawarma|ساندويتش|شاورما|برجر|لفافة|توست)\b/i],
   ['fruit', /\b(fruit|apple|banana|berry|berries|dates|mango|salad|فواكه|فاكهة|تمر|موز|تفاح|سلطة)\b/i],
   ['packaged', /\b(bar|chips|biscuit|cereal|yogurt|yoghurt|بسكويت|زبادي|شيبس|حبوب)\b/i],
+  ['pizza', /\b(pizza|manakish|manakeesh|بيتزا|مناقيش)\b/i],
+  ['fish', /\b(fish|salmon|tuna|hammour|shrimp|prawn|سمك|سلمون|تونة|هامور|روبيان|جمبري)\b/i],
+  ['egg', /\b(egg|eggs|omelette|omelet|shakshuka|بيض|عجة|شكشوكة)\b/i],
   ['bowl', /\b(soup|stew|bowl|porridge|oats|lentil|harees|شوربة|يخنة|عدس|هريس|شوفان|طبق)\b/i],
 ];
 

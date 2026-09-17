@@ -4,6 +4,8 @@ import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type View
 
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { knownLabel } from '@/lib/recipes';
+import type { NutrientKey } from '@/lib/types';
 
 /*
  * Handoff v1.1 primitives. Each one is a contract the boards reuse: the same
@@ -268,7 +270,7 @@ export function Tile({
         <Ionicons name={icon} size={20} color={theme.primary} />
         <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
       </View>
-      <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14 }} numberOfLines={1}>
+      <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14 }} numberOfLines={2}>
         {title}
       </Text>
       {!!subtitle && (
@@ -386,14 +388,14 @@ export function SearchField({
 }
 
 /** Labelled progress with the percentage printed inside the fill (Nutrition today). */
-export function ProgressTrack({ value, max, color, height = 12 }: { value: number; max: number; color?: string; height?: number }) {
+export function ProgressTrack({ value, max, color, height = 12, approx = false }: { value: number; max: number; color?: string; height?: number; approx?: boolean }) {
   const theme = useTheme();
   const pct = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
   const percent = Math.round(pct * 100);
   return (
     <View style={[styles.track, { backgroundColor: theme.surfaceTint, height, borderRadius: height / 2 }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: percent }}>
       <View style={[styles.fill, { backgroundColor: color ?? theme.primary, width: `${percent}%`, height, borderRadius: height / 2 }]}>
-        {pct > 0.18 && <Text style={styles.trackLabel}>{percent}%</Text>}
+        {pct > 0.18 && <Text style={styles.trackLabel}>{approx ? '≥' : ''}{percent}%</Text>}
       </View>
     </View>
   );
@@ -405,11 +407,14 @@ export function MacroRow({
   targets,
   labels,
   unit,
+  unknown,
 }: {
   values: { proteinG: number; carbsG: number; fatG: number };
   targets?: { proteinG: number; carbsG: number; fatG: number } | null;
   labels: { protein: string; carbs: string; fat: string };
   unit: string;
+  /** Nutrients whose value is a known subtotal (shown as ≥n, or — when nothing is known). */
+  unknown?: NutrientKey[];
 }) {
   const theme = useTheme();
   const cols: { key: 'proteinG' | 'carbsG' | 'fatG'; label: string; color: string }[] = [
@@ -426,7 +431,7 @@ export function MacroRow({
             <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{c.label}</Text>
           </View>
           <Text style={{ color: theme.text, fontSize: 15, fontWeight: '800' }}>
-            {Math.round(values[c.key])}
+            {knownLabel(Math.round(values[c.key]), !!unknown?.includes(c.key))}
             {targets && (
               <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>
                 {' '}/ {Math.round(targets[c.key])} {unit}

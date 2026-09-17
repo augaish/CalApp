@@ -24,12 +24,15 @@ export function BrandHeader({
   title,
   showLogo = true,
   right = 'ai',
+  extra,
   children,
   bottomRadius = true,
 }: {
   title: string;
   showLogo?: boolean;
   right?: 'ai' | 'none' | ReactNode;
+  /** Rendered before the AI Support pill (Food's date), so the root access pattern stays intact. */
+  extra?: ReactNode;
   children?: ReactNode;
   bottomRadius?: boolean;
 }) {
@@ -61,6 +64,7 @@ export function BrandHeader({
           {title}
         </Text>
         <View style={{ flex: 1 }} />
+        {extra}
         {right === 'ai' ? (
           <Pressable
             onPress={() => router.push('/coach')}
@@ -207,10 +211,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     height: 36,
     borderRadius: Radius.pill,
     maxWidth: 190,
+    flexShrink: 1,
   },
   pillText: { fontSize: 13, fontWeight: '700' },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

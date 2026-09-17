@@ -18,7 +18,8 @@ import { resolveIngredientKey } from '@/lib/ingredients';
 import { perServing, roundMacros } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
 import type { Recipe } from '@/lib/types';
-import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
+import { isStarterId } from '@/lib/starter-recipes';
+import { useAllRecipes } from '@/lib/use-recipes';
 
 /** A few starting points, so an empty box is not the first thing you meet. */
 const SUGGESTIONS = ['recipes.ideaHighProtein', 'recipes.ideaQuick', 'recipes.ideaGulf'] as const;
@@ -69,6 +70,7 @@ export default function Recipes() {
   const recipes = useAllRecipes();
   const addRecipe = useAppStore((s) => s.addRecipe);
   const updateRecipe = useAppStore((s) => s.updateRecipe);
+  const toggleFavoriteId = useAppStore((s) => s.toggleFavoriteId);
   const [request, setRequest] = useState('');
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
@@ -129,11 +131,11 @@ export default function Recipes() {
     }
   };
 
-  // A favourite is a reference; keeping a starter copies it privately first.
+  // A favourite is a reference: a bundled original is never copied for it (AT45).
   const toggleFavorite = (r: Recipe) => {
-    const stored = ensureRecipeInStore(r.id, lang);
-    if (!stored) return;
-    updateRecipe(r.id, { favorite: !stored.favorite });
+    const stored = useAppStore.getState().recipes.some((x) => x.id === r.id);
+    if (!stored && isStarterId(r.id)) toggleFavoriteId(r.id);
+    else updateRecipe(r.id, { favorite: !r.favorite });
     lightHaptic();
   };
 

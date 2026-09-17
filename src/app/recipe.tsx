@@ -21,9 +21,12 @@ import {
   scaledIngredients,
   unknownNutritionCount,
   withIngredientAmount,
+  knownLabel,
+  recipeUnknownNutrients,
 } from '@/lib/recipes';
+import { isStarterId } from '@/lib/starter-recipes';
 import { useAppStore } from '@/lib/store';
-import type { RecipeAisle } from '@/lib/types';
+import type { RecipeAisle, NutrientKey } from '@/lib/types';
 import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
 
 const AISLE_ICON: Record<RecipeAisle, keyof typeof Ionicons.glyphMap> = {
@@ -56,6 +59,7 @@ export default function RecipeScreen() {
 
   const recipes = useAllRecipes();
   const updateRecipe = useAppStore((s) => s.updateRecipe);
+  const toggleFavoriteId = useAppStore((s) => s.toggleFavoriteId);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
   const recipe = recipes.find((r) => r.id === id);
 
@@ -70,6 +74,9 @@ export default function RecipeScreen() {
 
   const serving = roundMacros(perServing(recipe));
   const batch = roundMacros(scaleMacros(perServing(recipe), cookingFor));
+  // Unknown ingredient values make every figure a known subtotal, shown as ≥ (section 7).
+  const unk = recipeUnknownNutrients(recipe);
+  const kl = (v: number, k: NutrientKey) => knownLabel(v, unk.includes(k));
   const ingredients = scaledIngredients(recipe, cookingFor);
   const estimated = isEstimated(recipe);
   const ready = isReady(recipe);
@@ -91,10 +98,11 @@ export default function RecipeScreen() {
     successHaptic();
   };
 
+  // A favourite is a reference: a bundled original is never copied for it (AT45).
   const toggleFavorite = () => {
-    const stored = ensureRecipeInStore(recipe.id, lang);
-    if (!stored) return;
-    updateRecipe(recipe.id, { favorite: !stored.favorite });
+    const stored = useAppStore.getState().recipes.some((x) => x.id === recipe.id);
+    if (!stored && isStarterId(recipe.id)) toggleFavoriteId(recipe.id);
+    else updateRecipe(recipe.id, { favorite: !recipe.favorite });
     lightHaptic();
   };
 
@@ -171,11 +179,11 @@ export default function RecipeScreen() {
             </View>
             <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: Spacing.sm }}>{t('recipe.perServing')}</Text>
             <Text style={{ color: theme.text }}>
-              <Text style={{ fontSize: 24, fontWeight: '800' }}>{serving.calories}</Text>
+              <Text style={{ fontSize: 24, fontWeight: '800' }}>{kl(serving.calories, 'calories')}</Text>
               <Text style={{ fontSize: 14, fontWeight: '700', color: theme.textSecondary }}> {t('common.kcal')}</Text>
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-              {t('home.protein')} {serving.proteinG} {t('common.grams')} · {t('home.carbs')} {serving.carbsG} {t('common.grams')} · {t('home.fat')} {serving.fatG} {t('common.grams')}
+              {t('home.protein')} {kl(serving.proteinG, 'proteinG')} {t('common.grams')} · {t('home.carbs')} {kl(serving.carbsG, 'carbsG')} {t('common.grams')} · {t('home.fat')} {kl(serving.fatG, 'fatG')} {t('common.grams')}
             </Text>
           </View>
         </View>
@@ -195,7 +203,7 @@ export default function RecipeScreen() {
         {showTotals && (
           <>
             <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>
-              {t('recipe.batchTotals', { servings: cookingFor, kcal: batch.calories, protein: batch.proteinG, carbs: batch.carbsG, fat: batch.fatG })}
+              {t('recipe.batchTotals', { servings: cookingFor, kcal: kl(batch.calories, 'calories'), protein: kl(batch.proteinG, 'proteinG'), carbs: kl(batch.carbsG, 'carbsG'), fat: kl(batch.fatG, 'fatG') })}
             </Text>
             {estimated && <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 2 }}>{t('recipe.estimatedDetail')}</Text>}
           </>

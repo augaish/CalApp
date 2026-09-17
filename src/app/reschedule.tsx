@@ -129,8 +129,10 @@ export default function Reschedule() {
       footer={
         <View style={{ gap: Spacing.xs }}>
           <Button label={canStart ? t('reschedule.applyStart') : t('planMeal.applyChange')} icon={canStart ? 'play' : undefined} onPress={() => apply(canStart)} />
-          {canStart && <Button label={t('planMeal.applyChange')} variant="secondary" onPress={() => apply(false)} />}
-          <Button label={t('common.cancel')} variant="ghost" onPress={() => router.back()} />
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            {canStart && <Button label={t('planMeal.applyChange')} variant="secondary" onPress={() => apply(false)} style={{ flex: 1 }} />}
+            <Button label={t('common.cancel')} variant="ghost" onPress={() => router.back()} style={{ flex: 1 }} />
+          </View>
         </View>
       }
     >
@@ -172,6 +174,8 @@ export default function Reschedule() {
         </View>
       </View>
 
+      <DeltaRows rows={affected} note={unresolved ? t('reschedule.keepBothNote') : t('reschedule.thisOccurrenceOnly')} />
+
       {collision && (
         <View style={[styles.card, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.warningText }, cardShadow(theme.shadow)]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
@@ -200,7 +204,6 @@ export default function Reschedule() {
         </View>
       )}
 
-      <DeltaRows rows={affected} note={unresolved ? t('reschedule.keepBothNote') : t('reschedule.thisOccurrenceOnly')} />
       <InfoLine>{t('reschedule.performedNote')}</InfoLine>
     </Screen>
   );

@@ -1,4 +1,4 @@
-import type { FoodItem, Recipe, RecipeIngredient } from './types';
+import type { FoodItem, NutrientKey, Recipe, RecipeIngredient } from './types';
 
 /**
  * Everything numeric about a recipe.
@@ -131,7 +131,7 @@ export function foodItemForServings(recipe: Recipe, servings: number, portion: s
     // Unrounded, so a later correction rescales from this rather than from
     // the rounded figures above — five edits land where one would.
     recipeBasis: basis,
-    ...(unknownNutritionCount(recipe) > 0 ? { nutritionIncomplete: true as const } : {}),
+    ...(recipeUnknownNutrients(recipe).length > 0 ? { nutritionIncomplete: true as const, incompleteNutrients: recipeUnknownNutrients(recipe) } : {}),
   };
 }
 
@@ -239,5 +239,31 @@ export function isReady(recipe: Pick<Recipe, 'reviewStatus'>): boolean {
 /** How many ingredients carry no nutrition at all — shown beside any total
  * built from them, so a partial sum is never mistaken for a complete one. */
 export function unknownNutritionCount(recipe: Pick<Recipe, 'ingredients'>): number {
-  return recipe.ingredients.filter((i) => i.macrosUnknown).length;
+  return recipe.ingredients.filter((i) => unknownNutrientsOf(i).length > 0).length;
+}
+
+export const NUTRIENT_KEYS: NutrientKey[] = ['calories', 'proteinG', 'carbsG', 'fatG'];
+
+/** The nutrients an ingredient's author never entered. */
+export function unknownNutrientsOf(i: Pick<RecipeIngredient, 'macrosUnknown' | 'unknownNutrients'>): NutrientKey[] {
+  if (i.macrosUnknown) return NUTRIENT_KEYS;
+  return i.unknownNutrients ?? [];
+}
+
+/** Every nutrient for which the recipe's total is a known subtotal, not a total. */
+export function recipeUnknownNutrients(recipe: Pick<Recipe, 'ingredients'>): NutrientKey[] {
+  const set = new Set<NutrientKey>();
+  for (const i of recipe.ingredients) for (const k of unknownNutrientsOf(i)) set.add(k);
+  return NUTRIENT_KEYS.filter((k) => set.has(k));
+}
+
+/**
+ * A figure for display when part of it may be unknown: the number when the
+ * total is complete, "≥number" for a known subtotal, and a dash when nothing
+ * at all is known (section 7: missing is unknown, not zero).
+ */
+export function knownLabel(value: number | string, unknown: boolean, dash = '—'): string {
+  if (!unknown) return String(value);
+  const n = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.-]/g, ''));
+  return n > 0 ? `≥${value}` : dash;
 }

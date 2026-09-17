@@ -1395,7 +1395,7 @@ app.post('/api/coach', async (c) => {
       const ds = await withOneRetry(() =>
         deepseekToolCall(
           [{ role: 'system', content: system }, ...messages],
-          [toDeepseekTool(SCHEDULE_TOOL)],
+          [toDeepseekTool(SCHEDULE_TOOL), toDeepseekTool(RECIPE_TOOL)],
           6000,
         ),
       );
@@ -1405,11 +1405,13 @@ app.post('/api/coach', async (c) => {
       });
       const call = ds.toolCalls.find((t) => t.name === 'propose_weekly_schedule');
       const plan = call ? sanitizeSchedulePlan(call.args) : undefined;
+      const recipeCall = ds.toolCalls.find((t) => t.name === 'write_recipe');
+      const recipeDraft = recipeCall ? sanitizeRecipe(recipeCall.args) : undefined;
       // A tool-only reply has no prose; the app shows the card alone, but a
       // blank bubble above it reads as a glitch, so borrow the plan's own
       // one-line summary the way the Claude path's fallbackIntro does.
-      const reply = ds.text || (plan ? (plan.summary ?? '') : '');
-      return c.json({ reply, schedulePlan: plan });
+      const reply = ds.text || (plan ? (plan.summary ?? '') : recipeDraft ? recipeDraft.name : '');
+      return c.json({ reply, schedulePlan: plan, recipeDraft });
     }
     const response = await anthropic.messages.create({
       model: MODEL,
@@ -1418,7 +1420,7 @@ app.post('/api/coach', async (c) => {
       max_tokens: 2000,
       system,
       messages,
-      tools: [SCHEDULE_TOOL],
+      tools: [SCHEDULE_TOOL, RECIPE_TOOL],
     });
     await trackUsage({ ref, kind: 'coach' }, MODEL, response.usage);
     const reply = replyText(response);
@@ -1428,7 +1430,13 @@ app.post('/api/coach', async (c) => {
     const schedulePlan: CoachSchedulePlan | undefined = toolUse
       ? sanitizeSchedulePlan(toolUse.input)
       : undefined;
-    return c.json({ reply, schedulePlan });
+    // A recipe the coach wrote is returned as a draft only; the app saves it
+    // as Needs review and never plans or logs it on its own (S18).
+    const recipeUse = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'write_recipe',
+    );
+    const recipeDraft = recipeUse ? sanitizeRecipe(recipeUse.input) : undefined;
+    return c.json({ reply, schedulePlan, recipeDraft });
   } catch (err) {
     console.error('coach failed:', err);
     await release(ref, 'coach');

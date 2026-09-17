@@ -12,6 +12,7 @@ import type {
   ChatMessage,
   CoachReferenceDoc,
   CoachShare,
+  NutrientKey,
   FocusArea,
   Units,
   WorkoutOccurrence,
@@ -206,6 +207,8 @@ interface AppState {
   activeSession: ActiveSession | null;
   /** S42 dated occurrences moved or skipped off the weekly template, by original date. */
   occurrences: Record<string, WorkoutOccurrence>;
+  /** Favourites of bundled Calgym recipes are references, never copies (AT45). */
+  favoriteIds: string[];
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -365,6 +368,7 @@ interface AppState {
   applyOccurrenceMoves: (moves: OccurrenceMove[], expected: Record<string, number>, opId: string) => boolean;
   /** Reverses one operation while its occurrences are unchanged and unstarted; false when nothing could be reversed. */
   undoOccurrenceOp: (opId: string) => boolean;
+  toggleFavoriteId: (id: string) => void;
   updateSession: (patch: Partial<ActiveSession>) => void;
   endSession: () => void;
   setRemindMeals: (on: boolean) => void;
@@ -492,6 +496,7 @@ export const useAppStore = create<AppState>()(
       fastingHistory: [],
       activeSession: null,
       occurrences: {},
+      favoriteIds: [],
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -1154,6 +1159,8 @@ export const useAppStore = create<AppState>()(
         set({ occurrences: next });
         return true;
       },
+      toggleFavoriteId: (recipeId) =>
+        set((s) => ({ favoriteIds: s.favoriteIds.includes(recipeId) ? s.favoriteIds.filter((x) => x !== recipeId) : [...s.favoriteIds, recipeId] })),
       undoOccurrenceOp: (opId) => {
         const s = get();
         const next = undoOp(s.occurrences, s.schedule, s.workouts, opId);
@@ -1316,6 +1323,7 @@ export const useAppStore = create<AppState>()(
         fastingHistory,
         activeSession,
         occurrences,
+        favoriteIds,
       }) => ({
         account,
         language,
@@ -1360,6 +1368,7 @@ export const useAppStore = create<AppState>()(
         fastingHistory,
         activeSession,
         occurrences,
+        favoriteIds,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
@@ -1626,10 +1635,13 @@ export interface DayTotals {
   proteinG: number;
   carbsG: number;
   fatG: number;
+  /** Nutrients for which at least one entry is a known subtotal (section 7). */
+  incomplete?: NutrientKey[];
 }
 
 export function totalsForDay(meals: LoggedMeal[], day: Date): DayTotals {
   const totals: DayTotals = { calories: 0, proteinG: 0, carbsG: 0, fatG: 0 };
+  const incomplete = new Set<NutrientKey>();
   for (const meal of meals) {
     if (!isSameDay(meal.at, day)) continue;
     for (const item of meal.items) {
@@ -1637,8 +1649,13 @@ export function totalsForDay(meals: LoggedMeal[], day: Date): DayTotals {
       totals.proteinG += item.proteinG;
       totals.carbsG += item.carbsG;
       totals.fatG += item.fatG;
+      // A snapshot logged from a recipe with unknown values stays a known
+      // subtotal; older entries carry only the boolean and count as all four.
+      const keys = item.incompleteNutrients ?? (item.nutritionIncomplete ? (['calories', 'proteinG', 'carbsG', 'fatG'] as NutrientKey[]) : []);
+      for (const k of keys) incomplete.add(k);
     }
   }
+  if (incomplete.size) totals.incomplete = (['calories', 'proteinG', 'carbsG', 'fatG'] as NutrientKey[]).filter((k) => incomplete.has(k));
   return totals;
 }
 

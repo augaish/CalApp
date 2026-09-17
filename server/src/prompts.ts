@@ -206,6 +206,8 @@ const VOICE: Record<Language, string> = {
  * prompt so it reads as one clear instruction rather than being buried among
  * the voice/data rules above it.
  */
+const RECIPE_TOOL_GUIDE = `RECIPE: If the user asks what to cook, for a recipe, a dish idea they can make, or how to prepare something, call write_recipe with one complete recipe (ingredients with grams and nutrition, numbered steps) instead of writing it as prose. The app saves it as a DRAFT the user reviews before it can be planned or logged — nothing is added to their plan or diary by you. Keep any text alongside the tool call to one short sentence. Never call it for a general nutrition question that does not ask for a dish.`;
+
 const SCHEDULE_TOOL_GUIDE = `WEEKLY SCHEDULE: If the user asks you to build, suggest, or change a training plan/schedule/split/routine, call propose_weekly_schedule instead of writing it out as prose — it renders as a card they add to their app with one tap. Base it on their goal (from their data, if you have it) and whatever day-count or frequency they mentioned. If you genuinely don't know how many days a week they want and it is not obvious from their data, ask ONE short question first rather than guessing. Keep any text alongside the tool call to one short sentence — the card shows the detail. Never call the tool for anything short of an explicit request for a plan.
 
 If their data includes a "whoop" field, weigh it when the request is about training intensity, recovery, or a schedule: recoveryScore is 0-100% (WHOOP's own bands are roughly <34 red/needs rest, 34-66 yellow/moderate, >66 green/primed) — a low score is a real reason to propose fewer or lighter days that week, not just heavy volume by default. todayStrain is WHOOP's 0-21 exertion scale (>14 is already a hard day) — do not stack another high-strain session on top of one. sleepHours and sleepPerformancePercent matter the same way. Still name the actual figure when you use it, exactly like any other piece of their data.`;
@@ -262,6 +264,8 @@ When you reply in English: ${VOICE.en}
 - Never give medical diagnoses; suggest seeing a professional for medical issues.
 
 ${SCHEDULE_TOOL_GUIDE}
+
+${RECIPE_TOOL_GUIDE}
 
 One thing does NOT follow the user's message language: if you call propose_weekly_schedule, write every day "title" in ${LANGUAGE_NAME[language]}. Those titles are saved into the user's weekly schedule and shown throughout an app set to ${LANGUAGE_NAME[language]}, so they have to match it — your prose reply alongside the card still follows the rule above.`;
   if (!context) return `${base}\n\n${lock}`;

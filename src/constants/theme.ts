@@ -8,8 +8,8 @@ import { Platform, type TextStyle, type ViewStyle } from 'react-native';
 export const Colors = {
   light: {
     text: '#211B2E',
-    textSecondary: 'rgba(33,27,46,0.6)',
-    textTertiary: 'rgba(33,27,46,0.4)',
+    textSecondary: 'rgba(33,27,46,0.72)',
+    textTertiary: 'rgba(33,27,46,0.58)',
     background: '#F5F3FA',
     card: '#FFFFFF',
     cardSubtle: 'rgba(122,106,184,0.09)',
@@ -39,8 +39,8 @@ export const Colors = {
   },
   dark: {
     text: '#F1EEF8',
-    textSecondary: 'rgba(241,238,248,0.62)',
-    textTertiary: 'rgba(241,238,248,0.4)',
+    textSecondary: 'rgba(241,238,248,0.74)',
+    textTertiary: 'rgba(241,238,248,0.58)',
     background: '#141021',
     card: '#1E1832',
     cardSubtle: 'rgba(167,139,224,0.14)',

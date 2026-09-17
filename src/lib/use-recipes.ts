@@ -10,7 +10,8 @@ export function useAllRecipes(): Recipe[] {
   const { i18n } = useTranslation();
   const lang: Language = i18n.language === 'ar' ? 'ar' : 'en';
   const saved = useAppStore((s) => s.recipes);
-  return useMemo(() => mergeRecipes(saved, lang), [saved, lang]);
+  const favoriteIds = useAppStore((s) => s.favoriteIds);
+  return useMemo(() => mergeRecipes(saved, lang, favoriteIds), [saved, lang, favoriteIds]);
 }
 
 /**

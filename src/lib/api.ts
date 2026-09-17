@@ -435,6 +435,8 @@ export interface CoachReply {
   reply: string;
   /** Present when the coach proposed a weekly schedule the user can add. */
   schedulePlan?: CoachSchedulePlan;
+  /** Present when the coach wrote a recipe; saved once by the app as a draft to review. */
+  recipeDraft?: Omit<Recipe, 'id' | 'createdAt' | 'language' | 'source'>;
 }
 
 /** Reads an uploaded document (photo or PDF) and turns it into a compact

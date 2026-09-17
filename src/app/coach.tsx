@@ -19,7 +19,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BrandHeader, HeaderPill } from '@/components/brand-header';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
-import { ActionButton, IconTile, RowGroup, Segmented, SettingsRow } from '@/components/system';
+import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { ActionButton, IconTile, RowGroup, Segmented, SettingsRow, StatusPill } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeCoachAttachment, coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
@@ -30,6 +31,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { successHaptic } from '@/lib/feedback';
 import { useEntitlement } from '@/lib/entitlement';
+import { perServing } from '@/lib/recipes';
 import { MAX_COACH_REFERENCE_DOCS, useAppStore } from '@/lib/store';
 import type { ChatMessage, CoachFocus, CoachSchedulePlan } from '@/lib/types';
 
@@ -63,6 +65,10 @@ export default function Coach() {
   const coachCap = useEntitlement((s) => s.features?.coachCap);
   const coachUsed = useEntitlement((s) => s.features?.coachUsed ?? 0);
   const coachLeft = typeof coachCap === 'number' ? Math.max(0, coachCap - coachUsed) : null;
+  const remaining = useEntitlement((s) => s.remaining);
+  const limit = useEntitlement((s) => s.limit);
+  const entLoaded = useEntitlement((s) => s.loaded);
+  const savedRecipes = useAppStore((s) => s.recipes);
 
   const messages = useAppStore((s) => s.coachMessages);
   const setMessages = useAppStore((s) => s.setCoachMessages);
@@ -90,10 +96,13 @@ export default function Coach() {
     if (override == null) setInput('');
     setBusy(true);
     try {
-      const { reply, schedulePlan } = await coachChat(next, language, await buildCoachContext(language, 7, focus));
+      const { reply, schedulePlan, recipeDraft } = await coachChat(next, language, await buildCoachContext(language, 7, focus));
       useEntitlement.getState().spend('coach');
-      const text = isMockMode ? t('coach.mockReply') : reply || (schedulePlan ? t('coach.schedulePlan.fallbackIntro') : reply);
-      setMessages([...next, { role: 'assistant', content: text, schedulePlan, at: nowIso() }]);
+      // A recipe the coach wrote is saved exactly once, as a draft to review;
+      // nothing is planned or logged until the person does it (S18).
+      const recipeId = recipeDraft ? useAppStore.getState().addRecipe({ ...recipeDraft, language, source: 'ai', reviewStatus: 'needs_review' }) : undefined;
+      const text = isMockMode ? t('coach.mockReply') : reply || (schedulePlan ? t('coach.schedulePlan.fallbackIntro') : recipeDraft ? t('coach.recipeDraftIntro') : reply);
+      setMessages([...next, { role: 'assistant', content: text, schedulePlan, at: nowIso(), ...(recipeId ? { recipeId } : {}) }]);
     } catch (err) {
       const action = aiFailureAction(err, { titleKey: 'common.error', bodyKey: 'common.error' });
       if (action.kind === 'upgrade') {
@@ -197,12 +206,18 @@ export default function Coach() {
     }
   };
 
+  // The allowance line is the live figure, a loading state, or an honest
+  // "unavailable"; it never pretends to know.
   const allowance =
     !coachUnlocked
       ? t('coach.lockedTitle')
       : coachLeft !== null
         ? t('coach.allowanceLeft', { left: coachLeft, cap: coachCap })
-        : t('coach.usesAllowance');
+        : typeof remaining === 'number' && typeof limit === 'number'
+          ? t('upgrade.remaining', { remaining, limit })
+          : !entLoaded
+            ? t('coach.allowanceLoading')
+            : t('coach.allowanceUnavailable');
   const canSend = !!input.trim() && !busy;
 
   return (
@@ -270,6 +285,33 @@ export default function Coach() {
         {messages.map((m, i) => (
           <View key={i} style={{ gap: 4 }}>
             <Bubble role={m.role} text={m.content} at={m.at} locale={locale} avatarLabel={t('tabs.ai')} />
+            {m.recipeId &&
+              (() => {
+                const r = savedRecipes.find((x) => x.id === m.recipeId);
+                return (
+                  <View style={[styles.draftWrap, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+                    {r ? (
+                      <>
+                        <View style={styles.draftHead}>
+                          <PhotoFallback uri={r.photoUri} illustration={illustrationFor(r.name)} size={64} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{r.name}</Text>
+                            <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18 }} numberOfLines={3}>
+                              {r.description || t('coach.recipeDraftBody', { kcal: Math.round(perServing(r).calories), servings: r.servings })}
+                            </Text>
+                            <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
+                              <StatusPill label={r.reviewStatus === 'ready' ? t('coach.recipeReady') : t('coach.recipeDraft')} tone={r.reviewStatus === 'ready' ? 'logged' : 'review'} />
+                            </View>
+                          </View>
+                        </View>
+                        <ActionButton label={t('coach.reviewRecipeDraft')} icon="document-text-outline" onPress={() => router.push(`/recipe?id=${encodeURIComponent(r.id)}`)} style={{ marginTop: Spacing.sm }} />
+                      </>
+                    ) : (
+                      <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('coach.draftRemoved')}</Text>
+                    )}
+                  </View>
+                );
+              })()}
             {m.schedulePlan && (
               <View style={[styles.draftWrap, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
                 <View style={styles.draftHead}>

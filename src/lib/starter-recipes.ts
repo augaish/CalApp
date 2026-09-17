@@ -275,9 +275,10 @@ export function starterRecipes(lang: Language): Recipe[] {
  * they have not already copied (a copy keeps the starter's id, so it simply
  * replaces the original in this view — never duplicates it).
  */
-export function mergeRecipes(saved: Recipe[], lang: Language): Recipe[] {
+export function mergeRecipes(saved: Recipe[], lang: Language, favoriteIds: string[] = []): Recipe[] {
   const ids = new Set(saved.map((r) => r.id));
-  return [...saved, ...starterRecipes(lang).filter((r) => !ids.has(r.id))];
+  // A favourite of a bundled original is a reference, never a copy (AT45).
+  return [...saved, ...starterRecipes(lang).filter((r) => !ids.has(r.id)).map((r) => (favoriteIds.includes(r.id) ? { ...r, favorite: true } : r))];
 }
 
 export function findRecipe(id: string | undefined, saved: Recipe[], lang: Language): Recipe | undefined {

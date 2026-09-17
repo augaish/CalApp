@@ -1,4 +1,6 @@
 export type Language = 'en' | 'ar';
+/** The four counted nutrients. */
+export type NutrientKey = 'calories' | 'proteinG' | 'carbsG' | 'fatG';
 /** S20 display units. Stored values are always metric. */
 export type Units = 'metric' | 'imperial';
 /** S19 focus preference — steers suggestions, never access. */
@@ -82,6 +84,8 @@ export interface FoodItem {
   /** Logged from a recipe with ingredients whose nutrition was never entered:
    * the figures are a lower bound, and the diary says so (section 7). */
   nutritionIncomplete?: true;
+  /** Which nutrients of this entry are a known subtotal rather than a total. */
+  incompleteNutrients?: NutrientKey[];
 }
 
 export interface MealAnalysis {
@@ -189,6 +193,8 @@ export interface ChatMessage {
   focus?: CoachFocus;
   /** A proposed weekly schedule, rendered as a card the user can add with one tap. */
   schedulePlan?: CoachSchedulePlan;
+  /** A recipe the coach wrote, saved once as a Needs review draft; the card links here. */
+  recipeId?: string;
 }
 
 /** S18 context tabs — which area a question is asked from. */
@@ -338,6 +344,9 @@ export interface RecipeIngredient {
    * sum as complete. Missing is unknown, not zero (section 7).
    */
   macrosUnknown?: true;
+  /** Per-nutrient: the values this ingredient's author left blank. Blank is
+   * unknown, never zero; a genuine 0 is entered as 0. */
+  unknownNutrients?: NutrientKey[];
   /**
    * These numbers are an estimate, not a measurement. The app's arithmetic on
    * top of them is exact, which is not the same thing as the totals being

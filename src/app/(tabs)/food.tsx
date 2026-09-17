@@ -143,6 +143,8 @@ export default function Food() {
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const dayMeals = meals.filter((m) => isSameDay(m.at, selected));
   const totals = totalsForDay(meals, selected);
+  const incomplete = totals.incomplete ?? [];
+  const kcalIncomplete = incomplete.includes('calories');
   const remaining = (targets?.calories ?? 0) - totals.calories;
   const num = (n: number) => Math.round(n).toLocaleString(locale);
 
@@ -197,11 +199,11 @@ export default function Food() {
   const header = (
     <BrandHeader
       title={t('tabs.food')}
-      showLogo
-      right={
+      showLogo={false}
+      extra={
         <HeaderPill
           icon="calendar-outline"
-          label={selectedIsToday ? `${t('home.today')} · ${shortDate}` : shortDate}
+          label={selectedIsToday ? t('home.today') : shortDate}
           trailing="chevron-down"
           onPress={() => router.push('/calendar')}
           accessibilityLabel={t('food.chooseDay')}
@@ -280,7 +282,7 @@ export default function Food() {
             </Text>
             <View style={styles.kcalRow}>
               <Text style={{ color: theme.text }}>
-                <Text style={{ fontSize: 26, fontWeight: '800' }}>{num(totals.calories)}</Text>
+                <Text style={{ fontSize: 26, fontWeight: '800' }}>{kcalIncomplete ? '≥' : ''}{num(totals.calories)}</Text>
                 {targets && (
                   <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textSecondary }}>
                     {' '}/ {num(targets.calories)} {t('common.kcal')}
@@ -289,17 +291,24 @@ export default function Food() {
               </Text>
               {targets && (
                 <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
-                  {remaining < 0 ? t('today.overBy', { n: num(-remaining) }) : t('today.left', { n: num(remaining) })}
+                  {remaining < 0 ? t('today.overBy', { n: num(-remaining) }) : kcalIncomplete ? t('today.leftAtMost', { n: num(remaining) }) : t('today.left', { n: num(remaining) })}
                 </Text>
               )}
             </View>
-            {targets && <ProgressTrack value={totals.calories} max={targets.calories} />}
+            {targets && <ProgressTrack value={totals.calories} max={targets.calories} approx={kcalIncomplete} />}
             <MacroRow
               values={totals}
               targets={targets}
+              unknown={incomplete}
               labels={{ protein: t('home.protein'), carbs: t('home.carbs'), fat: t('home.fat') }}
               unit={t('common.grams')}
             />
+            {incomplete.length > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: Spacing.sm }}>
+                <StatusPill label={t('mealPlan.incomplete')} tone="review" icon="alert-circle-outline" />
+                <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1, lineHeight: 17 }}>{t('food.incompleteNote')}</Text>
+              </View>
+            )}
           </View>
 
           {/* Cooking, shopping and reviewing the week: each tile reports its state. */}

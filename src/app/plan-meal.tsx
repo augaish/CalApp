@@ -12,7 +12,7 @@ import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
-import { perServing, roundMacros, scaleMacros, servingCountLabel, servingPluralCount, SERVING_STEPS } from '@/lib/recipes';
+import { perServing, recipeUnknownNutrients, roundMacros, scaleMacros, servingCountLabel, servingPluralCount, SERVING_STEPS } from '@/lib/recipes';
 import { dateKey, plannedMealCalories, plannedMealFor, useAppStore } from '@/lib/store';
 import type { MealType } from '@/lib/types';
 import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
@@ -72,6 +72,7 @@ export default function PlanMeal() {
   const currentRecipe = current?.items[0]?.recipeId ? recipes.find((r) => r.id === current.items[0].recipeId) : undefined;
   const currentKcal = current ? Math.round(plannedMealCalories(current)) : 0;
   const next = roundMacros(scaleMacros(perServing(recipe), servings));
+  const kcalUnknown = recipeUnknownNutrients(recipe).includes('calories');
   const delta = next.calories - currentKcal;
   const portionLabel = `${servingCountLabel(servings)} ${t('recipe.servingUnit', { count: servingPluralCount(servings) })}`;
 
@@ -163,7 +164,7 @@ export default function PlanMeal() {
               {recipe.name}
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-              {portionLabel} · {num(next.calories)} {t('common.kcal')}
+              {portionLabel} · {kcalUnknown ? '≥' : ''}{num(next.calories)} {t('common.kcal')}
             </Text>
           </View>
         </View>
@@ -177,12 +178,12 @@ export default function PlanMeal() {
 
       <DeltaRows
         rows={[
-          { label: t('planMeal.difference'), value: `${sign(delta)}${num(Math.abs(delta))} ${t('common.kcal')}`, emphasis: true },
+          { label: t('planMeal.difference'), value: `${kcalUnknown ? '≥' : ''}${sign(delta)}${num(Math.abs(delta))} ${t('common.kcal')}`, emphasis: true },
           { label: t('planMeal.plannedDayLabel'), value: t('planMeal.plannedDayValue', { before: num(dayPlanned), after: num(dayAfter) }) },
           { label: t('home.protein'), value: `${sign(next.proteinG - (current ? Math.round(current.items.reduce((s, i) => s + i.proteinG, 0)) : 0))}${Math.abs(next.proteinG - (current ? Math.round(current.items.reduce((s, i) => s + i.proteinG, 0)) : 0))} ${t('common.grams')}` },
           { label: t('planMeal.source'), value: activeProgram ? t('program.title') : t('today.myPlan') },
         ]}
-        note={t('planMeal.thisDayOnly')}
+        note={kcalUnknown ? `${t('planMeal.incompleteNote')} ${t('planMeal.thisDayOnly')}` : t('planMeal.thisDayOnly')}
       />
     </Screen>
   );

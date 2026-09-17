@@ -10,9 +10,10 @@ import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
 import { resolveIngredientKey } from '@/lib/ingredients';
 import { normalizeDigits } from '@/lib/numbers';
+import { unknownNutrientsOf } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
-import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
-import type { Recipe, RecipeIngredient } from '@/lib/types';
+import { useAllRecipes } from '@/lib/use-recipes';
+import type { NutrientKey, Recipe, RecipeIngredient } from '@/lib/types';
 
 /** A row as typed, before it becomes an ingredient. Strings, so a half-typed
  * "7." is never reformatted out from under someone. */
@@ -30,16 +31,17 @@ interface Draft {
 const EMPTY: Draft = { name: '', amount: '', unit: 'g', state: 'raw', calories: '', proteinG: '', carbsG: '', fatG: '' };
 
 function toDraft(i: RecipeIngredient): Draft {
-  const s = (n: number) => (i.macrosUnknown ? '' : String(n));
+  const unknown = unknownNutrientsOf(i);
+  const s = (n: number, k: NutrientKey) => (unknown.includes(k) ? '' : String(n));
   return {
     name: i.name,
     amount: String(i.amount),
     unit: i.unit,
     state: i.state ?? 'raw',
-    calories: s(i.calories),
-    proteinG: s(i.proteinG),
-    carbsG: s(i.carbsG),
-    fatG: s(i.fatG),
+    calories: s(i.calories, 'calories'),
+    proteinG: s(i.proteinG, 'proteinG'),
+    carbsG: s(i.carbsG, 'carbsG'),
+    fatG: s(i.fatG, 'fatG'),
   };
 }
 
@@ -98,6 +100,8 @@ export default function RecipeEdit() {
       const c = num(r.carbsG);
       const f = num(r.fatG);
       const entered = [kcal, p, c, f].some((v) => v != null);
+      // A blank beside an entered value is unknown for that nutrient only.
+      const unknownKeys = (['calories', 'proteinG', 'carbsG', 'fatG'] as NutrientKey[]).filter((_, idx) => [kcal, p, c, f][idx] == null);
       ingredients.push({
         name: iname,
         // Resolved locally so a shopping list merges this onion with every
@@ -110,7 +114,7 @@ export default function RecipeEdit() {
         proteinG: Math.max(0, Math.round((p ?? 0) * 10) / 10),
         carbsG: Math.max(0, Math.round((c ?? 0) * 10) / 10),
         fatG: Math.max(0, Math.round((f ?? 0) * 10) / 10),
-        ...(entered ? {} : { macrosUnknown: true as const }),
+        ...(entered ? (unknownKeys.length ? { unknownNutrients: unknownKeys } : {}) : { macrosUnknown: true as const }),
       });
     }
     if (ingredients.length === 0) return { error: t('recipeEdit.needIngredient') };
@@ -147,8 +151,15 @@ export default function RecipeEdit() {
     setError(null);
     if (existing) {
       // Editing a starter makes a private copy; the original stays as shipped.
-      ensureRecipeInStore(existing.id, useAppStore.getState().language ?? 'en');
-      updateRecipe(existing.id, { ...out.recipe, source: existing.source === 'calgym' ? 'custom' : out.recipe.source });
+      if (existing.source === 'calgym') {
+        // Customising a bundled original makes a separate private copy; the
+        // original stays in the Calgym collection untouched (AT45).
+        const copyId = addRecipe({ ...out.recipe, source: 'custom' });
+        successHaptic();
+        router.replace(`/recipe?id=${encodeURIComponent(copyId)}`);
+        return;
+      }
+      updateRecipe(existing.id, { ...out.recipe, source: out.recipe.source });
       successHaptic();
       router.back();
       return;
@@ -174,7 +185,7 @@ export default function RecipeEdit() {
   };
 
   const unknownRows = rows.filter(
-    (r) => (r.name.trim() || num(r.amount)) && ![r.calories, r.proteinG, r.carbsG, r.fatG].some((v) => num(v) != null),
+    (r) => (r.name.trim() || num(r.amount)) && ![r.calories, r.proteinG, r.carbsG, r.fatG].every((v) => num(v) != null),
   ).length;
 
   return (

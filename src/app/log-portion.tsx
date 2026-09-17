@@ -22,10 +22,12 @@ import {
   servingPluralCount,
   SERVING_STEPS,
   unknownNutritionCount,
+  knownLabel,
+  recipeUnknownNutrients,
 } from '@/lib/recipes';
 import { dateKey, mealTypeForNow, useAppStore } from '@/lib/store';
 import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
-import type { MealType } from '@/lib/types';
+import type { MealType, NutrientKey } from '@/lib/types';
 
 const MEAL_SLOTS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
@@ -65,6 +67,8 @@ export default function LogPortion() {
 
   const mine = roundMacros(scaleMacros(perServing(recipe), portion));
   const unknown = unknownNutritionCount(recipe);
+  const unk = recipeUnknownNutrients(recipe);
+  const kl = (v: number, k: NutrientKey) => knownLabel(v, unk.includes(k));
   const portionLabel = (n: number) =>
     `${servingCountLabel(n)} ${t('recipe.servingUnit', { count: servingPluralCount(n) })}`;
   const dayLabel = isToday ? t('home.today') : day.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
@@ -142,10 +146,10 @@ export default function LogPortion() {
             )}
         <View style={styles.macros}>
           <Text style={[styles.big, { color: theme.text }]}>
-            {mine.calories} <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textSecondary }}>{t('common.kcal')}</Text>
+            {kl(mine.calories, 'calories')} <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textSecondary }}>{t('common.kcal')}</Text>
           </Text>
           <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-            {t('recipe.portionMacros', { kcal: mine.calories, protein: mine.proteinG, carbs: mine.carbsG, fat: mine.fatG })}
+            {t('recipe.portionMacros', { kcal: kl(mine.calories, 'calories'), protein: kl(mine.proteinG, 'proteinG'), carbs: kl(mine.carbsG, 'carbsG'), fat: kl(mine.fatG, 'fatG') })}
           </Text>
           <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
             {t('logPortion.batchNote', { count: recipe.servings })}

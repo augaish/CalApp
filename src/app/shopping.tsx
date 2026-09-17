@@ -126,12 +126,8 @@ export default function Shopping() {
         started ? (
           <Button label={t('shopping.share')} icon="share-outline" onPress={share} />
         ) : meals.length === 0 ? (
-          // With nothing to shop for, the primary action is the prerequisite.
-          <Button
-            label={plannedTotal === 0 ? t('shopping.planMeals') : t('shopping.addRecipes', { n: missing })}
-            icon="calendar-outline"
-            onPress={() => router.push('/food?tab=plan')}
-          />
+          // The empty state already carries the one prerequisite action.
+          null
         ) : (
           <Button
             label={t('shopping.create')}

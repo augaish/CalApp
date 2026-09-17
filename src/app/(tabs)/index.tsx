@@ -9,16 +9,7 @@ import { BrandHeader } from '@/components/brand-header';
 import { WeekBars } from '@/components/charts';
 import { CoachTour, type TourRect, type TourStep } from '@/components/coach-tour';
 import { SponsorCard } from '@/components/sponsor-card';
-import {
-  ActionButton,
-  DayStrip,
-  IconTile,
-  IllustrationTile,
-  MacroRow,
-  ProgressTrack,
-  SectionTitle,
-  SettingsRow,
-} from '@/components/system';
+import { ActionButton, DayStrip, IconTile, IllustrationTile, MacroRow, ProgressTrack, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -162,6 +153,8 @@ export default function Overview() {
   if (!targets || !profile) return null;
 
   const totals = totalsForDay(meals, selected);
+  const incomplete = totals.incomplete ?? [];
+  const kcalIncomplete = incomplete.includes('calories');
   const remaining = targets.calories - totals.calories;
   const over = remaining < 0;
   const waterMl = waterForDay(water, selected);
@@ -476,20 +469,27 @@ export default function Overview() {
           <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 6 }]}>{t('today.nutritionToday')}</Text>
           <View style={styles.kcalRow}>
             <Text style={{ color: theme.text }}>
-              <Text style={{ fontSize: 26, fontWeight: '800' }}>{num(totals.calories)}</Text>
+              <Text style={{ fontSize: 26, fontWeight: '800' }}>{kcalIncomplete ? '≥' : ''}{num(totals.calories)}</Text>
               <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textSecondary }}> {t('today.kcalEatenOf', { target: num(targets.calories) })}</Text>
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
-              {over ? t('today.overBy', { n: num(-remaining) }) : t('today.left', { n: num(remaining) })}
+              {over ? t('today.overBy', { n: num(-remaining) }) : kcalIncomplete ? t('today.leftAtMost', { n: num(remaining) }) : t('today.left', { n: num(remaining) })}
             </Text>
           </View>
-          <ProgressTrack value={totals.calories} max={targets.calories} />
+          <ProgressTrack value={totals.calories} max={targets.calories} approx={kcalIncomplete} />
           <MacroRow
             values={totals}
             targets={targets}
             labels={{ protein: t('home.protein'), carbs: t('home.carbs'), fat: t('home.fat') }}
             unit={t('common.grams')}
+            unknown={incomplete}
           />
+          {incomplete.length > 0 && (
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, marginTop: Spacing.sm }}>
+              <StatusPill label={t('mealPlan.incomplete')} tone="review" icon="alert-circle-outline" />
+              <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1, lineHeight: 17 }}>{t('food.incompleteNote')}</Text>
+            </View>
+          )}
         </View>
 
         {/* Latest weight — read-only. A reading shown today is not a reading

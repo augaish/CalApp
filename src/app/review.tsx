@@ -11,7 +11,7 @@ import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { buildWeeklyReview, reviewSuggestions } from '@/lib/review';
-import { dateKey, useAppStore } from '@/lib/store';
+import { dateKey, totalsForDay, useAppStore } from '@/lib/store';
 import { formatWeight, formatWeightDelta } from '@/lib/units';
 
 /** The last seven days including today. Module-level so the clock is never read during render. */
@@ -96,6 +96,8 @@ export default function Review() {
   const review = useMemo(() => buildWeeklyReview(days, meals, workouts, weights, targets), [days, meals, workouts, weights, targets]);
   const suggestions = useMemo(() => reviewSuggestions(review, goal), [review, goal]);
   const setsTotal = review.days.reduce((n, d) => n + d.setsDone, 0);
+  // Days whose logged entries include unknown nutrition: the average is a known subtotal.
+  const incompleteDays = days.filter((d) => (totalsForDay(meals, d).incomplete ?? []).includes('calories')).length;
   const selectedDay = review.days.find((d) => d.dateKey === dateKey(selected));
   const latestInRange = weights.find((w) => {
     const k = dateKey(new Date(w.at));
@@ -160,9 +162,9 @@ export default function Review() {
         <SummaryRow
           icon="stats-chart-outline"
           eyebrow={t('review.nutrition')}
-          subtitle={t('review.averageOnLogged')}
+          subtitle={incompleteDays > 0 ? t('review.incompleteDays', { count: incompleteDays }) : t('review.averageOnLogged')}
           big={{
-            value: `${num(review.avgCalories)} ${t('common.kcal')}`,
+            value: `${incompleteDays > 0 ? '≥' : ''}${num(review.avgCalories)} ${t('common.kcal')}`,
             sub: `${num(review.avgProteinG ?? 0)} ${t('common.grams')} ${t('home.protein').toLowerCase()}`,
           }}
           onPress={() => router.push('/(tabs)/food')}

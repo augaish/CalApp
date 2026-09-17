@@ -15,6 +15,7 @@ import {
   servingCountLabel,
   servingPluralCount,
   SERVING_STEPS,
+  knownLabel,
 } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
 
@@ -77,6 +78,8 @@ export default function EditPortion() {
   const next = roundMacros(scaleMacros(basis, servings));
   const changed = servings !== item.recipeServings;
   const delta = next.calories - current.calories;
+  // The snapshot's unknown values stay unknown after a correction (section 7).
+  const incompleteKcal = item.incompleteNutrients ? item.incompleteNutrients.includes('calories') : !!item.nutritionIncomplete;
 
   const save = () => {
     const items = meal.items.map((it, i) =>
@@ -163,7 +166,7 @@ export default function EditPortion() {
       {/* What it becomes, before saving. */}
       <Card style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
         <Text style={{ color: theme.text, fontWeight: '700' }}>
-          {t('editPortion.changesTo', { portion: portionLabel(servings), kcal: next.calories })}
+          {t('editPortion.changesTo', { portion: portionLabel(servings), kcal: knownLabel(next.calories, incompleteKcal) })}
           {changed ? ` · ${delta >= 0 ? '+' : ''}${delta} ${t('common.kcal')}` : ''}
         </Text>
         <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
