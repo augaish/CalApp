@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { weekdayLabel } from '@/components/schedule-plan-card';
 import { Button, Card, Screen, Title } from '@/components/ui';
@@ -64,6 +64,10 @@ export default function PlanMeal() {
     MEAL_SLOTS.includes(params.slot as MealType) ? (params.slot as MealType) : 'lunch',
   );
   const [servings, setServings] = useState(1);
+  // The programme this preview was built against. If it changes underneath
+  // (another screen activates a different plan), Apply must not land the
+  // override on a meal in a plan nobody previewed (S14/AT15).
+  const [programAtOpen] = useState(activeProgram?.id);
 
   if (!recipe) return null;
 
@@ -89,7 +93,21 @@ export default function PlanMeal() {
     count: servingPluralCount(servings),
   })}`;
 
+  // The whole planned day, before and after — the number a person actually
+  // budgets against, not only this one meal.
+  const dayPlanned = MEAL_SLOTS.reduce((sum, sl) => {
+    const m = plannedMealFor(activeProgram?.mealPlan, day, sl, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id);
+    return sum + (m ? plannedMealCalories(m) : 0);
+  }, 0);
+  const dayAfter = dayPlanned - currentKcal + next.calories;
+
   const apply = () => {
+    if (activeProgram?.id !== programAtOpen) {
+      Alert.alert(t('planMeal.staleTitle'), t('planMeal.staleBody'), [
+        { text: t('common.close'), onPress: () => router.back() },
+      ]);
+      return;
+    }
     setPlannedRecipe(key, slot, { recipeId: recipe.id, servings });
     successHaptic();
     router.back();
@@ -208,6 +226,9 @@ export default function PlanMeal() {
         ) : (
           <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('planMeal.nothingPlanned')}</Text>
         )}
+        <Text style={{ color: theme.text, fontWeight: '600', fontSize: 13 }}>
+          {t('planMeal.plannedDay', { before: Math.round(dayPlanned), after: Math.round(dayAfter) })}
+        </Text>
         <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('planMeal.dailyTotalNote')}</Text>
         <View style={[styles.macros, { borderTopColor: theme.border }]}>
           <Text style={{ color: theme.textSecondary, fontSize: 13 }}>

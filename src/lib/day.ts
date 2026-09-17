@@ -31,6 +31,13 @@ export function timestampFor(day: Date): string {
   return d.toISOString();
 }
 
+/** Inverse of store.dateKey — local y-m-d with a ZERO-BASED month, never an
+ * ISO string. Reinterpreting it as ISO shifts every date back a month. */
+export function dayFromKey(key: string): Date {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m, d);
+}
+
 /**
  * Whole calendar days between an entry and a reference day — 1 for yesterday
  * however few hours ago that was, which is what a person means by "a day ago".

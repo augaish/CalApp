@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { weekdayLabel } from '@/components/schedule-plan-card';
-import { Card, Screen } from '@/components/ui';
+import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { timestampFor, useViewDay } from '@/lib/day';
@@ -48,6 +48,7 @@ const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 
 export default function Food() {
   const { t, i18n } = useTranslation();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   const theme = useTheme();
   const router = useRouter();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
@@ -69,6 +70,11 @@ export default function Food() {
   const shift = useViewDay((s) => s.shift);
 
   const [sharing, setSharing] = useState(false);
+  // Today / Meal plan are local views of the same day (S02). A deep link can
+  // open the plan directly (Shopping's "Plan meals" does); a tap here wins
+  // over the link afterwards.
+  const [tabOverride, setTabOverride] = useState<'today' | 'plan' | null>(null);
+  const tab: 'today' | 'plan' = tabOverride ?? (tabParam === 'plan' ? 'plan' : 'today');
   // Which slot has its swap chooser open, and the last plan meal logged
   // from this screen (so the row can offer Undo for a few seconds).
   const [swapping, setSwapping] = useState<MealType | null>(null);
@@ -170,6 +176,25 @@ export default function Food() {
         </View>
       </View>
 
+      <View style={[styles.segment, { backgroundColor: theme.cardSubtle }]}>
+        {(['today', 'plan'] as const).map((k) => {
+          const on = tab === k;
+          return (
+            <Pressable
+              key={k}
+              onPress={() => setTabOverride(k)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: on }}
+              style={[styles.segmentItem, on && { backgroundColor: theme.card }]}
+            >
+              <Text style={{ color: on ? theme.text : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
+                {k === 'today' ? t('food.tabToday') : t('food.tabPlan')}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <Pressable
         onPress={() => router.push('/fasting')}
         style={[styles.fastingCard, { backgroundColor: theme.cardSubtle }]}
@@ -244,6 +269,17 @@ export default function Food() {
         </Pressable>
       </View>
 
+      {tab === 'plan' ? (
+        <PlanTab
+          day={selected}
+          eaten={Math.round(totals.calories)}
+          target={targets?.calories}
+          hasProgram={!!mealPlan}
+          slotMeal={(slot) => plannedMealFor(mealPlan, selected, slot, mealPlanSwaps, mealPlanRecipes, recipes, activeProgramId)}
+          onLog={logPlanned}
+        />
+      ) : (
+        <>
       <View style={styles.eatenRow}>
         <Text style={{ color: theme.textSecondary, flex: 1 }}>
           {t('home.eaten')}:{' '}
@@ -368,7 +404,14 @@ export default function Food() {
                       </Text>
                     </Pressable>
                     <Pressable
-                      onPress={() => logPlanned(type)}
+                      onPress={() => {
+                        // A recipe-backed meal has a portion to review first
+                        // (S13); a programme meal without one logs as planned,
+                        // with Undo beside it.
+                        const rid = planned.items[0]?.recipeId;
+                        if (rid) router.push(`/log-portion?recipeId=${encodeURIComponent(rid)}&slot=${type}&day=${dateKey(selected)}`);
+                        else logPlanned(type);
+                      }}
                       style={({ pressed }) => [styles.plannedBtn, { flex: 1, backgroundColor: theme.primary }, pressed && { opacity: 0.85 }]}
                     >
                       <Ionicons name="checkmark" size={16} color={theme.onPrimary} />
@@ -457,11 +500,139 @@ export default function Food() {
           </Card>
         );
       })}
+        </>
+      )}
     </Screen>
   );
 }
 
+/**
+ * The plan for one day (S11, compact): what is planned, what was eaten, and
+ * one useful action per slot. Planning writes nothing here — every action
+ * leads to a preview or a picker. With no weekly programme the slots can
+ * still be planned date by date from saved recipes, which is a meal plan
+ * built by hand and needs no AI.
+ */
+function PlanTab({
+  day,
+  eaten,
+  target,
+  hasProgram,
+  slotMeal,
+  onLog,
+}: {
+  day: Date;
+  eaten: number;
+  target?: number;
+  hasProgram: boolean;
+  slotMeal: (slot: MealType) => ReturnType<typeof plannedMealFor>;
+  onLog: (slot: MealType) => void;
+}) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  const router = useRouter();
+  const key = dateKey(day);
+  const rows = MEAL_TYPES.map((slot) => ({ slot, meal: slotMeal(slot) }));
+  const planned = rows.reduce((sum, r) => sum + (r.meal ? plannedMealCalories(r.meal) : 0), 0);
+  const anyPlanned = rows.some((r) => r.meal);
+  return (
+    <>
+      <Card>
+        <View style={{ flexDirection: 'row', gap: Spacing.lg }}>
+          <View>
+            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('mealPlan.planned')}</Text>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20 }}>
+              {Math.round(planned)} <Text style={{ fontSize: 13, fontWeight: '600' }}>{t('common.kcal')}</Text>
+            </Text>
+          </View>
+          <View>
+            <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('home.eaten')}</Text>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20 }}>
+              {eaten} <Text style={{ fontSize: 13, fontWeight: '600' }}>{t('common.kcal')}</Text>
+            </Text>
+          </View>
+        </View>
+        {target != null && (
+          <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 4 }}>
+            {t('food.dailyTarget', { kcal: target })}
+          </Text>
+        )}
+      </Card>
+
+      {!hasProgram && !anyPlanned && (
+        <Card style={{ gap: Spacing.sm }}>
+          <Text style={{ color: theme.text, fontWeight: '700' }}>{t('food.noPlanTitle')}</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('food.noPlanBody')}</Text>
+          <Button
+            label={t('food.planFromRecipes')}
+            icon="restaurant"
+            onPress={() => router.push(`/recipes?day=${key}&slot=lunch`)}
+          />
+          <Button label={t('food.buildWithAi')} variant="secondary" icon="sparkles" onPress={() => router.push('/program')} />
+        </Card>
+      )}
+
+      {rows.map(({ slot, meal }) => {
+        const recipeId = meal?.items[0]?.recipeId;
+        return (
+          <Card key={slot}>
+            <Text style={{ color: theme.textTertiary, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>
+              {t(`home.mealTypes.${slot}`)}
+            </Text>
+            {meal ? (
+              <>
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }} numberOfLines={1}>
+                  {meal.name}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
+                  {Math.round(plannedMealCalories(meal))} {t('common.kcal')}
+                </Text>
+              </>
+            ) : (
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('food.nothingPlanned')}</Text>
+            )}
+            <View style={styles.plannedActions}>
+              <Pressable
+                onPress={() =>
+                  router.push(
+                    recipeId
+                      ? `/recipe?id=${encodeURIComponent(recipeId)}&day=${key}&slot=${slot}`
+                      : `/recipes?day=${key}&slot=${slot}`,
+                  )
+                }
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.plannedBtn, { backgroundColor: theme.cardSubtle }, pressed && { opacity: 0.7 }]}
+              >
+                <Ionicons name="restaurant" size={16} color={theme.text} />
+                <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
+                  {recipeId ? t('mealPlan.viewRecipe') : meal ? t('mealPlan.addRecipe') : t('food.planMeal')}
+                </Text>
+              </Pressable>
+              {meal && (
+                <Pressable
+                  onPress={() =>
+                    recipeId
+                      ? router.push(`/log-portion?recipeId=${encodeURIComponent(recipeId)}&slot=${slot}&day=${key}`)
+                      : onLog(slot)
+                  }
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.plannedBtn, { flex: 1, backgroundColor: theme.primary }, pressed && { opacity: 0.85 }]}
+                >
+                  <Ionicons name="checkmark" size={16} color={theme.onPrimary} />
+                  <Text style={{ color: theme.onPrimary, fontWeight: '700', fontSize: 13 }}>{t('mealPlan.logEaten')}</Text>
+                </Pressable>
+              )}
+            </View>
+          </Card>
+        );
+      })}
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
+  segment: { flexDirection: 'row', borderRadius: Radius.full, padding: 3, marginBottom: Spacing.md },
+  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: Radius.full },
   fastingCard: {
     flexDirection: 'row',
     alignItems: 'center',

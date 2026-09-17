@@ -62,10 +62,16 @@ export default function Recipes() {
   const updateRecipe = useAppStore((s) => s.updateRecipe);
   const [request, setRequest] = useState('');
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<'all' | 'favorites' | 'review'>('all');
   const [busy, setBusy] = useState(false);
 
   const library = [...recipes].sort(libraryOrder);
-  const shown = library.filter((r) => matches(r, query));
+  const needsReview = library.filter((r) => r.reviewStatus === 'needs_review').length;
+  const shown = library.filter(
+    (r) =>
+      matches(r, query) &&
+      (filter === 'all' || (filter === 'favorites' ? !!r.favorite : r.reviewStatus === 'needs_review')),
+  );
 
   const create = async (text: string) => {
     const ask = text.trim();
@@ -85,6 +91,9 @@ export default function Recipes() {
         })),
         language: lang,
         source: 'ai',
+        // Saved on arrival so a retry can never charge twice; a draft until
+        // someone has looked at it (S09).
+        reviewStatus: 'needs_review',
       });
       successHaptic();
       setRequest('');
@@ -146,6 +155,27 @@ export default function Recipes() {
             </View>
           )}
 
+          {/* All / Favourites / Needs review. "Calgym originals" waits for a
+              reviewed starter collection to exist (section 15); a filter over
+              nothing would be an inert control. */}
+          <View style={styles.filters}>
+            {(['all', 'favorites', ...(needsReview > 0 ? (['review'] as const) : [])] as const).map((f) => {
+              const on = filter === f;
+              return (
+                <Pressable
+                  key={f}
+                  onPress={() => setFilter(f)}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}
+                  style={[styles.filter, { backgroundColor: on ? theme.primary : theme.cardSubtle }]}
+                >
+                  <Text style={{ color: on ? theme.onPrimary : theme.textSecondary, fontSize: 12, fontWeight: '700' }}>
+                    {f === 'all' ? t('recipes.filterAll') : f === 'favorites' ? t('recipes.filterFavorites') : t('recipes.filterReview', { n: needsReview })}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
           <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>
             {t('recipes.saved')}
           </Text>
@@ -164,9 +194,16 @@ export default function Recipes() {
                 ]}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.text, fontWeight: '700' }} numberOfLines={1}>
-                    {r.name}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Text style={{ color: theme.text, fontWeight: '700', flexShrink: 1 }} numberOfLines={1}>
+                      {r.name}
+                    </Text>
+                    {r.reviewStatus === 'needs_review' && (
+                      <View style={[styles.pill, { backgroundColor: theme.cardSubtle }]}>
+                        <Text style={{ color: theme.warning, fontSize: 10, fontWeight: '800' }}>{t('recipes.needsReview')}</Text>
+                      </View>
+                    )}
+                  </View>
                   <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                     {t('recipes.perServingShort', { kcal: m.calories, protein: m.proteinG })}
                     {' · '}
@@ -235,6 +272,9 @@ export default function Recipes() {
           onPress={() => create(request)}
           disabled={request.trim().length < 2}
         />
+        {/* No AI, no network: the dishes nobody needs a model to describe, and
+            the route that keeps the journey alive when generation is down. */}
+        <Button label={t('recipes.addMine')} variant="secondary" icon="create-outline" onPress={() => router.push('/recipe-edit')} />
       </Card>
 
       {library.length === 0 && (
@@ -249,6 +289,9 @@ export default function Recipes() {
 
 const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: Radius.sm, padding: Spacing.md, minHeight: 64 },
+  filters: { flexDirection: 'row', gap: 6, marginBottom: Spacing.sm },
+  filter: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: Radius.full },
+  pill: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: Radius.full },
   search: {
     flexDirection: 'row',
     alignItems: 'center',

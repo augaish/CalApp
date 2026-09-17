@@ -301,6 +301,13 @@ export interface RecipeIngredient {
   fatG: number;
   aisle?: RecipeAisle;
   /**
+   * The person who wrote this ingredient did not enter its nutrition. The
+   * stored macros are 0 only because the type needs a number; the recipe
+   * reports how many ingredients are in this state rather than presenting the
+   * sum as complete. Missing is unknown, not zero (section 7).
+   */
+  macrosUnknown?: true;
+  /**
    * These numbers are an estimate, not a measurement. The app's arithmetic on
    * top of them is exact, which is not the same thing as the totals being
    * right — so the screen says so rather than implying precision it does not
@@ -354,6 +361,14 @@ export interface Recipe {
   /** When it was last opened to cook from, so "what do I actually make" is
    * answerable without asking anyone to rate anything. */
   lastCookedAt?: string;
+  /**
+   * An AI result is saved the moment it arrives — so a restart or a retry can
+   * never charge for it twice — but it is a draft until a person has looked
+   * at the ingredients and servings (S09, section 15). Planning and logging
+   * wait for that. Absent means ready: everything saved before this field
+   * existed was usable, and stays so.
+   */
+  reviewStatus?: 'needs_review' | 'ready';
 }
 
 export interface Program {

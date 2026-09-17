@@ -229,3 +229,14 @@ export function withIngredientAmount(
 export function mergeKey(i: RecipeIngredient): string {
   return `${i.key}|${i.unit}|${i.state ?? 'raw'}`;
 }
+
+/** Planning and logging wait for a person to have looked at an AI draft. */
+export function isReady(recipe: Pick<Recipe, 'reviewStatus'>): boolean {
+  return recipe.reviewStatus !== 'needs_review';
+}
+
+/** How many ingredients carry no nutrition at all — shown beside any total
+ * built from them, so a partial sum is never mistaken for a complete one. */
+export function unknownNutritionCount(recipe: Pick<Recipe, 'ingredients'>): number {
+  return recipe.ingredients.filter((i) => i.macrosUnknown).length;
+}

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
@@ -48,6 +49,7 @@ export default function Shopping() {
   const { t, i18n } = useTranslation();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
   const theme = useTheme();
+  const router = useRouter();
 
   const recipes = useAppStore((s) => s.recipes);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
@@ -170,6 +172,19 @@ export default function Shopping() {
         {plannedTotal > meals.length && (
           <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('shopping.coverageHint')}</Text>
         )}
+        {/* One next action for the state you are in (S12/J05): with no plan,
+            plan; with meals that lack recipes, add them. A disabled Create
+            button on its own is a dead end. */}
+        {plannedTotal === 0 ? (
+          <Button label={t('shopping.planMeals')} variant="secondary" icon="calendar" onPress={() => router.push('/food?tab=plan')} />
+        ) : plannedTotal > meals.length ? (
+          <Button
+            label={t('shopping.addRecipes', { n: plannedTotal - meals.length })}
+            variant="secondary"
+            icon="restaurant"
+            onPress={() => router.push('/food?tab=plan')}
+          />
+        ) : null}
       </Card>
 
       {/* How much of each recipe is being cooked, before anything is bought. */}

@@ -4,43 +4,23 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { PhotoFallback } from '@/components/photo-fallback';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { useCelebrate } from '@/lib/celebrate';
 import { successHaptic, lightHaptic } from '@/lib/feedback';
 import {
-  foodItemForServings,
   ingredientAmountLabel,
   isEstimated,
+  isReady,
   perServing,
   roundMacros,
   scaleMacros,
   scaledIngredients,
-  servingCountLabel,
-  servingPluralCount,
-  SERVING_STEPS,
+  unknownNutritionCount,
   withIngredientAmount,
 } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
-import type { MealType } from '@/lib/types';
-
-const MEAL_SLOTS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
-
-/** Which meal a given hour most likely belongs to — only a default; the
- * chips below let it be changed before logging. */
-function slotForHour(hour: number): MealType {
-  if (hour < 11) return 'breakfast';
-  if (hour < 16) return 'lunch';
-  if (hour < 21) return 'dinner';
-  return 'snack';
-}
-
-/** Module-level: the React Compiler's purity rule forbids reading the clock
- * inside a component or a handler declared in one. */
-function currentSlot(): MealType {
-  return slotForHour(new Date().getHours());
-}
 
 /**
  * One recipe, in the order it is actually used: what it is, what a serving
@@ -68,58 +48,42 @@ export default function RecipeScreen() {
   const recipes = useAppStore((s) => s.recipes);
   const updateRecipe = useAppStore((s) => s.updateRecipe);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
-  const meals = useAppStore((s) => s.meals);
-  const logMeal = useAppStore((s) => s.logMeal);
-  const removeMeal = useAppStore((s) => s.removeMeal);
 
   const recipe = recipes.find((r) => r.id === id);
 
   const [cookingFor, setCookingFor] = useState(recipe?.servings ?? 2);
-  const [portion, setPortion] = useState(1);
-  const [slot, setSlot] = useState<MealType>(() =>
-    MEAL_SLOTS.includes(slotParam as MealType) ? (slotParam as MealType) : currentSlot(),
-  );
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [showTotals, setShowTotals] = useState(false);
   // Index of the ingredient being corrected, and the text in its field.
   const [editing, setEditing] = useState<number | null>(null);
   const [draft, setDraft] = useState('');
-  // The id of the meal this screen just logged, so it can be undone and so a
-  // second tap cannot quietly create a duplicate entry.
-  const [loggedId, setLoggedId] = useState<string | null>(null);
 
   if (!recipe) return null;
 
   const serving = roundMacros(perServing(recipe));
   const batch = roundMacros(scaleMacros(perServing(recipe), cookingFor));
-  const mine = roundMacros(scaleMacros(perServing(recipe), portion));
   const ingredients = scaledIngredients(recipe, cookingFor);
   const estimated = isEstimated(recipe);
 
-  // Still counts as logged only while that meal actually exists — deleting it
-  // from the diary elsewhere should bring this screen back to "not logged".
-  const loggedMeal = loggedId ? meals.find((m) => m.id === loggedId) : undefined;
+  const ready = isReady(recipe);
+  const unknown = unknownNutritionCount(recipe);
 
-  const logIt = () => {
-    if (loggedMeal) return; // already in the diary; Undo first
-    const item = foodItemForServings(recipe, portion, portionLabel(portion));
-    logMeal([item], undefined, slot);
-    // logMeal prepends, so the new meal is the newest one for this slot.
-    const newest = useAppStore.getState().meals[0];
-    setLoggedId(newest?.id ?? null);
+  // "I ate" is its own review screen (S13): the meal, the date and the amount
+  // are stated before a diary write, and this screen keeps "cooking for"
+  // separate from it — doubling the batch must never double the diary.
+  const goLog = () => {
+    const q = new URLSearchParams({ recipeId: recipe.id });
+    if (slotParam) q.set('slot', slotParam);
+    if (day) q.set('day', day);
+    router.push(`/log-portion?${q.toString()}`);
+  };
+
+  // An AI draft becomes usable only once a person has looked at it. The tap
+  // is the review; there is nothing to fill in, only something to read.
+  const markReady = () => {
+    updateRecipe(recipe.id, { reviewStatus: 'ready' });
     successHaptic();
-    useCelebrate.getState().celebrate(t('celebrate.mealLogged'));
   };
-
-  const undo = () => {
-    if (!loggedId) return;
-    removeMeal(loggedId);
-    setLoggedId(null);
-    lightHaptic();
-  };
-
-  const portionLabel = (servings: number) =>
-    `${servingCountLabel(servings)} ${t('recipe.servingUnit', { count: servingPluralCount(servings) })}`;
 
   // How many planned meals this recipe currently stands on. Correcting a
   // quantity moves their totals too, so say so before it happens rather than
@@ -156,19 +120,11 @@ export default function RecipeScreen() {
   return (
     <Screen
       footer={
-        loggedMeal ? (
-          <View style={[styles.loggedBar, { backgroundColor: theme.cardSubtle, borderColor: theme.border }]}>
-            <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
-            <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>
-              {t('recipe.addedTo', { slot: t(`home.mealTypes.${slot}`), portion: portionLabel(portion) })}
-            </Text>
-            <Pressable onPress={undo} hitSlop={8}>
-              <Text style={{ color: theme.primary, fontWeight: '700' }}>{t('recipe.undo')}</Text>
-            </Pressable>
-          </View>
+        !ready ? (
+          <Button label={t('recipe.markReady')} icon="checkmark-circle" onPress={markReady} />
         ) : fromPlan ? (
           // Opened from today's plan: you are about to eat it.
-          <Button label={t('recipe.logEaten', { portion: portionLabel(portion) })} icon="add" onPress={logIt} />
+          <Button label={t('recipe.logEatenShort')} icon="add" onPress={goLog} />
         ) : (
           // Discovery: planning is the likely next step, but logging stays one
           // tap away for someone who just cooked it.
@@ -178,18 +134,38 @@ export default function RecipeScreen() {
               icon="calendar"
               onPress={() => router.push(`/plan-meal?recipeId=${encodeURIComponent(recipe.id)}`)}
             />
-            <Button
-              label={t('recipe.logEaten', { portion: portionLabel(portion) })}
-              variant="secondary"
-              icon="add"
-              onPress={logIt}
-            />
+            <Button label={t('recipe.logEatenShort')} variant="secondary" icon="add" onPress={goLog} />
           </View>
         )
       }
     >
       {/* 1. What it is */}
-      <Title>{recipe.name}</Title>
+      {/* Photo or category illustration — same geometry either way (C09). */}
+      <View style={styles.titleRow}>
+        <PhotoFallback uri={recipe.photoUri} size={64} />
+        <View style={{ flex: 1 }}>
+          <Title>{recipe.name}</Title>
+        </View>
+        <Pressable
+          onPress={() => router.push(`/recipe-edit?id=${encodeURIComponent(recipe.id)}`)}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel={t('recipe.edit')}
+        >
+          <Ionicons name="create-outline" size={22} color={theme.textSecondary} />
+        </Pressable>
+      </View>
+      {!ready && (
+        <Card style={{ borderColor: theme.warning, borderWidth: 1, marginBottom: Spacing.md }}>
+          <Text style={{ color: theme.text, fontWeight: '700' }}>{t('recipe.needsReviewTitle')}</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>{t('recipe.needsReviewBody')}</Text>
+        </Card>
+      )}
+      {unknown > 0 && (
+        <Text style={{ color: theme.warning, fontSize: 12, marginBottom: Spacing.sm }}>
+          {t('recipeEdit.unknownNote', { n: unknown })}
+        </Text>
+      )}
       <View style={styles.metaRow}>
         {!!recipe.prepMinutes && (
           <Meta icon="time-outline" label={t('recipe.prep', { n: recipe.prepMinutes })} theme={theme} />
@@ -357,68 +333,6 @@ export default function RecipeScreen() {
         ))}
       </Card>
 
-      {/* 6. How much of it you ate — separate from how much you cooked. */}
-      <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>
-        {t('recipe.myPortion')}
-      </Text>
-      <Card style={{ gap: Spacing.sm }}>
-        <View style={styles.chips}>
-          {SERVING_STEPS.map((p) => {
-            const active = portion === p;
-            return (
-              <Pressable
-                key={p}
-                onPress={() => {
-                  lightHaptic();
-                  setPortion(p);
-                }}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active ? theme.primary : theme.cardSubtle,
-                    borderColor: active ? theme.primary : theme.border,
-                  },
-                ]}
-              >
-                <Text style={{ color: active ? theme.onPrimary : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
-                  {servingCountLabel(p)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-        <Text style={{ color: theme.text, fontWeight: '700' }}>
-          {t('recipe.portionMacros', {
-            kcal: mine.calories,
-            protein: mine.proteinG,
-            carbs: mine.carbsG,
-            fat: mine.fatG,
-          })}
-        </Text>
-        <View style={styles.chips}>
-          {MEAL_SLOTS.map((s) => {
-            const active = slot === s;
-            return (
-              <Pressable
-                key={s}
-                onPress={() => setSlot(s)}
-                style={[
-                  styles.chip,
-                  {
-                    backgroundColor: active ? theme.primary : theme.cardSubtle,
-                    borderColor: active ? theme.primary : theme.border,
-                  },
-                ]}
-              >
-                <Text style={{ color: active ? theme.onPrimary : theme.textSecondary, fontWeight: '600', fontSize: 13 }}>
-                  {t(`home.mealTypes.${s}`)}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-      </Card>
-
       <Button
         label={t('recipe.delete')}
         variant="ghost"
@@ -467,6 +381,7 @@ function Macro({
 }
 
 const styles = StyleSheet.create({
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginBottom: Spacing.sm },
   metaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.md },
   meta: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   macroRow: { flexDirection: 'row', alignItems: 'flex-end' },
