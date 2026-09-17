@@ -451,8 +451,15 @@ export default function SessionScreen() {
           <View style={[styles.sameReps, { borderTopColor: theme.border }]}>
             <Ionicons name="repeat" size={14} color={theme.textTertiary} />
             <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+              {/* A nearest-count fallback is labelled AS a fallback (S06/AT04):
+                  "Last × 8" under a 9-rep stepper read as if it were the
+                  same thing, and a number that quietly answers a different
+                  question is worse than one that says which question it
+                  answers. */}
               {sameReps
-                ? t('session.lastAtReps', { reps: sameReps.reps })
+                ? sameReps.reps === reps
+                  ? t('session.lastAtReps', { reps: sameReps.reps })
+                  : t('session.nearestReps', { reps, nearest: sameReps.reps })
                 : t('session.noRepsRecord')}
             </Text>
             {sameReps && (

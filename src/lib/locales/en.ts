@@ -188,6 +188,7 @@ export const en = {
     target: 'Target',
     targetFromPlan: 'From your weekly plan · edit',
     lastAtReps: 'Last × {{reps}}:',
+    nearestReps: 'No previous {{reps}}-rep set · nearest × {{nearest}}:',
     noRepsRecord: 'No completed set at these reps yet',
     whenToday: 'today',
     whenYesterday: 'yesterday',
@@ -456,6 +457,7 @@ export const en = {
     doneOf: '{{done}}/{{total}} done',
     inProgress: 'In progress',
     workoutDone: 'Workout done',
+    noFurtherPlanned: 'No further training planned today.',
     addExercise: 'Add exercise',
     nextMeal: 'Next meal',
     allLogged: 'All meals logged',
@@ -509,6 +511,9 @@ export const en = {
     best: 'Best',
     max: 'Max',
     lastTime: 'Last time',
+    restDay: 'Rest day',
+    restDayHint: 'Nothing planned. Add an exercise below, or duplicate a past day from your history.',
+    nothingLogged: 'Nothing logged',
     planned: 'Planned',
     skippedToday: 'Skipped today — tap to restore',
     planTarget: 'Target: {{count}} × {{detail}}',
@@ -601,6 +606,7 @@ export const en = {
     muscleMap: 'Muscle map',
     listView: 'List',
     targets: 'Targets',
+    musclesAndForm: 'Muscles & form',
     alsoWorks: 'Also works',
   },
   muscles: {
@@ -796,21 +802,6 @@ export const en = {
     soon: 'Subscriptions coming soon',
     features: {
       scan: { title: 'Snap your meal', body: 'Photo scan with calories and macros' },
-      legal: {
-    section: 'Legal & data',
-    privacy: 'Privacy policy',
-    terms: 'Terms of use',
-    exportData: 'Export my data',
-    deleteAccount: 'Delete my account',
-    deleteConfirm:
-      'This permanently deletes your data on this device and your records on our server. This cannot be undone.',
-    deleteConfirmCta: 'Delete everything',
-    deletePartial:
-      'Your device data was erased, but we could not reach the server. Please try again while online.',
-  },
-  sponsor: {
-    label: 'SPONSORED',
-  },
   describe: { title: 'Describe it in words', body: 'Type any dish and get an estimate' },
       equipment: { title: 'Scan gym equipment', body: 'Identify machines and how to use them' },
       coach: { title: 'AI coach', body: 'Ask about nutrition and training' },
@@ -1268,6 +1259,21 @@ export const en = {
     deleteConfirm: 'Delete this fasting session?',
     cardStart: 'Start a fast',
     cardRemaining: 'until eating window',
+  },
+  legal: {
+    section: 'Legal & data',
+    privacy: 'Privacy policy',
+    terms: 'Terms of use',
+    exportData: 'Export my data',
+    deleteAccount: 'Delete my account',
+    deleteConfirm:
+      'This permanently deletes your data on this device and your records on our server. This cannot be undone.',
+    deleteConfirmCta: 'Delete everything',
+    deletePartial:
+      'Your device data was erased, but we could not reach the server. Please try again while online.',
+  },
+  sponsor: {
+    label: 'SPONSORED',
   },
 };
 

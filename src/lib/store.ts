@@ -1701,9 +1701,17 @@ export function workoutBurn(
   // was still credited the whole window, capped to 5 min → 36 kcal for the
   // exact same set it started at 14 for. Same set, same work, a number that
   // depended on edit history.
+  //
+  // Clamped from BELOW as well. The ceiling stopped a long interruption from
+  // inflating the estimate, but nothing stopped a short window deflating it:
+  // two sets logged a minute apart were credited one minute of work, less
+  // than the two minutes a single set is assumed to take — so adding a set
+  // dropped the day's estimate from 14 kcal to 8. The per-set assumption is
+  // the floor, which makes the estimate monotonic in the work logged: more
+  // sets can never mean fewer calories.
   const trustedMinutes =
     minutes != null && setCount >= 2
-      ? Math.min(minutes, MAX_MINUTES_PER_SET * setCount)
+      ? Math.min(Math.max(minutes, DEFAULT_MINUTES_PER_SET * setCount), MAX_MINUTES_PER_SET * setCount)
       : DEFAULT_MINUTES_PER_SET * setCount;
   return Math.round(((met * 3.5 * bodyKg) / 200) * trustedMinutes);
 }

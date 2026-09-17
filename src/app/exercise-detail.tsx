@@ -182,6 +182,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   // reinstalled or the OS clearing its cache. Without this the failed load
   // left a 150pt blank rectangle mid-screen that read as a broken layout.
   const [photoFailed, setPhotoFailed] = useState(false);
+  const [showAnatomy, setShowAnatomy] = useState(false);
 
   if (!exercise) return null;
 
@@ -307,58 +308,6 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
         </View>
       </View>
 
-      <Card style={styles.muscleMapCard}>
-          {exercise.primaryMuscles?.length ? (
-            <BodyMap
-              view={mapView}
-              highlightedMuscles={exercise.primaryMuscles}
-              secondaryMuscles={exercise.secondaryMuscles}
-              size={110}
-            />
-          ) : (
-            <BodyMap view={mapView} highlighted={groupsForCategory(exercise.category)} size={110} />
-          )}
-          <BodyMapViewSwitch view={mapView} onChange={setMapView} />
-          <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
-            {t('exercises.targets')}{' '}
-            {exercise.primaryMuscles?.length
-              ? exercise.primaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')
-              : t(`muscles.${exercise.category}`)}
-          </Text>
-          {!!exercise.secondaryMuscles?.length && (
-            <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '500' }}>
-              {t('exercises.alsoWorks')} {exercise.secondaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')}
-            </Text>
-          )}
-      </Card>
-
-      {exercise.photoUri && !photoFailed ? (
-        <Image
-          source={{ uri: exercise.photoUri }}
-          style={styles.photo}
-          contentFit="cover"
-          onError={() => setPhotoFailed(true)}
-        />
-      ) : null}
-      {exercise.description ? (
-        <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: Spacing.md }}>
-          {exercise.description}
-        </Text>
-      ) : null}
-      <Pressable
-        onPress={() => {
-          const url = exercise.videoUrl?.trim();
-          const query = encodeURIComponent(t('gymResult.videoQuery', { name: exerciseName(exercise, lang) }));
-          Linking.openURL(url && /^https?:\/\//.test(url) ? url : `https://www.youtube.com/results?search_query=${query}`);
-        }}
-        style={styles.videoLink}
-      >
-        <Ionicons name="logo-youtube" size={18} color={theme.danger} />
-        <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
-          {t('gymResult.watchVideo')}
-        </Text>
-      </Pressable>
-
       {/* Tabs */}
       <View style={[styles.tabBar, { backgroundColor: theme.cardSubtle }]}>
         {(['track', 'history', 'graph'] as Tab[]).map((tb) => {
@@ -412,6 +361,78 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
 
       {tab === 'graph' && (
         <GraphTab sessions={history} type={type} width={width - Spacing.md * 2 - Spacing.md * 2} locale={locale} />
+      )}
+
+      {/* Data entry first, anatomy second (S22, F5). The muscle map, photo
+          and description used to sit above the steppers, which on a phone
+          put the weight field under the fold and the keyboard over the
+          controls when it was focused. Everything you need to log a set is
+          now above this line; the reference material opens on request. */}
+      <Pressable
+        onPress={() => setShowAnatomy((v) => !v)}
+        style={styles.anatomyHead}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showAnatomy }}
+      >
+        <Ionicons name="body" size={18} color={theme.primary} />
+        <Text style={{ color: theme.text, fontWeight: '700', flex: 1 }}>{t('exercises.musclesAndForm')}</Text>
+        <Ionicons name={showAnatomy ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
+      </Pressable>
+      {showAnatomy && (
+        <>
+      <Card style={styles.muscleMapCard}>
+          {exercise.primaryMuscles?.length ? (
+            <BodyMap
+              view={mapView}
+              highlightedMuscles={exercise.primaryMuscles}
+              secondaryMuscles={exercise.secondaryMuscles}
+              size={110}
+            />
+          ) : (
+            <BodyMap view={mapView} highlighted={groupsForCategory(exercise.category)} size={110} />
+          )}
+          <BodyMapViewSwitch view={mapView} onChange={setMapView} />
+          <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+            {t('exercises.targets')}{' '}
+            {exercise.primaryMuscles?.length
+              ? exercise.primaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')
+              : t(`muscles.${exercise.category}`)}
+          </Text>
+          {!!exercise.secondaryMuscles?.length && (
+            <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '500' }}>
+              {t('exercises.alsoWorks')} {exercise.secondaryMuscles.map((m) => t(`muscleIds.${m}`)).join(', ')}
+            </Text>
+          )}
+      </Card>
+
+      {exercise.photoUri && !photoFailed ? (
+        <Image
+          source={{ uri: exercise.photoUri }}
+          style={styles.photo}
+          contentFit="cover"
+          onError={() => setPhotoFailed(true)}
+        />
+      ) : null}
+      {exercise.description ? (
+        <Text style={{ color: theme.textSecondary, fontSize: 14, lineHeight: 20, marginBottom: Spacing.md }}>
+          {exercise.description}
+        </Text>
+      ) : null}
+      <Pressable
+        onPress={() => {
+          const url = exercise.videoUrl?.trim();
+          const query = encodeURIComponent(t('gymResult.videoQuery', { name: exerciseName(exercise, lang) }));
+          Linking.openURL(url && /^https?:\/\//.test(url) ? url : `https://www.youtube.com/results?search_query=${query}`);
+        }}
+        style={styles.videoLink}
+      >
+        <Ionicons name="logo-youtube" size={18} color={theme.danger} />
+        <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
+          {t('gymResult.watchVideo')}
+        </Text>
+      </Pressable>
+
+        </>
       )}
     </Screen>
   );
@@ -718,6 +739,7 @@ const styles = StyleSheet.create({
   metaRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
   tag: { borderRadius: Radius.full, paddingHorizontal: 12, paddingVertical: 5 },
   muscleMapCard: { alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.md },
+  anatomyHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm, marginTop: Spacing.md },
   photo: { width: '100%', height: 150, borderRadius: Radius.lg, marginBottom: Spacing.md },
   videoLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.md },
   tabBar: { flexDirection: 'row', borderRadius: Radius.full, padding: 4, marginBottom: Spacing.md },

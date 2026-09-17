@@ -217,16 +217,23 @@ export default function Overview() {
   // from here and from there walk through identical exercises.
   const todayPlan = schedule[selected.getDay()];
   const todaySkips = skips[dateKey(selected)] ?? [];
-  const todayIds = applyOrder(
-    todayPlan ? todayPlan.exerciseIds.filter((id) => !todaySkips.includes(id)) : [],
-    dayOrder[dateKey(selected)],
-  );
   const todayDoneIds = new Set(
     workouts
       .filter((w) => isSameDay(w.at, selected) && w.sets.some((s) => s.done))
       .map((w) => w.exerciseId),
   );
+  // Scheduled exercises PLUS anything actually trained today that the
+  // schedule does not know about — the same merge the Training tab does.
+  // Reading only the plan meant that switching to a schedule with nothing on
+  // today turned a finished workout into "Rest day / Nothing planned" on this
+  // screen while Training still showed the sets: two roots disagreeing about
+  // whether you had trained. What was done takes precedence over what a plan
+  // happens to say. (S01: completed workout over a newly selected rest day.)
+  const scheduledIds = todayPlan ? todayPlan.exerciseIds.filter((id) => !todaySkips.includes(id)) : [];
+  const unplannedDoneIds = [...todayDoneIds].filter((id) => !scheduledIds.includes(id));
+  const todayIds = applyOrder([...scheduledIds, ...unplannedDoneIds], dayOrder[dateKey(selected)]);
   const todayDoneCount = todayIds.filter((id) => todayDoneIds.has(id)).length;
+  const todayOnlyUnplanned = scheduledIds.length === 0 && unplannedDoneIds.length > 0;
   const todayNames = todayIds.map((id) => {
     const ex = findExercise(id, exercises);
     return ex ? exerciseName(ex, locale) : id;
@@ -523,12 +530,21 @@ export default function Overview() {
                     </Text>
                   </View>
                   {todayDoneCount >= todayIds.length ? (
-                    <View style={[styles.todayDone, { backgroundColor: theme.cardSubtle }]}>
-                      <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
-                      <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
-                        {t('today.workoutDone')}
-                      </Text>
-                    </View>
+                    <>
+                      <View style={[styles.todayDone, { backgroundColor: theme.cardSubtle }]}>
+                        <Ionicons name="checkmark-circle" size={16} color={theme.primary} />
+                        <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
+                          {t('today.workoutDone')}
+                        </Text>
+                      </View>
+                      {/* The plan's own state is still worth a line — as the
+                          secondary fact, under what actually happened. */}
+                      {todayOnlyUnplanned && (
+                        <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 4 }}>
+                          {t('today.noFurtherPlanned')}
+                        </Text>
+                      )}
+                    </>
                   ) : (
                     <MiniBtn
                       label={t('session.start')}
