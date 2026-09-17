@@ -269,6 +269,7 @@ export const ar: TranslationSchema = {
     cookingForHint: 'يغيّر المقادير وقائمة التسوق فقط، ولا يغيّر ما يُسجَّل في يومياتك.',
     ingredients: 'المكوّنات',
     steps: 'الخطوات',
+    noSteps: 'لم تُكتب خطوات بعد — اضغط على القلم لإضافتها.',
     myPortion: 'حصتي',
     portionMacros: '{{kcal}} سعرة · {{protein}}غ بروتين · {{carbs}}غ كربوهيدرات · {{fat}}غ دهون',
     servingUnit: 'حصص',

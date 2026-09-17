@@ -323,6 +323,10 @@ export default function RecipeScreen() {
         {t('recipe.steps')}
       </Text>
       <Card style={{ gap: Spacing.md }}>
+        {recipe.steps.length === 0 && (
+          // A hand-written recipe may have none yet; an empty card says nothing.
+          <Text style={{ color: theme.textTertiary, fontSize: 13 }}>{t('recipe.noSteps')}</Text>
+        )}
         {recipe.steps.map((step, i) => (
           <View key={i} style={styles.step}>
             <View style={[styles.stepNum, { backgroundColor: theme.cardSubtle }]}>

@@ -184,21 +184,30 @@ export function TrendLine({
           renders next (another chart, on a screen with several) overlaps
           these labels instead of appearing below them. */}
       <View style={{ flexDirection: 'row', width, height: 14, marginTop: 2 }}>
-        {labels.map((l, i) => (
-          <Text
-            key={i}
-            style={{
-              position: 'absolute',
-              left: padX + i * step - 18,
-              width: 36,
-              textAlign: 'center',
-              fontSize: 10,
-              color: t.textTertiary,
-            }}
-          >
-            {l}
-          </Text>
-        ))}
+        {labels.map((l, i) => {
+          // A date label ("17 سبتمبر") is wider than a value label; kept
+          // to one line and inside the chart, so the outermost labels hug
+          // the edge instead of wrapping into whatever renders below.
+          const lw = 56;
+          const centred = padX + i * step - lw / 2;
+          const left = Math.min(Math.max(0, centred), width - lw);
+          return (
+            <Text
+              key={i}
+              numberOfLines={1}
+              style={{
+                position: 'absolute',
+                left,
+                width: lw,
+                textAlign: left < centred ? 'right' : left > centred ? 'left' : 'center',
+                fontSize: 10,
+                color: t.textTertiary,
+              }}
+            >
+              {l}
+            </Text>
+          );
+        })}
         <Text style={{ opacity: 0, fontSize: 10 }}>{unit}</Text>
       </View>
     </View>

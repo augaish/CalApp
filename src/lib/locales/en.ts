@@ -267,6 +267,7 @@ export const en = {
     cookingForHint: 'Changes the ingredients and the shopping. It does not change what goes in your diary.',
     ingredients: 'Ingredients',
     steps: 'Steps',
+    noSteps: 'No steps written yet — tap the pencil to add them.',
     myPortion: 'My portion',
     portionMacros: '{{kcal}} kcal · {{protein}}g protein · {{carbs}}g carbs · {{fat}}g fat',
     servingUnit: 'servings',
