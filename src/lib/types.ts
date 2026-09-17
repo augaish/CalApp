@@ -353,10 +353,15 @@ export interface Recipe {
   cookedYieldMeasured?: boolean;
   /** Which language it was written in — recipes are not translated in place. */
   language: Language;
-  source: 'ai' | 'custom';
+  /** `calgym` is a bundled original: reference values, browsable offline,
+   * copied into the private library the first time it is planned, logged,
+   * kept or edited (section 15). */
+  source: 'ai' | 'custom' | 'calgym';
   createdAt: string;
   photoUri?: string;
   notes?: string;
+  /** One line under the name in the library ("A hearty lentil stew."). */
+  description?: string;
   /**
    * Kept at the top of the library. A collection you cook from is mostly a
    * handful of things you make again and again with the experiments piled on

@@ -11,6 +11,7 @@ import { successHaptic } from '@/lib/feedback';
 import { resolveIngredientKey } from '@/lib/ingredients';
 import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
+import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
 import type { Recipe, RecipeIngredient } from '@/lib/types';
 
 /** A row as typed, before it becomes an ingredient. Strings, so a half-typed
@@ -63,7 +64,7 @@ export default function RecipeEdit() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
 
-  const recipes = useAppStore((s) => s.recipes);
+  const recipes = useAllRecipes();
   const addRecipe = useAppStore((s) => s.addRecipe);
   const updateRecipe = useAppStore((s) => s.updateRecipe);
   const existing = id ? recipes.find((r) => r.id === id) : undefined;
@@ -145,7 +146,9 @@ export default function RecipeEdit() {
     }
     setError(null);
     if (existing) {
-      updateRecipe(existing.id, out.recipe);
+      // Editing a starter makes a private copy; the original stays as shipped.
+      ensureRecipeInStore(existing.id, useAppStore.getState().language ?? 'en');
+      updateRecipe(existing.id, { ...out.recipe, source: existing.source === 'calgym' ? 'custom' : out.recipe.source });
       successHaptic();
       router.back();
       return;

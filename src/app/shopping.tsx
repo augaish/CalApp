@@ -21,6 +21,7 @@ import {
   type ShoppingLine,
 } from '@/lib/shopping';
 import { datesBetween, dateKey, plannedRecipeMealsBetween, useAppStore } from '@/lib/store';
+import { useAllRecipes } from '@/lib/use-recipes';
 
 /** The window a shop is worth planning over. Module-level so the clock is
  * never read during render. */
@@ -64,7 +65,7 @@ export default function Shopping() {
   const theme = useTheme();
   const router = useRouter();
 
-  const recipes = useAppStore((s) => s.recipes);
+  const recipes = useAllRecipes();
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
   const mealPlan = useAppStore((s) => s.activeProgram?.mealPlan);
   const activeProgramId = useAppStore((s) => s.activeProgram?.id);

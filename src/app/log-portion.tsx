@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { PhotoFallback } from '@/components/photo-fallback';
-import { Button, Card, Screen, Title } from '@/components/ui';
+import { PageHeader } from '@/components/brand-header';
+import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
@@ -23,6 +24,7 @@ import {
   unknownNutritionCount,
 } from '@/lib/recipes';
 import { dateKey, mealTypeForNow, useAppStore } from '@/lib/store';
+import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
 import type { MealType } from '@/lib/types';
 
 const MEAL_SLOTS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -43,7 +45,7 @@ export default function LogPortion() {
   const router = useRouter();
   const params = useLocalSearchParams<{ recipeId?: string; slot?: string; day?: string }>();
 
-  const recipes = useAppStore((s) => s.recipes);
+  const recipes = useAllRecipes();
   const meals = useAppStore((s) => s.meals);
   const logMeal = useAppStore((s) => s.logMeal);
   const removeMeal = useAppStore((s) => s.removeMeal);
@@ -83,6 +85,8 @@ export default function LogPortion() {
     logMeal([item], undefined, slot, timestampFor(day));
     const newest = useAppStore.getState().meals[0];
     setLoggedId(newest?.id ?? null);
+    // A starter becomes a private copy the moment it is logged.
+    ensureRecipeInStore(recipe.id, locale);
     updateRecipe(recipe.id, { lastCookedAt: new Date().toISOString() });
     successHaptic();
     useCelebrate.getState().celebrate(t('celebrate.mealLogged'));
@@ -97,6 +101,7 @@ export default function LogPortion() {
 
   return (
     <Screen
+      header={<PageHeader title={t('logPortion.title')} variant="plain" />}
       footer={
         loggedMeal ? (
           <View style={{ gap: Spacing.xs }}>
@@ -119,14 +124,12 @@ export default function LogPortion() {
         )
       }
     >
-      <Title>{t('logPortion.title')}</Title>
-
       <Card>
         <Text style={[Type.caption, { color: theme.textTertiary, textTransform: 'uppercase' }]}>
           {t(`home.mealTypes.${slot}`)} · {dayLabel}
         </Text>
         <View style={styles.head}>
-          <PhotoFallback uri={recipe.photoUri} size={56} />
+          <PhotoFallback uri={recipe.photoUri} illustration={illustrationFor(recipe.name)} size={96} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 18 }} numberOfLines={2}>
               {recipe.name}
@@ -137,9 +140,6 @@ export default function LogPortion() {
             {unknown > 0 && (
               <Text style={{ color: theme.warning, fontSize: 12 }}>{t('recipeEdit.unknownNote', { n: unknown })}</Text>
             )}
-          </View>
-        </View>
-
         <View style={styles.macros}>
           <Text style={[styles.big, { color: theme.text }]}>
             {mine.calories} <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textSecondary }}>{t('common.kcal')}</Text>
@@ -150,6 +150,8 @@ export default function LogPortion() {
           <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
             {t('logPortion.batchNote', { count: recipe.servings })}
           </Text>
+        </View>
+          </View>
         </View>
       </Card>
 
@@ -213,8 +215,8 @@ export default function LogPortion() {
 }
 
 const styles = StyleSheet.create({
-  head: { flexDirection: 'row', gap: Spacing.md, alignItems: 'center', marginTop: 6 },
-  macros: { marginTop: Spacing.md, gap: 2 },
+  head: { flexDirection: 'row', gap: Spacing.md, alignItems: 'flex-start', marginTop: 6 },
+  macros: { marginTop: Spacing.sm, gap: 2 },
   big: { fontSize: 30, fontWeight: '800' },
   stepper: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   stepBtn: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },

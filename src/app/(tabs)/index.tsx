@@ -42,6 +42,7 @@ import {
   waterTargetMl,
 } from '@/lib/store';
 import { targetsNeedUpdate } from '@/lib/tdee';
+import { useAllRecipes } from '@/lib/use-recipes';
 import type { MealType } from '@/lib/types';
 
 const MAIN_MEALS: MealType[] = ['breakfast', 'lunch', 'dinner'];
@@ -105,7 +106,7 @@ export default function Overview() {
   const startSession = useAppStore((s) => s.startSession);
   const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
-  const recipes = useAppStore((s) => s.recipes);
+  const recipes = useAllRecipes();
   const checklistDismissed = useAppStore((s) => s.checklistDismissed);
   const dismissChecklist = useAppStore((s) => s.dismissChecklist);
   const tourSeen = useAppStore((s) => s.tourSeen);

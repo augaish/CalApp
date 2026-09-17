@@ -41,6 +41,7 @@ import {
   useAppStore,
 } from '@/lib/store';
 import type { FastingSession, LoggedMeal, MealType } from '@/lib/types';
+import { useAllRecipes } from '@/lib/use-recipes';
 
 /** Xh Ym — same coarse-duration format the fasting screen itself uses. */
 function formatHoursMinutes(ms: number): string {
@@ -101,7 +102,7 @@ export default function Food() {
   const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
   const swapPlannedMeal = useAppStore((s) => s.swapPlannedMeal);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
-  const recipes = useAppStore((s) => s.recipes);
+  const recipes = useAllRecipes();
   const shopping = useAppStore((s) => s.shopping);
   const selected = useViewDay((s) => s.day);
   const setDay = useViewDay((s) => s.setDay);
