@@ -2531,8 +2531,14 @@ export function plannedRecipeMealsBetween(
   for (const day of datesBetween(fromKey, toKey)) {
     const key = dateKey(day);
     const slots = mealPlan?.days.find((d) => d.weekday === day.getDay())?.meals ?? [];
-    plannedTotal += slots.length;
+    // A planned meal is a programme slot OR a recipe put on a date by hand —
+    // a week planned from recipes alone is not "0 meals".
+    const plannedSlots = new Set<string>(slots.map((m) => m.slot));
     const dayOverrides = overrides[key];
+    for (const [slot, entry] of Object.entries(dayOverrides ?? {})) {
+      if (entry && (entry.programId == null || entry.programId === activeProgramId)) plannedSlots.add(slot);
+    }
+    plannedTotal += plannedSlots.size;
     if (!dayOverrides) continue;
     for (const [slot, entry] of Object.entries(dayOverrides)) {
       if (!entry) continue;
