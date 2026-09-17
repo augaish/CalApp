@@ -463,7 +463,11 @@ export default function Food() {
                             {num(item.calories)} {t('common.kcal')}
                           </Text>
                         </View>
-                        <StatusPill label={t('mealPlan.logged')} tone="logged" icon="checkmark" />
+                        {item.nutritionIncomplete ? (
+                          <StatusPill label={t('mealPlan.incomplete')} tone="review" icon="alert-circle-outline" />
+                        ) : (
+                          <StatusPill label={t('mealPlan.logged')} tone="logged" icon="checkmark" />
+                        )}
                         <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
                       </Pressable>
                     );

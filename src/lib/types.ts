@@ -79,6 +79,9 @@ export interface FoodItem {
    * It is still a SNAPSHOT — changing the recipe later never touches it.
    */
   recipeBasis?: { calories: number; proteinG: number; carbsG: number; fatG: number };
+  /** Logged from a recipe with ingredients whose nutrition was never entered:
+   * the figures are a lower bound, and the diary says so (section 7). */
+  nutritionIncomplete?: true;
 }
 
 export interface MealAnalysis {

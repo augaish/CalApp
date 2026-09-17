@@ -1555,6 +1555,7 @@ export const ar: TranslationSchema = {
     swapBody: 'اختر وجبة أخرى من خطتك لهذه الفترة اليوم.',
     original: 'العودة إلى الخطة',
     logged: 'سُجّلت',
+    incomplete: 'غير مكتمل',
     undo: 'تراجع',
     dayTotal: '{{kcal}} سعرة مخططة',
     viewPlan: 'عرض خطة الوجبات',

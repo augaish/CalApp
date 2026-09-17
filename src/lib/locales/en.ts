@@ -1559,6 +1559,7 @@ export const en = {
     swapBody: 'Pick another meal from your plan for this slot today.',
     original: 'Back to the plan',
     logged: 'Logged',
+    incomplete: 'Incomplete',
     undo: 'Undo',
     dayTotal: '{{kcal}} kcal planned',
     viewPlan: 'View meal plan',

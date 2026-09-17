@@ -131,6 +131,7 @@ export function foodItemForServings(recipe: Recipe, servings: number, portion: s
     // Unrounded, so a later correction rescales from this rather than from
     // the rounded figures above — five edits land where one would.
     recipeBasis: basis,
+    ...(unknownNutritionCount(recipe) > 0 ? { nutritionIncomplete: true as const } : {}),
   };
 }
 
