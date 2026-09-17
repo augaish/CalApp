@@ -1,0 +1,314 @@
+[
+ {
+  "id": "AT01",
+  "screens": "S01,S02",
+  "status": "Passed (browser)",
+  "evidence": "handoff-browser: Overview and Food eaten totals agree; planned lunch excluded (Stage E, re-run on this build)"
+ },
+ {
+  "id": "AT02",
+  "screens": "S01,S05,S08",
+  "status": "Passed (browser)",
+  "evidence": "schedules-test + handoff-browser: activation changes future plan only; Overview leads with completed work (F3 fix retained)"
+ },
+ {
+  "id": "AT03",
+  "screens": "S05,S06",
+  "status": "Passed (browser)",
+  "evidence": "reference-browser: Best 25 kg × 10 shown; latest matching reps used, not the older set"
+ },
+ {
+  "id": "AT04",
+  "screens": "S06",
+  "status": "Passed (browser)",
+  "evidence": "reference-browser: 'No previous 5-rep set · nearest × 6' labelled as a fallback; typed weight preserved"
+ },
+ {
+  "id": "AT05",
+  "screens": "S06",
+  "status": "Passed (browser)",
+  "evidence": "reference-browser: set 4 on a 3-set plan shows no Target"
+ },
+ {
+  "id": "AT06",
+  "screens": "S06,S21",
+  "status": "Passed (browser analogue) · Not tested (native process kill)",
+  "evidence": "E5: context dropped and reopened at root → session restored at Set 2 of 2, one set, no duplicate. Native termination not run."
+ },
+ {
+  "id": "AT07",
+  "screens": "S06",
+  "status": "Passed (browser)",
+  "evidence": "E6: Undo removes exactly the last set; screen returns to Set 2 of 2"
+ },
+ {
+  "id": "AT08",
+  "screens": "S08",
+  "status": "Passed (browser)",
+  "evidence": "schedules-test + F5 activation preview: Cancel writes nothing"
+ },
+ {
+  "id": "AT09",
+  "screens": "S08",
+  "status": "Passed (unit)",
+  "evidence": "schedules-test: activating Home changes the working week only; workouts and bests untouched"
+ },
+ {
+  "id": "AT10",
+  "screens": "S10,S13",
+  "status": "Passed (unit + browser)",
+  "evidence": "recipe-model-test + E3: per-serving stable at batch 8; 0.5 and 2 servings stored as separate entries"
+ },
+ {
+  "id": "AT11",
+  "screens": "S13",
+  "status": "Passed (browser)",
+  "evidence": "E3: entry edited from its captured basis after the recipe changed (515 → 1,030, not 1,730); same entry id, no duplicate"
+ },
+ {
+  "id": "AT12",
+  "screens": "S10",
+  "status": "Passed (browser)",
+  "evidence": "E1: 'Nutrition estimated' stays after Looks right; ingredient flags kept"
+ },
+ {
+  "id": "AT13",
+  "screens": "S10,S13",
+  "status": "Passed (unit)",
+  "evidence": "portion-edit-test: cooked grams blocked until a measured batch weight exists"
+ },
+ {
+  "id": "AT14",
+  "screens": "S14",
+  "status": "Passed (browser)",
+  "evidence": "handoff-browser S14: no write before Apply; planned day 0 → 515; one override on Apply"
+ },
+ {
+  "id": "AT15",
+  "screens": "S14",
+  "status": "Passed (unit)",
+  "evidence": "plan-recipe-test: override stamped with programme id; stale preview refused (programAtOpen guard)"
+ },
+ {
+  "id": "AT16",
+  "screens": "S12",
+  "status": "Passed (unit)",
+  "evidence": "shopping-test: bought 500 g kept, 300 g more needed"
+ },
+ {
+  "id": "AT17",
+  "screens": "S12",
+  "status": "Passed (unit)",
+  "evidence": "shopping-test + merge-test: identity/state/unit merge; basmati distinct from rice"
+ },
+ {
+  "id": "AT18",
+  "screens": "S12",
+  "status": "Passed (unit)",
+  "evidence": "shopping-test: separate cooking vs one grouped batch"
+ },
+ {
+  "id": "AT19",
+  "screens": "S12",
+  "status": "Passed (browser)",
+  "evidence": "handoff-browser Shopping: coverage stated, Add recipes / Plan meals offered, list never declared complete"
+ },
+ {
+  "id": "AT20",
+  "screens": "S09,S10,S02",
+  "status": "Passed (browser)",
+  "evidence": "PhotoFallback illustrations on every list; no image request; shots18 recipes/recipe/food"
+ },
+ {
+  "id": "AT21",
+  "screens": "S09",
+  "status": "Passed (browser)",
+  "evidence": "F6: favourite via ensureRecipeInStore does not open the row; search resolves aliases; reopening a saved recipe makes no request"
+ },
+ {
+  "id": "AT22",
+  "screens": "S28,S31",
+  "status": "Blocked",
+  "evidence": "No ANTHROPIC_API_KEY in this sandbox and Railway is unreachable through the proxy; live recipe/program generation (F1/F2) could not be exercised. Error mapping covered by ai-errors-test / ai-failure-test."
+ },
+ {
+  "id": "AT23",
+  "screens": "S04,S25",
+  "status": "Passed (unit + browser)",
+  "evidence": "weight-test + F4 form: only entered values saved; missing body fat stays null; source and date recorded"
+ },
+ {
+  "id": "AT24",
+  "screens": "S03,S23",
+  "status": "Passed (browser)",
+  "evidence": "F4: saving on an older date revises that reading (original at kept, editedAt set); latest still the newer reading"
+ },
+ {
+  "id": "AT25",
+  "screens": "S17",
+  "status": "Passed (unit + browser)",
+  "evidence": "review-test + F8: average on logged days only; 1 of 7 days; descriptive hint, no target applied"
+ },
+ {
+  "id": "AT26",
+  "screens": "S16,S29",
+  "status": "Passed (browser)",
+  "evidence": "E8: manual per-100 g entry saved privately (120 kcal from 400/100 g × 30 g); share opt-in off by default"
+ },
+ {
+  "id": "AT27",
+  "screens": "S16",
+  "status": "Failed (unit, fresh database) · Passed (barcode source)",
+  "evidence": "barcode-source-test passes. catalogue-test shows 4 failures on a fresh Postgres (a submitted reading is returned as published, not pending; review queue empty). The server catalogue code was not changed by this work; flagged for a separate investigation before the catalogue share is relied on."
+ },
+ {
+  "id": "AT28",
+  "screens": "S13,S04,S06",
+  "status": "Passed (browser)",
+  "evidence": "E4: three taps write one entry; Undo removes exactly it. Session Complete set is one write per tap (E6)."
+ },
+ {
+  "id": "AT29",
+  "screens": "S22,S04,S29",
+  "status": "Not tested (native keyboard)",
+  "evidence": "Keyboard avoidance was implemented (F5 fix, Screen KeyboardAvoidingView); a browser cannot show the native keyboard."
+ },
+ {
+  "id": "AT30",
+  "screens": "S01,S02,S03,S06,S13",
+  "status": "Passed (browser)",
+  "evidence": "E9 + handoff-browser AT30: Arabic renders on every new screen with mirrored layout and no raw keys; i18n coverage ALL PASS"
+ },
+ {
+  "id": "AT31",
+  "screens": "S01,S02,S03,S20",
+  "status": "Partially passed",
+  "evidence": "Every icon control carries an accessibilityLabel/role and status is text, never colour alone (code review); screen-reader announcement order not tested without a device."
+ },
+ {
+  "id": "AT32",
+  "screens": "S13,S11,S21",
+  "status": "Passed (unit)",
+  "evidence": "store migration + dateKey fixtures (Stage E); month index keys preserved"
+ },
+ {
+  "id": "AT33",
+  "screens": "S18",
+  "status": "Passed (browser)",
+  "evidence": "F8: a food question sends only the allowed context (share switches honoured in buildCoachContext); drafts need an explicit Review + Add"
+ },
+ {
+  "id": "AT34",
+  "screens": "S30,S37",
+  "status": "Passed (browser)",
+  "evidence": "Export and history remain on Profile/Health/Training with no new gate; upgrade screen untouched"
+ },
+ {
+  "id": "AT35",
+  "screens": "S26",
+  "status": "Passed (browser)",
+  "evidence": "F4 Connections screen shows true WHOOP state; reauthorisation flow itself not exercised (no WHOOP account)"
+ },
+ {
+  "id": "AT36",
+  "screens": "S01,S02,S03,S06",
+  "status": "Not tested",
+  "evidence": "No native build or OTA was published from this session, by instruction. Installed build/update identity to be recorded on the device after review."
+ },
+ {
+  "id": "AT37",
+  "screens": "S35",
+  "status": "Deferred",
+  "evidence": "Coach management stays deferred (owner's instruction)"
+ },
+ {
+  "id": "AT38",
+  "screens": "S36",
+  "status": "Deferred",
+  "evidence": "Household planning stays deferred (owner's instruction)"
+ },
+ {
+  "id": "AT39",
+  "screens": "S28",
+  "status": "Passed (browser)",
+  "evidence": "E2: manual recipe saved without AI; unknown ingredient stays unknown through recipe, Log eaten and the diary row (Incomplete)"
+ },
+ {
+  "id": "AT40",
+  "screens": "S01,S02,S03,S15",
+  "status": "Passed (browser)",
+  "evidence": "handoff-browser: every root and the Add sheet have actionable empty states; measurements say 'No reading yet'"
+ },
+ {
+  "id": "AT41",
+  "screens": "S41",
+  "status": "Partially passed",
+  "evidence": "Native splash is the platform launch (expo-splash-screen with the original icon, no JS splash, hidden once the store is hydrated). Cold-start timing on a device not tested."
+ },
+ {
+  "id": "AT42",
+  "screens": "S41,S06",
+  "status": "Passed (browser analogue)",
+  "evidence": "E5: root launch restores the session; a Food deep link is honoured and the session stays reachable via Resume"
+ },
+ {
+  "id": "AT43",
+  "screens": "S09",
+  "status": "Passed (browser)",
+  "evidence": "F6: All / Calgym / My recipes / Favourites; 12 Calgym originals; honest My recipes empty state"
+ },
+ {
+  "id": "AT44",
+  "screens": "S09,S28",
+  "status": "Blocked (generation) · Passed (persistence)",
+  "evidence": "Save-once and reopen-without-regeneration covered by Stage E suites; live generation blocked (see AT22)"
+ },
+ {
+  "id": "AT45",
+  "screens": "S09,S10",
+  "status": "Passed (browser)",
+  "evidence": "F6: editing/favouriting a Calgym original makes a private copy under the same id; the bundled original is unchanged"
+ },
+ {
+  "id": "AT46",
+  "screens": "S09,S28",
+  "status": "Passed (browser)",
+  "evidence": "E1/E2: drafts stay identified; incomplete data flagged through to the diary; Not saved path covered by ai-failure-test"
+ },
+ {
+  "id": "AT47",
+  "screens": "S01,S09,S06",
+  "status": "Deferred",
+  "evidence": "Ads remain subject to commercial/configuration approval; only the existing SponsorCard slot exists"
+ },
+ {
+  "id": "AT48",
+  "screens": "S01,S09,S37",
+  "status": "Deferred",
+  "evidence": "As AT47"
+ },
+ {
+  "id": "AT49",
+  "screens": "S01,S03,S09",
+  "status": "Deferred",
+  "evidence": "As AT47"
+ },
+ {
+  "id": "AT50",
+  "screens": "S05,S42",
+  "status": "Passed (unit + browser)",
+  "evidence": "occurrences-test + E7: Cancel zero writes; Apply moves exactly two occurrences; original dates and template retained; no set created"
+ },
+ {
+  "id": "AT51",
+  "screens": "S06,S42",
+  "status": "Passed (unit + browser)",
+  "evidence": "E7: set performed today carries today's time and occurrenceId of the original date; the other workout's targets stay planned"
+ },
+ {
+  "id": "AT52",
+  "screens": "S42",
+  "status": "Passed (unit)",
+  "evidence": "occurrences-test: stale revision refused; fresh apply accepted; undo refused once started; Apply blocked while a session is active (reschedule.tsx stale guard)"
+ }
+]
