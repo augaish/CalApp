@@ -83,6 +83,14 @@ Rules:
 - Estimate the portion from what is visible, but size it realistically (a full plate, not a token serving).`;
 }
 
+/**
+ * Appended to the text prompt on the one retry after a reply came back
+ * without parseable JSON — typically a search turn that ended in prose.
+ */
+export const JSON_ONLY_REMINDER = `
+
+IMPORTANT: The previous attempt did not come back as JSON. Do not search and do not explain anything outside the JSON — reply with the JSON object only, starting with "{". If the user already stated calories or macros, use those figures as given.`;
+
 export function textMealPrompt(language: Language, text: string): string {
   return `You are a meticulous nutrition analyst with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes.
 
@@ -114,6 +122,7 @@ Rules:
 - "name" and "portion" must be written in ${LANGUAGE_NAME[language]}.
 - "portion" MUST include an approximate weight in grams, e.g. "1 plate (~500 g)".
 - The user may write amounts in Arabic-Indic digits (٧٠٠ = 700, ٣ = 3). Read them, and respect the amounts they gave instead of substituting a standard serving.
+- If the user states calories or macros for a dish (e.g. from a menu: "709 kcal, 23 g protein, 91 g carbs, 65 g fat"), use those figures as given for that dish instead of re-estimating them, and do not search for them.
 - "notes" (in ${LANGUAGE_NAME[language]}) MUST state the portion size and key assumptions you used so the user can verify them, e.g. "Assumed ~1.5 cups rice cooked in ghee + 250 g chicken". Keep it under 200 characters.
 - "confidence" is 0-1.
 - If the text is not about food, return {"items": [], "confidence": 0, "notes": "<explain briefly>"}.`;

@@ -242,8 +242,8 @@ check('E8 manual entry opens with the barcode context', /\/food-edit\?barcode=62
 await page.getByPlaceholder('e.g. Watermelon').fill('Date bar');
 await page.getByText('Per 100 g', { exact: true }).click(); await page.waitForTimeout(300);
 await page.getByPlaceholder('e.g. 30').fill('30');
-const inputs = page.locator('input[inputmode="numeric"]');
-await inputs.nth(1).fill('400'); await inputs.nth(2).fill('5'); await inputs.nth(3).fill('70'); await inputs.nth(4).fill('10');
+const inputs = page.locator('input[inputmode="decimal"]');
+await inputs.nth(0).fill('400'); await inputs.nth(1).fill('5'); await inputs.nth(2).fill('70'); await inputs.nth(3).fill('10');
 b = await body(page); await shot(page, 'E8-per-100g');
 check('E8 the serving is computed from the per-100 g basis (30 g → 120 kcal)', /This serving \(30 g\): 120 kcal/.test(b), b.match(/This serving[^k]*kcal/)?.[0]);
 await page.getByText('Add food', { exact: true }).last().click(); await page.waitForTimeout(1200);
@@ -298,7 +298,7 @@ check('E11 two taps on Save reading leave exactly one reading for today, at 76 k
 await close(ctx, page);
 ({ ctx, page } = await open(base(), '/food-edit', 'E11-double-save-food'));
 await page.getByPlaceholder('e.g. Watermelon').fill('Banana');
-await page.locator('input[inputmode="numeric"]').nth(0).fill('90');
+await page.locator('input[inputmode="decimal"]').nth(0).fill('90');
 const addFood = page.getByText('Add food', { exact: true }).last();
 await addFood.click(); await addFood.click().catch(() => {}); await page.waitForTimeout(1200);
 st = await store(page);
@@ -339,8 +339,8 @@ const arWorkouts = [
 ];
 ({ ctx, page } = await open({ ...base('ar'), schedule: arWeek, workouts: arWorkouts }, '/food-edit', 'E13-arabic-input'));
 await page.getByPlaceholder('مثال: بطيخ').fill('تمر');
-await page.locator('input[inputmode="numeric"]').nth(0).fill('٣٠٠');
-await page.locator('input[inputmode="numeric"]').nth(1).fill('٢');
+await page.locator('input[inputmode="decimal"]').nth(0).fill('٣٠٠');
+await page.locator('input[inputmode="decimal"]').nth(1).fill('٢');
 b = await body(page); await shot(page, 'E13-food-edit-ar');
 await page.getByText('إضافة الطعام', { exact: true }).last().click(); await page.waitForTimeout(1200);
 st = await store(page);

@@ -9,15 +9,18 @@ import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import {
+  itemUnknownNutrients,
+  knownLabel,
   loggedBasis,
+  NUTRIENT_KEYS,
   roundMacros,
   scaleMacros,
   servingCountLabel,
   servingPluralCount,
   SERVING_STEPS,
-  knownLabel,
 } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
+import type { NutrientKey } from '@/lib/types';
 
 /**
  * Correct the portion on something already eaten.
@@ -75,11 +78,33 @@ export default function EditPortion() {
   const current = { calories: item.calories, proteinG: item.proteinG, carbsG: item.carbsG, fatG: item.fatG };
   // Rescaled from the unrounded basis, so editing five times lands exactly
   // where editing once would.
-  const next = roundMacros(scaleMacros(basis, servings));
+  const exactNext = scaleMacros(basis, servings);
+  const next = roundMacros(exactNext);
   const changed = servings !== item.recipeServings;
-  const delta = next.calories - current.calories;
-  // The snapshot's unknown values stay unknown after a correction (section 7).
-  const incompleteKcal = item.incompleteNutrients ? item.incompleteNutrients.includes('calories') : !!item.nutritionIncomplete;
+  // Full precision internally: the difference between two unrounded amounts,
+  // rounded once for display, so ¼ → ½ → 1 never accumulates a stray calorie.
+  const delta = Math.round(exactNext.calories - scaleMacros(basis, item.recipeServings ?? 1).calories);
+  // The snapshot's unknown values stay unknown after a correction (section 7),
+  // and each nutrient is judged on its own: a recipe missing only its fat
+  // still has a fully known calorie figure.
+  const unknown = itemUnknownNutrients(item);
+  const incompleteKcal = unknown.includes('calories');
+  const kl = (v: number, k: NutrientKey) => knownLabel(v, unknown.includes(k));
+  const nothingKnown = (m: typeof current) => unknown.length === NUTRIENT_KEYS.length && NUTRIENT_KEYS.every((k) => m[k] === 0);
+  const nutrientName: Record<NutrientKey, string> = {
+    calories: t('foodEdit.calories'),
+    proteinG: t('home.protein'),
+    carbsG: t('home.carbs'),
+    fatG: t('home.fat'),
+  };
+  const unknownList = unknown.map((k) => nutrientName[k]).join(t('nutrition.listSeparator'));
+  /** "{portion} · 420 kcal", "{portion} · ≥420 kcal", or "{portion} · Unknown". */
+  const headline = (portion: string, kcal: number) =>
+    incompleteKcal && kcal === 0 ? `${portion} · ${t('nutrition.unknown')}` : `${portion} · ${kl(kcal, 'calories')} ${t('common.kcal')}`;
+  const macroLine = (m: typeof current) =>
+    nothingKnown(m)
+      ? t('nutrition.nothingKnown')
+      : t('recipe.portionMacros', { kcal: kl(m.calories, 'calories'), protein: kl(m.proteinG, 'proteinG'), carbs: kl(m.carbsG, 'carbsG'), fat: kl(m.fatG, 'fatG') });
 
   const save = () => {
     const items = meal.items.map((it, i) =>
@@ -120,17 +145,13 @@ export default function EditPortion() {
       {/* What is on record right now. */}
       <Card style={{ gap: 4 }}>
         <Text style={[Type.caption, { color: theme.textSecondary }]}>{t('editPortion.currently')}</Text>
-        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16 }}>
-          {portionLabel(item.recipeServings ?? 1)} · {current.calories} {t('common.kcal')}
-        </Text>
-        <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-          {t('recipe.portionMacros', {
-            kcal: current.calories,
-            protein: current.proteinG,
-            carbs: current.carbsG,
-            fat: current.fatG,
-          })}
-        </Text>
+        <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16 }}>{headline(portionLabel(item.recipeServings ?? 1), current.calories)}</Text>
+        <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{macroLine(current)}</Text>
+        {unknown.length > 0 && (
+          <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17 }}>
+            {unknown.length === NUTRIENT_KEYS.length ? t('nutrition.allUnknownNote') : t('nutrition.knownSubtotalNote', { list: unknownList })}
+          </Text>
+        )}
       </Card>
 
       {/* The correction. */}
@@ -166,17 +187,23 @@ export default function EditPortion() {
       {/* What it becomes, before saving. */}
       <Card style={{ marginTop: Spacing.md, gap: Spacing.sm }}>
         <Text style={{ color: theme.text, fontWeight: '700' }}>
-          {t('editPortion.changesTo', { portion: portionLabel(servings), kcal: knownLabel(next.calories, incompleteKcal) })}
-          {changed ? ` · ${delta >= 0 ? '+' : ''}${delta} ${t('common.kcal')}` : ''}
+          {incompleteKcal && next.calories === 0
+            ? t('editPortion.changesToUnknown', { portion: portionLabel(servings) })
+            : t('editPortion.changesTo', { portion: portionLabel(servings), kcal: kl(next.calories, 'calories') })}
+          {changed && !incompleteKcal ? ` · ${delta >= 0 ? '+' : ''}${delta} ${t('common.kcal')}` : ''}
         </Text>
-        <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-          {t('recipe.portionMacros', {
-            kcal: next.calories,
-            protein: next.proteinG,
-            carbs: next.carbsG,
-            fat: next.fatG,
-          })}
-        </Text>
+        {changed && incompleteKcal && (
+          // A subtotal's change is a subtotal's change — never presented as
+          // the exact calorie difference of a meal whose total is unknown.
+          <Text style={{ color: theme.text, fontSize: 13 }}>
+            <Text style={{ color: theme.textSecondary }}>{t('nutrition.changeKnown')}: </Text>
+            <Text style={{ fontWeight: '700' }}>
+              {delta >= 0 ? '+' : ''}
+              {delta} {t('common.kcal')}
+            </Text>
+          </Text>
+        )}
+        <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{macroLine(next)}</Text>
         <View style={styles.note}>
           <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
           <Text style={{ color: theme.textTertiary, fontSize: 12, flex: 1 }}>

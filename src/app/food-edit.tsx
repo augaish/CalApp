@@ -17,12 +17,29 @@ import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { pastFoods, suggestFoods } from '@/lib/food-history';
 import { normalizeDigits } from '@/lib/numbers';
 import { usePending } from '@/lib/pending';
+import { incompleteFlags, itemUnknownNutrients, knownLabel, NUTRIENT_KEYS } from '@/lib/recipes';
 import { mealTypeForNow, useAppStore } from '@/lib/store';
-import type { FoodItem, MealType } from '@/lib/types';
+import type { FoodItem, MealType, NutrientKey } from '@/lib/types';
 
 type Basis = 'serving' | 'per100';
+type Macros = { calories: number; proteinG: number; carbsG: number; fatG: number };
 
-const num = (s: string) => parseInt(s, 10) || 0;
+/**
+ * A typed value, or null for a field left blank. Blank is unknown, not zero:
+ * "0" is a genuine zero the person entered, "" is a value they never had.
+ * Decimals are kept ("12.5"); the inputs already normalise Arabic-Indic
+ * digits and the Arabic decimal separator before this runs.
+ */
+const parseField = (s: string): number | null => {
+  const text = s.trim();
+  if (!text) return null;
+  const n = parseFloat(text);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+
+/** Prefill text for a stored value — blank when the record marks it unknown. */
+const fieldText = (item: FoodItem, key: NutrientKey, base?: Macros): string =>
+  itemUnknownNutrients(item).includes(key) ? '' : String(Math.round((base ?? item)[key] * 10) / 10);
 
 /**
  * S29 Manual food entry — the structured review form behind "Enter food
@@ -51,10 +68,10 @@ export default function FoodEdit() {
   const [basis, setBasis] = useState<Basis>(draft?.basePer100 ? 'per100' : 'serving');
   const [grams, setGrams] = useState(draft?.gramsEaten ? String(Math.round(draft.gramsEaten)) : '');
   const base = draft?.basePer100;
-  const [calories, setCalories] = useState(draft ? String(Math.round(base ? base.calories : draft.calories)) : '');
-  const [protein, setProtein] = useState(draft ? String(Math.round(base ? base.proteinG : draft.proteinG)) : '');
-  const [carbs, setCarbs] = useState(draft ? String(Math.round(base ? base.carbsG : draft.carbsG)) : '');
-  const [fat, setFat] = useState(draft ? String(Math.round(base ? base.fatG : draft.fatG)) : '');
+  const [calories, setCalories] = useState(draft ? fieldText(draft, 'calories', base) : '');
+  const [protein, setProtein] = useState(draft ? fieldText(draft, 'proteinG', base) : '');
+  const [carbs, setCarbs] = useState(draft ? fieldText(draft, 'carbsG', base) : '');
+  const [fat, setFat] = useState(draft ? fieldText(draft, 'fatG', base) : '');
   const [mealType, setMealType] = useState<MealType>(
     () => usePending.getState().consumeMealTypeHint() ?? mealTypeForNow(),
   );
@@ -67,29 +84,44 @@ export default function FoodEdit() {
     lightHaptic();
     setName(item.name);
     setPortion(item.portion ?? '');
-    if (item.basePer100) {
+    const b = item.basePer100;
+    if (b) {
       setBasis('per100');
       setGrams(item.gramsEaten ? String(Math.round(item.gramsEaten)) : '100');
-      setCalories(String(Math.round(item.basePer100.calories)));
-      setProtein(String(Math.round(item.basePer100.proteinG)));
-      setCarbs(String(Math.round(item.basePer100.carbsG)));
-      setFat(String(Math.round(item.basePer100.fatG)));
     } else {
       setBasis('serving');
-      setCalories(String(Math.round(item.calories)));
-      setProtein(String(Math.round(item.proteinG)));
-      setCarbs(String(Math.round(item.carbsG)));
-      setFat(String(Math.round(item.fatG)));
     }
+    // A value that was unknown when it was logged comes back blank, not 0.
+    setCalories(fieldText(item, 'calories', b));
+    setProtein(fieldText(item, 'proteinG', b));
+    setCarbs(fieldText(item, 'carbsG', b));
+    setFat(fieldText(item, 'fatG', b));
   };
 
-  const gramsN = num(grams);
+  const gramsN = parseField(grams) ?? 0;
   const factor = basis === 'per100' ? gramsN / 100 : 1;
+  // What was actually typed, nutrient by nutrient. A blank stays unknown and
+  // is carried into the saved entry as such; only the values entered count.
+  const entered: Record<NutrientKey, number | null> = {
+    calories: parseField(calories),
+    proteinG: parseField(protein),
+    carbsG: parseField(carbs),
+    fatG: parseField(fat),
+  };
+  const unknown = NUTRIENT_KEYS.filter((k) => entered[k] == null);
+  const nutrientName: Record<NutrientKey, string> = {
+    calories: t('foodEdit.calories'),
+    proteinG: t('home.protein'),
+    carbsG: t('home.carbs'),
+    fatG: t('home.fat'),
+  };
+  const unknownList = unknown.map((k) => nutrientName[k]).join(t('nutrition.listSeparator'));
+  const kl = (v: number, k: NutrientKey) => knownLabel(v, unknown.includes(k));
   const totals = {
-    calories: Math.round(num(calories) * factor),
-    proteinG: Math.round(num(protein) * factor),
-    carbsG: Math.round(num(carbs) * factor),
-    fatG: Math.round(num(fat) * factor),
+    calories: Math.round((entered.calories ?? 0) * factor),
+    proteinG: Math.round((entered.proteinG ?? 0) * factor),
+    carbsG: Math.round((entered.carbsG ?? 0) * factor),
+    fatG: Math.round((entered.fatG ?? 0) * factor),
   };
 
   const save = () => {
@@ -105,8 +137,20 @@ export default function FoodEdit() {
       name: name.trim(),
       portion: portion.trim() || (basis === 'per100' ? `${gramsN} ${t('common.grams')}` : '1'),
       ...totals,
+      // The missing-value status travels with the entry, so the diary row,
+      // the day's totals and the weekly review show a known subtotal rather
+      // than a false zero.
+      ...incompleteFlags(unknown),
       ...(basis === 'per100'
-        ? { basePer100: { calories: num(calories), proteinG: num(protein), carbsG: num(carbs), fatG: num(fat) }, gramsEaten: gramsN }
+        ? {
+            basePer100: {
+              calories: entered.calories ?? 0,
+              proteinG: entered.proteinG ?? 0,
+              carbsG: entered.carbsG ?? 0,
+              fatG: entered.fatG ?? 0,
+            },
+            gramsEaten: gramsN,
+          }
         : {}),
     };
     logMeal([item], capturedPhoto ?? undefined, mealType, timestampFor(viewDay));
@@ -212,29 +256,36 @@ export default function FoodEdit() {
         label={basis === 'per100' ? t('foodEdit.caloriesPer100') : t('foodEdit.calories')}
         value={calories}
         onChangeText={(v) => setCalories(normalizeDigits(v))}
-        keyboardType="number-pad"
-        maxLength={5}
+        keyboardType="decimal-pad"
+        maxLength={7}
         suffix={t('common.kcal')}
       />
       <View style={styles.row}>
         <View style={styles.flex}>
-          <Field label={t('home.protein')} value={protein} onChangeText={(v) => setProtein(normalizeDigits(v))} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
+          <Field label={t('home.protein')} value={protein} onChangeText={(v) => setProtein(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={6} suffix={t('common.grams')} />
         </View>
         <View style={styles.flex}>
-          <Field label={t('home.carbs')} value={carbs} onChangeText={(v) => setCarbs(normalizeDigits(v))} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
+          <Field label={t('home.carbs')} value={carbs} onChangeText={(v) => setCarbs(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={6} suffix={t('common.grams')} />
         </View>
         <View style={styles.flex}>
-          <Field label={t('home.fat')} value={fat} onChangeText={(v) => setFat(normalizeDigits(v))} keyboardType="number-pad" maxLength={4} suffix={t('common.grams')} />
+          <Field label={t('home.fat')} value={fat} onChangeText={(v) => setFat(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={6} suffix={t('common.grams')} />
         </View>
       </View>
+
+      {unknown.length > 0 && (
+        <View style={[styles.blank, { backgroundColor: theme.cardSubtle }]}>
+          <Ionicons name="help-circle-outline" size={15} color={theme.textSecondary} />
+          <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17, flex: 1 }}>{t('foodEdit.blankNote', { list: unknownList })}</Text>
+        </View>
+      )}
 
       {basis === 'per100' && gramsN > 0 && (
         <View style={[styles.totals, { backgroundColor: theme.surfaceTint }]}>
           <Text style={{ color: theme.primaryDark, fontWeight: '700', fontSize: 14 }}>
-            {t('foodEdit.thisServing', { grams: gramsN, kcal: totals.calories })}
+            {t('foodEdit.thisServing', { grams: gramsN, kcal: kl(totals.calories, 'calories') })}
           </Text>
           <Text style={{ color: theme.primaryDark, fontSize: 13 }}>
-            {t('home.protein')} {totals.proteinG} {t('common.grams')} · {t('home.carbs')} {totals.carbsG} {t('common.grams')} · {t('home.fat')} {totals.fatG} {t('common.grams')}
+            {t('home.protein')} {kl(totals.proteinG, 'proteinG')} {t('common.grams')} · {t('home.carbs')} {kl(totals.carbsG, 'carbsG')} {t('common.grams')} · {t('home.fat')} {kl(totals.fatG, 'fatG')} {t('common.grams')}
           </Text>
         </View>
       )}
@@ -272,5 +323,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', gap: Spacing.sm },
   flex: { flex: 1 },
   totals: { borderRadius: Radius.control, padding: Spacing.ms, marginBottom: Spacing.md, gap: 2 },
+  blank: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.control, padding: 10, marginTop: -Spacing.xs, marginBottom: Spacing.md },
   dateRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: Spacing.md, minHeight: 32 },
 });

@@ -14,6 +14,7 @@ import { successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
+import { incompleteFlags, itemUnknownNutrients } from '@/lib/recipes';
 import type { FoodItem, MealAnalysis, MealType } from '@/lib/types';
 
 const PORTIONS: { m: number; label: string }[] = [
@@ -85,10 +86,16 @@ export default function MealEdit() {
       prev.map((item, i) => {
         if (i !== index) return item;
         const next = { ...item, ...patch };
-        // Editing a macro by hand breaks the auto-scale link.
+        // Editing a macro by hand breaks the auto-scale link — and a value
+        // the person typed is known from then on, while the untouched
+        // unknowns stay unknown.
         if ('calories' in patch || 'proteinG' in patch || 'carbsG' in patch || 'fatG' in patch) {
           delete next.basePer100;
           delete next.portionMultiplier;
+          const stillUnknown = itemUnknownNutrients(item).filter((k) => !(k in patch));
+          delete next.nutritionIncomplete;
+          delete next.incompleteNutrients;
+          Object.assign(next, incompleteFlags(stillUnknown));
         }
         return next;
       }),

@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
-import { Chip, DeltaRows, IconTile, InfoLine } from '@/components/system';
+import { ChangeSummary, Chip, IconTile, InfoLine } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -77,13 +77,27 @@ export default function Reschedule() {
   if (collision && resolution.kind === 'move') moves.push({ originalDate: collision.originalDate, weekday: collision.weekday, to: resolution.to });
   if (collision && resolution.kind === 'skip') moves.push({ originalDate: collision.originalDate, weekday: collision.weekday, to: null });
 
+  // One stacked block per affected workout: name, original date, then the
+  // new date or outcome — separate lines, so an Arabic title and an English
+  // date never share (and fight over) one row.
   const affected = [
-    { label: `${name} · ${long(moving.originalDate)}`, value: to === originalDate ? t('reschedule.unchanged') : long(to), emphasis: true },
+    {
+      key: 'moving',
+      title: name,
+      from: { label: t('reschedule.fromLabel'), value: long(moving.originalDate) },
+      to: { label: t('reschedule.toLabel'), value: to === originalDate ? t('reschedule.unchanged') : long(to) },
+      emphasis: true,
+    },
     ...(collision
       ? [
           {
-            label: `${collisionName} · ${long(collision.originalDate)}`,
-            value: resolution.kind === 'move' ? long(resolution.to) : resolution.kind === 'skip' ? t('reschedule.skip') : t('reschedule.keepBoth'),
+            key: 'collision',
+            title: collisionName,
+            from: { label: t('reschedule.fromLabel'), value: long(collision.originalDate) },
+            to:
+              resolution.kind === 'move'
+                ? { label: t('reschedule.toLabel'), value: long(resolution.to) }
+                : { label: t('reschedule.outcomeLabel'), value: resolution.kind === 'skip' ? t('reschedule.skip') : t('reschedule.keepBoth') },
           },
         ]
       : []),
@@ -174,7 +188,7 @@ export default function Reschedule() {
         </View>
       </View>
 
-      <DeltaRows rows={affected} note={unresolved ? t('reschedule.keepBothNote') : t('reschedule.thisOccurrenceOnly')} />
+      <ChangeSummary items={affected} note={unresolved ? t('reschedule.keepBothNote') : t('reschedule.thisOccurrenceOnly')} />
 
       {collision && (
         <View style={[styles.card, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.warningText }, cardShadow(theme.shadow)]}>

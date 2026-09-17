@@ -343,7 +343,8 @@ export function ActionButton({
       style={({ pressed }) => [styles.action, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, pressed && { opacity: 0.85 }, style]}
     >
       {icon && <Ionicons name={icon} size={17} color={fg} />}
-      <Text style={{ color: fg, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
+      {/* Two lines before any clipping: an action label that ends in an ellipsis is not an action label. */}
+      <Text style={{ color: fg, fontWeight: '700', fontSize: 14, textAlign: 'center', flexShrink: 1 }} numberOfLines={2}>
         {label}
       </Text>
     </Pressable>
@@ -473,6 +474,52 @@ export function DeltaRows({
   );
 }
 
+/**
+ * C07 variant for changes that do not fit on one line: each affected item is
+ * a stacked block — its name, then the original value, then the new value or
+ * outcome — every line wrapping on its own. Built for the reschedule summary,
+ * where an Arabic workout name next to an English date overlapped in a
+ * label/value row.
+ */
+export function ChangeSummary({
+  items,
+  note,
+}: {
+  items: { key: string; title: string; from: { label: string; value: string }; to: { label: string; value: string }; emphasis?: boolean }[];
+  note?: string;
+}) {
+  const theme = useTheme();
+  return (
+    <View style={[styles.delta, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+      {items.map((item, i) => (
+        <View
+          key={item.key}
+          style={[styles.changeBlock, i < items.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.border }]}
+          accessible
+          accessibilityLabel={`${item.title}. ${item.from.label}: ${item.from.value}. ${item.to.label}: ${item.to.value}`}
+        >
+          <Text style={{ color: theme.text, fontSize: item.emphasis ? 16 : 15, fontWeight: '800' }}>{item.title}</Text>
+          <View style={styles.changeLine}>
+            <Text style={[Type.caption, { color: theme.textSecondary }]}>{item.from.label}</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 14, fontWeight: '600' }}>{item.from.value}</Text>
+          </View>
+          <View style={styles.changeLine}>
+            <Text style={[Type.caption, { color: theme.textSecondary }]}>{item.to.label}</Text>
+            {/* Neutral ink on purpose: a change is information, not a verdict. */}
+            <Text style={{ color: theme.text, fontSize: item.emphasis ? 16 : 14, fontWeight: '800' }}>{item.to.value}</Text>
+          </View>
+        </View>
+      ))}
+      {!!note && (
+        <View style={[styles.deltaNote, { backgroundColor: theme.surfaceTint }]}>
+          <Ionicons name="information-circle-outline" size={15} color={theme.primaryDark} />
+          <Text style={{ color: theme.primaryDark, fontSize: 12, flex: 1 }}>{note}</Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 /** Seven-day strip; `selected` is compared by calendar day. */
 export function DayStrip({
   days,
@@ -562,6 +609,8 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4 },
   delta: { borderRadius: Radius.module, paddingHorizontal: Spacing.md, paddingTop: 2, marginBottom: Spacing.md },
   deltaRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.ms },
+  changeBlock: { paddingVertical: Spacing.ms, gap: 6 },
+  changeLine: { gap: 1 },
   deltaNote: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 10, borderRadius: Radius.control, marginBottom: Spacing.md },
   dayStrip: { flexDirection: 'row', gap: 6 },
   day: { flex: 1, alignItems: 'center', borderRadius: Radius.control, paddingVertical: 8, gap: 2, minHeight: TOUCH },

@@ -113,6 +113,7 @@ import {
   programPrompt,
   recipePrompt,
   refineMealPrompt,
+  JSON_ONLY_REMINDER,
   textMealPrompt,
   type Language,
 } from './prompts.js';
@@ -1228,6 +1229,17 @@ app.post('/api/analyze-text', async (c) => {
     let response;
     try {
       response = await anthropic.messages.create({ ...request, tools: [WEB_SEARCH_TOOL] });
+      // A server-tool turn can come back paused mid-search; continue it (a
+      // couple of times at most) rather than treating the half-turn as the
+      // answer, which had no JSON in it and surfaced as "could not read".
+      for (let turns = 0; response.stop_reason === 'pause_turn' && turns < 2; turns++) {
+        await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
+        response = await anthropic.messages.create({
+          ...request,
+          tools: [WEB_SEARCH_TOOL],
+          messages: [...request.messages, { role: 'assistant' as const, content: response.content as Anthropic.MessageParam['content'] }],
+        });
+      }
     } catch (err) {
       // Web search is an org-level Console setting; a disabled account must
       // still get its meal estimated, just without a restaurant lookup.
@@ -1236,7 +1248,27 @@ app.post('/api/analyze-text', async (c) => {
       response = await anthropic.messages.create(request);
     }
     await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
-    return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
+    try {
+      return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
+    } catch (parseErr) {
+      // No usable JSON (a search turn that ended in prose, or a cut-off
+      // answer). One retry without tools and with a JSON-only reminder before
+      // giving up — and the head of what came back is logged, because until
+      // now this failure was invisible on the server too.
+      const head = response.content
+        .map((b) => (b.type === 'text' ? b.text.slice(0, 160) : `<${b.type}>`))
+        .join(' | ')
+        .slice(0, 400);
+      console.warn(
+        `analyze-text reply unparseable (${parseErr instanceof Error ? parseErr.message.slice(0, 120) : parseErr}); stop=${response.stop_reason}; head: ${head}. Retrying without web search.`,
+      );
+      const retry = await anthropic.messages.create({
+        ...request,
+        messages: [{ role: 'user' as const, content: textMealPrompt(language, text) + JSON_ONLY_REMINDER }],
+      });
+      await trackUsage({ ref, kind: 'describe' }, request.model, retry.usage);
+      return c.json(toMealAnalysis(replyText(retry)));
+    }
   } catch (err) {
     // The text is logged (trimmed) because the failures worth fixing here are
     // all about what the user wrote, and they are invisible otherwise.

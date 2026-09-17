@@ -28,7 +28,7 @@ import { timestampFor, useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { usePending } from '@/lib/pending';
-import { isEstimated } from '@/lib/recipes';
+import { isEstimated, itemUnknownNutrients, knownLabel } from '@/lib/recipes';
 import {
   dateKey,
   isSameDay,
@@ -40,7 +40,7 @@ import {
   totalsForDay,
   useAppStore,
 } from '@/lib/store';
-import type { FastingSession, LoggedMeal, MealType } from '@/lib/types';
+import type { FastingSession, LoggedMeal, MealType, NutrientKey } from '@/lib/types';
 import { useAllRecipes } from '@/lib/use-recipes';
 
 /** Xh Ym — same coarse-duration format the fasting screen itself uses. */
@@ -76,6 +76,10 @@ function weekOf(day: Date): Date[] {
 }
 
 const MEAL_TYPES: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
+
+/** A planned meal whose calories are a known subtotal (a recipe with unrecorded nutrition). */
+const plannedKcalUnknown = (meal: { items: { nutritionIncomplete?: true; incompleteNutrients?: NutrientKey[] }[] }) =>
+  meal.items.some((i) => itemUnknownNutrients(i).includes('calories'));
 
 /**
  * S02 Food — the day's diary (Today) and the day's plan (Meal plan) as local
@@ -197,10 +201,11 @@ export default function Food() {
   );
 
   const header = (
-    <BrandHeader
-      title={t('tabs.food')}
-      showLogo={false}
-      extra={
+    // The brand row keeps the Calgym logo, AI Support and Profile like every
+    // root screen (C02); the date control gets its own compact row beneath
+    // rather than crowding the brand out.
+    <BrandHeader title={t('tabs.food')}>
+      <View style={styles.dateRow}>
         <HeaderPill
           icon="calendar-outline"
           label={selectedIsToday ? t('home.today') : shortDate}
@@ -208,9 +213,7 @@ export default function Food() {
           onPress={() => router.push('/calendar')}
           accessibilityLabel={t('food.chooseDay')}
         />
-      }
-    >
-      <View style={{ height: Spacing.md }} />
+      </View>
     </BrandHeader>
   );
 
@@ -361,7 +364,7 @@ export default function Food() {
                       </Text>
                       <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
                         {planned.items.length === 1 && planned.items[0].portion ? `${planned.items[0].portion} · ` : ''}
-                        {num(plannedMealCalories(planned))} {t('common.kcal')}
+                        {knownLabel(num(plannedMealCalories(planned)), plannedKcalUnknown(planned))} {t('common.kcal')}
                       </Text>
                       {(plannedRecipe ? isEstimated(plannedRecipe) : false) && (
                         <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('recipe.estimated')}</Text>
@@ -377,18 +380,11 @@ export default function Food() {
                       <ActionButton label={t('mealPlan.undo')} icon="arrow-undo" variant="secondary" onPress={undoPlanned} />
                     </View>
                   ) : (
-                    <View style={styles.actions}>
-                      <ActionButton
-                        label={rid ? t('mealPlan.viewRecipe') : t('mealPlan.addRecipe')}
-                        variant="secondary"
-                        style={{ flex: 1, backgroundColor: theme.card }}
-                        onPress={() =>
-                          router.push(rid ? `/recipe?id=${encodeURIComponent(rid)}&day=${key}&slot=${type}` : `/recipes?day=${key}&slot=${type}`)
-                        }
-                      />
+                    // The primary action owns a full row so its label is never
+                    // clipped in either language; secondary actions sit underneath.
+                    <View style={styles.actionStack}>
                       <ActionButton
                         label={t('mealPlan.logEaten')}
-                        style={{ flex: 1 }}
                         onPress={() => {
                           // A recipe-backed meal has a portion to review (S13);
                           // a programme meal without one logs as planned, with Undo.
@@ -396,6 +392,16 @@ export default function Food() {
                           else logPlanned(type, selected);
                         }}
                       />
+                      <View style={styles.actions}>
+                        <ActionButton
+                          label={rid ? t('mealPlan.viewRecipe') : t('mealPlan.addRecipe')}
+                          variant="secondary"
+                          style={{ flex: 1, backgroundColor: theme.card }}
+                          onPress={() =>
+                            router.push(rid ? `/recipe?id=${encodeURIComponent(rid)}&day=${key}&slot=${type}` : `/recipes?day=${key}&slot=${type}`)
+                          }
+                        />
+                      </View>
                     </View>
                   )}
                 </View>
@@ -438,6 +444,11 @@ export default function Food() {
                   meal.items.map((item, itemIndex) => {
                     const first = mi === 0 && itemIndex === 0;
                     const rec = recipeFor(item.recipeId);
+                    // Same completeness rule as the portion editor: a known
+                    // subtotal reads "≥", and nothing known reads "Unknown".
+                    const unknown = itemUnknownNutrients(item);
+                    const kcalUnknown = unknown.includes('calories');
+                    const kcalLabel = kcalUnknown && item.calories === 0 ? t('nutrition.unknown') : `${knownLabel(num(item.calories), kcalUnknown)} ${t('common.kcal')}`;
                     return (
                       <Pressable
                         key={`${meal.id}-${itemIndex}`}
@@ -450,7 +461,7 @@ export default function Food() {
                         }
                         onLongPress={() => (meal.items.length > 1 ? confirmDeleteItem(meal, itemIndex) : confirmDelete(meal.id))}
                         accessibilityRole="button"
-                        accessibilityLabel={`${item.name} · ${num(item.calories)} ${t('common.kcal')} · ${t('mealPlan.logged')}`}
+                        accessibilityLabel={`${item.name} · ${kcalLabel} · ${unknown.length > 0 ? t('mealPlan.incomplete') : t('mealPlan.logged')}`}
                         style={({ pressed }) => [
                           styles.mealRow,
                           !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
@@ -467,12 +478,13 @@ export default function Food() {
                           <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }} numberOfLines={2}>
                             {item.name}
                           </Text>
-                          <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
+                          {/* Two lines so the completeness marker is never the part that gets clipped. */}
+                          <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={2}>
                             {item.portion ? `${item.portion} · ` : ''}
-                            {num(item.calories)} {t('common.kcal')}
+                            {kcalLabel}
                           </Text>
                         </View>
-                        {item.nutritionIncomplete ? (
+                        {unknown.length > 0 ? (
                           <StatusPill label={t('mealPlan.incomplete')} tone="review" icon="alert-circle-outline" />
                         ) : (
                           <StatusPill label={t('mealPlan.logged')} tone="logged" icon="checkmark" />
@@ -619,7 +631,7 @@ function PlanDay({
                     </Text>
                     <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
                       {meal.items.length === 1 && meal.items[0].portion ? `${meal.items[0].portion} · ` : ''}
-                      {num(plannedMealCalories(meal))} {t('common.kcal')}
+                      {knownLabel(num(plannedMealCalories(meal)), plannedKcalUnknown(meal))} {t('common.kcal')}
                     </Text>
                   </>
                 ) : (
@@ -627,39 +639,41 @@ function PlanDay({
                 )}
               </View>
             </View>
-            <View style={[styles.actions, { marginTop: Spacing.sm }]}>
-              <ActionButton
-                label={recipeId ? t('mealPlan.viewRecipe') : meal ? t('mealPlan.addRecipe') : t('food.planSlot', { meal: slotLabel })}
-                variant="secondary"
-                icon={recipeId ? undefined : 'add'}
-                style={{ flex: 1 }}
-                onPress={() =>
-                  router.push(recipeId ? `/recipe?id=${encodeURIComponent(recipeId)}&day=${key}&slot=${slot}` : `/recipes?day=${key}&slot=${slot}`)
-                }
-              />
-              {meal && (
-                <ActionButton
-                  label={t('mealPlan.swap')}
-                  variant="secondary"
-                  icon="swap-horizontal"
-                  style={{ flex: 1 }}
-                  onPress={() => {
-                    // A programme slot swaps with another weekday's meal; a
-                    // date-planned recipe swaps by choosing another recipe.
-                    if (swapOptions(slot).length > 1) setSwapping(swapping === slot ? null : slot);
-                    else router.push(`/recipes?day=${key}&slot=${slot}`);
-                  }}
-                />
-              )}
+            <View style={[styles.actionStack, { marginTop: Spacing.sm }]}>
+              {/* Primary action on its own row; View recipe and Swap share the row beneath. */}
               {meal && isToday && (
                 <ActionButton
                   label={t('mealPlan.logEaten')}
-                  style={{ flex: 1 }}
                   onPress={() =>
                     recipeId ? router.push(`/log-portion?recipeId=${encodeURIComponent(recipeId)}&slot=${slot}&day=${key}`) : onLog(slot)
                   }
                 />
               )}
+              <View style={styles.actions}>
+                <ActionButton
+                  label={recipeId ? t('mealPlan.viewRecipe') : meal ? t('mealPlan.addRecipe') : t('food.planSlot', { meal: slotLabel })}
+                  variant="secondary"
+                  icon={recipeId ? undefined : 'add'}
+                  style={{ flex: 1 }}
+                  onPress={() =>
+                    router.push(recipeId ? `/recipe?id=${encodeURIComponent(recipeId)}&day=${key}&slot=${slot}` : `/recipes?day=${key}&slot=${slot}`)
+                  }
+                />
+                {meal && (
+                  <ActionButton
+                    label={t('mealPlan.swap')}
+                    variant="secondary"
+                    icon="swap-horizontal"
+                    style={{ flex: 1 }}
+                    onPress={() => {
+                      // A programme slot swaps with another weekday's meal; a
+                      // date-planned recipe swaps by choosing another recipe.
+                      if (swapOptions(slot).length > 1) setSwapping(swapping === slot ? null : slot);
+                      else router.push(`/recipes?day=${key}&slot=${slot}`);
+                    }}
+                  />
+                )}
+              </View>
             </View>
             {swapping === slot && options.length > 0 && (
               <View style={styles.swapList}>
@@ -727,6 +741,8 @@ const styles = StyleSheet.create({
   kcalRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 8 },
   tiles: { flexDirection: 'row', gap: Spacing.sm },
   actions: { flexDirection: 'row', gap: 8 },
+  actionStack: { gap: 8 },
+  dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm, marginBottom: Spacing.md + Spacing.xs },
   loggedNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 44 },
   mealRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, paddingVertical: Spacing.ms },
   addMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 44 },

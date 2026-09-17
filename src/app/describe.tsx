@@ -10,6 +10,7 @@ import { ApiError, analyzeText, isMockMode, QuotaError } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
+import { extractTypedNutrition, typedMealAnalysis } from '@/lib/typed-nutrition';
 
 export default function Describe() {
   const { t } = useTranslation();
@@ -43,6 +44,24 @@ export default function Describe() {
       // same description. A failed request and a rejected one need different
       // advice, so they get different messages.
       const reachedServer = err instanceof ApiError;
+      // A description that already states its calories (a menu's figures,
+      // say) does not need the estimate at all: offer to log those numbers
+      // exactly as typed, with the unstated nutrients kept unknown.
+      const typed = reachedServer ? extractTypedNutrition(text) : null;
+      if (typed) {
+        Alert.alert(t('describe.failedTitle'), `${t('describe.failed')}\n\n${t('describe.typedFound', { kcal: Math.round(typed.calories) })}`, [
+          { text: t('common.cancel'), style: 'cancel' },
+          {
+            text: t('describe.useTyped'),
+            onPress: () => {
+              setMeal(typedMealAnalysis(text.trim(), typed, t('describe.typedNote')), null);
+              router.replace('/meal-result');
+            },
+          },
+        ]);
+        setBusy(false);
+        return;
+      }
       Alert.alert(
         t('describe.failedTitle'),
         reachedServer ? t('describe.failed') : t('describe.offline'),

@@ -258,6 +258,21 @@ export function recipeUnknownNutrients(recipe: Pick<Recipe, 'ingredients'>): Nut
 }
 
 /**
+ * The nutrients of a logged entry that are a known subtotal rather than a
+ * total. Entries logged before the per-nutrient list existed carry only the
+ * boolean and count as all four, so nothing unknown is ever shown as zero.
+ */
+export function itemUnknownNutrients(item: Pick<FoodItem, 'nutritionIncomplete' | 'incompleteNutrients'>): NutrientKey[] {
+  if (item.incompleteNutrients) return item.incompleteNutrients;
+  return item.nutritionIncomplete ? NUTRIENT_KEYS : [];
+}
+
+/** The completeness flags for a saved entry, or nothing at all when every value is known. */
+export function incompleteFlags(unknown: NutrientKey[]): Pick<FoodItem, 'nutritionIncomplete' | 'incompleteNutrients'> {
+  return unknown.length > 0 ? { nutritionIncomplete: true, incompleteNutrients: unknown } : {};
+}
+
+/**
  * A figure for display when part of it may be unknown: the number when the
  * total is complete, "≥number" for a known subtotal, and a dash when nothing
  * at all is known (section 7: missing is unknown, not zero).

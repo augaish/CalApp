@@ -251,6 +251,7 @@ export function Field(props: TextInputProps & { label: string; suffix?: string }
       >
         <TextInput
           placeholderTextColor={t.textTertiary}
+          accessibilityLabel={label}
           {...rest}
           style={[styles.input, { color: t.text }, style]}
         />

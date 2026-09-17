@@ -3,7 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { categoryForMuscles, findExercise } from './exercises';
-import { perServing, roundMacros, scaleMacros, servingCountLabel } from './recipes';
+import { incompleteFlags, perServing, recipeUnknownNutrients, roundMacros, scaleMacros, servingCountLabel } from './recipes';
 import type { PlannedRecipeMeal } from './shopping';
 import { applyMoves, resolvePlan, undoOp, type OccurrenceMove } from './occurrences';
 import { dailyTargets } from './tdee';
@@ -2595,6 +2595,9 @@ export function plannedMealFromRecipe(
         portion: `${servingCountLabel(servings)}`,
         recipeId: recipe.id,
         recipeServings: servings,
+        // A recipe with unrecorded nutrition plans as a known subtotal, so a
+        // replacement preview never compares it as if it were complete.
+        ...incompleteFlags(recipeUnknownNutrients(recipe)),
       },
     ],
   };

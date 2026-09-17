@@ -12,9 +12,19 @@ import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
-import { perServing, recipeUnknownNutrients, roundMacros, scaleMacros, servingCountLabel, servingPluralCount, SERVING_STEPS } from '@/lib/recipes';
+import {
+  itemUnknownNutrients,
+  knownLabel,
+  perServing,
+  recipeUnknownNutrients,
+  roundMacros,
+  scaleMacros,
+  servingCountLabel,
+  servingPluralCount,
+  SERVING_STEPS,
+} from '@/lib/recipes';
 import { dateKey, plannedMealCalories, plannedMealFor, useAppStore } from '@/lib/store';
-import type { MealType } from '@/lib/types';
+import type { MealType, NutrientKey } from '@/lib/types';
 import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
 
 const MEAL_SLOTS: MealType[] = ['breakfast', 'lunch', 'dinner', 'snack'];
@@ -70,19 +80,40 @@ export default function PlanMeal() {
   // What the plan says for this slot right now. Untouched until Apply.
   const current = plannedMealFor(activeProgram?.mealPlan, day, slot, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id);
   const currentRecipe = current?.items[0]?.recipeId ? recipes.find((r) => r.id === current.items[0].recipeId) : undefined;
-  const currentKcal = current ? Math.round(plannedMealCalories(current)) : 0;
-  const next = roundMacros(scaleMacros(perServing(recipe), servings));
-  const kcalUnknown = recipeUnknownNutrients(recipe).includes('calories');
-  const delta = next.calories - currentKcal;
+  // Full precision on both sides; rounding happens once, at display.
+  const currentKcalExact = current ? plannedMealCalories(current) : 0;
+  const currentProteinExact = current ? current.items.reduce((s, i) => s + i.proteinG, 0) : 0;
+  const exactNext = scaleMacros(perServing(recipe), servings);
+  const next = roundMacros(exactNext);
+  // Completeness is judged per nutrient and per side: the planned meal's
+  // snapshot may be a known subtotal just as the new recipe may be.
+  const currentUnknown = new Set<NutrientKey>((current?.items ?? []).flatMap((i) => itemUnknownNutrients(i)));
+  const newUnknown = recipeUnknownNutrients(recipe);
+  const unknownEither = (k: NutrientKey) => currentUnknown.has(k) || newUnknown.includes(k);
+  const kcalUnknown = newUnknown.includes('calories');
+  const currentKcalUnknown = currentUnknown.has('calories');
+  const kcalChangeKnown = unknownEither('calories');
+  const delta = Math.round(exactNext.calories - currentKcalExact);
+  const proteinDelta = Math.round(exactNext.proteinG - currentProteinExact);
   const portionLabel = `${servingCountLabel(servings)} ${t('recipe.servingUnit', { count: servingPluralCount(servings) })}`;
 
   // The whole planned day, before and after — what a person budgets against.
-  const dayPlanned = MEAL_SLOTS.reduce((sum, sl) => {
-    const m = plannedMealFor(activeProgram?.mealPlan, day, sl, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id);
-    return sum + (m ? plannedMealCalories(m) : 0);
-  }, 0);
-  const dayAfter = dayPlanned - currentKcal + next.calories;
+  const dayMeals = MEAL_SLOTS.map((sl) => plannedMealFor(activeProgram?.mealPlan, day, sl, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id));
+  const dayPlanned = dayMeals.reduce((sum, m) => sum + (m ? plannedMealCalories(m) : 0), 0);
+  const dayUnknown = kcalUnknown || dayMeals.some((m) => m?.items.some((i) => itemUnknownNutrients(i).includes('calories')));
+  const dayAfter = dayPlanned - currentKcalExact + exactNext.calories;
   const sign = (n: number) => (n > 0 ? '+' : n < 0 ? '−' : '');
+  const subtotalTag = ` (${t('nutrition.knownSubtotalShort')})`;
+  // Which caveat the change needs: none, one side incomplete, or both — the
+  // last is never presented as the full nutritional difference.
+  const changeNote =
+    currentKcalUnknown && kcalUnknown
+      ? t('planMeal.bothIncompleteNote')
+      : kcalUnknown
+        ? t('planMeal.incompleteNote')
+        : currentKcalUnknown
+          ? t('planMeal.currentIncompleteNote')
+          : '';
 
   const apply = () => {
     if (activeProgram?.id !== programAtOpen) {
@@ -140,7 +171,7 @@ export default function PlanMeal() {
             </Text>
             {current && (
               <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-                {num(currentKcal)} {t('common.kcal')}
+                {knownLabel(num(currentKcalExact), currentKcalUnknown)} {t('common.kcal')}
               </Text>
             )}
           </View>
@@ -164,7 +195,7 @@ export default function PlanMeal() {
               {recipe.name}
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-              {portionLabel} · {kcalUnknown ? '≥' : ''}{num(next.calories)} {t('common.kcal')}
+              {portionLabel} · {knownLabel(num(next.calories), kcalUnknown)} {t('common.kcal')}
             </Text>
           </View>
         </View>
@@ -178,12 +209,17 @@ export default function PlanMeal() {
 
       <DeltaRows
         rows={[
-          { label: t('planMeal.difference'), value: `${kcalUnknown ? '≥' : ''}${sign(delta)}${num(Math.abs(delta))} ${t('common.kcal')}`, emphasis: true },
-          { label: t('planMeal.plannedDayLabel'), value: t('planMeal.plannedDayValue', { before: num(dayPlanned), after: num(dayAfter) }) },
-          { label: t('home.protein'), value: `${sign(next.proteinG - (current ? Math.round(current.items.reduce((s, i) => s + i.proteinG, 0)) : 0))}${Math.abs(next.proteinG - (current ? Math.round(current.items.reduce((s, i) => s + i.proteinG, 0)) : 0))} ${t('common.grams')}` },
+          // A difference between subtotals is labelled as exactly that — an
+          // incomplete meal never shows an unqualified exact calorie change.
+          { label: kcalChangeKnown ? t('nutrition.changeKnown') : t('planMeal.difference'), value: `${sign(delta)}${num(Math.abs(delta))} ${t('common.kcal')}`, emphasis: true },
+          {
+            label: `${t('planMeal.plannedDayLabel')}${dayUnknown ? subtotalTag : ''}`,
+            value: t('planMeal.plannedDayValue', { before: num(dayPlanned), after: num(dayAfter) }),
+          },
+          { label: `${t('home.protein')}${unknownEither('proteinG') ? subtotalTag : ''}`, value: `${sign(proteinDelta)}${Math.abs(proteinDelta)} ${t('common.grams')}` },
           { label: t('planMeal.source'), value: activeProgram ? t('program.title') : t('today.myPlan') },
         ]}
-        note={kcalUnknown ? `${t('planMeal.incompleteNote')} ${t('planMeal.thisDayOnly')}` : t('planMeal.thisDayOnly')}
+        note={changeNote ? `${changeNote} ${t('planMeal.thisDayOnly')}` : t('planMeal.thisDayOnly')}
       />
     </Screen>
   );
