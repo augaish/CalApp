@@ -10,6 +10,7 @@ import type {
   ActiveSession,
   ChatMessage,
   CoachReferenceDoc,
+  CoachShare,
   DailyTargets,
   Exercise,
   ExerciseType,
@@ -186,6 +187,9 @@ interface AppState {
   coachAppliedPlans: number[];
   /** Documents the user has taught the coach — see CoachReferenceDoc. */
   coachReferenceDocs: CoachReferenceDoc[];
+  /** S18 shared-context permissions: which of the person's own data the AI
+   * Support snapshot may include. Changed only from Manage shared context. */
+  coachShare: CoachShare;
   /** The fast currently running, if any — cleared once ended or cancelled. */
   activeFast: FastingSession | null;
   /** Completed fasts, most recent first. */
@@ -363,6 +367,7 @@ interface AppState {
   /** Adds a reference doc, evicting the oldest once at MAX_COACH_REFERENCE_DOCS. */
   addCoachReferenceDoc: (doc: Omit<CoachReferenceDoc, 'id' | 'addedAt'>) => void;
   removeCoachReferenceDoc: (docId: string) => void;
+  setCoachShare: (patch: Partial<CoachShare>) => void;
   /** Begins a new fast — replaces any already-active one (the UI should
    * never offer starting a second while one is running, but this stays a
    * plain overwrite rather than a no-op so it can't get stuck). */
@@ -464,6 +469,7 @@ export const useAppStore = create<AppState>()(
       coachMessages: [],
       coachAppliedPlans: [],
       coachReferenceDocs: [],
+      coachShare: { food: true, training: true, body: true, wearable: true },
       activeFast: null,
       fastingHistory: [],
       activeSession: null,
@@ -1143,6 +1149,7 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           coachReferenceDocs: s.coachReferenceDocs.filter((d) => d.id !== docId),
         })),
+      setCoachShare: (patch) => set((s) => ({ coachShare: { ...s.coachShare, ...patch } })),
       startFast: (protocol, targetHours) =>
         set({ activeFast: { id: id(), startedAt: new Date().toISOString(), protocol, targetHours } }),
       endFast: () =>
@@ -1263,6 +1270,7 @@ export const useAppStore = create<AppState>()(
         coachMessages,
         coachAppliedPlans,
         coachReferenceDocs,
+        coachShare,
         activeFast,
         fastingHistory,
         activeSession,
@@ -1303,6 +1311,7 @@ export const useAppStore = create<AppState>()(
         coachMessages,
         coachAppliedPlans,
         coachReferenceDocs,
+        coachShare,
         activeFast,
         fastingHistory,
         activeSession,

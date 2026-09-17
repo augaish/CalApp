@@ -290,7 +290,9 @@ fasting, when present, describes the user's intermittent-fasting habit:
 streakDays is consecutive days with a completed fast, and active (if set) is
 the fast running right now — its startedAt plus targetHours tells you when
 its eating window opens; do not assume the user is fasting unless this field
-says so.
+says so. focus, when present, names the area of the app the user opened
+AI Support from (food, training or health) — lean the reply toward that area
+unless the question is clearly about something else.
 
 Whenever an answer draws on this data, SAY SO EXPLICITLY by naming the actual
 figure(s) you are using (e.g. "You've logged 1,850 kcal today, 120 g

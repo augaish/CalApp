@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Field, Screen, Title } from '@/components/ui';
+import { PageHeader } from '@/components/brand-header';
+import { DeltaRows } from '@/components/system';
+import { Button, Field, Screen } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
@@ -19,6 +21,9 @@ export default function EditTargets() {
   const targets = useAppStore((s) => s.targets);
   const profile = useAppStore((s) => s.profile);
   const setTargets = useAppStore((s) => s.setTargets);
+  // S17 hands over a suggested calorie figure as a draft; nothing changes until Save.
+  const { suggested } = useLocalSearchParams<{ suggested?: string }>();
+  const suggestedKcal = parseInt(suggested ?? '', 10) || 0;
 
   const [calories, setCalories] = useState(String(targets?.calories ?? ''));
   const [protein, setProtein] = useState(String(targets?.proteinG ?? ''));
@@ -71,8 +76,25 @@ export default function EditTargets() {
   };
 
   return (
-    <Screen footer={<Button label={t('common.save')} icon="checkmark" onPress={save} />}>
-      <Title>{t('editTargets.title')}</Title>
+    <Screen header={<PageHeader title={t('editTargets.title')} close />} footer={<Button label={t('common.save')} icon="checkmark" onPress={save} />}>
+      {suggestedKcal > 0 && (
+        <DeltaRows
+          rows={[
+            { label: t('editTargets.currentTarget'), value: `${targets?.calories ?? '—'} ${t('common.kcal')}` },
+            { label: t('editTargets.suggestedTarget'), value: `${suggestedKcal} ${t('common.kcal')}`, emphasis: true },
+          ]}
+          note={t('editTargets.suggestedNote')}
+        />
+      )}
+      {suggestedKcal > 0 && String(suggestedKcal) !== calories && (
+        <Button
+          label={t('editTargets.useSuggested', { kcal: suggestedKcal })}
+          variant="secondary"
+          icon="bulb-outline"
+          onPress={() => setCalories(String(suggestedKcal))}
+          style={{ marginBottom: Spacing.md }}
+        />
+      )}
 
       <Field
         label={t('onboarding.dailyCalories')}

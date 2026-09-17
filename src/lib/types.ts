@@ -176,8 +176,27 @@ export interface WeightEntry {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** When it was sent (ISO). Older persisted messages have none. */
+  at?: string;
+  /** The area the question was asked from (S18 context tabs). */
+  focus?: CoachFocus;
   /** A proposed weekly schedule, rendered as a card the user can add with one tap. */
   schedulePlan?: CoachSchedulePlan;
+}
+
+/** S18 context tabs — which area a question is asked from. */
+export type CoachFocus = 'food' | 'training' | 'health';
+
+/** S18 shared-context permissions. */
+export interface CoachShare {
+  /** Meals, calories and macros by day. */
+  food: boolean;
+  /** Logged exercises with their times, burn and streaks. */
+  training: boolean;
+  /** Weight, body fat, muscle mass and tape measurements. */
+  body: boolean;
+  /** WHOOP recovery, sleep and strain. */
+  wearable: boolean;
 }
 
 /** A named fasting window — 'custom' pairs with a user-chosen targetHours

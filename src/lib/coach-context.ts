@@ -10,7 +10,7 @@ import {
   waterForDay,
   workoutStreakDays,
 } from './store';
-import type { BodyMeasurements, Language } from './types';
+import type { BodyMeasurements, CoachFocus, CoachShare, Language } from './types';
 
 /**
  * Compact snapshot of the user's own data, sent with each coach message so it
@@ -68,6 +68,8 @@ export interface CoachContext {
   /** Summaries of documents the user has taught the coach (training
    * programs, meal plans, body-composition reports) — see CoachReferenceDoc. */
   referenceDocs?: { name: string; summary: string }[];
+  /** S18: the area the person asked from — a hint, not a data source. */
+  focus?: CoachFocus;
 }
 
 function ymd(d: Date): string {
@@ -90,8 +92,10 @@ function hhmmss(iso: string): string {
 }
 
 /** Build the snapshot for the last `dayCount` days (today first). */
-export async function buildCoachContext(lang: Language, dayCount = 7): Promise<CoachContext> {
+export async function buildCoachContext(lang: Language, dayCount = 7, focus?: CoachFocus): Promise<CoachContext> {
   const s = useAppStore.getState();
+  // What may be shared is decided in Manage shared context (S18), never here.
+  const share: CoachShare = s.coachShare ?? { food: true, training: true, body: true, wearable: true };
   const days: CoachContext['days'] = [];
 
   for (let i = 0; i < dayCount; i++) {
@@ -118,19 +122,19 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
       });
     days.push({
       date: ymd(d),
-      calories: Math.round(totals.calories),
-      proteinG: Math.round(totals.proteinG),
-      carbsG: Math.round(totals.carbsG),
-      fatG: Math.round(totals.fatG),
-      burned: actualBurnedForDay(s.workouts, s.whoopBurnByDay, s.whoopWorkoutsByDay, d),
-      waterMl: waterForDay(s.water, d),
-      workouts: names.slice(0, 8),
+      calories: share.food ? Math.round(totals.calories) : 0,
+      proteinG: share.food ? Math.round(totals.proteinG) : 0,
+      carbsG: share.food ? Math.round(totals.carbsG) : 0,
+      fatG: share.food ? Math.round(totals.fatG) : 0,
+      burned: share.training ? actualBurnedForDay(s.workouts, s.whoopBurnByDay, s.whoopWorkoutsByDay, d) : 0,
+      waterMl: share.food ? waterForDay(s.water, d) : 0,
+      workouts: share.training ? names.slice(0, 8) : [],
     });
   }
 
   // A no-op single query when there's no connection — cheap enough to just
   // always ask rather than caching "are we connected" separately.
-  const whoopSummary = await fetchWhoopSummary();
+  const whoopSummary = share.wearable ? await fetchWhoopSummary() : null;
   const whoop =
     whoopSummary?.connected &&
     (whoopSummary.recoveryScore != null ||
@@ -148,7 +152,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
 
   // Only worth sending when it carries more than the bare weigh-in the
   // Overview screen logs — a plain kg entry adds nothing a program needs.
-  const latest = s.weights[0];
+  const latest = share.body ? s.weights[0] : undefined;
   const latestBodyReading =
     latest && (latest.bodyFatPercent != null || latest.skeletalMuscleMassKg != null || latest.measurementsCm)
       ? {
@@ -175,8 +179,8 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
       ? {
           sex: s.profile.sex,
           age: ageFrom(s.profile.birthDate),
-          heightCm: s.profile.heightCm,
-          weightKg: s.profile.weightKg,
+          heightCm: share.body ? s.profile.heightCm : undefined,
+          weightKg: share.body ? s.profile.weightKg : undefined,
           goal: s.profile.goal,
           activity: s.profile.activityLevel,
         }
@@ -190,13 +194,14 @@ export async function buildCoachContext(lang: Language, dayCount = 7): Promise<C
         }
       : undefined,
     days,
-    streakDays: streakDays(s.meals),
-    workoutStreakDays: workoutStreakDays(s.workouts),
+    streakDays: share.food ? streakDays(s.meals) : 0,
+    workoutStreakDays: share.training ? workoutStreakDays(s.workouts) : 0,
     whoop,
     latestBodyReading,
     fasting,
     referenceDocs: s.coachReferenceDocs.length
       ? s.coachReferenceDocs.map((d) => ({ name: d.name, summary: d.summary }))
       : undefined,
+    focus,
   };
 }

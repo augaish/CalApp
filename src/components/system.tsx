@@ -47,7 +47,7 @@ export function Segmented<K extends string>({
   onChange,
   style,
 }: {
-  options: { key: K; label: string }[];
+  options: { key: K; label: string; icon?: keyof typeof Ionicons.glyphMap }[];
   value: K;
   onChange: (key: K) => void;
   style?: StyleProp<ViewStyle>;
@@ -69,6 +69,7 @@ export function Segmented<K extends string>({
               pressed && !on && { opacity: 0.7 },
             ]}
           >
+            {o.icon && <Ionicons name={o.icon} size={16} color={on ? theme.onPrimary : theme.primaryDark} />}
             <Text style={{ color: on ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
               {o.label}
             </Text>
@@ -534,7 +535,7 @@ const styles = StyleSheet.create({
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.lg, marginBottom: Spacing.ms },
   sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 34, borderRadius: Radius.pill },
   segmented: { flexDirection: 'row', padding: 4, borderRadius: Radius.control + 4 },
-  segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.control },
+  segment: { flex: 1, minHeight: 40, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.control },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 36, borderRadius: Radius.pill },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 3, borderRadius: Radius.pill },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, paddingVertical: Spacing.ms, minHeight: 56 },
