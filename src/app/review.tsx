@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { buildWeeklyReview, reviewSuggestions } from '@/lib/review';
 import { dateKey, useAppStore } from '@/lib/store';
+import { formatWeight, formatWeightDelta } from '@/lib/units';
 
 /** The last seven days including today. Module-level so the clock is never read during render. */
 function lastSevenDays(): Date[] {
@@ -87,6 +88,7 @@ export default function Review() {
   const weights = useAppStore((s) => s.weights);
   const targets = useAppStore((s) => s.targets);
   const goal = useAppStore((s) => s.profile?.goal);
+  const units = useAppStore((s) => s.units);
 
   const [days] = useState(lastSevenDays);
   const [selected, setSelected] = useState(() => days[days.length - 1]);
@@ -169,11 +171,11 @@ export default function Review() {
       <SummaryRow
         icon="scale-outline"
         eyebrow={t('review.measurement')}
-        title={latestInRange ? t('review.latestWeight', { kg: latestInRange.kg.toFixed(1) }) : t('review.noReadingInRange')}
+        title={latestInRange ? t('review.latestWeight', { kg: formatWeight(latestInRange.kg, units, t) }) : t('review.noReadingInRange')}
         subtitle={
           latestInRange
             ? review.weightDeltaKg != null
-              ? `${short(new Date(latestInRange.at))} · ${review.weightDeltaKg > 0 ? '+' : ''}${review.weightDeltaKg.toFixed(1)} ${t('progress.kg')} ${t('review.sinceStart')}`
+              ? `${short(new Date(latestInRange.at))} · ${formatWeightDelta(review.weightDeltaKg, units, t)} ${t('review.sinceStart')}`
               : short(new Date(latestInRange.at))
             : t('review.addReadingHint')
         }

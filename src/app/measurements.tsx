@@ -21,6 +21,7 @@ import { ActionButton, Chip, EmptyState, InfoLine, SectionTitle } from '@/compon
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatWeight, kgToDisplay, weightUnit } from '@/lib/units';
 import { bmiFor, useAppStore } from '@/lib/store';
 import type { WeightEntry } from '@/lib/types';
 
@@ -45,6 +46,7 @@ export default function Measurements() {
   const router = useRouter();
   const { width } = useWindowDimensions();
 
+  const units = useAppStore((s) => s.units);
   const profile = useAppStore((s) => s.profile);
   const weights = useAppStore((s) => s.weights);
   const deleteWeight = useAppStore((s) => s.deleteWeight);
@@ -55,7 +57,7 @@ export default function Measurements() {
   const valueOf = (w: WeightEntry): number | undefined => {
     switch (metric) {
       case 'weight':
-        return w.kg;
+        return Number(kgToDisplay(w.kg, units).toFixed(1));
       case 'bmi':
         return profile ? Number(bmiFor(w.kg, profile.heightCm).toFixed(1)) : undefined;
       case 'fat':
@@ -66,7 +68,7 @@ export default function Measurements() {
         return w.measurementsCm?.waist;
     }
   };
-  const unit = metric === 'weight' ? t('progress.kg') : metric === 'waist' ? 'cm' : metric === 'bmi' ? '' : '%';
+  const unit = metric === 'weight' ? weightUnit(units, t) : metric === 'waist' ? t('units.cm') : metric === 'bmi' ? '' : '%';
   const label = (m: Metric) =>
     m === 'weight' ? t('progress.weight') : m === 'bmi' ? t('progress.bmi') : m === 'fat' ? t('bodyReading.bodyFat') : m === 'muscle' ? t('progress.musclePercent') : t('bodyReading.waist');
 
@@ -84,7 +86,7 @@ export default function Measurements() {
   const activeMap: BodyMapMetric = zoneIntensity == null && fatZoneIntensity != null ? 'fat' : mapMetric;
   const activeSeg = activeMap === 'fat' ? latestFatSeg?.segmentalFatMassKg : latestSeg?.segmentalLeanMassKg;
   const zoneLabels = activeSeg
-    ? Object.fromEntries(Object.entries(activeSeg).map(([k, v]) => [k, v != null ? `${Number(v).toFixed(1)}kg` : undefined]))
+    ? Object.fromEntries(Object.entries(activeSeg).map(([k, v]) => [k, v != null ? formatWeight(Number(v), units, t) : undefined]))
     : undefined;
   const activeStatus = zoneStatusFromSegmental(activeMap === 'fat' ? latestFatSeg?.segmentalFatMassStatus : latestSeg?.segmentalLeanMassStatus);
 

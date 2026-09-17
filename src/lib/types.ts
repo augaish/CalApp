@@ -1,4 +1,8 @@
 export type Language = 'en' | 'ar';
+/** S20 display units. Stored values are always metric. */
+export type Units = 'metric' | 'imperial';
+/** S19 focus preference — steers suggestions, never access. */
+export type FocusArea = 'food' | 'training';
 
 export type Sex = 'male' | 'female';
 

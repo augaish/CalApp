@@ -11,6 +11,7 @@ import { Chip, IconTile, RowGroup, SettingsRow } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatWeight, formatWeightDelta, kgToDisplay, weightUnit } from '@/lib/units';
 import { buildExport } from '@/lib/account';
 import { useAppStore } from '@/lib/store';
 import type { WeightEntry } from '@/lib/types';
@@ -49,6 +50,7 @@ export default function Health() {
   const { width } = useWindowDimensions();
 
   // `weights` is kept newest-first by the store (see logWeight).
+  const units = useAppStore((s) => s.units);
   const weights = useAppStore((s) => s.weights);
   const [range, setRange] = useState<(typeof RANGES)[number]>(30);
   const [pickingRange, setPickingRange] = useState(false);
@@ -119,8 +121,7 @@ export default function Health() {
             <View style={[styles.deltaPill, { backgroundColor: theme.surfaceTint }]}>
               <Text style={{ color: theme.primaryDark, fontSize: 13 }}>
                 <Text style={{ fontWeight: '800' }}>
-                  {delta > 0 ? '+' : delta < 0 ? '−' : ''}
-                  {Math.abs(delta).toFixed(1)} {t('progress.kg')}
+                  {formatWeightDelta(delta, units, t)}
                 </Text>{' '}
                 {t('health.since', { date: dateOf(first.at) })}
               </Text>
@@ -130,8 +131,8 @@ export default function Health() {
         {latest ? (
           <>
             <Text style={{ color: theme.text, marginTop: 6 }}>
-              <Text style={styles.big}>{latest.kg}</Text>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.textSecondary }}> {t('progress.kg')}</Text>
+              <Text style={styles.big}>{kgToDisplay(latest.kg, units).toFixed(1).replace(/\.0$/, '')}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.textSecondary }}> {weightUnit(units, t)}</Text>
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 14, marginTop: 2 }}>
               {dateOf(latest.at)} · {sourceOf(latest)}
@@ -139,7 +140,7 @@ export default function Health() {
             {series.length >= 2 ? (
               <View style={{ marginTop: Spacing.sm }}>
                 <MetricTrend
-                  values={series.map((w) => w.kg)}
+                  values={series.map((w) => Number(kgToDisplay(w.kg, units).toFixed(1)))}
                   labels={series.map((w) => dateOf(w.at))}
                   color={theme.primary}
                   width={width - Spacing.page * 2 - Spacing.md * 2}
@@ -178,7 +179,7 @@ export default function Health() {
             composition
               ? [
                   composition.bodyFatPercent != null ? `${t('health.bodyFat')} ${composition.bodyFatPercent}%` : null,
-                  composition.skeletalMuscleMassKg != null ? `${t('health.muscle')} ${composition.skeletalMuscleMassKg} ${t('progress.kg')}` : null,
+                  composition.skeletalMuscleMassKg != null ? `${t('health.muscle')} ${formatWeight(composition.skeletalMuscleMassKg, units, t)}` : null,
                 ]
                   .filter(Boolean)
                   .join(' · ') + ` · ${dateOf(composition.at)}`

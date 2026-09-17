@@ -22,6 +22,7 @@ import {
 import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatWeight } from '@/lib/units';
 import { fetchWhoopDayBurn } from '@/lib/api';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
@@ -87,6 +88,7 @@ export default function Overview() {
   const { width, height } = useWindowDimensions();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
 
+  const units = useAppStore((s) => s.units);
   const profile = useAppStore((s) => s.profile);
   const targets = useAppStore((s) => s.targets);
   const meals = useAppStore((s) => s.meals);
@@ -497,7 +499,7 @@ export default function Overview() {
             {latestWeight ? (
               <>
                 <Text style={{ color: theme.text, fontSize: 18, fontWeight: '800' }}>
-                  {latestWeight.kg} {t('progress.kg')}
+                  {formatWeight(latestWeight.kg, units, t)}
                 </Text>
                 <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                   {new Date(latestWeight.at).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}

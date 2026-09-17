@@ -13,6 +13,7 @@ import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Button, Field, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { displayToKg, formatWeight, kgToDisplay, weightUnit } from '@/lib/units';
 import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
 import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { useEntitlement } from '@/lib/entitlement';
@@ -100,7 +101,10 @@ export default function BodyReading() {
   const initial = existingForParam;
 
   const [mode, setMode] = useState<'manual' | 'photo'>(scanned ? 'photo' : 'manual');
-  const [kg, setKg] = useState(scanned?.weightKg != null ? String(scanned.weightKg) : initial ? String(initial.kg) : '');
+  const units = useAppStore((s) => s.units);
+  const show = (v: number) => String(Number(kgToDisplay(v, units).toFixed(1)));
+  // The field holds the display unit; `weightValue` below is always kg.
+  const [kg, setKg] = useState(scanned?.weightKg != null ? show(scanned.weightKg) : initial ? show(initial.kg) : '');
   const [bodyFat, setBodyFat] = useState(
     scanned?.bodyFatPercent != null ? String(scanned.bodyFatPercent) : initial?.bodyFatPercent != null ? String(initial.bodyFatPercent) : '',
   );
@@ -153,7 +157,7 @@ export default function BodyReading() {
   // Picking a date that already has a reading loads it — the date picker
   // doubles as the way to revise history, not just tag a new entry.
   const loadReading = (entry: WeightEntry) => {
-    setKg(String(entry.kg));
+    setKg(show(entry.kg));
     setBodyFat(entry.bodyFatPercent != null ? String(entry.bodyFatPercent) : '');
     setMuscleMass(entry.skeletalMuscleMassKg != null ? String(entry.skeletalMuscleMassKg) : '');
     setSegmental(segToText(entry.segmentalLeanMassKg));
@@ -261,7 +265,7 @@ export default function BodyReading() {
     ]);
   };
 
-  const weightValue = num(kg);
+  const weightValue = num(kg) != null ? Number(displayToKg(num(kg)!, units).toFixed(2)) : undefined;
   const bodyFatValue = num(bodyFat);
   const anyMetric = !!weightValue || !!bodyFatValue || !!num(muscleMass) || hasAny(dimensions) || hasAny(segmental) || hasAny(segmentalFat);
 
@@ -271,7 +275,7 @@ export default function BodyReading() {
     // a diagnosis: nothing here decides what a body should weigh.
     const unusual =
       weightValue && (weightValue < 25 || weightValue > 350)
-        ? { value: `${weightValue} ${t('progress.kg')}`, field: t('bodyReading.weight') }
+        ? { value: formatWeight(weightValue, units, t), field: t('bodyReading.weight') }
         : bodyFatValue && (bodyFatValue < 2 || bodyFatValue > 70)
           ? { value: `${bodyFatValue}%`, field: t('bodyReading.bodyFat') }
           : null;
@@ -450,7 +454,7 @@ export default function BodyReading() {
         />
 
         <View style={{ height: Spacing.md }} />
-        <Field label={t('bodyReading.weight')} value={kg} onChangeText={touch((v: string) => setKg(normalizeDigits(v)))} keyboardType="decimal-pad" maxLength={5} suffix={t('progress.kg')} />
+        <Field label={t('bodyReading.weight')} value={kg} onChangeText={touch((v: string) => setKg(normalizeDigits(v)))} keyboardType="decimal-pad" maxLength={5} suffix={weightUnit(units, t)} />
         <Field
           label={`${t('bodyReading.waist')} ${t('bodyReading.optional')}`}
           value={dimensions.waist}

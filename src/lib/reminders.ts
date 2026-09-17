@@ -72,6 +72,18 @@ const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 100, 150, 200, 365];
  * water/workout reminders repeat daily; meal prompts, the streak saver and the
  * macro summary are conditional and only scheduled for today when still due.
  */
+/** The OS permission as it stands — read only, never prompts. `null` when notifications are not available on this platform. */
+export async function notificationsGranted(): Promise<boolean | null> {
+  const mod = notifications();
+  if (!mod) return null;
+  try {
+    const settings = await mod.getPermissionsAsync();
+    return !!settings.granted;
+  } catch {
+    return null;
+  }
+}
+
 export async function syncReminders(): Promise<{ granted: boolean }> {
   const mod = notifications();
   if (!mod) return { granted: false };

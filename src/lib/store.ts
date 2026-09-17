@@ -11,6 +11,8 @@ import type {
   ChatMessage,
   CoachReferenceDoc,
   CoachShare,
+  FocusArea,
+  Units,
   DailyTargets,
   Exercise,
   ExerciseType,
@@ -48,6 +50,10 @@ export interface Account {
 interface AppState {
   account: Account | null;
   language: Language | null;
+  /** S20 Units: display only — records stay in kg / cm. */
+  units: Units;
+  /** S19 focus preference; both by default. */
+  focusAreas: FocusArea[];
   profile: Profile | null;
   targets: DailyTargets | null;
   meals: LoggedMeal[];
@@ -201,6 +207,8 @@ interface AppState {
   setAccount: (account: Account | null) => void;
   signOut: () => void;
   setLanguage: (language: Language) => void;
+  setUnits: (units: Units) => void;
+  setFocusAreas: (areas: FocusArea[]) => void;
   setProfile: (profile: Profile) => void;
   /** Manually override the daily calorie/macro targets. */
   setTargets: (targets: DailyTargets) => void;
@@ -435,6 +443,8 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       account: null,
       language: null,
+      units: 'metric',
+      focusAreas: ['food', 'training'],
       profile: null,
       targets: null,
       meals: [],
@@ -478,6 +488,8 @@ export const useAppStore = create<AppState>()(
       setAccount: (account) => set({ account }),
       signOut: () => set({ account: null }),
       setLanguage: (language) => set({ language }),
+      setUnits: (units) => set({ units }),
+      setFocusAreas: (areas) => set({ focusAreas: areas.length ? areas : ['food', 'training'] }),
       setProfile: (profile) => set({ profile, targets: dailyTargets(profile) }),
       setTargets: (targets) => set({ targets }),
       logMeal: (items, photoUri, mealType, at) =>
@@ -1236,6 +1248,8 @@ export const useAppStore = create<AppState>()(
       partialize: ({
         account,
         language,
+        units,
+        focusAreas,
         profile,
         targets,
         meals,
@@ -1277,6 +1291,8 @@ export const useAppStore = create<AppState>()(
       }) => ({
         account,
         language,
+        units,
+        focusAreas,
         profile,
         targets,
         meals,
