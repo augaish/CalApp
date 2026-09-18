@@ -440,6 +440,23 @@ export function MacroRow({
             )}
             {!targets && <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}> {unit}</Text>}
           </Text>
+          {/* Progress toward the target, in the macro's colour — the same read
+              the calorie track gives. A known subtotal draws lighter: it is a
+              floor, not the day. */}
+          {targets && targets[c.key] > 0 && (
+            <View style={[styles.macroTrack, { backgroundColor: theme.border }]}>
+              <View
+                style={[
+                  styles.macroFill,
+                  {
+                    backgroundColor: c.color,
+                    width: `${Math.min(100, Math.round((values[c.key] / targets[c.key]) * 100))}%`,
+                    opacity: unknown?.includes(c.key) ? 0.55 : 1,
+                  },
+                ]}
+              />
+            </View>
+          )}
         </View>
       ))}
     </View>
@@ -606,6 +623,8 @@ const styles = StyleSheet.create({
   macroRow: { flexDirection: 'row', marginTop: Spacing.ms },
   macroCol: { flex: 1, paddingHorizontal: 8 },
   macroHead: { flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 2 },
+  macroTrack: { height: 6, borderRadius: 3, overflow: 'hidden', marginTop: 6, marginEnd: 4 },
+  macroFill: { height: 6, borderRadius: 3 },
   dot: { width: 8, height: 8, borderRadius: 4 },
   delta: { borderRadius: Radius.module, paddingHorizontal: Spacing.md, paddingTop: 2, marginBottom: Spacing.md },
   deltaRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: Spacing.ms },
