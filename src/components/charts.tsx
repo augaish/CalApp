@@ -31,7 +31,10 @@ export function WeekBars({
 }) {
   const t = useTheme();
   const max = Math.max(target, ...values, 1);
-  const goalTop = target > 0 ? BAR_ZONE - (Math.min(target, max) / max) * BAR_ZONE : null;
+  // Bars grow up from the bottom of the CHART_H box (the 18px above BAR_ZONE
+  // is the value-label band), so the goal line is measured from that same
+  // bottom edge: a bar taller than the target genuinely crosses it.
+  const goalTop = target > 0 ? CHART_H - (Math.min(target, max) / max) * BAR_ZONE : null;
   return (
     <View>
       <View style={{ height: CHART_H }}>
@@ -69,7 +72,19 @@ export function WeekBars({
                 }}
               >
                 {v > 0 && (
-                  <Text style={{ fontSize: 10, fontWeight: '700', color: t.textSecondary, marginBottom: 3 }}>
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: '700',
+                      color: t.textSecondary,
+                      marginBottom: 3,
+                      // The goal line runs behind the labels; a card-coloured
+                      // backing keeps a value legible where the two meet.
+                      backgroundColor: i === selectedIndex ? t.cardSubtle : t.card,
+                      paddingHorizontal: 3,
+                      borderRadius: 3,
+                    }}
+                  >
                     {v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}
                   </Text>
                 )}
