@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { PageHeader } from '@/components/brand-header';
@@ -22,7 +22,6 @@ import {
   dayBurnAllocation,
   isSameDay,
   lastSessionBefore,
-  lastSetAtReps,
   useAppStore,
   whoopCalibrationFactor,
   workoutFor,
@@ -30,6 +29,8 @@ import {
 import type { ExerciseType, PlannedSet, WorkoutSet } from '@/lib/types';
 
 const REST_OPTIONS = [60, 90, 120];
+/** The rep counts most working sets land on; last time's and the target join them. */
+const QUICK_REPS = [6, 8, 10, 12];
 
 /** Inverse of store.dateKey (local y-m-d, month zero-based). */
 function dayFromKey(key: string): Date {
@@ -118,8 +119,23 @@ export default function SessionScreen() {
   const distance = live.distanceM ?? prefill.distanceM;
   const edit = (patch: Partial<SetShape>) => setEdits({ ...live, key: prefillKey, ...patch });
 
-  // What you last lifted for exactly the reps now in the stepper.
-  const sameReps = type === 'weight_reps' && exId && reps > 0 ? lastSetAtReps(workouts, exId, reps) : undefined;
+  // Rep counts one tap away: the usual working range plus whatever last
+  // time's matching set and the plan ask for, so a repeat is a tap, not typing.
+  const quickCounts = new Set<number>(QUICK_REPS);
+  if (lastSet?.reps) quickCounts.add(lastSet.reps);
+  if (target?.reps) quickCounts.add(target.reps);
+  const quickReps = [...quickCounts].sort((a, b) => a - b);
+
+  // iOS's number pad has no Done key; while it is up, the footer offers one.
+  const [keyboardShown, setKeyboardShown] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardShown(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardShown(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const defaultView = initialBodyView(ex?.primaryMuscles, ex?.category);
   const [viewOverride, setViewOverride] = useState<{ key: string; view: 'front' | 'back' } | null>(null);
@@ -174,8 +190,17 @@ export default function SessionScreen() {
   };
   const shortDate = (iso: string) => new Date(iso).toLocaleDateString(lang, { day: 'numeric', month: 'short' });
 
+  /** A set from last time fills the fields; Complete set still does the logging. */
+  const fillFromLast = (s: SetShape) => {
+    lightHaptic();
+    edit({ weightKg: s.weightKg ?? 0, reps: s.reps ?? 0, seconds: s.seconds ?? 0, distanceM: s.distanceM ?? 0 });
+  };
+
   const completeSet = () => {
     if (!ex) return;
+    // A typed number is already in state on every keystroke; closing the
+    // keyboard here means this tap does the whole job.
+    Keyboard.dismiss();
     const set: WorkoutSet = {
       weightKg: type === 'weight_reps' ? weight : undefined,
       reps: type === 'weight_reps' || type === 'bodyweight_reps' ? reps : undefined,
@@ -288,7 +313,11 @@ export default function SessionScreen() {
       footer={
         <View style={{ gap: Spacing.xs }}>
           <Button label={continuous ? t('track.saveSession') : t('session.completeSet')} icon="checkmark" onPress={completeSet} />
-          <Button label={t('session.finishWorkout')} variant="secondary" onPress={() => setFinishing(true)} />
+          {keyboardShown ? (
+            <Button label={t('common.done')} variant="secondary" icon="chevron-down" onPress={() => Keyboard.dismiss()} />
+          ) : (
+            <Button label={t('session.finishWorkout')} variant="secondary" onPress={() => setFinishing(true)} />
+          )}
         </View>
       }
     >
@@ -339,25 +368,73 @@ export default function SessionScreen() {
           </View>
         )}
 
+        {/* Last time, set by set, one tap away. The set matching this set
+            number is emphasised; the whole session is there because the
+            question mid-workout is "what did I do last time", not one row. */}
+        {!continuous && (
+          <View style={styles.lastTime}>
+            <View style={styles.lastTimeHead}>
+              <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+              <Text style={[Type.caption, { color: theme.textSecondary, flex: 1 }]}>
+                {lastSession ? `${t('session.lastTime')} · ${whenLabel(lastSession.at)}` : t('session.noLastTime')}
+              </Text>
+            </View>
+            {lastSession && (
+              <View style={styles.lastTimeRow}>
+                {lastSession.sets.map((s, i) => {
+                  const current = i === setNo;
+                  return (
+                    <Pressable
+                      key={i}
+                      onPress={() => fillFromLast(s)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${t('session.lastTime')} ${i + 1}: ${label(s)}`}
+                      style={({ pressed }) => [
+                        styles.lastChip,
+                        current ? { backgroundColor: theme.primary } : { backgroundColor: theme.surfaceTint },
+                        pressed && { opacity: 0.7 },
+                      ]}
+                    >
+                      <Text style={{ color: current ? theme.onPrimary : theme.textSecondary, fontSize: 11, fontWeight: '700' }}>{i + 1}</Text>
+                      <Text style={{ color: current ? theme.onPrimary : theme.text, fontSize: 13, fontWeight: '700' }}>{label(s)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+
         {(type === 'time' || type === 'distance_time') && <Stopwatch value={seconds} onChange={(v) => edit({ seconds: v })} compact />}
+        {/* Weight and reps share a row so both stay above the keyboard. */}
         <View style={styles.steppers}>
-          {type === 'weight_reps' && <Stepper label={`${t('track.weight')} (${kg})`} value={weight} onChange={(v) => edit({ weightKg: v })} step={2.5} decimals={1} suffix={kg} />}
+          {type === 'weight_reps' && <Stepper label={`${t('track.weight')} (${kg})`} value={weight} onChange={(v) => edit({ weightKg: v })} step={2.5} decimals={1} />}
           {(type === 'weight_reps' || type === 'bodyweight_reps') && <Stepper label={t('track.reps')} value={reps} onChange={(v) => edit({ reps: v })} step={1} />}
           {(type === 'time' || type === 'distance_time') && <Stepper label={t('track.seconds')} value={seconds} onChange={(v) => edit({ seconds: v })} step={5} />}
           {type === 'distance_time' && <Stepper label={t('track.distance')} value={distance} onChange={(v) => edit({ distanceM: v })} step={100} />}
         </View>
 
-        {type === 'weight_reps' && (
-          <View style={[styles.sameReps, { backgroundColor: theme.surfaceTint }]}>
-            <Ionicons name="repeat" size={14} color={theme.primaryDark} />
-            <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1 }}>
-              {/* A nearest-count fallback is labelled as one (AT04). */}
-              {sameReps
-                ? sameReps.reps === reps
-                  ? t('session.lastRepSet', { reps, weight: `${sameReps.set.weightKg ?? 0} ${kg}`, when: shortDate(sameReps.at) })
-                  : `${t('session.nearestReps', { reps, nearest: sameReps.reps })} ${sameReps.set.weightKg ?? 0} ${kg} · ${whenLabel(sameReps.at)}`
-                : t('session.noPreviousRepSet', { reps })}
-            </Text>
+        {(type === 'weight_reps' || type === 'bodyweight_reps') && (
+          <View style={styles.quickReps}>
+            {quickReps.map((n) => (
+              <Pressable
+                key={n}
+                onPress={() => {
+                  lightHaptic();
+                  edit({ reps: n });
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ selected: reps === n }}
+                accessibilityLabel={`${n} ${t('session.reps')}`}
+                style={({ pressed }) => [
+                  styles.quickChip,
+                  reps === n ? { backgroundColor: theme.primary } : { backgroundColor: theme.surfaceTint },
+                  pressed && { opacity: 0.7 },
+                ]}
+              >
+                <Text style={{ color: reps === n ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 14 }}>× {n}</Text>
+              </Pressable>
+            ))}
           </View>
         )}
 
@@ -429,8 +506,13 @@ const styles = StyleSheet.create({
   refValue: { fontSize: 20, fontWeight: '800' },
   restCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.control, padding: Spacing.ms, marginTop: Spacing.md },
   restTime: { fontSize: 30, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  steppers: { gap: Spacing.md, marginTop: Spacing.md },
-  sameReps: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.ms, minHeight: 40, marginTop: Spacing.md },
+  steppers: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
+  lastTime: { marginTop: Spacing.md, gap: 6 },
+  lastTimeHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  lastTimeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  lastChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.control, paddingHorizontal: 10, minHeight: 36 },
+  quickReps: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },
+  quickChip: { borderRadius: Radius.full, paddingHorizontal: 12, minHeight: 32, alignItems: 'center', justifyContent: 'center' },
   restPick: { flexDirection: 'row', gap: 8 },
   doneList: { borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.control, paddingHorizontal: Spacing.ms },
   doneRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 10, minHeight: 44 },

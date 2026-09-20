@@ -689,7 +689,18 @@ export const useAppStore = create<AppState>()(
           );
           const stamped: WorkoutSet = { ...newSet, isPR: false };
           if (existing) {
-            const sets = [...existing.sets, stamped];
+            // A day's record can hold rows nobody has lifted yet: a preview
+            // of last time (an unticked plan item) or an unticked exercise.
+            // A real set replaces the preview rather than joining it, else
+            // last time's numbers and today's sit side by side as one
+            // session of double the sets.
+            const anyDone = existing.sets.some((st) => st.done);
+            const placeholder = existing.sets.findIndex((st) => !st.done);
+            const sets = !anyDone
+              ? [stamped]
+              : placeholder >= 0
+                ? existing.sets.map((st, i) => (i === placeholder ? stamped : st))
+                : [...existing.sets, stamped];
             const withPR = markPRs(sets, exercise.type);
             return {
               workouts: s.workouts.map((w) =>
@@ -1276,7 +1287,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 13,
+      version: 14,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -1433,7 +1444,7 @@ export const useAppStore = create<AppState>()(
  * Now capped per set. Same reasoning as v7 → v8: recompute again so the
  * uncapped numbers don't linger.
  */
-function migrateStore(persisted: unknown, version: number): unknown {
+export function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
   const state = persisted as Record<string, unknown>;
 
@@ -1569,6 +1580,20 @@ function migrateStore(persisted: unknown, version: number): unknown {
       ? [{ id: 'sched:original', name: '', days: state.schedule, createdAt: now, activatedAt: now }]
       : [];
     state.activeScheduleId = hasWeek ? 'sched:original' : null;
+  }
+
+  // v13 → v14: a day's record that mixes lifted sets with rows nobody lifted
+  // is a preview of last time that a real session then appended to (opening
+  // an exercise used to write the preview; Complete set used to append).
+  // Only the lifted sets are the session; the preview rows go. Records with
+  // no lifted set at all are left alone: an unticked exercise keeps its
+  // numbers for when it is ticked. The burn already counted only lifted
+  // sets, so it is unchanged; the trophy is re-picked among what remains.
+  if (version < 14 && Array.isArray(state.workouts)) {
+    state.workouts = (state.workouts as LoggedWorkout[]).map((w) => {
+      if (!Array.isArray(w.sets) || !w.sets.some((s) => s.done) || w.sets.every((s) => s.done)) return w;
+      return { ...w, sets: markPRs(w.sets.filter((s) => s.done), w.type) };
+    });
   }
 
   if (version >= 2) return state;

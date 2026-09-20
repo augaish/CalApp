@@ -508,9 +508,13 @@ export default function Training() {
                 // Today's sets, else last time's, else the plan — and the
                 // strip says which, so the numbers never look invented.
                 const lastSession = lastSessionBefore(workouts, exId, selected);
-                const source: 'today' | 'last' | 'plan' = wToday?.sets.length ? 'today' : lastSession?.sets.length ? 'last' : 'plan';
+                // Only lifted sets are today's. A record whose rows nobody
+                // lifted (an unticked exercise keeping its numbers) reads as
+                // last time, which is what those numbers are.
+                const lifted = wToday?.sets.filter((s) => s.done) ?? [];
+                const source: 'today' | 'last' | 'plan' = lifted.length ? 'today' : lastSession?.sets.length ? 'last' : 'plan';
                 const rows: WorkoutSet[] = (
-                  source === 'today' ? [...wToday!.sets] : source === 'last' ? lastSession!.sets.map((s) => ({ ...s, done: false })) : planned.map((p) => ({ ...p, done: false }))
+                  source === 'today' ? lifted : source === 'last' ? lastSession!.sets.map((s) => ({ ...s, done: false })) : planned.map((p) => ({ ...p, done: false }))
                 ).sort((a, b) => setScore(a, type) - setScore(b, type));
                 const best = bestSetEver(workouts, exId);
                 const wTodayCalories = wToday ? selectedDayAllocation.get(wToday.id) : undefined;

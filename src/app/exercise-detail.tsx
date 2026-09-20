@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  Keyboard,
   Linking,
   Pressable,
   ScrollView,
@@ -31,6 +32,7 @@ import {
   dayBurnAllocation,
   historyFor,
   isSameDay,
+  lastSessionBefore,
   useAppStore,
   whoopCalibrationFactor,
   whoopKcalForWorkout,
@@ -98,11 +100,9 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   const workouts = useAppStore((s) => s.workouts);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
-  const schedule = useAppStore((s) => s.schedule);
   const logSet = useAppStore((s) => s.logSet);
   const updateSet = useAppStore((s) => s.updateSet);
   const removeSet = useAppStore((s) => s.removeSet);
-  const markExerciseDone = useAppStore((s) => s.markExerciseDone);
   const viewDay = useViewDay((s) => s.day);
 
   const exercise = findExercise(exerciseId, custom);
@@ -113,6 +113,11 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   );
   const today = exercise ? workoutFor(workouts, exercise.id, viewDay) : undefined;
   const todaySets = today?.sets ?? [];
+  // Only lifted sets are the day's sets. Rows nobody lifted (an unticked
+  // exercise keeping its numbers) are not shown as done work; the "Last
+  // time" reference below covers that case honestly.
+  const liftedSets = todaySets.filter((s) => s.done);
+  const lastSession = exercise ? lastSessionBefore(workouts, exercise.id, viewDay) : undefined;
   // Same calibration + day-level cap the Training tab's rows use (see
   // dayBurnAllocation) — otherwise this exercise could show a different
   // number here than it does in the list it was tapped from.
@@ -133,31 +138,19 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
       ) != null
     : false;
 
-  // Opening a scheduled exercise that isn't logged yet pre-fills its sets from
-  // your best record / plan, but marks them NOT trained (no calories) — so an
-  // unchecked plan item shows the same reps as a checked one. Tick it on the
-  // Training plan to count it as done.
-  useEffect(() => {
-    if (!exercise || today) return;
-    const day = schedule[viewDay.getDay()];
-    if (!day?.exerciseIds.includes(exercise.id)) return;
-    const hasHistory = historyFor(workouts, exercise.id).some((w) => !isSameDay(w.at, viewDay));
-    const planned = day.plans?.[exercise.id];
-    if (!hasHistory && !(planned && planned.length > 0)) return;
-    markExerciseDone(
-      { id: exercise.id, name: exerciseName(exercise, lang), type: exercise.type, category: exercise.category },
-      viewDay,
-      false,
-    );
-  }, [exercise, today, schedule, viewDay, workouts, lang, markExerciseDone]);
+  // Opening this page writes nothing. It used to file a preview of last
+  // time's sets as an untrained record for a scheduled exercise, and a real
+  // session then appended to that preview, doubling the day. Last time is
+  // shown as a reference list instead, and a record exists only once a set
+  // is logged or the exercise is ticked on Training.
 
-  // Seed the steppers once (lazy initial state) from the last set of the most
-  // recent session — where you actually left off. Seeding from the highest set
-  // ever logged put a personal best from weeks ago in front of you every time,
-  // which is a number to aim at, not a number to start from. The record still
-  // shows as "Max" on the Training tab and as the trophy in History.
-  const recent = exercise ? historyFor(workouts, exercise.id)[0] : undefined;
-  const lastSet = recent?.sets[recent.sets.length - 1];
+  // Seed the steppers once (lazy initial state) from the last set lifted
+  // today, else the last set of the previous session — where you actually
+  // left off. Seeding from the highest set ever logged put a personal best
+  // from weeks ago in front of you every time, which is a number to aim at,
+  // not a number to start from. The record still shows as "Max" on the
+  // Training tab and as the trophy in History.
+  const lastSet = liftedSets.length ? liftedSets[liftedSets.length - 1] : lastSession?.sets[lastSession.sets.length - 1];
   const repsSeed = exercise && (exercise.type === 'weight_reps' || exercise.type === 'bodyweight_reps') ? 10 : 0;
 
   // One unbroken effort (a padel match, a treadmill run) has no sets to count,
@@ -198,6 +191,9 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   });
 
   const primary = () => {
+    // A number typed into a stepper is already in state on every keystroke;
+    // closing the keyboard here just means the tap does one thing.
+    Keyboard.dismiss();
     successHaptic();
     // Saving a continuous effort twice should correct the day, not stack a
     // second match on top of the first.
@@ -228,6 +224,16 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
     setSeconds(s.seconds ?? 0);
     setDistance(s.distanceM ?? 0);
     setNote(s.comment ?? '');
+  };
+
+  /** A set from last time fills the steppers; nothing is logged until Add set. */
+  const pickReference = (s: WorkoutSet) => {
+    lightHaptic();
+    setEditingIndex(null);
+    setWeight(s.weightKg ?? 0);
+    setReps(s.reps ?? 0);
+    setSeconds(s.seconds ?? 0);
+    setDistance(s.distanceM ?? 0);
   };
 
   const cancelEdit = () => {
@@ -347,7 +353,18 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
           dayLabel={dayLabel}
           caloriesBurned={todayCalories}
           fromWhoop={todayFromWhoop}
-          sets={todaySets}
+          sets={todaySets.map((set, index) => ({ set, index })).filter((r) => r.set.done)}
+          reference={
+            !continuous && liftedSets.length === 0 && lastSession
+              ? {
+                  sets: lastSession.sets,
+                  when: isSameDay(lastSession.at, new Date())
+                    ? t('track.today')
+                    : new Date(lastSession.at).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' }),
+                }
+              : undefined
+          }
+          onPickReference={pickReference}
           editingIndex={editingIndex}
           onSelect={selectSet}
           onDelete={deleteSet}
@@ -464,6 +481,8 @@ function TrackTab({
   editing,
   dayLabel,
   sets,
+  reference,
+  onPickReference,
   caloriesBurned,
   fromWhoop,
   editingIndex,
@@ -488,7 +507,11 @@ function TrackTab({
   setNote: (s: string) => void;
   editing: boolean;
   dayLabel: string;
-  sets: WorkoutSet[];
+  /** The day's lifted sets, each with its index in the stored record. */
+  sets: { set: WorkoutSet; index: number }[];
+  /** Last time's sets, shown while nothing is lifted today; a tap fills the steppers. */
+  reference?: { sets: WorkoutSet[]; when: string };
+  onPickReference: (s: WorkoutSet) => void;
   /** Screen's own scroller and this field's ref — used to scroll the note
    * field into view above the keyboard, since RN's automatic version
    * doesn't reach it once a KeyboardAvoidingView is in the ancestry (see
@@ -589,18 +612,46 @@ function TrackTab({
           {sets.length > 0 ? t('track.sessionLogged') : t('track.sessionHint')}
         </Text>
       ) : sets.length === 0 ? (
-        <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.sm }}>
-          {t('training.emptyDay')}
-        </Text>
-      ) : (
-        <Card>
-          {sets.map((s, i) => {
-            const active = editingIndex === i;
-            const isBest = i === bestSetIndex(sets, type);
-            return (
+        reference ? (
+          // Nothing lifted today: last time, as a reference to tap into the
+          // steppers. Not a record — the day has none until Add set.
+          <Card>
+            <View style={styles.histHead}>
+              <Text style={{ color: theme.textSecondary, fontWeight: '700', flex: 1 }}>{t('training.lastTime')}</Text>
+              <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '600' }}>{reference.when}</Text>
+            </View>
+            {reference.sets.map((s, i) => (
               <Pressable
                 key={i}
-                onPress={() => onSelect(s, i)}
+                onPress={() => onPickReference(s)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('training.lastTime')} ${i + 1} ${setLabel(s, type, kg, t('track.min'))}`}
+                style={[styles.setRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}
+              >
+                <View style={[styles.setNum, { borderWidth: 1, borderColor: theme.border }]}>
+                  <Text style={{ color: theme.textTertiary, fontWeight: '800', fontSize: 13 }}>{i + 1}</Text>
+                </View>
+                <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 15, flex: 1 }}>
+                  {setLabel(s, type, kg, t('track.min'))}
+                </Text>
+                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('track.useSet')}</Text>
+              </Pressable>
+            ))}
+          </Card>
+        ) : (
+          <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.sm }}>
+            {t('training.emptyDay')}
+          </Text>
+        )
+      ) : (
+        <Card>
+          {sets.map(({ set: s, index }, i) => {
+            const active = editingIndex === index;
+            const isBest = i === bestSetIndex(sets.map((r) => r.set), type);
+            return (
+              <Pressable
+                key={index}
+                onPress={() => onSelect(s, index)}
                 style={[
                   styles.setRow,
                   i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
@@ -625,13 +676,13 @@ function TrackTab({
                       >
                         {s.comment}
                       </Text>
-                      <Pressable onPress={() => onDeleteComment(i)} hitSlop={8}>
+                      <Pressable onPress={() => onDeleteComment(index)} hitSlop={8}>
                         <Ionicons name="trash-outline" size={13} color={theme.textTertiary} />
                       </Pressable>
                     </View>
                   ) : null}
                 </View>
-                <Pressable onPress={() => onDelete(i)} hitSlop={8} style={{ padding: 4 }}>
+                <Pressable onPress={() => onDelete(index)} hitSlop={8} style={{ padding: 4 }}>
                   <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
                 </Pressable>
               </Pressable>

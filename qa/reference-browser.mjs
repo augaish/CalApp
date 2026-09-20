@@ -93,37 +93,36 @@ check('THE FIX: the reference is now "Best"', /Best\s*25 kg × 10/.test(body), b
 check('  NOT the burnout set 25 kg × 7', !/(Last time|Best)\s*25 kg × 7/.test(body));
 const todayLabel = new Date().toLocaleDateString('en', { month: 'short', day: 'numeric' });
 check('  and it says when', new RegExp('Best\\s*25 kg × 10\\s*(today|' + todayLabel + ')').test(body), body.match(/Best.{0,28}/)?.[0]);
-check('"Last time" is gone from the reference row', !/Last time/.test(body));
+check('the Best tile is the only reference tile', !/Last time\s*25 kg × 7/.test(body));
 
-console.log('\n=== Same reps, live off the stepper ===');
-// Past the plan the steppers open on the set just finished — 20 kg × 9 —
-// so the reference opens at 9 reps to match.
-check('it opens on the reps just performed', /Last 9-rep set:\s*25 kg/.test(body), body.match(/Last \d+-rep set:.{0,22}/)?.[0]);
-check('  dated today (set 2 of this session)', new RegExp('Last 9-rep set:\\s*25 kg\\s*· (today|' + todayLabel + ')').test(body));
+console.log('\n=== Last time, set by set, one tap away ===');
+// The same-reps box is gone; last week's whole session is the reference.
+check('the same-reps box is gone', !/-rep set/.test(body), body.match(/.{0,10}-rep set.{0,20}/)?.[0]);
+check('last time is dated a week back', /Last time · 7 days ago/.test(body), body.match(/Last time.{0,20}/)?.[0]);
+check('  and lists all three of its sets in order', /1\s*25 kg × 10\s*2\s*25 kg × 8\s*3\s*25 kg × 7/.test(body), body.match(/Last time[^]{0,80}/)?.[0]);
+const inputVal = async (i) => page.locator('input').nth(i).inputValue();
+check('the steppers open on the set just finished (20 × 9)', (await inputVal(0)) === '20' && (await inputVal(1)) === '9', `${await inputVal(0)} × ${await inputVal(1)}`);
+// Tap the third chip: both fields follow.
+await page.getByRole('button', { name: /Last time 3: 25 kg × 7/ }).click();
+await page.waitForTimeout(400);
+check('tapping a last-time set fills weight and reps', (await inputVal(0)) === '25' && (await inputVal(1)) === '7', `${await inputVal(0)} × ${await inputVal(1)}`);
+await page.screenshot({ path: `${OUT}/session-lasttime.png`, fullPage: true });
 
-// Turn the reps stepper and watch the reference follow. The stepper value is
-// a real text field, so setting it is exactly what a thumb on ± produces.
-const setReps = async (n) => {
-  const reps = page.locator('input').nth(1);
-  await reps.fill(String(n));
-  await reps.blur();
-  await page.waitForTimeout(500);
-};
-await setReps(10);
+console.log('\n=== Reps, one tap away ===');
+const quick = await page.getByRole('button', { name: /^\d+ reps$/ }).allTextContents();
+check('quick rep counts are offered: 6 8 10 12 plus last time\'s 7', quick.join(' ') === '× 6 × 7 × 8 × 10 × 12', quick.join(' '));
+await page.getByRole('button', { name: /^12 reps$/ }).click();
+await page.waitForTimeout(300);
+check('tapping × 12 sets the reps field', (await inputVal(1)) === '12', await inputVal(1));
+// A number typed into the field reaches the log without leaving the field.
+const repsField = page.locator('input').nth(1);
+await repsField.fill('7');
+await page.waitForTimeout(200);
+await page.getByText('Complete set').first().click();
+await page.waitForTimeout(800);
 body = squash(await page.textContent('body'));
-await page.screenshot({ path: `${OUT}/session-reps10.png`, fullPage: true });
-check('turning the stepper to 10 moves the reference with it', new RegExp('Last 10-rep set:\\s*25 kg\\s*· (today|' + todayLabel + ')').test(body), body.match(/Last \d+-rep set:.{0,22}/)?.[0]);
-await setReps(7);
-body = squash(await page.textContent('body'));
-check('at 7 reps it finds last week, not today', /Last 7-rep set:\s*25 kg/.test(body), body.match(/Last \d+-rep set:.{0,24}/)?.[0]);
-const weekAgoLabel = new Date(Date.now() - 7 * 86400000).toLocaleDateString('en', { month: 'short', day: 'numeric' });
-check('  and dates it a week back', new RegExp('Last 7-rep set:\\s*25 kg\\s*· (7 days ago|' + weekAgoLabel + ')').test(body), body.match(/Last 7-rep set:.{0,26}/)?.[0]);
-
-// A rep count never attempted falls back and says which.
-await setReps(5);
-body = squash(await page.textContent('body'));
-await page.screenshot({ path: `${OUT}/session-reps5.png`, fullPage: true });
-check('5 reps was never done → it says so and labels the 6 it found', /No previous 5-rep set · nearest × 6:\s*25 kg/.test(body), body.match(/No previous.{0,50}/)?.[0]);
+check('Complete set with the field still focused logs the typed 7', /4\s*25 kg × 7\s*Undo/.test(body), body.match(/Completed sets[^]{0,120}/)?.[0]);
+check('  as set 4, i.e. exactly one set was added', /Set 5/.test(body) && !/5\s*25 kg/.test(body), body.match(/Set \d/)?.[0]);
 
 console.log('\n=== The Training card, without going in ===');
 await page.goto(`${BASE}/training`, { waitUntil: 'networkidle' });
@@ -148,8 +147,17 @@ const chips = () => page.$$eval('div', (els) =>
   els.filter((e) => e.children.length === 0 && /^\d+(\.\d+)?kg × \d+$/.test((e.textContent || '').trim()))
      .map((e) => e.textContent.trim()));
 const before = (await chips()).join(', ');
+const raiseRecords = () => page.evaluate(() => JSON.parse(localStorage.getItem('calapp-store')).state.workouts.filter((w) => w.exerciseId === 'builtin:lateral-raise').length);
+const recordsBefore = await raiseRecords();
 await page.goto(`${BASE}/exercise-detail?id=${encodeURIComponent(RAISE)}`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2000);
+body = squash(await page.textContent('body'));
+await page.screenshot({ path: `${OUT}/detail-reference.png`, fullPage: true });
+check('the exercise page shows last time as a reference, with Use on each row', /Last time[^]{0,40}24 kg × 12\s*Use/.test(body), body.match(/Last time[^]{0,80}/)?.[0]);
+check('  opening it wrote no record', (await raiseRecords()) === recordsBefore, `${recordsBefore} → ${await raiseRecords()}`);
+await page.getByRole('button', { name: /Last time 3 28 kg × 8/ }).click();
+await page.waitForTimeout(300);
+check('  Use fills the steppers', (await page.locator('input').nth(0).inputValue()) === '28' && (await page.locator('input').nth(1).inputValue()) === '8');
 await page.goto(`${BASE}/training`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2500);
 body = squash(await page.textContent('body'));
@@ -157,6 +165,38 @@ await page.screenshot({ path: `${OUT}/training-after-visit.png`, fullPage: true 
 const after = (await chips()).join(', ');
 check('the same three sets are there afterwards', after.includes('24kg × 12, 24kg × 12, 28kg × 8'), after);
 check('  the numbers did not change by visiting', before === after, `before=[${before}]  after=[${after}]`);
+check('  and they are still labelled last time, not today', /Lateral Raise\s*Last time/.test(body), body.match(/Lateral Raise.{0,30}/)?.[0]);
+
+console.log('\n=== A session into a preview record does not double it ===');
+// The doubled day from the report: a preview of last time (unlifted rows)
+// already filed for today, then Start workout → Complete set × 3.
+await page.evaluate(() => {
+  const s = JSON.parse(localStorage.getItem('calapp-store'));
+  const d = new Date(); d.setHours(8, 0, 0, 0);
+  s.state.workouts.unshift({ id: 'prev', at: d.toISOString(), updatedAt: d.toISOString(), exerciseId: 'builtin:lateral-raise', exerciseName: 'Lateral Raise', type: 'weight_reps', caloriesBurned: 0,
+    sets: [{ weightKg: 24, reps: 12, done: false }, { weightKg: 24, reps: 12, done: false }, { weightKg: 28, reps: 8, done: false }] });
+  s.state.activeSession = { ...s.state.activeSession, index: 1 };
+  localStorage.setItem('calapp-store', JSON.stringify(s));
+});
+await page.goto(`${BASE}/session`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+body = squash(await page.textContent('body'));
+check('the session opens on set 1 of Lateral Raise', /Lateral Raise\s*Set 1/.test(body), body.match(/Lateral Raise.{0,20}/)?.[0]);
+for (let i = 0; i < 3; i++) {
+  await page.getByText('Complete set').first().click();
+  await page.waitForTimeout(500);
+  const skip = page.getByText('Skip rest');
+  if (await skip.count()) await skip.first().click();
+  await page.waitForTimeout(300);
+}
+const setsNow = await page.evaluate(() => JSON.parse(localStorage.getItem('calapp-store')).state.workouts.find((w) => w.id === 'prev' || (w.exerciseId === 'builtin:lateral-raise' && new Date(w.at).toDateString() === new Date().toDateString())).sets);
+check('three completed sets are three sets, not six', setsNow.length === 3, JSON.stringify(setsNow));
+check('  all of them lifted', setsNow.every((s) => s.done));
+await page.goto(`${BASE}/training`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(2500);
+body = squash(await page.textContent('body'));
+await page.screenshot({ path: `${OUT}/training-after-session.png`, fullPage: true });
+check('the Training card says 3 sets for Lateral Raise', /Lateral Raise\s*3 sets/.test(body), body.match(/Lateral Raise.{0,40}/)?.[0]);
 
 // expo-notifications has no web implementation; that warning predates this
 // change and has nothing to do with it.
