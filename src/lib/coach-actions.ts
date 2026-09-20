@@ -1,5 +1,5 @@
 import { timestampFor } from './day';
-import { matchExerciseByName, findExercise } from './exercises';
+import { findExercise, guessCategory, matchExerciseByName } from './exercises';
 import { incompleteFlags, itemUnknownNutrients } from './recipes';
 import { useAppStore } from './store';
 import type { CoachAction } from './types';
@@ -61,7 +61,7 @@ export function applyCoachAction(action: CoachAction): ApplyResult {
       // a custom entry when the name is new — never a lost set.
       let exercise = matchExerciseByName(action.exerciseName, s.exercises);
       if (!exercise) {
-        const id = s.addExercise({ name: action.exerciseName, category: 'fullBody', type: 'weight_reps', source: 'custom' });
+        const id = s.addExercise({ name: action.exerciseName, category: guessCategory(action.exerciseName) ?? 'fullBody', type: 'weight_reps', source: 'custom' });
         exercise = findExercise(id, useAppStore.getState().exercises);
       }
       if (!exercise) return { ok: false, reason: 'missingEntry' };

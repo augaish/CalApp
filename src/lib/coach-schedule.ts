@@ -1,4 +1,4 @@
-import { matchExerciseByName } from './exercises';
+import { guessCategory, matchExerciseByName } from './exercises';
 import type { CoachSchedulePlan, Exercise, PlannedSet } from './types';
 
 export interface ResolvedScheduleDay {
@@ -65,7 +65,9 @@ export function resolveCoachSchedule(
       matched ?? {
         id: newExerciseId(),
         name,
-        category: 'fullBody',
+        // Filed by what the name says (a "pulldown" is back) and only under
+        // fullBody when the name says nothing the library recognises.
+        category: guessCategory(name) ?? 'fullBody',
         type: 'weight_reps',
         source: 'custom',
       };

@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import { categoryForMuscles, findExercise } from './exercises';
+import { categoryForMuscles, exactExerciseMatch, findExercise, guessCategory, matchExerciseByName } from './exercises';
 import { incompleteFlags, perServing, recipeUnknownNutrients, roundMacros, scaleMacros, servingCountLabel } from './recipes';
 import type { PlannedRecipeMeal } from './shopping';
 import { applyMoves, resolvePlan, undoOp, type OccurrenceMove } from './occurrences';
@@ -610,70 +610,7 @@ export const useAppStore = create<AppState>()(
       updateRecipe: (rid, patch) =>
         set((s) => ({ recipes: s.recipes.map((r) => (r.id === rid ? { ...r, ...patch } : r)) })),
       removeRecipe: (rid) => set((s) => ({ recipes: s.recipes.filter((r) => r.id !== rid) })),
-      mergeExercise: (fromId, intoId) =>
-        set((s) => {
-          if (fromId === intoId) return {};
-          const target = findExercise(intoId, s.exercises);
-          if (!target) return {};
-          const bodyKg = s.profile?.weightKg ?? 75;
-          // Replace the id wherever it appears in a list, without leaving a
-          // duplicate behind if the target was already in that same list.
-          const swapList = (ids: string[]): string[] => {
-            const out: string[] = [];
-            for (const id of ids) {
-              const next = id === fromId ? intoId : id;
-              if (!out.includes(next)) out.push(next);
-            }
-            return out;
-          };
-
-          const workouts = s.workouts.map((w) =>
-            w.exerciseId === fromId
-              ? {
-                  ...w,
-                  exerciseId: intoId,
-                  exerciseName: target.name,
-                  // The burn was computed from the old exercise's category and
-                  // MET, so it has to be redone against the one it now belongs
-                  // to — otherwise the history keeps the wrong figure forever.
-                  caloriesBurned: burnForSets(
-                    w.sets,
-                    bodyKg,
-                    target.category,
-                    elapsedMinutes(w.at, w.updatedAt),
-                    target,
-                  ),
-                }
-              : w,
-          );
-
-          const schedule: typeof s.schedule = {};
-          for (const [weekday, day] of Object.entries(s.schedule)) {
-            const plans = day.plans ? { ...day.plans } : undefined;
-            // Planned sets follow the exercise, but never overwrite targets
-            // the person already set on the exercise being merged into.
-            if (plans && plans[fromId]) {
-              if (!plans[intoId]) plans[intoId] = plans[fromId];
-              delete plans[fromId];
-            }
-            schedule[Number(weekday)] = { ...day, exerciseIds: swapList(day.exerciseIds), plans };
-          }
-
-          const remap = (rec: Record<string, string[]>): Record<string, string[]> =>
-            Object.fromEntries(Object.entries(rec).map(([k, ids]) => [k, swapList(ids)]));
-
-          return {
-            workouts,
-            schedule,
-            skips: remap(s.skips),
-            dayOrder: remap(s.dayOrder),
-            activeSession: s.activeSession
-              ? { ...s.activeSession, exerciseIds: swapList(s.activeSession.exerciseIds) }
-              : s.activeSession,
-            // Built-ins live in code, so only a custom entry is ever removed.
-            exercises: s.exercises.filter((e) => e.id !== fromId),
-          };
-        }),
+      mergeExercise: (fromId, intoId) => set((s) => mergeExerciseState(s, fromId, intoId) ?? {}),
       logSet: (exercise, newSet, at) =>
         set((s) => {
           const when = at ?? new Date().toISOString();
@@ -1287,7 +1224,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'calapp-store',
-      version: 14,
+      version: 15,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -1444,6 +1381,118 @@ export const useAppStore = create<AppState>()(
  * Now capped per set. Same reasoning as v7 → v8: recompute again so the
  * uncapped numbers don't linger.
  */
+/** The slice of state a merge touches — the store's, or a persisted snapshot's. */
+type MergeSlice = Pick<AppState, 'workouts' | 'schedule' | 'skips' | 'dayOrder' | 'activeSession' | 'exercises' | 'savedSchedules'> & {
+  profile: { weightKg?: number } | null;
+};
+
+/**
+ * Fold `fromId` into `intoId` everywhere: history, the weekly schedule and
+ * every saved one, planned sets, skips, day ordering and a session in
+ * progress. Returns the changed fields, or null when there is nothing to do.
+ * Pure, so the store action and a migration do exactly the same thing.
+ */
+export function mergeExerciseState(s: MergeSlice, fromId: string, intoId: string): Partial<Omit<MergeSlice, 'profile'>> | null {
+  if (fromId === intoId) return null;
+  const target = findExercise(intoId, s.exercises);
+  if (!target) return null;
+  const bodyKg = s.profile?.weightKg ?? 75;
+  // Replace the id wherever it appears in a list, without leaving a
+  // duplicate behind if the target was already in that same list.
+  const swapList = (ids: string[]): string[] => {
+    const out: string[] = [];
+    for (const id of ids) {
+      const next = id === fromId ? intoId : id;
+      if (!out.includes(next)) out.push(next);
+    }
+    return out;
+  };
+
+  const workouts = s.workouts.map((w) =>
+    w.exerciseId === fromId
+      ? {
+          ...w,
+          exerciseId: intoId,
+          exerciseName: target.name,
+          // The burn was computed from the old exercise's category and
+          // MET, so it has to be redone against the one it now belongs
+          // to — otherwise the history keeps the wrong figure forever.
+          caloriesBurned: burnForSets(w.sets, bodyKg, target.category, elapsedMinutes(w.at, w.updatedAt), target),
+        }
+      : w,
+  );
+
+  const mergeDays = (days: AppState['schedule']): AppState['schedule'] => {
+    const out: AppState['schedule'] = {};
+    for (const [weekday, day] of Object.entries(days)) {
+      if (!day) continue;
+      const plans = day.plans ? { ...day.plans } : undefined;
+      // Planned sets follow the exercise, but never overwrite targets
+      // the person already set on the exercise being merged into.
+      if (plans && plans[fromId]) {
+        if (!plans[intoId]) plans[intoId] = plans[fromId];
+        delete plans[fromId];
+      }
+      out[Number(weekday)] = { ...day, exerciseIds: swapList(day.exerciseIds ?? []), plans };
+    }
+    return out;
+  };
+
+  const remap = (rec: Record<string, string[]> | undefined): Record<string, string[]> =>
+    Object.fromEntries(Object.entries(rec ?? {}).map(([k, ids]) => [k, swapList(ids)]));
+
+  return {
+    workouts,
+    schedule: mergeDays(s.schedule ?? {}),
+    savedSchedules: (s.savedSchedules ?? []).map((sc) => ({ ...sc, days: mergeDays(sc.days ?? {}) })),
+    skips: remap(s.skips),
+    dayOrder: remap(s.dayOrder),
+    activeSession: s.activeSession
+      ? { ...s.activeSession, exerciseIds: swapList(s.activeSession.exerciseIds) }
+      : s.activeSession,
+    // Built-ins live in code, so only a custom entry is ever removed.
+    exercises: s.exercises.filter((e) => e.id !== fromId),
+  };
+}
+
+/**
+ * Re-file the custom exercises that ended up under Full body without being
+ * whole-body movements — a coach's "سحب علوي" the library did not match at
+ * the time, a scan with no muscles identified — and fold exact duplicates of
+ * a built-in into it. Returns the changed fields, or null when the library
+ * is already clean. Shared by the v15 migration and the library screen.
+ */
+export function tidyLibraryState(s: MergeSlice): Partial<Omit<MergeSlice, 'profile'>> | null {
+  let cur: MergeSlice = s;
+  let changed = false;
+  for (const e of [...s.exercises]) {
+    if (e.category !== 'fullBody' || e.source === 'builtin') continue;
+    // The muscles a scan identified are the best evidence there is.
+    const byMuscles = categoryForMuscles(e.primaryMuscles);
+    if (byMuscles === 'fullBody') continue;
+    // An exact twin of a built-in (by name or alias, either language) is
+    // the built-in: its history moves there and the twin goes. Only a twin
+    // of the same measure — a timed custom is not a rep-counted built-in.
+    const twin = [e.name, e.nameAr, e.nameEn].map((n) => (n ? exactExerciseMatch(n, []) : undefined)).find(Boolean);
+    if (twin && twin.type === e.type) {
+      const patch = mergeExerciseState(cur, e.id, twin.id);
+      if (patch) {
+        cur = { ...cur, ...patch };
+        changed = true;
+      }
+      continue;
+    }
+    // Else file it where its name (or a near-match's) says it belongs.
+    const near = twin ?? [e.name, e.nameAr, e.nameEn].map((n) => (n ? matchExerciseByName(n, []) : undefined)).find(Boolean);
+    const category = byMuscles ?? [e.name, e.nameAr, e.nameEn].map(guessCategory).find(Boolean) ?? near?.category ?? null;
+    if (!category || category === 'fullBody') continue;
+    const muscles = e.primaryMuscles?.length ? {} : near?.primaryMuscles?.length ? { primaryMuscles: near.primaryMuscles, secondaryMuscles: near.secondaryMuscles } : {};
+    cur = { ...cur, exercises: cur.exercises.map((x) => (x.id === e.id ? { ...x, category, ...muscles } : x)) };
+    changed = true;
+  }
+  return changed ? cur : null;
+}
+
 export function migrateStore(persisted: unknown, version: number): unknown {
   if (!persisted || typeof persisted !== 'object') return persisted;
   const state = persisted as Record<string, unknown>;
@@ -1594,6 +1643,26 @@ export function migrateStore(persisted: unknown, version: number): unknown {
       if (!Array.isArray(w.sets) || !w.sets.some((s) => s.done) || w.sets.every((s) => s.done)) return w;
       return { ...w, sets: markPRs(w.sets.filter((s) => s.done), w.type) };
     });
+  }
+
+  // v14 → v15: custom exercises filed under Full body for want of a better
+  // answer get the answer: an exact twin of a built-in is folded into it,
+  // the rest are re-filed by their identified muscles or by what their name
+  // says. See tidyLibraryState. A rollback to v14 reads this state
+  // unchanged, since nothing here adds a field.
+  if (version < 15 && Array.isArray(state.exercises)) {
+    const slice: MergeSlice = {
+      workouts: Array.isArray(state.workouts) ? (state.workouts as LoggedWorkout[]) : [],
+      schedule: (state.schedule ?? {}) as AppState['schedule'],
+      savedSchedules: Array.isArray(state.savedSchedules) ? (state.savedSchedules as AppState['savedSchedules']) : [],
+      skips: (state.skips ?? {}) as Record<string, string[]>,
+      dayOrder: (state.dayOrder ?? {}) as Record<string, string[]>,
+      activeSession: (state.activeSession ?? null) as AppState['activeSession'],
+      exercises: state.exercises as Exercise[],
+      profile: (state.profile ?? null) as { weightKg?: number } | null,
+    };
+    const tidy = tidyLibraryState(slice);
+    if (tidy) Object.assign(state, tidy);
   }
 
   if (version >= 2) return state;

@@ -373,6 +373,59 @@ function normalize(s: string): string {
 }
 
 /**
+ * The exercise whose name or alias IS this name, in either language — no
+ * containment, so "Smith machine squat" does not become the barbell squat.
+ * The strict half of `matchExerciseByName`, for callers that will act on
+ * the answer without asking (folding a duplicate into the original).
+ */
+export function exactExerciseMatch(name: string, custom: Exercise[]): Exercise | undefined {
+  const q = normalize(name);
+  if (!q) return undefined;
+  for (const ex of allExercises(custom)) {
+    const candidates = [ex.name, ex.nameEn, ex.nameAr, ...(ex.aliases ?? [])]
+      .filter(Boolean)
+      .map((c) => normalize(c as string));
+    if (candidates.some((c) => c === q)) return ex;
+  }
+  return undefined;
+}
+
+/**
+ * Where an exercise belongs, read off its name alone — for a name the
+ * library does not know (a coach's plan, a logged set, a scan with no
+ * muscles identified). Earlier rules win, so "shoulder press" is shoulders
+ * before "press" can make it chest and "leg curl" is legs before "curl" can
+ * make it biceps. Arabic has no word boundaries the regex engine knows, so
+ * those patterns are bare substrings.
+ *
+ * Null when nothing fits: the caller then asks, or files under fullBody as
+ * the last resort. It is never a way of guessing "fullBody".
+ */
+const CATEGORY_RULES: [MuscleGroup, RegExp][] = [
+  ['cardio', /\b(treadmill|running|run|jogging|jog|walking|walk|bike|cycling|cycle|elliptical|stair|stepper|rowing machine|rower|jump rope|skipping|swim|swimming|hiit|sprint|padel|tennis|football|basketball|boxing)\b|جري|مشي|دراجة|سيكل|تريدميل|سباحة|نط الحبل|إليبتيكال|درج|بادل|تنس|كرة|ملاكمة|جهاز التجديف/i],
+  ['calves', /\b(calf|calves)\b|سمانة|بطة الساق|بطه الساق/i],
+  ['glutes', /\b(glute|glutes|hip thrust|glute kickbacks?|donkey kicks?)\b|أرداف|ارداف|مؤخرة|جلوت/i],
+  ['core', /\b(plank|crunch|crunches|sit.?ups?|abs|ab|abdominal|abdominals|oblique|obliques|core|leg raises?|knee raises?|russian twist|hanging|dead bug|bird dog|mountain climbers?)\b|بلانك|بطن|كرنش|معدة|معده|طحن/i],
+  ['legs', /\b(squat|squats|leg|legs|lunge|lunges|hamstring|hamstrings|quad|quads|adductor|abductor|hack|deadlift|rdl|step.?up)\b|سكوات|رجل|أرجل|ارجل|فخذ|لانج|هاك|ديدلفت|رفعة مميتة|الرفعة الميتة|ساق|سومو/i],
+  ['forearms', /\b(forearm|forearms|wrist|grip)\b|ساعد|رسغ|قبضة|قبضه/i],
+  ['shoulders', /\b(shoulder|shoulders|delt|delts|deltoid|lateral raise|lateral raises|front raise|front raises|overhead press|military|arnold|face pull|face pulls|upright row|rear delt)\b|كتف|أكتاف|اكتاف|رفرفة جانبية|رفرفه جانبيه|رفرفة أمامية|رفرفة خلفية|عسكري|أرنولد|ارنولد|فيس بول/i],
+  ['back', /\b(row|rows|pull.?downs?|pulldown|pull.?ups?|chin.?ups?|lat|lats|shrug|shrugs|back|rhomboid|hyperextension|hyperextensions|good morning)\b|سحب|ظهر|لات|بول داون|بول اب|شراغ|شرقز|تجديف|عضلة الظهر/i],
+  ['triceps', /\b(tricep|triceps|pushdown|pushdowns|push.?down|skull|skullcrusher|skullcrushers|kickback|kickbacks|extension|extensions|close.?grip|dips?)\b|ترايسبس|تراي|خلفية الذراع|بوش داون|كسر الجمجمة|ديبس|متوازي/i],
+  ['chest', /\b(bench|chest|fly|flye|flyes|flies|pec|pecs|push.?ups?|press|crossover|crossovers)\b|صدر|بنش|فلاي|رفرفة|تفتيح|ضغط|كروس/i],
+  ['biceps', /\b(bicep|biceps|curl|curls|hammer|preacher|concentration)\b|بايسبس|ثني الذراع|كيرل|كرل|هامر|مرجحة|مرجحه|عضلة الذراع الأمامية/i],
+];
+
+export function guessCategory(name: string | undefined): MuscleGroup | null {
+  if (!name) return null;
+  const q = normalize(name);
+  if (!q) return null;
+  for (const [group, rule] of CATEGORY_RULES) {
+    if (rule.test(q)) return group;
+  }
+  return null;
+}
+
+/**
  * Try to match a scanned/typed machine name to an existing exercise (built-in
  * or custom). A hit means we can skip the token-heavy AI analysis entirely.
  */
@@ -384,12 +437,8 @@ export function matchExerciseByName(
   if (!q) return undefined;
   const pool = allExercises(custom);
   // 1) exact name (either language) or alias match
-  for (const ex of pool) {
-    const candidates = [ex.name, ex.nameEn, ex.nameAr, ...(ex.aliases ?? [])]
-      .filter(Boolean)
-      .map((c) => normalize(c as string));
-    if (candidates.some((c) => c === q)) return ex;
-  }
+  const exact = exactExerciseMatch(name, custom);
+  if (exact) return exact;
   // 2) containment either direction (e.g. "seated lat pulldown" ⊃ "lat pulldown").
   //    The LONGEST matching alias wins rather than whichever exercise happens to
   //    sit earlier in the library: "assisted chin up dip" contains both "chin up"
