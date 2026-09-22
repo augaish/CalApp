@@ -16,12 +16,12 @@ import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
-import { keyToDate, pendingOccurrences, resolvePlan } from '@/lib/occurrences';
+import { dayExerciseIds } from '@/lib/day-plan';
+import { keyToDate, pendingOccurrences } from '@/lib/occurrences';
 import { usePending } from '@/lib/pending';
 import { useTourTarget } from '@/lib/tour';
 import {
   actualBurnedForDay,
-  applyOrder,
   bestSetEver,
   bestSetIndex,
   dateKey,
@@ -144,23 +144,20 @@ export default function Training() {
   const undoOccurrenceOp = useAppStore((s) => s.undoOccurrenceOp);
   const lastOp = usePending((s) => s.lastOccurrenceOp);
   const setLastOp = usePending((s) => s.setLastOccurrenceOp);
-  // S42: the dated occurrence layer over the weekly template.
-  const resolved = resolvePlan(schedule, occurrences, selected);
-  const plan = resolved?.day;
-  const planWeekday = resolved?.weekday ?? selected.getDay();
+  // S42: the dated occurrence layer over the weekly template. The same
+  // reading the live workout uses, so what is reordered or skipped here is
+  // what the session trains.
+  const dayList = dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder }, selected);
+  const plan = dayList.plan;
+  const planWeekday = dayList.weekday;
   const ownOccurrence = occurrences[dateKey(selected)];
   const pending = pendingOccurrences(schedule, occurrences, workouts, skips, new Date());
   const nextPending = pending[0];
-  const skippedIds = skips[dateKey(selected)] ?? [];
-  const scheduledIds = plan ? plan.exerciseIds.filter((id) => !skippedIds.includes(id)) : [];
-  const skippedPlanIds = plan ? plan.exerciseIds.filter((id) => skippedIds.includes(id)) : [];
-
-  // Anything logged on this day that the weekly schedule does not know about
-  // — duplicated from another day, scanned in, or picked from the library.
+  const skippedPlanIds = dayList.skippedPlanIds;
+  const scheduledIds = plan ? plan.exerciseIds.filter((id) => !skippedPlanIds.includes(id)) : [];
   const selectedDayWorkouts = workouts.filter((w) => isSameDay(w.at, selected));
   const loggedTodayCount = selectedDayWorkouts.length;
-  const unplannedIds = [...new Set(selectedDayWorkouts.map((w) => w.exerciseId))].filter((id) => !scheduledIds.includes(id));
-  const visiblePlanIds = applyOrder([...scheduledIds, ...unplannedIds], dayOrder[dateKey(selected)]);
+  const visiblePlanIds = dayList.ids;
 
   const selectedIsToday = isSameDay(new Date().toISOString(), selected);
   const burned = actualBurnedForDay(workouts, whoopBurnByDay, whoopWorkoutsByDay, selected);
@@ -419,12 +416,12 @@ export default function Training() {
       )}
 
       <SectionTitle style={{ marginTop: Spacing.xs }}>{selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}</SectionTitle>
-      {resolved?.movedFrom && (
+      {dayList.movedFrom && (
         <View style={{ marginBottom: Spacing.sm, alignSelf: 'flex-start' }}>
-          <StatusPill label={t('reschedule.movedFrom', { date: keyToDate(resolved.movedFrom).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' }) })} tone="planned" icon="swap-horizontal" />
+          <StatusPill label={t('reschedule.movedFrom', { date: keyToDate(dayList.movedFrom).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' }) })} tone="planned" icon="swap-horizontal" />
         </View>
       )}
-      {!resolved && ownOccurrence && (
+      {!dayList.plan && ownOccurrence && (
         <View style={{ marginBottom: Spacing.sm, alignSelf: 'flex-start' }}>
           <StatusPill
             label={

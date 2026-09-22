@@ -153,11 +153,28 @@ await page.goto(`${BASE}/exercise-detail?id=${encodeURIComponent(RAISE)}`, { wai
 await page.waitForTimeout(2000);
 body = squash(await page.textContent('body'));
 await page.screenshot({ path: `${OUT}/detail-reference.png`, fullPage: true });
-check('the exercise page shows last time as a reference, with Use on each row', /Last time[^]{0,40}24 kg × 12\s*Use/.test(body), body.match(/Last time[^]{0,80}/)?.[0]);
+check('the exercise page shows last time as a reference, with Log on each row', /Last time[^]{0,40}24 kg × 12[\s\uE000-\uF8FF]*Log/.test(body), body.match(/Last time[^]{0,80}/)?.[0]);
 check('  opening it wrote no record', (await raiseRecords()) === recordsBefore, `${recordsBefore} → ${await raiseRecords()}`);
+// Tapping the row's text fills the steppers for a tweak...
 await page.getByRole('button', { name: /Last time 3 28 kg × 8/ }).click();
 await page.waitForTimeout(300);
-check('  Use fills the steppers', (await page.locator('input').nth(0).inputValue()) === '28' && (await page.locator('input').nth(1).inputValue()) === '8');
+check('  tapping a row fills the steppers', (await page.locator('input').nth(0).inputValue()) === '28' && (await page.locator('input').nth(1).inputValue()) === '8');
+// ...and Log on a row writes that set, done, with no further confirmation.
+await page.getByRole('button', { name: /^Log 24 kg × 12$/ }).first().click();
+await page.waitForTimeout(800);
+const loggedSets = await page.evaluate(() => {
+  const s = JSON.parse(localStorage.getItem('calapp-store')).state;
+  const w = s.workouts.find((x) => x.exerciseId === 'builtin:lateral-raise' && new Date(x.at).toDateString() === new Date().toDateString());
+  return w ? w.sets : [];
+});
+check('  THE FIX: Log writes exactly that set, done', loggedSets.length === 1 && loggedSets[0].weightKg === 24 && loggedSets[0].reps === 12 && loggedSets[0].done === true, JSON.stringify(loggedSets));
+body = squash(await page.textContent('body'));
+check('  and the row it came from now reads as matched', /Last time[^]{0,200}/.test(body) && !/Log 24 kg × 12\s*Log 24 kg × 12/.test(body));
+await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('calapp-store'));
+  st.state.workouts = st.state.workouts.filter((x) => !(x.exerciseId === 'builtin:lateral-raise' && new Date(x.at).toDateString() === new Date().toDateString()));
+  localStorage.setItem('calapp-store', JSON.stringify(st));
+});
 await page.goto(`${BASE}/training`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(2500);
 body = squash(await page.textContent('body'));
@@ -166,6 +183,44 @@ const after = (await chips()).join(', ');
 check('the same three sets are there afterwards', after.includes('24kg × 12, 24kg × 12, 28kg × 8'), after);
 check('  the numbers did not change by visiting', before === after, `before=[${before}]  after=[${after}]`);
 check('  and they are still labelled last time, not today', /Lateral Raise\s*Last time/.test(body), body.match(/Lateral Raise.{0,30}/)?.[0]);
+
+console.log('\n=== The workout follows the day, live ===');
+// Reorder the day on Training WHILE a session is running: the workout must
+// show the new order and stay on the same exercise.
+await page.goto(`${BASE}/session`, { waitUntil: 'networkidle' });
+await page.waitForTimeout(2000);
+body = squash(await page.textContent('body'));
+check('the session lists the day\'s exercises as a strip', /Chest Fly/.test(body) && /Lateral Raise/.test(body), body.match(/Exercise \d of \d/)?.[0]);
+check('  and says which one of how many', /Exercise 1 of 2/.test(body), body.match(/Exercise \d of \d/)?.[0]);
+await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('calapp-store'));
+  const d = new Date();
+  st.state.dayOrder = { [`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`]: ['builtin:lateral-raise', 'builtin:chest-fly'] };
+  localStorage.setItem('calapp-store', JSON.stringify(st));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(2000);
+body = squash(await page.textContent('body'));
+check('THE FIX: a reorder made mid-workout is reflected at once', /Exercise 2 of 2/.test(body), body.match(/Exercise \d of \d/)?.[0]);
+check('  and the person is still on the same exercise', /Chest Fly\s*Set 5/.test(body), body.match(/Chest Fly.{0,14}|Lateral Raise.{0,14}/)?.[0]);
+// Adding an exercise to the day mid-workout shows up too.
+await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('calapp-store'));
+  const d = new Date(); d.setHours(10, 0, 0, 0);
+  st.state.workouts.unshift({ id: 'extra', at: d.toISOString(), updatedAt: d.toISOString(), exerciseId: 'builtin:shoulder-press', exerciseName: 'Shoulder Press', type: 'weight_reps', caloriesBurned: 8, sets: [{ weightKg: 20, reps: 10, done: true }] });
+  localStorage.setItem('calapp-store', JSON.stringify(st));
+});
+await page.reload({ waitUntil: 'networkidle' });
+await page.waitForTimeout(2000);
+body = squash(await page.textContent('body'));
+check('an exercise added to the day mid-workout joins the strip', /Exercise 2 of 3/.test(body) && /Shoulder Press/.test(body), body.match(/Exercise \d of \d/)?.[0]);
+await page.screenshot({ path: `${OUT}/session-live-order.png`, fullPage: true });
+await page.evaluate(() => {
+  const st = JSON.parse(localStorage.getItem('calapp-store'));
+  st.state.workouts = st.state.workouts.filter((x) => x.id !== 'extra');
+  st.state.dayOrder = {};
+  localStorage.setItem('calapp-store', JSON.stringify(st));
+});
 
 console.log('\n=== A session into a preview record does not double it ===');
 // The doubled day from the report: a preview of last time (unlifted rows)

@@ -38,6 +38,37 @@ export interface DeepseekResult {
   outputTokens: number;
 }
 
+/**
+ * A reasoning model's hidden thinking shares max_tokens with its answer; when
+ * the thinking uses it all, the reply arrives with finish_reason=length and
+ * no content. Typed so the retry can raise the budget instead of repeating
+ * the same call and losing the same way.
+ */
+export class DeepseekBudgetError extends Error {
+  constructor(detail: string) {
+    super(`DeepSeek ran out of tokens before answering: ${detail}`);
+    this.name = 'DeepseekBudgetError';
+  }
+}
+
+/**
+ * The reply's text, or a typed failure. A reply that is tool-call markup
+ * (the model trying to invoke a tool it was not given) is a failure too:
+ * it has no JSON in it and would surface as "could not read that meal".
+ */
+export function readTextReply(json: DeepseekChatResponse, what = 'DeepSeek reply'): string {
+  const choice = json.choices?.[0];
+  const text = choice?.message?.content ?? '';
+  if (!text) {
+    if (choice?.finish_reason === 'length') throw new DeepseekBudgetError(describeEmptyReply(json));
+    throw new Error(`${what} had no content: ${describeEmptyReply(json)}`);
+  }
+  if (/DSML|<invoke\b|<tool_call\b|<function_call\b/.test(text)) {
+    throw new Error(`${what} was tool-call markup, not an answer: ${text.slice(0, 160)}`);
+  }
+  return text;
+}
+
 /** Text-only completion — the DeepSeek equivalent of index.ts's textCall. */
 export async function deepseekTextCall(prompt: string, maxTokens = 1500): Promise<DeepseekResult> {
   const key = process.env.DEEPSEEK_API_KEY;
@@ -59,8 +90,7 @@ export async function deepseekTextCall(prompt: string, maxTokens = 1500): Promis
     throw new Error(`DeepSeek request failed: ${res.status} ${body.slice(0, 300)}`);
   }
   const json = (await res.json()) as DeepseekChatResponse;
-  const text = json.choices?.[0]?.message?.content ?? '';
-  if (!text) throw new Error(`DeepSeek reply had no content: ${describeEmptyReply(json)}`);
+  const text = readTextReply(json);
   return {
     text,
     model: MODEL,
@@ -75,7 +105,7 @@ interface DeepseekToolCallWire {
   function?: { name?: string; arguments?: string };
 }
 
-interface DeepseekChatResponse {
+export interface DeepseekChatResponse {
   choices?: {
     message?: { content?: string; reasoning_content?: string; tool_calls?: DeepseekToolCallWire[] };
     finish_reason?: string;
@@ -210,8 +240,7 @@ export async function deepseekVisionCall(imageBase64Jpeg: string, prompt: string
     throw new Error(`DeepSeek vision request failed: ${res.status} ${body.slice(0, 300)}`);
   }
   const json = (await res.json()) as DeepseekChatResponse;
-  const text = json.choices?.[0]?.message?.content ?? '';
-  if (!text) throw new Error(`DeepSeek vision reply had no content: ${describeEmptyReply(json)}`);
+  const text = readTextReply(json, 'DeepSeek vision reply');
   return {
     text,
     model: VISION_MODEL,

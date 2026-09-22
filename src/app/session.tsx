@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Keyboard, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { PageHeader } from '@/components/brand-header';
@@ -11,6 +11,7 @@ import { ActionButton, Chip, IconTile } from '@/components/system';
 import { Button, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { dayExerciseIds } from '@/lib/day-plan';
 import { resolvePlan } from '@/lib/occurrences';
 import { useCelebrate } from '@/lib/celebrate';
 import { calendarDaysBetween, timestampFor } from '@/lib/day';
@@ -65,6 +66,8 @@ export default function SessionScreen() {
   const custom = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const occurrences = useAppStore((s) => s.occurrences);
+  const skips = useAppStore((s) => s.skips);
+  const dayOrder = useAppStore((s) => s.dayOrder);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const logSet = useAppStore((s) => s.logSet);
@@ -83,8 +86,16 @@ export default function SessionScreen() {
   const stale = !!session && !isSameDay(new Date().toISOString(), day);
   const showSummary = finishing || stale;
 
-  const index = session?.index ?? 0;
-  const exId = session?.exerciseIds[index];
+  // The day's list as Training shows it right now — reordered, skipped or
+  // added to since Start — not the copy taken at Start. The exercise being
+  // trained is found by identity, so a reorder moves the list, not the
+  // person; only if it was skipped does the position stand in.
+  const liveIds = session ? dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder }, day).ids : [];
+  const ids = liveIds.length ? liveIds : (session?.exerciseIds ?? []);
+  const wantedId = session?.currentId ?? session?.exerciseIds[session.index];
+  const foundIndex = wantedId ? ids.indexOf(wantedId) : -1;
+  const index = foundIndex >= 0 ? foundIndex : Math.min(session?.index ?? 0, Math.max(0, ids.length - 1));
+  const exId = ids[index];
   const ex = exId ? findExercise(exId, custom) : undefined;
   const type: ExerciseType = ex?.type ?? 'weight_reps';
   const dayPlan = resolvePlan(schedule, occurrences, day)?.day;
@@ -158,9 +169,12 @@ export default function SessionScreen() {
   if (!session) return null;
 
   const kg = t('progress.kg');
-  const total = session.exerciseIds.length;
+  const total = ids.length;
   const isLast = index >= total - 1;
-  const nextEx = !isLast ? findExercise(session.exerciseIds[index + 1], custom) : undefined;
+  const nextEx = !isLast ? findExercise(ids[index + 1], custom) : undefined;
+  // Dots for the sets: the plan's count, or one more than done when there
+  // is no plan (or it has been exceeded).
+  const dotCount = Math.max(planned.length, setNo + 1);
   const allPlannedDone = planned.length > 0 && setNo >= planned.length;
   const continuous = logStyleFor(ex) === 'continuous';
   const loggedContinuous = continuous && (todayWorkout?.sets.length ?? 0) > 0;
@@ -225,12 +239,12 @@ export default function SessionScreen() {
     lightHaptic();
   };
 
-  const go = (delta: number) => {
-    const next = Math.min(total - 1, Math.max(0, index + delta));
-    if (next === index) return;
-    updateSession({ index: next, restEndsAt: null });
+  const jumpTo = (next: number) => {
+    if (next === index || next < 0 || next >= total) return;
+    updateSession({ index: next, currentId: ids[next], restEndsAt: null });
     lightHaptic();
   };
+  const go = (delta: number) => jumpTo(Math.min(total - 1, Math.max(0, index + delta)));
 
   const finishAndSave = () => {
     endSession();
@@ -251,7 +265,7 @@ export default function SessionScreen() {
   // ── Summary ────────────────────────────────────────────────────────────
   if (showSummary) {
     const allocation = dayBurnAllocation(workouts, day, whoopBurnByDay, whoopWorkoutsByDay, whoopCalibrationFactor(workouts, whoopWorkoutsByDay));
-    const rows = session.exerciseIds.map((id) => {
+    const rows = ids.map((id) => {
       const e = findExercise(id, custom);
       const w = workoutFor(workouts, id, day);
       const done = w?.sets.filter((s) => s.done) ?? [];
@@ -321,17 +335,86 @@ export default function SessionScreen() {
         </View>
       }
     >
+      {/* The day's exercises in their live order: where you are, what is
+          done, and a tap to jump. This is the same list as the Training
+          card, so a reorder made there is what shows here. */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} style={styles.stripWrap}>
+        {ids.map((id, i) => {
+          const e = findExercise(id, custom);
+          const w = workoutFor(workouts, id, day);
+          const done = w?.sets.filter((st) => st.done).length ?? 0;
+          const plannedN = dayPlan?.plans?.[id]?.length ?? 0;
+          const current = i === index;
+          const complete = done > 0 && (plannedN === 0 || done >= plannedN);
+          const name = e ? exerciseName(e, lang) : id;
+          return (
+            <Pressable
+              key={id}
+              onPress={() => jumpTo(i)}
+              accessibilityRole="button"
+              accessibilityState={{ selected: current }}
+              accessibilityLabel={`${i + 1}. ${name} · ${t('track.setsSummary', { count: done })}`}
+              style={({ pressed }) => [
+                styles.stripChip,
+                current
+                  ? { backgroundColor: theme.primary }
+                  : complete
+                    ? { backgroundColor: theme.success + '22' }
+                    : { backgroundColor: theme.card },
+                !current && cardShadow(theme.shadow),
+                pressed && { opacity: 0.7 },
+              ]}
+            >
+              <View style={[styles.stripNum, current ? { backgroundColor: 'rgba(255,255,255,0.25)' } : { backgroundColor: theme.surfaceTint }]}>
+                {complete && !current ? (
+                  <Ionicons name="checkmark" size={12} color={theme.successText} />
+                ) : (
+                  <Text style={{ color: current ? theme.onPrimary : theme.primaryDark, fontSize: 11, fontWeight: '800' }}>{i + 1}</Text>
+                )}
+              </View>
+              <Text numberOfLines={1} style={{ color: current ? theme.onPrimary : theme.text, fontSize: 13, fontWeight: '700', maxWidth: 120 }}>
+                {name}
+              </Text>
+              {done > 0 && (
+                <Text style={{ color: current ? theme.onPrimary : theme.textSecondary, fontSize: 11, fontWeight: '700' }}>
+                  {plannedN ? `${done}/${plannedN}` : done}
+                </Text>
+              )}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
       <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
         <Text style={[styles.exerciseName, { color: theme.text }]}>{ex ? exerciseName(ex, lang) : exId}</Text>
-        <Text style={{ color: theme.textSecondary, fontSize: 16, marginTop: 2 }}>
-          {continuous
-            ? t(loggedContinuous ? 'track.sessionLogged' : 'session.thisSession')
-            : allPlannedDone
-              ? `${t('session.setNumber', { n: setNo + 1 })} · ${t('session.allPlannedDone')}`
-              : planned.length > 0
-                ? t('session.setOf', { n: setNo + 1, total: planned.length })
-                : t('session.setNumber', { n: setNo + 1 })}
-        </Text>
+        <View style={styles.setLine}>
+          <Text style={{ color: theme.textSecondary, fontSize: 16 }}>
+            {continuous
+              ? t(loggedContinuous ? 'track.sessionLogged' : 'session.thisSession')
+              : allPlannedDone
+                ? `${t('session.setNumber', { n: setNo + 1 })} · ${t('session.allPlannedDone')}`
+                : planned.length > 0
+                  ? t('session.setOf', { n: setNo + 1, total: planned.length })
+                  : t('session.setNumber', { n: setNo + 1 })}
+          </Text>
+          {!continuous && (
+            <View style={styles.dots} accessible accessibilityLabel={t('track.setsSummary', { count: setNo })}>
+              {Array.from({ length: Math.min(dotCount, 8) }, (_, i) => (
+                <View
+                  key={i}
+                  style={[
+                    styles.dot,
+                    i < setNo
+                      ? { backgroundColor: theme.primary }
+                      : i === setNo
+                        ? { borderWidth: 2, borderColor: theme.primary }
+                        : { backgroundColor: theme.border },
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* Target and Best: two different facts, two tiles. No target past the plan. */}
         <View style={styles.refRow}>
@@ -358,13 +441,18 @@ export default function SessionScreen() {
 
         {restRemaining > 0 && (
           <View style={[styles.restCard, { backgroundColor: theme.surfaceTint }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('session.rest')}</Text>
-              <Text style={[styles.restTime, { color: theme.primary }]}>
-                {Math.floor(restRemaining / 60)}:{String(restRemaining % 60).padStart(2, '0')}
-              </Text>
+            <View style={styles.restRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('session.rest')}</Text>
+                <Text style={[styles.restTime, { color: theme.primary }]}>
+                  {Math.floor(restRemaining / 60)}:{String(restRemaining % 60).padStart(2, '0')}
+                </Text>
+              </View>
+              <ActionButton label={t('session.skipRest')} variant="secondary" onPress={() => updateSession({ restEndsAt: null })} />
             </View>
-            <ActionButton label={t('session.skipRest')} variant="secondary" onPress={() => updateSession({ restEndsAt: null })} />
+            <View style={[styles.restTrack, { backgroundColor: theme.border }]}>
+              <View style={[styles.restFill, { backgroundColor: theme.primary, width: `${Math.max(2, Math.min(100, Math.round((restRemaining / Math.max(1, session.restSeconds)) * 100)))}%` }]} />
+            </View>
           </View>
         )}
 
@@ -499,12 +587,22 @@ export default function SessionScreen() {
 }
 
 const styles = StyleSheet.create({
+  stripWrap: { marginHorizontal: -Spacing.page, marginBottom: Spacing.sm },
+  strip: { paddingHorizontal: Spacing.page, gap: 8, paddingVertical: 4 },
+  stripChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.full, paddingStart: 4, paddingEnd: 12, minHeight: 36 },
+  stripNum: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  setLine: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm, marginTop: 2 },
+  dots: { flexDirection: 'row', gap: 5 },
+  dot: { width: 10, height: 10, borderRadius: 5 },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
   exerciseName: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
   refRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
   ref: { flex: 1, borderRadius: Radius.control, padding: Spacing.ms, gap: 2, minHeight: 78 },
   refValue: { fontSize: 20, fontWeight: '800' },
-  restCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.control, padding: Spacing.ms, marginTop: Spacing.md },
+  restCard: { borderRadius: Radius.control, padding: Spacing.ms, marginTop: Spacing.md, gap: Spacing.sm },
+  restRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  restTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
+  restFill: { height: 6, borderRadius: 3 },
   restTime: { fontSize: 30, fontWeight: '800', fontVariant: ['tabular-nums'] },
   steppers: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
   lastTime: { marginTop: Spacing.md, gap: 6 },

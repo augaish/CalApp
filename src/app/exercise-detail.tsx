@@ -226,7 +226,25 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
     setNote(s.comment ?? '');
   };
 
-  /** A set from last time fills the steppers; nothing is logged until Add set. */
+  /** "Log" on a last-time row: that set, done, now — no fields to confirm. */
+  const logReference = (s: WorkoutSet) => {
+    Keyboard.dismiss();
+    successHaptic();
+    logSet(
+      { id: exercise.id, name: exerciseName(exercise, lang), type, category: exercise.category },
+      {
+        weightKg: type === 'weight_reps' ? s.weightKg : undefined,
+        reps: type === 'weight_reps' || type === 'bodyweight_reps' ? s.reps : undefined,
+        seconds: type === 'time' || type === 'distance_time' ? s.seconds : undefined,
+        distanceM: type === 'distance_time' ? s.distanceM : undefined,
+        done: true,
+      },
+      timestampFor(viewDay),
+    );
+    useCelebrate.getState().celebrate(t('celebrate.setLogged'));
+  };
+
+  /** Tapping a last-time row's text fills the steppers for a tweak before Add set. */
   const pickReference = (s: WorkoutSet) => {
     lightHaptic();
     setEditingIndex(null);
@@ -355,7 +373,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
           fromWhoop={todayFromWhoop}
           sets={todaySets.map((set, index) => ({ set, index })).filter((r) => r.set.done)}
           reference={
-            !continuous && liftedSets.length === 0 && lastSession
+            !continuous && lastSession
               ? {
                   sets: lastSession.sets,
                   when: isSameDay(lastSession.at, new Date())
@@ -365,6 +383,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
               : undefined
           }
           onPickReference={pickReference}
+          onLogReference={logReference}
           editingIndex={editingIndex}
           onSelect={selectSet}
           onDelete={deleteSet}
@@ -483,6 +502,7 @@ function TrackTab({
   sets,
   reference,
   onPickReference,
+  onLogReference,
   caloriesBurned,
   fromWhoop,
   editingIndex,
@@ -509,9 +529,12 @@ function TrackTab({
   dayLabel: string;
   /** The day's lifted sets, each with its index in the stored record. */
   sets: { set: WorkoutSet; index: number }[];
-  /** Last time's sets, shown while nothing is lifted today; a tap fills the steppers. */
+  /** Last time's sets. Rows already matched by today's count read as done;
+   * the rest carry Log (that set, now) and fill the steppers when their
+   * text is tapped. */
   reference?: { sets: WorkoutSet[]; when: string };
   onPickReference: (s: WorkoutSet) => void;
+  onLogReference: (s: WorkoutSet) => void;
   /** Screen's own scroller and this field's ref — used to scroll the note
    * field into view above the keyboard, since RN's automatic version
    * doesn't reach it once a KeyboardAvoidingView is in the ancestry (see
@@ -611,39 +634,11 @@ function TrackTab({
         <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.sm }}>
           {sets.length > 0 ? t('track.sessionLogged') : t('track.sessionHint')}
         </Text>
-      ) : sets.length === 0 ? (
-        reference ? (
-          // Nothing lifted today: last time, as a reference to tap into the
-          // steppers. Not a record — the day has none until Add set.
-          <Card>
-            <View style={styles.histHead}>
-              <Text style={{ color: theme.textSecondary, fontWeight: '700', flex: 1 }}>{t('training.lastTime')}</Text>
-              <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '600' }}>{reference.when}</Text>
-            </View>
-            {reference.sets.map((s, i) => (
-              <Pressable
-                key={i}
-                onPress={() => onPickReference(s)}
-                accessibilityRole="button"
-                accessibilityLabel={`${t('training.lastTime')} ${i + 1} ${setLabel(s, type, kg, t('track.min'))}`}
-                style={[styles.setRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}
-              >
-                <View style={[styles.setNum, { borderWidth: 1, borderColor: theme.border }]}>
-                  <Text style={{ color: theme.textTertiary, fontWeight: '800', fontSize: 13 }}>{i + 1}</Text>
-                </View>
-                <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 15, flex: 1 }}>
-                  {setLabel(s, type, kg, t('track.min'))}
-                </Text>
-                <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('track.useSet')}</Text>
-              </Pressable>
-            ))}
-          </Card>
-        ) : (
-          <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.sm }}>
-            {t('training.emptyDay')}
-          </Text>
-        )
-      ) : (
+      ) : sets.length === 0 && !reference ? (
+        <Text style={{ color: theme.textTertiary, textAlign: 'center', marginTop: Spacing.sm }}>
+          {t('training.emptyDay')}
+        </Text>
+      ) : sets.length === 0 ? null : (
         <Card>
           {sets.map(({ set: s, index }, i) => {
             const active = editingIndex === index;
@@ -686,6 +681,52 @@ function TrackTab({
                   <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
                 </Pressable>
               </Pressable>
+            );
+          })}
+        </Card>
+      )}
+
+      {reference && !continuous && (
+        // Last time, row by row. A row the day has already matched (by
+        // count) is ticked; the rest can be logged as they are in one tap,
+        // or tapped on their text to fill the steppers for a tweak.
+        <Card>
+          <View style={styles.histHead}>
+            <Text style={{ color: theme.textSecondary, fontWeight: '700', flex: 1 }}>{t('training.lastTime')}</Text>
+            <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '600' }}>{reference.when}</Text>
+          </View>
+          {reference.sets.map((s, i) => {
+            const matched = i < sets.length;
+            return (
+              <View key={i} style={[styles.setRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }, matched && { opacity: 0.5 }]}>
+                <View style={[styles.setNum, { borderWidth: 1, borderColor: theme.border }]}>
+                  {matched ? (
+                    <Ionicons name="checkmark" size={14} color={theme.successText} />
+                  ) : (
+                    <Text style={{ color: theme.textTertiary, fontWeight: '800', fontSize: 13 }}>{i + 1}</Text>
+                  )}
+                </View>
+                <Pressable
+                  onPress={() => onPickReference(s)}
+                  disabled={matched}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${t('training.lastTime')} ${i + 1} ${setLabel(s, type, kg, t('track.min'))}`}
+                  style={{ flex: 1, minHeight: 32, justifyContent: 'center' }}
+                >
+                  <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 15 }}>{setLabel(s, type, kg, t('track.min'))}</Text>
+                </Pressable>
+                {!matched && (
+                  <Pressable
+                    onPress={() => onLogReference(s)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('track.logSet')} ${setLabel(s, type, kg, t('track.min'))}`}
+                    style={({ pressed }) => [styles.logBtn, { backgroundColor: theme.primary }, pressed && { opacity: 0.7 }]}
+                  >
+                    <Ionicons name="checkmark" size={14} color={theme.onPrimary} />
+                    <Text style={{ color: theme.onPrimary, fontWeight: '700', fontSize: 13 }}>{t('track.logSet')}</Text>
+                  </Pressable>
+                )}
+              </View>
             );
           })}
         </Card>
@@ -809,6 +850,7 @@ const styles = StyleSheet.create({
   },
   setRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 10, paddingHorizontal: 4, borderRadius: Radius.sm },
   setNum: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  logBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: Radius.full, paddingHorizontal: 12, minHeight: 32 },
   histHead: { flexDirection: 'row', alignItems: 'center', marginBottom: Spacing.sm },
   histSet: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: 4 },
   emptyBox: {

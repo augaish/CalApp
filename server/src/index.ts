@@ -833,14 +833,21 @@ function toDeepseekTool(tool: Anthropic.Tool): DeepseekTool {
  * and return no content at all; one retry catches nearly all of those
  * without falling back to a paid Claude call.
  */
-async function withOneRetry<T>(call: () => Promise<T>): Promise<T> {
+async function withOneRetry<T>(call: (attempt: 0 | 1) => Promise<T>): Promise<T> {
   try {
-    return await call();
+    return await call(0);
   } catch (err) {
     console.warn('deepseek call failed once, retrying:', err instanceof Error ? err.message : err);
-    return await call();
+    return await call(1);
   }
 }
+
+/**
+ * Token budget for a DeepSeek text call: the retry gets three times the
+ * room, because the failure it most often follows is the model's hidden
+ * reasoning spending the whole first budget (DeepseekBudgetError).
+ */
+const dsBudget = (attempt: 0 | 1, base: number) => (attempt ? base * 3 : base);
 
 app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
@@ -853,7 +860,7 @@ app.post('/api/analyze-meal', async (c) => {
     if ((await providerFor(access)) === 'deepseek') {
       // Same generous budget as the shadow test, for the same reason (a
       // reasoning model's thinking shares max_tokens with the JSON answer).
-      const ds = await withOneRetry(() => deepseekVisionCall(parsed.image, mealPrompt(parsed.language), 8000));
+      const ds = await withOneRetry((attempt) => deepseekVisionCall(parsed.image, mealPrompt(parsed.language), dsBudget(attempt, 8000)));
       await trackUsage({ ref, kind: 'meal' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
       return c.json(toMealAnalysis(ds.text));
     }
@@ -1084,7 +1091,7 @@ app.post('/api/analyze-equipment', async (c) => {
     const detailsPrompt = equipmentDetailsPrompt(parsed.language, name);
     let raw: unknown;
     if (provider === 'deepseek') {
-      const ds = await withOneRetry(() => deepseekTextCall(detailsPrompt, 4000));
+      const ds = await withOneRetry((attempt) => deepseekTextCall(detailsPrompt, dsBudget(attempt, 4000)));
       await trackUsage({ ref, kind: 'equipment' }, ds.model, {
         input_tokens: ds.inputTokens,
         output_tokens: ds.outputTokens,
@@ -1213,7 +1220,7 @@ app.post('/api/analyze-text', async (c) => {
     if ((await providerFor(access)) === 'deepseek') {
       // No web search on this path — a branded/restaurant item gets
       // DeepSeek's own knowledge of it rather than a live menu lookup.
-      const ds = await withOneRetry(() => deepseekTextCall(textMealPrompt(language, text), 4000));
+      const ds = await withOneRetry((attempt) => deepseekTextCall(textMealPrompt(language, text, { canSearch: false }) + (attempt ? JSON_ONLY_REMINDER : ''), dsBudget(attempt, 4000)));
       await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
       return c.json(toMealAnalysis(ds.text));
     }
@@ -1314,7 +1321,7 @@ app.post('/api/refine-meal', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     if ((await providerFor(access)) === 'deepseek') {
-      const ds = await withOneRetry(() => deepseekTextCall(refineMealPrompt(language, items, message), 4000));
+      const ds = await withOneRetry((attempt) => deepseekTextCall(refineMealPrompt(language, items, message, { canSearch: false }) + (attempt ? JSON_ONLY_REMINDER : ''), dsBudget(attempt, 4000)));
       await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
       return c.json(toMealAnalysis(ds.text));
     }
@@ -1360,7 +1367,7 @@ app.post('/api/analyze-exercise', async (c) => {
       // Same reasoning-token budget issue as the meal call (see there) —
       // 600 was tight enough that this used to lose to the Claude fallback
       // on most real requests.
-      const ds = await withOneRetry(() => deepseekTextCall(prompt, 4000));
+      const ds = await withOneRetry((attempt) => deepseekTextCall(prompt, dsBudget(attempt, 4000)));
       await trackUsage({ ref, kind: 'exercise' }, ds.model, {
         input_tokens: ds.inputTokens,
         output_tokens: ds.outputTokens,

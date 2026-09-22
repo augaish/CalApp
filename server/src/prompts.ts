@@ -91,7 +91,36 @@ export const JSON_ONLY_REMINDER = `
 
 IMPORTANT: The previous attempt did not come back as JSON. Do not search and do not explain anything outside the JSON — reply with the JSON object only, starting with "{". If the user already stated calories or macros, use those figures as given.`;
 
-export function textMealPrompt(language: Language, text: string): string {
+/**
+ * Whether the model answering can search the web. Claude on this route can;
+ * DeepSeek cannot, and a prompt that names a web_search tool made it answer
+ * in tool-call markup instead of JSON (the "could not read that meal" on a
+ * branded product). A model with no tools is told so, plainly.
+ */
+export interface PromptOptions {
+  canSearch?: boolean;
+}
+
+const BRANDS = `international (e.g. "McDonald's Big Mac meal", "Starbucks grande latte") OR regional Gulf/Levant chains (e.g. "كودو", "الطازج", "البيك", "هرفي", "مام نورة", or their English names Kudu, Al Tazaj, Al Baik, Herfy, Mama Noura)`;
+
+function brandBlock(opts: PromptOptions | undefined, verb: string): string {
+  if (opts?.canSearch === false) {
+    return `RESTAURANT AND BRANDED-PRODUCT ACCURACY:
+- You have NO tools and cannot search the web. Never attempt a tool call and never write tool-call markup of any kind — the whole reply is the JSON object below.
+- If the text names a specific restaurant, chain, or packaged product — ${BRANDS} — use your own knowledge of that brand's published nutrition for the exact item, and say so in "notes" (e.g. "Used the brand's published figures per 100 g").
+- If you do not know the item's figures, estimate from the realism guidance above and say in "notes" that it is an estimate — never invent a source.
+- If a size or side isn't specified, assume the standard/medium size and say so in "notes".
+- Keep any reasoning short: this is a small estimate, not a research task.`;
+  }
+  return `RESTAURANT AND BRANDED-PRODUCT ACCURACY:
+- If the description names a specific restaurant, chain, or packaged product — ${BRANDS} — use the web_search tool BEFORE ${verb} — check the brand's own published nutrition info, or a reputable database (nutritionix, myfitnesspal, fatsecret). 1-3 searches is normally enough; if two sources disagree, prefer the brand's own listing.
+- When you have official nutrition for the exact item, use THOSE figures instead of the general realism guidance above, and say what you used in "notes", e.g. "Used McDonald's official Big Mac meal nutrition (medium fries + regular Coke)."
+- If a size or side isn't specified (e.g. "a Big Mac meal" with no size given), assume the standard/medium size and say so in "notes".
+- Do NOT search for generic home-cooked or unbranded food ("rice with chicken", "a sandwich") — answer those directly, as before.
+- If search finds nothing usable (a small local place, or the tool is unavailable), fall back to the realism-based estimate — never invent a source you did not actually check.`;
+}
+
+export function textMealPrompt(language: Language, text: string, opts?: PromptOptions): string {
   return `You are a meticulous nutrition analyst with deep knowledge of international cuisines, especially Middle Eastern and Gulf dishes.
 
 The user described a meal in text: "${text.replace(/"/g, "'")}"
@@ -100,12 +129,7 @@ Estimate the foods, realistic portions, calories and macros AS ACTUALLY SERVED.
 
 ${REALISM_BLOCK(language)}
 
-RESTAURANT AND BRANDED-PRODUCT ACCURACY:
-- If the description names a specific restaurant, chain, or packaged product — international (e.g. "McDonald's Big Mac meal", "Starbucks grande latte") OR regional Gulf/Levant chains (e.g. "كودو", "الطازج", "البيك", "هرفي", "مام نورة", or their English names Kudu, Al Tazaj, Al Baik, Herfy, Mama Noura) — use the web_search tool BEFORE estimating — check the brand's own published nutrition info, or a reputable database (nutritionix, myfitnesspal, fatsecret). 1-3 searches is normally enough; if two sources disagree, prefer the brand's own listing.
-- When you have official nutrition for the exact item, use THOSE figures instead of the general realism guidance above, and say what you used in "notes", e.g. "Used McDonald's official Big Mac meal nutrition (medium fries + regular Coke)."
-- If a size or side isn't specified (e.g. "a Big Mac meal" with no size given), assume the standard/medium size and say so in "notes".
-- Do NOT search for generic home-cooked or unbranded food ("rice with chicken", "a sandwich") — answer those directly, as before.
-- If search finds nothing usable (a small local place, or the tool is unavailable), fall back to the realism-based estimate — never invent a source you did not actually check.
+${brandBlock(opts, 'estimating')}
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema:
 {
@@ -138,7 +162,7 @@ Rules:
  * rice", "actually 300g"), not something that needs a second look at a
  * photo, and skipping that keeps every correction fast and cheap.
  */
-export function refineMealPrompt(language: Language, items: FoodItem[], message: string): string {
+export function refineMealPrompt(language: Language, items: FoodItem[], message: string, opts?: PromptOptions): string {
   const current = items.map((it) => ({
     name: it.name,
     portion: it.portion,
@@ -162,9 +186,7 @@ Apply ONLY what they actually said, and leave everything else in the current est
 
 ${REALISM_BLOCK(language)}
 
-RESTAURANT AND BRANDED-PRODUCT ACCURACY:
-- If the correction names a specific restaurant, chain, or packaged product — international (e.g. "McDonald's Big Mac meal", "Starbucks grande latte") OR regional Gulf/Levant chains (e.g. "كودو", "الطازج", "البيك", "هرفي", "مام نورة", or their English names Kudu, Al Tazaj, Al Baik, Herfy, Mama Noura) — use the web_search tool BEFORE re-estimating that item — check the brand's own published nutrition info, or a reputable database (nutritionix, myfitnesspal, fatsecret). 1-3 searches is normally enough; if two sources disagree, prefer the brand's own listing.
-- When you have official nutrition for the exact item, use THOSE figures instead of the general realism guidance above, and say what you used in "notes".
+${brandBlock(opts, 're-estimating that item')}
 
 Respond with ONLY valid JSON, no markdown fences, matching exactly this schema — the FULL corrected item list, not just what changed:
 {

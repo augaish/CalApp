@@ -912,7 +912,7 @@ export const ar: TranslationSchema = {
     distance: 'المسافة (م)',
     addSet: 'إضافة مجموعة',
     saveSet: 'حفظ المجموعة',
-    useSet: 'استخدم',
+    logSet: 'سجّل',
     saveSession: 'حفظ الجلسة',
     sessionLogged: 'سُجّلت الجلسة',
     sessionHint: 'شغّل المؤقّت أو حدّد المدة، ثم احفظ.',

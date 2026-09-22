@@ -25,7 +25,17 @@ export default function Describe() {
     if (text.trim().length < 3 || busy) return;
     setBusy(true);
     try {
-      const analysis = await analyzeText(text.trim(), language);
+      let analysis;
+      try {
+        analysis = await analyzeText(text.trim(), language);
+      } catch (first) {
+        // One quiet retry for a failed estimate — a reasoning model that ran
+        // out of room, a reply without JSON — before the person is told. A
+        // quota or credits answer is final and is not retried.
+        const transient = first instanceof ApiError && !(first instanceof QuotaError) && first.code !== 'ai_credits_exhausted';
+        if (!transient) throw first;
+        analysis = await analyzeText(text.trim(), language);
+      }
       useEntitlement.getState().spend();
       setMeal(analysis, null);
       router.replace('/meal-result');

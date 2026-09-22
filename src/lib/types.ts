@@ -651,8 +651,15 @@ export interface ActiveSession {
   startedAt: string;
   /** dateKey() of the day the session belongs to. */
   dayKey: string;
+  /** The day's list as it stood at Start — a fallback only. The session
+   * follows the day's live list (see dayExerciseIds), so a reorder, a skip
+   * or an exercise added mid-workout shows up straight away. */
   exerciseIds: string[];
   index: number;
+  /** The exercise being trained, by identity, so a reorder never moves the
+   * person onto a different exercise. Absent on sessions from before it
+   * existed; `index` into the live list stands in. */
+  currentId?: string;
   /** ISO time the current rest ends, or null when not resting. */
   restEndsAt: string | null;
   restSeconds: number;

@@ -1096,6 +1096,7 @@ export const useAppStore = create<AppState>()(
             dayKey: dateKey(day),
             exerciseIds,
             index: 0,
+            currentId: exerciseIds[0],
             restEndsAt: null,
             restSeconds: 90,
             ...(occurrenceId ? { occurrenceId } : {}),
@@ -1448,7 +1449,11 @@ export function mergeExerciseState(s: MergeSlice, fromId: string, intoId: string
     skips: remap(s.skips),
     dayOrder: remap(s.dayOrder),
     activeSession: s.activeSession
-      ? { ...s.activeSession, exerciseIds: swapList(s.activeSession.exerciseIds) }
+      ? {
+          ...s.activeSession,
+          exerciseIds: swapList(s.activeSession.exerciseIds),
+          ...(s.activeSession.currentId === fromId ? { currentId: intoId } : {}),
+        }
       : s.activeSession,
     // Built-ins live in code, so only a custom entry is ever removed.
     exercises: s.exercises.filter((e) => e.id !== fromId),

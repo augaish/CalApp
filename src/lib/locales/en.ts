@@ -912,7 +912,7 @@ export const en = {
     distance: 'Distance (m)',
     addSet: 'Add set',
     saveSet: 'Save set',
-    useSet: 'Use',
+    logSet: 'Log',
     saveSession: 'Save session',
     sessionLogged: 'Session logged',
     sessionHint: 'Time it, or set the duration, then save.',
