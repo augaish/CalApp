@@ -45,3 +45,4 @@ example
 # env files with secrets
 .env
 server/.env
+qa-out/
