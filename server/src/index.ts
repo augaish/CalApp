@@ -67,6 +67,8 @@ import {
   upsertPromo,
   deletePromo,
   listRedemptions,
+  clearPromo,
+  recordPromoConversion,
 } from './db.js';
 import {
   citationDomains,
@@ -107,7 +109,7 @@ import {
   type DeepseekTool,
 } from './deepseek.js';
 import { estimateCostUsd } from './pricing.js';
-import { decide, type RevenueCatEvent } from './revenuecat.js';
+import { decide, planFromSubscriber, type RevenueCatEvent, type SubscriberRecord } from './revenuecat.js';
 import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining } from './promo.js';
 import {
   bodyReadingPrompt,
@@ -1710,6 +1712,7 @@ app.post('/api/generate-program', async (c) => {
 app.get('/api/me', async (c) => {
   const ref = await callerRef(c);
   const access = await checkAccess(ref, 'meal');
+  const user = ref ? await getOrCreateUser(ref) : null;
   const sponsor = await getSetting<Record<string, unknown> | null>('sponsor', null);
   const [prices, limits, weights] = await Promise.all([
     planPrices(),
@@ -1752,6 +1755,16 @@ app.get('/api/me', async (c) => {
     // uses 5 of your credits" before spending them rather than after.
     weights,
     sponsor,
+    // The store SDK's public keys. Served rather than baked into the app so
+    // subscriptions switch on by setting two variables on the server, with
+    // no release. Public by design (RevenueCat's "public app-specific" keys);
+    // the secret key never leaves this server.
+    billing: {
+      iosKey: process.env.REVENUECAT_IOS_KEY || null,
+      androidKey: process.env.REVENUECAT_ANDROID_KEY || null,
+    },
+    // How long a promo gift has left, so the app can say so.
+    promo: user?.promo ?? null,
   });
 });
 
@@ -1864,6 +1877,14 @@ app.post('/api/billing/revenuecat', async (c) => {
 
     if (action.kind === 'grant') {
       await setUserPlan(ref, action.plan, action.note, action.until);
+      // A first purchase may have come from a discount code: mark it, so the
+      // admin sees how many redemptions turned into paying customers.
+      if ((event.type ?? '').toUpperCase() === 'INITIAL_PURCHASE') {
+        const offer = event.offer_code ? normalizeCode(event.offer_code) : '';
+        await recordPromoConversion(ref, offer || null).catch((err) =>
+          console.error('promo conversion failed:', err),
+        );
+      }
     } else {
       await setUserPlan(ref, 'free', action.note, null);
     }
@@ -1872,6 +1893,41 @@ app.post('/api/billing/revenuecat', async (c) => {
   } catch (err) {
     console.error('billing webhook failed:', err);
     return c.json({ error: 'webhook_failed' }, 500);
+  }
+});
+
+/**
+ * "I just paid": ask RevenueCat directly what this person is entitled to and
+ * apply it now, so the plan changes as the store sheet closes rather than
+ * whenever the webhook lands. The webhook stays the source of truth for
+ * renewals, lapses and refunds; this only ever grants what RevenueCat itself
+ * reports as active, for the caller's own id.
+ */
+app.post('/api/billing/sync', async (c) => {
+  const raw = validRef(c.req.header('x-calgym-user') ?? '');
+  const ref = await callerRef(c);
+  if (!raw || !ref) return c.json({ error: 'identify_required' }, 400);
+  const key = process.env.REVENUECAT_SECRET_KEY;
+  if (!key) return c.json({ ok: false, result: 'not_configured' });
+  try {
+    // The store purchase is filed under the id the app configured with,
+    // which is the raw header id; the plan goes to whoever that id now is.
+    const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(raw)}`, {
+      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return c.json({ ok: false, result: `revenuecat_${res.status}` });
+    const found = planFromSubscriber((await res.json()) as SubscriberRecord);
+    if (found) await setUserPlan(ref, found.plan, 'revenuecat:sync', found.until);
+    const access = await checkAccess(ref, 'coach');
+    return c.json({
+      ok: true,
+      result: found ? 'granted' : 'none',
+      entitlement: { plan: access.plan, used: access.used, limit: access.limit, period: access.period },
+    });
+  } catch (err) {
+    console.error('billing sync failed:', err);
+    return c.json({ ok: false, result: 'sync_failed' });
   }
 });
 
@@ -2371,6 +2427,9 @@ app.post('/admin/api/plan', async (c) => {
       ? new Date(Date.now() + body.days * 86400000).toISOString()
       : null;
   await setUserPlan(ref, plan, 'admin', until, body.note);
+  // Setting someone to free is a revoke: a running code gift goes too, or
+  // the person would stay on the gifted tier with the table showing free.
+  if (plan === 'free') await clearPromo(ref);
   return c.json({ ok: true, ...(await getOrCreateUser(ref)) });
 });
 

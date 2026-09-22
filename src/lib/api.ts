@@ -35,15 +35,32 @@ export const isMockMode = !API_URL;
  * and resolve the plan. Replaced by the real auth user id when sign-in ships.
  */
 let installId: string | null = null;
+const idListeners = new Set<(id: string) => void>();
 export function setInstallId(id: string | null) {
+  const before = installId;
   installId = id;
+  if (id && before && id !== before) idListeners.forEach((fn) => fn(id));
+}
+
+/**
+ * Called whenever the id the server knows this person by changes (sign-in,
+ * sign-out) — the store SDK must follow it, or a purchase would be filed
+ * under an id the server no longer answers to.
+ */
+export function onIdentityChange(fn: (id: string) => void): () => void {
+  idListeners.add(fn);
+  return () => idListeners.delete(fn);
+}
+
+/** The id sent as x-calgym-user: the account id when signed in, else the install id. */
+export function currentRef(): string {
+  // The server refuses unmetered calls, so never send one without an id: if
+  // launch has not set it yet, mint it from the store on the spot.
+  return installId ?? useAppStore.getState().ensureInstallId();
 }
 
 function authHeaders(): Record<string, string> {
-  // The server refuses unmetered calls, so never send one without an id: if
-  // launch has not set it yet, mint it from the store on the spot.
-  const id = installId ?? useAppStore.getState().ensureInstallId();
-  return { 'x-calgym-user': id };
+  return { 'x-calgym-user': currentRef() };
 }
 
 // Defined in a leaf module so the rule for what to say about each failure
@@ -102,6 +119,10 @@ export interface Entitlement {
     limits?: { free?: number; pro?: number; proPlus?: number };
     coachCap?: number | null;
   };
+  /** RevenueCat public SDK keys; null until subscriptions are switched on. */
+  billing?: { iosKey?: string | null; androidKey?: string | null } | null;
+  /** A code gift that is running, whatever the plan shown. */
+  promo?: { plan: 'pro' | 'proPlus'; until: string; code: string | null } | null;
   sponsor?: {
     enabled?: boolean;
     title?: string;
@@ -201,6 +222,68 @@ export async function fetchEntitlement(): Promise<Entitlement | null> {
   }
 }
 
+export type RedeemFailure =
+  | 'unknown'
+  | 'inactive'
+  | 'not_started'
+  | 'expired'
+  | 'exhausted'
+  | 'already_redeemed'
+  | 'already_subscribed'
+  | 'unavailable'
+  | 'identify_required'
+  | 'offline';
+
+export type RedeemResponse =
+  | { ok: true; kind: 'free'; code: string; plan: 'pro' | 'proPlus'; until: string }
+  | {
+      ok: true;
+      kind: 'percent';
+      code: string;
+      plan: 'pro' | 'proPlus';
+      percentOff: number;
+      offerIos: string | null;
+      offerAndroid: string | null;
+      again?: boolean;
+    }
+  | { ok: false; reason: RedeemFailure };
+
+/** Redeem a promotion code for this account. Never throws. */
+export async function redeemCode(code: string): Promise<RedeemResponse> {
+  try {
+    const res = await fetch(`${API_URL}/api/redeem`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ code }),
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+    if (res.ok && data.ok) return data as RedeemResponse;
+    const known: RedeemFailure[] = [
+      'unknown', 'inactive', 'not_started', 'expired', 'exhausted',
+      'already_redeemed', 'already_subscribed', 'unavailable', 'identify_required',
+    ];
+    const reason = known.includes(data.error as RedeemFailure) ? (data.error as RedeemFailure) : 'unavailable';
+    return { ok: false, reason };
+  } catch {
+    return { ok: false, reason: 'offline' };
+  }
+}
+
+/**
+ * Ask the server to read this person's subscription straight from the store
+ * side, right after a purchase or restore, so the plan changes without
+ * waiting for the webhook. Best-effort.
+ */
+export async function syncBilling(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_URL}/api/billing/sync`, { method: 'POST', headers: authHeaders() });
+    const data = (await res.json().catch(() => ({}))) as { result?: string };
+    return data.result === 'granted';
+  } catch {
+    return false;
+  }
+}
+
 export interface WhoopStatus {
   connected: boolean;
   scope?: string;
@@ -214,7 +297,7 @@ export interface WhoopStatus {
  * as a query param rather than the usual x-calgym-user header.
  */
 export function whoopAuthorizeUrl(): string {
-  const ref = installId ?? useAppStore.getState().ensureInstallId();
+  const ref = currentRef();
   return `${API_URL}/api/whoop/authorize?ref=${encodeURIComponent(ref)}`;
 }
 

@@ -46,6 +46,8 @@ export interface PromoCode {
   active: boolean;
   note: string | null;
   createdAt: string;
+  /** Redemptions a purchase was matched to (percent codes). */
+  convertedCount?: number;
 }
 
 export type RedeemFailure =
@@ -55,11 +57,23 @@ export type RedeemFailure =
   | 'expired'
   | 'exhausted'
   | 'already_redeemed'
+  /** A free code would be wasted: the account already pays for this tier or better. */
+  | 'already_subscribed'
   | 'unavailable';
 
 export type RedeemResult =
   | { ok: true; kind: 'free'; code: string; plan: Plan; until: string }
-  | { ok: true; kind: 'percent'; code: string; plan: Plan; percentOff: number; offerIos: string | null; offerAndroid: string | null }
+  | {
+      ok: true;
+      kind: 'percent';
+      code: string;
+      plan: Plan;
+      percentOff: number;
+      offerIos: string | null;
+      offerAndroid: string | null;
+      /** True when this person had already claimed it and is being handed the offer again. */
+      again?: boolean;
+    }
   | { ok: false; reason: RedeemFailure };
 
 /** Arabic-Indic and Eastern Arabic digits, so a typed code works in either keyboard. */
@@ -208,6 +222,48 @@ export function cleanDraft(input: PromoDraft): { ok: true; value: CleanPromo } |
   };
 }
 
+export const PLAN_RANK: Record<Plan, number> = { free: 0, pro: 1, proPlus: 2 };
+
+export interface EffectivePlan {
+  plan: Plan;
+  source: string;
+  until: string | null;
+  /** The store/admin grant alone, lapsed to free once out of date. */
+  store: { plan: Plan; source: string; until: string | null };
+  /** The gift, when one is running. */
+  promo: { plan: Plan; until: string; code: string | null } | null;
+}
+
+/**
+ * The plan a person has: the better of what the store (or an admin) granted
+ * and a running promo gift. Pure, so the combinations can be tested without
+ * a database. The store grant keeps its own source and dates even while a
+ * gift outranks it, so when the gift ends the subscription simply shows
+ * through again.
+ */
+export function effectivePlan(
+  store: { plan: Plan; source: string; until: string | null },
+  promo: { plan: Plan | null; until: string | null; code: string | null },
+  now: Date = new Date(),
+): EffectivePlan {
+  const lapsed = store.until != null && new Date(store.until).getTime() < now.getTime();
+  const storeNow = { plan: lapsed ? ('free' as Plan) : store.plan, source: store.source, until: store.until };
+  const promoNow =
+    promo.plan && promo.plan !== 'free' && promo.until && new Date(promo.until).getTime() > now.getTime()
+      ? { plan: promo.plan, until: promo.until, code: promo.code }
+      : null;
+  if (promoNow && PLAN_RANK[promoNow.plan] > PLAN_RANK[storeNow.plan]) {
+    return {
+      plan: promoNow.plan,
+      source: `promo:${promoNow.code ?? ''}`,
+      until: promoNow.until,
+      store: storeNow,
+      promo: promoNow,
+    };
+  }
+  return { ...storeNow, store: storeNow, promo: promoNow };
+}
+
 /** When a free grant made now would run out. */
 export function grantUntil(durationDays: number | null, now: Date = new Date()): string {
   const d = new Date(now);
@@ -225,34 +281,61 @@ export function grantUntil(durationDays: number | null, now: Date = new Date()):
  * record that this person was given the offer.
  */
 export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemResult> {
-  const { claimPromo, getPromo, setUserPlan } = await import('./db.js');
+  const { claimPromo, getOrCreateUser, getPromo, getRedemption, grantPromo } = await import('./db.js');
   const code = normalizeCode(rawCode);
   if (code.length < 3) return { ok: false, reason: 'unknown' };
 
   const existing = await getPromo(code);
   if (!existing) return { ok: false, reason: 'unknown' };
 
-  const until = existing.kind === 'free' ? grantUntil(existing.durationDays) : null;
+  const user = await getOrCreateUser(ref);
+  let until: string | null = null;
+  if (existing.kind === 'free') {
+    // Days of a tier someone already pays for would simply be lost, and the
+    // redemption counted against the campaign for nothing. Checked before
+    // the claim so the code stays unspent for them.
+    const paying = user?.storePlan?.plan ?? 'free';
+    if (PLAN_RANK[paying] >= PLAN_RANK[existing.plan]) return { ok: false, reason: 'already_subscribed' };
+    // A second gift starts where a running one ends, rather than overlapping it.
+    const base = user?.promo?.until ? new Date(user.promo.until) : new Date();
+    until = grantUntil(existing.durationDays, base.getTime() > Date.now() ? base : new Date());
+  }
+
   const claimed = await claimPromo(code, ref, until);
   if (!claimed) {
     // The gate refused. Re-read to say which rule stopped it: a stale count
     // is better than a blank "no", and the row may have changed in between.
     const now = await getPromo(code);
     if (!now) return { ok: false, reason: 'unknown' };
+    // Someone who claimed a discount but backed out of the store sheet may
+    // come back for it. They already hold one of the campaign's places, so
+    // hand the same offer over again — without counting them twice — as
+    // long as the code itself is still live.
+    if (now.kind === 'percent') {
+      const mine = await getRedemption(code, ref);
+      const problem = codeProblem(now);
+      if (mine && !mine.convertedAt && (problem === null || problem === 'exhausted')) {
+        return { ...percentResult(now), again: true };
+      }
+    }
     return { ok: false, reason: codeProblem(now) ?? 'already_redeemed' };
   }
 
   if (claimed.kind === 'free') {
-    await setUserPlan(ref, claimed.plan, `promo:${code}`, until, claimed.note ?? undefined);
+    await grantPromo(ref, claimed.plan, code, until as string);
     return { ok: true, kind: 'free', code, plan: claimed.plan, until: until as string };
   }
+  return percentResult(claimed);
+}
+
+function percentResult(row: PromoCode): Extract<RedeemResult, { kind: 'percent' }> {
   return {
     ok: true,
     kind: 'percent',
-    code,
-    plan: claimed.plan,
-    percentOff: claimed.percentOff,
-    offerIos: claimed.offerIos,
-    offerAndroid: claimed.offerAndroid,
+    code: row.code,
+    plan: row.plan,
+    percentOff: row.percentOff,
+    offerIos: row.offerIos,
+    offerAndroid: row.offerAndroid,
   };
 }

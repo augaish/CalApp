@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { fetchEntitlement, type Entitlement } from './api';
+import { configurePurchases, setPlanChangedHandler } from './purchases';
 
 /**
  * Plan + remaining AI allowance, mirrored from the server (`/api/me`).
@@ -19,6 +20,9 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
     const data = await fetchEntitlement();
     if (data) set({ ...data, loaded: true });
     else set({ loaded: true });
+    // The server decides when subscriptions are on, by handing out the
+    // store key; the first refresh that carries one switches the SDK on.
+    if (data?.billing) configurePurchases(data.billing);
   },
   spend: (kind) => {
     const { used, limit, features } = get();
@@ -34,6 +38,9 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
     });
   },
 }));
+
+// A purchase, restore or App Store redemption re-reads the plan from here.
+setPlanChangedHandler(() => useEntitlement.getState().refresh());
 
 /** True on any paying tier — Pro+ is still Pro. */
 export function isPro(): boolean {

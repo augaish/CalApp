@@ -2,7 +2,7 @@ import pg from 'pg';
 
 import { HISTORICAL_COST_FALLBACK_USD, HISTORICAL_COST_PER_ACTION_USD } from './pricing.js';
 import type { Language } from './prompts.js';
-import type { CleanPromo, PromoCode } from './promo.js';
+import { effectivePlan, type CleanPromo, type PromoCode } from './promo.js';
 
 /**
  * Optional Postgres-backed cache for equipment analyses. When DATABASE_URL is
@@ -259,6 +259,20 @@ export async function initDb(): Promise<void> {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS promo_redemptions_at ON promo_redemptions (at DESC)`);
+  // A percent code only discounts; whether the person then paid is learned
+  // later from the store. Null until a purchase is matched to it.
+  await pool.query(`ALTER TABLE promo_redemptions ADD COLUMN IF NOT EXISTS converted_at TIMESTAMPTZ`);
+  // A free code's grant lives in its own columns, apart from plan/plan_until,
+  // which belong to the store (and the admin). A store webhook — an expiry, a
+  // refund, a renewal of a lower tier — therefore can never cancel a gift, and
+  // a gift can never hide a subscription's own dates. The plan a person gets
+  // is the better of the two while each is in date (see effectivePlan).
+  await pool.query(`
+    ALTER TABLE app_users
+      ADD COLUMN IF NOT EXISTS promo_plan  TEXT,
+      ADD COLUMN IF NOT EXISTS promo_until TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS promo_code  TEXT
+  `);
 }
 
 // ── Promotion codes ───────────────────────────────────────────────────────
@@ -279,8 +293,12 @@ function promoRow(r: Record<string, unknown>): PromoCode {
     active: !!r.active,
     note: (r.note as string) ?? null,
     createdAt: new Date(r.created_at as string).toISOString(),
+    convertedCount: r.converted_count == null ? undefined : Number(r.converted_count),
   };
 }
+
+const CONVERTED_SQL = `(SELECT COUNT(*) FROM promo_redemptions r
+                          WHERE r.code = promo_codes.code AND r.converted_at IS NOT NULL)::int AS converted_count`;
 
 /** Create a code, or edit one that already exists. Counters are never reset. */
 export async function upsertPromo(v: CleanPromo): Promise<PromoCode | null> {
@@ -306,7 +324,7 @@ export async function upsertPromo(v: CleanPromo): Promise<PromoCode | null> {
 export async function listPromos(limit = 200): Promise<PromoCode[]> {
   if (!pool) return [];
   const res = await pool.query(
-    `SELECT * FROM promo_codes ORDER BY active DESC, created_at DESC LIMIT $1`,
+    `SELECT *, ${CONVERTED_SQL} FROM promo_codes ORDER BY active DESC, created_at DESC LIMIT $1`,
     [limit],
   );
   return res.rows.map(promoRow);
@@ -314,7 +332,7 @@ export async function listPromos(limit = 200): Promise<PromoCode[]> {
 
 export async function getPromo(code: string): Promise<PromoCode | null> {
   if (!pool) return null;
-  const res = await pool.query(`SELECT * FROM promo_codes WHERE code = $1`, [code]);
+  const res = await pool.query(`SELECT *, ${CONVERTED_SQL} FROM promo_codes WHERE code = $1`, [code]);
   return res.rows[0] ? promoRow(res.rows[0]) : null;
 }
 
@@ -330,21 +348,101 @@ export interface PromoRedemption {
   plan: Plan;
   until: string | null;
   at: string;
+  /** When a purchase was matched to this redemption (percent codes). */
+  convertedAt: string | null;
+  /** The account's address, when it signed in — easier to read than a ref. */
+  email?: string | null;
+}
+
+function redemptionRow(r: Record<string, unknown>): PromoRedemption {
+  return {
+    code: r.code as string,
+    ref: r.ref as string,
+    plan: r.plan as Plan,
+    until: r.until ? new Date(r.until as string).toISOString() : null,
+    at: new Date(r.at as string).toISOString(),
+    convertedAt: r.converted_at ? new Date(r.converted_at as string).toISOString() : null,
+    email: (r.email as string) ?? null,
+  };
 }
 
 export async function listRedemptions(code: string, limit = 500): Promise<PromoRedemption[]> {
   if (!pool) return [];
   const res = await pool.query(
-    `SELECT code, ref, plan, until, at FROM promo_redemptions WHERE code = $1 ORDER BY at DESC LIMIT $2`,
+    `SELECT r.code, r.ref, r.plan, r.until, r.at, r.converted_at, u.email
+       FROM promo_redemptions r LEFT JOIN app_users u ON u.ref = r.ref
+      WHERE r.code = $1 ORDER BY r.at DESC LIMIT $2`,
     [code, limit],
   );
-  return res.rows.map((r) => ({
-    code: r.code,
-    ref: r.ref,
-    plan: r.plan as Plan,
-    until: r.until ? new Date(r.until).toISOString() : null,
-    at: new Date(r.at).toISOString(),
-  }));
+  return res.rows.map(redemptionRow);
+}
+
+export async function getRedemption(code: string, ref: string): Promise<PromoRedemption | null> {
+  if (!pool) return null;
+  const res = await pool.query(
+    `SELECT code, ref, plan, until, at, converted_at FROM promo_redemptions WHERE code = $1 AND ref = $2`,
+    [code, ref],
+  );
+  return res.rows[0] ? redemptionRow(res.rows[0]) : null;
+}
+
+/**
+ * Give `ref` a free code's tier until `until`. Written to the promo columns
+ * only, never to the store's. When a gift is already running the better tier
+ * of the two is kept, and `until` (computed by the caller from the later of
+ * now and the running gift's end) extends it rather than overlapping it.
+ */
+export async function grantPromo(ref: string, plan: Plan, code: string, until: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO app_users (ref, promo_plan, promo_until, promo_code) VALUES ($1, $2, $3, $4)
+     ON CONFLICT (ref) DO UPDATE SET
+       promo_plan = CASE
+         WHEN app_users.promo_until > now()
+          AND ${rankSql('app_users.promo_plan')} > ${rankSql('EXCLUDED.promo_plan')}
+         THEN app_users.promo_plan ELSE EXCLUDED.promo_plan END,
+       promo_until = EXCLUDED.promo_until,
+       promo_code = EXCLUDED.promo_code`,
+    [ref, plan, until, code],
+  );
+}
+
+/** Take a gift back (admin), leaving any store subscription untouched. */
+export async function clearPromo(ref: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `UPDATE app_users SET promo_plan = NULL, promo_until = NULL, promo_code = NULL WHERE ref = $1`,
+    [ref],
+  );
+}
+
+function rankSql(col: string): string {
+  return `(CASE ${col} WHEN 'proPlus' THEN 2 WHEN 'pro' THEN 1 ELSE 0 END)`;
+}
+
+/**
+ * A purchase just started for `ref`: mark the percent-code redemption it came
+ * from as converted. When the store names the offer code it used, that code
+ * is matched exactly (ours, or the App Store code the admin paired with it);
+ * otherwise the person's most recent unconverted percent redemption from the
+ * last fortnight is taken as the one that led here — Play does not report
+ * which offer a subscription was bought with.
+ */
+export async function recordPromoConversion(ref: string, offerCode: string | null): Promise<string | null> {
+  if (!pool) return null;
+  const res = await pool.query(
+    `UPDATE promo_redemptions r SET converted_at = now()
+      WHERE (r.code, r.ref) IN (
+        SELECT r2.code, r2.ref FROM promo_redemptions r2 JOIN promo_codes p ON p.code = r2.code
+         WHERE r2.ref = $1 AND r2.converted_at IS NULL AND p.kind = 'percent'
+           AND CASE WHEN $2::text IS NOT NULL
+                    THEN p.code = $2 OR regexp_replace(upper(COALESCE(p.offer_ios, '')), '[^A-Z0-9]', '', 'g') = $2
+                    ELSE r2.at > now() - interval '14 days' END
+         ORDER BY r2.at DESC LIMIT 1)
+      RETURNING r.code`,
+    [ref, offerCode],
+  );
+  return res.rows[0]?.code ?? null;
 }
 
 /**
@@ -504,10 +602,40 @@ export type Plan = 'free' | 'pro' | 'proPlus';
 
 export interface AppUser {
   ref: string;
+  /** The plan in force: the better of the store/admin grant and a gift. */
   plan: Plan;
   planSource: string;
   planUntil: string | null;
   note: string | null;
+  /** The store/admin grant alone, in date or free. */
+  storePlan?: { plan: Plan; source: string; until: string | null };
+  /** A running promo gift, if any. */
+  promo?: { plan: Plan; until: string; code: string | null } | null;
+}
+
+/**
+ * The account as the rest of the server sees it: one plan, whichever of the
+ * store/admin grant and a promo gift is better while in date. An expired
+ * grant silently falls back to free.
+ */
+function appUserFrom(r: Record<string, unknown>): AppUser {
+  const e = effectivePlan(
+    { plan: r.plan as Plan, source: r.plan_source as string, until: iso(r.plan_until) },
+    { plan: (r.promo_plan as Plan) ?? null, until: iso(r.promo_until), code: (r.promo_code as string) ?? null },
+  );
+  return {
+    ref: r.ref as string,
+    plan: e.plan,
+    planSource: e.source,
+    planUntil: e.until,
+    note: (r.note as string) ?? null,
+    storePlan: e.store,
+    promo: e.promo,
+  };
+}
+
+function iso(v: unknown): string | null {
+  return v ? new Date(v as string).toISOString() : null;
 }
 
 /** Fetch (creating on first sight) the caller's account row. */
@@ -517,19 +645,10 @@ export async function getOrCreateUser(ref: string): Promise<AppUser | null> {
     const res = await pool.query(
       `INSERT INTO app_users (ref) VALUES ($1)
        ON CONFLICT (ref) DO UPDATE SET last_seen_at = now()
-       RETURNING ref, plan, plan_source, plan_until, note`,
+       RETURNING ref, plan, plan_source, plan_until, note, promo_plan, promo_until, promo_code`,
       [ref],
     );
-    const r = res.rows[0];
-    // An expired grant silently falls back to free.
-    const expired = r.plan_until && new Date(r.plan_until).getTime() < Date.now();
-    return {
-      ref: r.ref,
-      plan: expired ? 'free' : (r.plan as Plan),
-      planSource: r.plan_source,
-      planUntil: r.plan_until ? new Date(r.plan_until).toISOString() : null,
-      note: r.note,
-    };
+    return appUserFrom(res.rows[0]);
   } catch (err) {
     console.error('getOrCreateUser failed:', err);
     return null;
@@ -898,6 +1017,18 @@ export async function linkRefs(fromRef: string, toRef: string): Promise<LinkResu
       [fromRef, toRef],
     );
 
+    // A running gift follows the person the same way, unless the account
+    // already has a longer one.
+    await client.query(
+      `UPDATE app_users t
+          SET promo_plan = f.promo_plan, promo_until = f.promo_until, promo_code = f.promo_code
+         FROM app_users f
+        WHERE t.ref = $2 AND f.ref = $1
+          AND f.promo_until > now()
+          AND (t.promo_until IS NULL OR t.promo_until < f.promo_until)`,
+      [fromRef, toRef],
+    );
+
     await client.query('DELETE FROM app_users WHERE ref = $1', [fromRef]);
     await client.query('INSERT INTO ref_links (from_ref, to_ref) VALUES ($1, $2)', [
       fromRef,
@@ -990,6 +1121,7 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
   const period = currentPeriod();
   const res = await pool.query(
     `SELECT u.ref, u.email, u.device, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
+            u.promo_plan, u.promo_until, u.promo_code,
             COALESCE((SELECT SUM(c.count) FROM usage_counters c
                       WHERE c.ref = u.ref AND c.period = $1), 0)::int AS used,
             COALESCE((SELECT SUM(c.input_tokens + c.output_tokens) FROM usage_counters c
@@ -1007,9 +1139,12 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
     ref: r.ref,
     email: r.email ?? null,
     device: r.device ?? null,
-    plan: r.plan,
-    planSource: r.plan_source,
-    planUntil: r.plan_until ? new Date(r.plan_until).toISOString() : null,
+    ...(() => {
+      // Show what the person actually has, gift included, so a code's
+      // recipients do not read as free users in the table.
+      const u = appUserFrom(r);
+      return { plan: u.plan, planSource: u.planSource, planUntil: u.planUntil };
+    })(),
     note: r.note,
     used: r.used,
     tokens: Number(r.tokens),
@@ -1038,7 +1173,8 @@ export async function adminStats(): Promise<AdminStats> {
     `SELECT
        (SELECT COUNT(*)::int FROM app_users) AS total_users,
        (SELECT COUNT(*)::int FROM app_users
-         WHERE plan = 'pro' AND (plan_until IS NULL OR plan_until > now())) AS pro_users,
+         WHERE (plan <> 'free' AND (plan_until IS NULL OR plan_until > now()))
+            OR (promo_plan IS NOT NULL AND promo_until > now())) AS pro_users,
        (SELECT COUNT(DISTINCT ref)::int FROM usage_counters WHERE period = $1) AS active_month,
        (SELECT COALESCE(SUM(count), 0)::int FROM usage_counters WHERE period = $1) AS actions_month,
        (SELECT COALESCE(SUM(cost_usd), 0)::numeric FROM usage_counters WHERE period = $1) AS cost_month`,

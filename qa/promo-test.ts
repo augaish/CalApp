@@ -3,10 +3,11 @@
 // concurrency, once-per-account, and that an edit never resets the counters.
 //
 // Needs DATABASE_URL pointing at a throwaway database.
-import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining, grantUntil } from '/home/user/CalApp/server/src/promo.ts';
+import { cleanDraft, codeProblem, effectivePlan, normalizeCode, redeemPromo, remaining, grantUntil } from '/home/user/CalApp/server/src/promo.ts';
+import { planFromSubscriber, decide } from '/home/user/CalApp/server/src/revenuecat.ts';
 import {
-  claimPromo, deletePromo, getOrCreateUser, getPromo, initDb, listPromos,
-  listRedemptions, upsertPromo,
+  deletePromo, getOrCreateUser, getPromo, initDb, linkRefs, listPromos,
+  listRedemptions, recordPromoConversion, setUserPlan, upsertPromo,
 } from '/home/user/CalApp/server/src/db.ts';
 
 let fails = 0;
@@ -64,6 +65,28 @@ check('a grant lands the right number of days out', (() => {
   return grantUntil(90, from).startsWith('2026-04-01');
 })(), grantUntil(90, new Date('2026-01-01T00:00:00Z')));
 
+// ── the plan a person has: store grant vs gift ──
+const soon = new Date(Date.now() + 5 * 86400000).toISOString();
+const later = new Date(Date.now() + 40 * 86400000).toISOString();
+const past = new Date(Date.now() - 86400000).toISOString();
+const free = { plan: null, until: null, code: null };
+eq('no gift, no subscription: free', effectivePlan({ plan: 'free', source: 'none', until: null }, free).plan, 'free');
+eq('a gift lifts a free account', effectivePlan({ plan: 'free', source: 'none', until: null }, { plan: 'pro', until: soon, code: 'G' }).source, 'promo:G');
+eq('a lapsed gift does not', effectivePlan({ plan: 'free', source: 'none', until: null }, { plan: 'pro', until: past, code: 'G' }).plan, 'free');
+eq('a Pro+ subscription outranks a Pro gift', effectivePlan({ plan: 'proPlus', source: 'revenuecat:renewal', until: later }, { plan: 'pro', until: soon, code: 'G' }).plan, 'proPlus');
+eq('a Pro+ gift outranks a Pro subscription', effectivePlan({ plan: 'pro', source: 'revenuecat:renewal', until: later }, { plan: 'proPlus', until: soon, code: 'G' }).plan, 'proPlus');
+eq('  while the subscription keeps its own dates underneath', effectivePlan({ plan: 'pro', source: 'revenuecat:renewal', until: later }, { plan: 'proPlus', until: soon, code: 'G' }).store.until, later);
+eq('a lapsed subscription is free underneath a gift', effectivePlan({ plan: 'pro', source: 'revenuecat:renewal', until: past }, { plan: 'pro', until: soon, code: 'G' }).store.plan, 'free');
+
+// ── RevenueCat's subscriber record ──
+eq('an active Pro entitlement reads as Pro', planFromSubscriber({ subscriber: { entitlements: { pro: { expires_date: later, product_identifier: 'calgym_pro_monthly' } } } })?.plan, 'pro');
+eq('an expired one reads as nothing', planFromSubscriber({ subscriber: { entitlements: { pro: { expires_date: past, product_identifier: 'calgym_pro_monthly' } } } }), null);
+eq('Pro+ wins when both are active', planFromSubscriber({ subscriber: { entitlements: { pro: { expires_date: later }, pro_plus: { expires_date: soon } } } })?.plan, 'proPlus');
+eq('a lifetime (no expiry) entitlement has no end date', planFromSubscriber({ subscriber: { entitlements: { pro: { expires_date: null } } } })?.until, null);
+eq('an unrelated entitlement is ignored', planFromSubscriber({ subscriber: { entitlements: { coins: { expires_date: later } } } }), null);
+eq('an empty record reads as nothing', planFromSubscriber({}), null);
+check('a first purchase event still decides as a grant with its offer code on it', decide({ type: 'INITIAL_PURCHASE', app_user_id: 'u', product_id: 'calgym_pro_monthly', expiration_at_ms: Date.now() + 1e9, offer_code: 'RAMADAN50' }).kind === 'grant');
+
 // ── against the database ──
 if (!process.env.DATABASE_URL) {
   console.log('SKIP  database checks (no DATABASE_URL)');
@@ -71,7 +94,15 @@ if (!process.env.DATABASE_URL) {
   process.exit(fails === 0 ? 0 : 1);
 }
 await initDb();
-for (const c of ['GYMPARTNER', 'HALF50', 'ONEONLY', 'RACE', 'EDITME']) await deletePromo(c);
+for (const c of ['GYMPARTNER', 'HALF50', 'ONEONLY', 'RACE', 'EDITME', 'PLUS30', 'RAMADAN50', 'WEEK7']) await deletePromo(c);
+// Users from earlier runs would carry their gifts into this one.
+{
+  const { Pool } = await import('/home/user/CalApp/server/node_modules/pg/lib/index.js');
+  const p = new Pool({ connectionString: process.env.DATABASE_URL });
+  await p.query(`DELETE FROM app_users WHERE ref LIKE 'user-%' OR ref LIKE 'racer-%' OR ref LIKE 'acct-%'`);
+  await p.query(`DELETE FROM ref_links WHERE from_ref LIKE 'user-%'`);
+  await p.end();
+}
 
 await upsertPromo((cleanDraft({ code: 'GYMPARTNER', durationDays: 90, maxRedemptions: 3 }) as { value: never }).value);
 const r1 = await redeemPromo('gym partner', 'user-a');
@@ -120,6 +151,54 @@ const pct = await redeemPromo('half 50', 'user-g');
 check('a percent code returns the store offer', pct.ok && pct.kind === 'percent' && pct.percentOff === 50 && pct.offerIos === 'pro_half', JSON.stringify(pct));
 check('  and grants no tier on its own', (await getOrCreateUser('user-g'))?.plan === 'free', (await getOrCreateUser('user-g'))?.plan);
 eq('  but is still counted', (await getPromo('HALF50'))?.redeemedCount, 1);
+
+// Someone who backs out of the store sheet can come back for the same offer,
+// without taking a second place in the campaign.
+const back = await redeemPromo('HALF50', 'user-g');
+check('the same person asking again is handed the offer again', back.ok && back.kind === 'percent' && back.again === true, JSON.stringify(back));
+eq('  without being counted twice', (await getPromo('HALF50'))?.redeemedCount, 1);
+
+// Their purchase lands: the redemption is marked converted.
+eq('a first purchase marks the recent percent redemption converted', await recordPromoConversion('user-g', null), 'HALF50');
+eq('  and the code reports one conversion', (await getPromo('HALF50'))?.convertedCount, 1);
+const afterBuy = await redeemPromo('HALF50', 'user-g');
+check('  after which the offer is not handed out again', !afterBuy.ok && afterBuy.reason === 'already_redeemed', JSON.stringify(afterBuy));
+eq('a purchase with nothing redeemed marks nothing', await recordPromoConversion('user-nobody', null), null);
+
+// The App Store names the offer code it used; match it even when the admin
+// typed it with a dash.
+await upsertPromo((cleanDraft({ code: 'RAMADAN50', kind: 'percent', percentOff: 50, offerIos: 'ramadan-50' }) as { value: never }).value);
+await redeemPromo('RAMADAN50', 'user-k');
+eq('a named store offer code is matched to its campaign', await recordPromoConversion('user-k', normalizeCode('RAMADAN-50')), 'RAMADAN50');
+
+// A gift and a subscription do not overwrite each other.
+await upsertPromo((cleanDraft({ code: 'PLUS30', plan: 'proPlus', durationDays: 30 }) as { value: never }).value);
+await upsertPromo((cleanDraft({ code: 'WEEK7', durationDays: 7 }) as { value: never }).value);
+await setUserPlan('user-s', 'pro', 'revenuecat:initial_purchase', later);
+const wasted = await redeemPromo('GYMPARTNER', 'user-s');
+check('a Pro subscriber cannot spend a free Pro code on nothing', !wasted.ok && (wasted.reason === 'already_subscribed' || wasted.reason === 'exhausted'), JSON.stringify(wasted));
+const weekWasted = await redeemPromo('WEEK7', 'user-s');
+check('  (said plainly, when the code is otherwise fine)', !weekWasted.ok && weekWasted.reason === 'already_subscribed', JSON.stringify(weekWasted));
+eq('  and the code stays unspent', (await getPromo('WEEK7'))?.redeemedCount, 0);
+const lift = await redeemPromo('PLUS30', 'user-s');
+check('a Pro subscriber can take a Pro+ gift', lift.ok, JSON.stringify(lift));
+eq('  and has Pro+ now', (await getOrCreateUser('user-s'))?.plan, 'proPlus');
+eq('  with the subscription still on record underneath', (await getOrCreateUser('user-s'))?.storePlan?.until, later);
+
+// The store expires user-a's (non-existent) subscription: the gift survives.
+await setUserPlan('user-a', 'free', 'revenuecat:expiration', null);
+eq('a store expiry does not take a code gift away', (await getOrCreateUser('user-a'))?.plan, 'pro');
+
+// A second gift extends the first instead of overlapping it.
+const firstEnd = (await getOrCreateUser('user-a'))?.planUntil as string;
+await redeemPromo('WEEK7', 'user-a');
+const secondEnd = (await getOrCreateUser('user-a'))?.planUntil as string;
+const gap = (new Date(secondEnd).getTime() - new Date(firstEnd).getTime()) / 86400000;
+check('a second gift starts where the first ends', Math.abs(gap - 7) < 0.01, `${firstEnd} → ${secondEnd}`);
+
+// Signing in carries the gift to the account.
+await linkRefs('user-b', 'acct-b');
+eq('a gift follows the person into their account', (await getOrCreateUser('acct-b'))?.plan, 'pro');
 
 const unknown = await redeemPromo('NOSUCHCODE', 'user-h');
 check('an unknown code says unknown', !unknown.ok && unknown.reason === 'unknown');

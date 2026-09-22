@@ -126,6 +126,41 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
     </div>
 
+    <div class="card" id="codes">
+      <b>Promotion codes</b>
+      <div class="sub" style="margin:4px 0 10px"><b>Free access</b> gives a tier for a number of days at no charge — handled entirely here, no store setup. <b>Percent off</b> is a real discount on a paid subscription, so the store has to know about it: create an offer code in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code) and/or a developer-determined offer on the Google Play base plan, then put those ids below. The store then charges the discounted price, in the person's currency, with VAT. <i>Used</i> counts redemptions in the app; <i>Paid</i> counts purchases matched back to them. To step a discount down (e.g. 50% for the first 100, then 30%), give the first code a use limit or end date and create the next one.</div>
+      <div class="row">
+        <div><label>Code</label><input id="pc_code" placeholder="RAMADAN50" autocomplete="off" /></div>
+        <div><label>Type</label><select id="pc_kind" onchange="pcKind()"><option value="free">Free access</option><option value="percent">Percent off</option></select></div>
+        <div><label>Tier</label><select id="pc_plan"><option value="pro">Pro</option><option value="proPlus">Pro+</option></select></div>
+        <div class="pc-free"><label>Days of access</label><input id="pc_days" type="number" min="1" max="3650" value="30" /></div>
+        <div class="pc-pct hide"><label>% off</label><input id="pc_pct" type="number" min="1" max="100" /></div>
+      </div>
+      <div class="row pc-pct hide">
+        <div><label>App Store offer code</label><input id="pc_ios" placeholder="the custom code made in App Store Connect" /></div>
+        <div><label>Google Play offer id</label><input id="pc_android" placeholder="offerId, or basePlanId:offerId" /></div>
+      </div>
+      <div class="row">
+        <div><label>Max uses (blank = unlimited)</label><input id="pc_max" type="number" min="1" /></div>
+        <div><label>Starts (optional)</label><input id="pc_start" type="datetime-local" /></div>
+        <div><label>Ends (optional)</label><input id="pc_end" type="datetime-local" /></div>
+        <div><label>Note</label><input id="pc_note" placeholder="e.g. gym partnership" /></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label style="margin:0"><input id="pc_active" type="checkbox" checked style="width:auto" /> Active</label>
+        <button onclick="savePromo()">Save code</button>
+        <button class="ghost" onclick="clearPromoForm()">Clear form</button>
+      </div>
+      <div id="pc_msg" class="sub hide" style="margin-top:8px"></div>
+      <div class="scroll" style="margin-top:12px">
+        <table>
+          <thead><tr><th>Code</th><th>Gives</th><th>Used</th><th>Left</th><th>Paid</th><th>Window</th><th>Status</th><th></th></tr></thead>
+          <tbody id="pc_rows"></tbody>
+        </table>
+      </div>
+      <div id="pc_detail" class="hide" style="margin-top:12px"></div>
+    </div>
+
     <div class="card">
       <b>Sponsor slot</b>
       <div class="sub" style="margin:4px 0 0">The in-app spot you rent to a real advertiser. Leave disabled to hide it.</div>
@@ -166,7 +201,7 @@ export const ADMIN_HTML = `<!doctype html>
 
     <div class="card">
       <b>Membership prices</b>
-      <div class="sub" style="margin:4px 0 10px">What the app's upgrade screen shows, and what the revenue estimate above is based on. <b>This does not change what anyone is actually charged</b> — the real amount comes from the product price in App Store Connect / Google Play (mirrored by RevenueCat). Change it there first, then set the same number here so the two agree.</div>
+      <div class="sub" style="margin:4px 0 10px">Used for the revenue estimate above, and shown on the upgrade screen only until the store products are live. <b>Once subscriptions are on, the app shows the store's own price</b> — set in App Store Connect / Google Play, in each person's currency with VAT included — so there is one price to manage, and it is there. These numbers never change what anyone is charged.</div>
       <div class="row">
         <div><label>Pro / month</label><input id="pr_pro" type="number" step="0.01" /></div>
         <div><label>Pro+ / month</label><input id="pr_proplus" type="number" step="0.01" /></div>
@@ -277,6 +312,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('lim_proplus').value = data.limits.proPlus;
     loadQueue();
     loadAiFailures();
+    loadPromos();
     var W = data.weights || {};
     WEIGHT_KINDS.forEach(function (k) {
       var el = document.getElementById('w_' + k);
@@ -682,6 +718,171 @@ export const ADMIN_HTML = `<!doctype html>
       imageUrl: document.getElementById('sp_img').value,
       linkUrl: document.getElementById('sp_link').value,
     }).then(load);
+  }
+  // ── Promotion codes ──
+  var PC_ERRORS = {
+    code_too_short: 'A code needs at least 3 letters or digits.',
+    plan_must_be_paid: 'A code has to give Pro or Pro+.',
+    percent_out_of_range: 'Percent off must be between 1 and 100.',
+    duration_out_of_range: 'Days of access must be between 1 and 3650.',
+    offer_required: 'A percent code needs the App Store offer code, the Google Play offer id, or both.',
+    max_out_of_range: 'Max uses must be at least 1 (or blank for unlimited).',
+    bad_starts_at: 'The start date is not a date.',
+    bad_expires_at: 'The end date is not a date.',
+    expires_before_starts: 'The end is before the start.',
+  };
+  var PC_PROBLEMS = { inactive: 'off', not_started: 'not started', expired: 'ended', exhausted: 'used up' };
+  var promos = [];
+  function pcKind() {
+    var pct = document.getElementById('pc_kind').value === 'percent';
+    document.querySelectorAll('.pc-pct').forEach(function (el) { el.classList.toggle('hide', !pct); });
+    document.querySelectorAll('.pc-free').forEach(function (el) { el.classList.toggle('hide', pct); });
+  }
+  function toLocalInput(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    var off = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - off).toISOString().slice(0, 16);
+  }
+  function fromLocalInput(v) { return v ? new Date(v).toISOString() : null; }
+  function pcMsg(text, bad) {
+    var box = document.getElementById('pc_msg');
+    box.textContent = text;
+    box.className = bad ? 'err' : 'sub';
+    box.style.marginTop = '8px';
+  }
+  function clearPromoForm() {
+    ['pc_code','pc_pct','pc_ios','pc_android','pc_max','pc_start','pc_end','pc_note'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('pc_days').value = 30;
+    document.getElementById('pc_kind').value = 'free';
+    document.getElementById('pc_plan').value = 'pro';
+    document.getElementById('pc_active').checked = true;
+    document.getElementById('pc_code').disabled = false;
+    pcKind();
+  }
+  function editPromo(p) {
+    document.getElementById('pc_code').value = p.code;
+    document.getElementById('pc_code').disabled = true;
+    document.getElementById('pc_kind').value = p.kind;
+    document.getElementById('pc_plan').value = p.plan;
+    document.getElementById('pc_days').value = p.durationDays || 30;
+    document.getElementById('pc_pct').value = p.kind === 'percent' ? p.percentOff : '';
+    document.getElementById('pc_ios').value = p.offerIos || '';
+    document.getElementById('pc_android').value = p.offerAndroid || '';
+    document.getElementById('pc_max').value = p.maxRedemptions || '';
+    document.getElementById('pc_start').value = toLocalInput(p.startsAt);
+    document.getElementById('pc_end').value = toLocalInput(p.expiresAt);
+    document.getElementById('pc_note').value = p.note || '';
+    document.getElementById('pc_active').checked = !!p.active;
+    pcKind();
+    pcMsg('Editing ' + p.code + ' — its counters are kept when you save.', false);
+    document.getElementById('codes').scrollIntoView({ behavior: 'smooth' });
+  }
+  function promoBody(overrides) {
+    var max = parseInt(document.getElementById('pc_max').value, 10);
+    var body = {
+      code: document.getElementById('pc_code').value,
+      kind: document.getElementById('pc_kind').value,
+      plan: document.getElementById('pc_plan').value,
+      durationDays: parseInt(document.getElementById('pc_days').value, 10),
+      percentOff: parseInt(document.getElementById('pc_pct').value, 10),
+      offerIos: document.getElementById('pc_ios').value,
+      offerAndroid: document.getElementById('pc_android').value,
+      maxRedemptions: isNaN(max) ? null : max,
+      startsAt: fromLocalInput(document.getElementById('pc_start').value),
+      expiresAt: fromLocalInput(document.getElementById('pc_end').value),
+      active: document.getElementById('pc_active').checked,
+      note: document.getElementById('pc_note').value,
+    };
+    Object.keys(overrides || {}).forEach(function (k) { body[k] = overrides[k]; });
+    return body;
+  }
+  function postPromo(body) {
+    return fetch('/admin/api/promo', {
+      method: 'POST',
+      headers: { 'x-admin-token': tok(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); });
+  }
+  function savePromo() {
+    postPromo(promoBody()).then(function (r) {
+      if (!r.ok) { pcMsg(PC_ERRORS[r.body.error] || ('Not saved: ' + (r.body.error || 'error')), true); return; }
+      pcMsg('Saved ' + r.body.promo.code + '.', false);
+      clearPromoForm();
+      loadPromos();
+    }).catch(function (e) { pcMsg('Request failed: ' + e, true); });
+  }
+  function togglePromo(p) {
+    postPromo(Object.assign({}, p, { active: !p.active })).then(loadPromos);
+  }
+  function removePromo(p) {
+    if (!confirm('Delete ' + p.code + ' and its ' + p.redeemedCount + ' redemption record(s)? People who already redeemed a free code keep their access.')) return;
+    api('/admin/api/promo-delete', { code: p.code }).then(loadPromos);
+  }
+  function showRedemptions(p) {
+    var host = document.getElementById('pc_detail');
+    fetch('/admin/api/promo-redemptions?code=' + encodeURIComponent(p.code), { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        var rows = d.redemptions || [];
+        var html = '<b>' + esc(p.code) + '</b> — ' + rows.length + ' redemption' + (rows.length === 1 ? '' : 's') +
+          (p.kind === 'percent' ? ', ' + (p.convertedCount || 0) + ' paid' : '') +
+          '<div class="scroll"><table><thead><tr><th>When</th><th>Who</th><th>Tier</th><th>' +
+          (p.kind === 'percent' ? 'Paid' : 'Access until') + '</th></tr></thead><tbody>';
+        rows.forEach(function (r) {
+          html += '<tr><td class="muted">' + new Date(r.at).toLocaleString() + '</td>' +
+            '<td>' + (r.email ? esc(r.email) : '<span style="font-family:monospace">' + esc(r.ref) + '</span>') + '</td>' +
+            '<td>' + esc(r.plan) + '</td>' +
+            '<td class="muted">' + (p.kind === 'percent'
+              ? (r.convertedAt ? new Date(r.convertedAt).toLocaleDateString() : '—')
+              : (r.until ? new Date(r.until).toLocaleDateString() : '—')) + '</td></tr>';
+        });
+        html += rows.length ? '' : '<tr><td colspan="4" class="muted">Nobody has used it yet.</td></tr>';
+        host.innerHTML = html + '</tbody></table></div>';
+        host.classList.remove('hide');
+      }).catch(function () {});
+  }
+  function renderPromos() {
+    var body = document.getElementById('pc_rows');
+    body.innerHTML = '';
+    if (!promos.length) {
+      body.innerHTML = '<tr><td colspan="8" class="muted">No codes yet.</td></tr>';
+      return;
+    }
+    promos.forEach(function (p) {
+      var tr = document.createElement('tr');
+      var tier = p.plan === 'proPlus' ? 'Pro+' : 'Pro';
+      var gives = p.kind === 'free' ? tier + ' free for ' + p.durationDays + ' days' : p.percentOff + '% off ' + tier;
+      var win = (p.startsAt ? new Date(p.startsAt).toLocaleDateString() : 'now') + ' → ' +
+        (p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : 'no end');
+      var status = p.problem ? (PC_PROBLEMS[p.problem] || p.problem) : 'live';
+      tr.innerHTML =
+        '<td><span style="font-family:monospace;font-weight:700">' + esc(p.code) + '</span>' + (p.note ? '<div class="muted">' + esc(p.note) + '</div>' : '') + '</td>' +
+        '<td>' + esc(gives) + '</td>' +
+        '<td>' + p.redeemedCount + (p.maxRedemptions ? ' / ' + p.maxRedemptions : '') + '</td>' +
+        '<td>' + (p.remaining == null ? '∞' : p.remaining) + '</td>' +
+        '<td>' + (p.kind === 'percent' ? (p.convertedCount || 0) : '<span class="muted">—</span>') + '</td>' +
+        '<td class="muted">' + esc(win) + '</td>' +
+        '<td><span class="pill ' + (p.problem ? 'free' : 'pro') + '">' + esc(status) + '</span></td>' +
+        '<td style="white-space:nowrap"></td>';
+      var actions = tr.lastChild;
+      [['Who', showRedemptions], ['Edit', editPromo], [p.active ? 'Turn off' : 'Turn on', togglePromo], ['Delete', removePromo]].forEach(function (a) {
+        var b = document.createElement('button');
+        b.className = 'ghost';
+        b.style.marginInlineEnd = '4px';
+        b.style.padding = '6px 10px';
+        b.textContent = a[0];
+        b.addEventListener('click', function () { a[1](p); });
+        actions.appendChild(b);
+      });
+      body.appendChild(tr);
+    });
+  }
+  function loadPromos() {
+    fetch('/admin/api/promos', { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { promos = d.promos || []; renderPromos(); })
+      .catch(function () {});
   }
   if (sessionStorage.getItem('ct')) load();
 </script>

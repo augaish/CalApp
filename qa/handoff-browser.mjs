@@ -180,7 +180,7 @@ await page.getByLabel('Smaller portion').click(); await page.waitForTimeout(300)
 await page.getByLabel('Smaller portion').click(); await page.waitForTimeout(300);
 b = await body(page);
 check('  ½ serving previews half the kcal', /½ serving/.test(b) && /258 kcal/.test(b), b.match(/\d+ kcal/)?.[0]);
-const addBtn = page.getByText(/^Add to (Breakfast|Lunch|Dinner|Snack)$/);
+const addBtn = page.getByText(/^Add to (Breakfast|Lunch|Dinner|Snacks?)$/);
 await addBtn.click(); await page.waitForTimeout(600);
 await addBtn.click().catch(() => {}); await page.waitForTimeout(600);
 st = await store(page);

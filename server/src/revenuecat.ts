@@ -34,6 +34,9 @@ export interface RevenueCatEvent {
   store?: string;
   transferred_to?: string[] | null;
   transferred_from?: string[] | null;
+  /** The offer code the purchase was made with (App Store offer codes, Play promo codes). */
+  offer_code?: string | null;
+  period_type?: string | null;
 }
 
 export type BillingAction =
@@ -145,4 +148,40 @@ export function decide(event: RevenueCatEvent, mapping = DEFAULT_MAPPING): Billi
 function msToIso(ms: number | null | undefined): string | null {
   if (typeof ms !== 'number' || !Number.isFinite(ms) || ms <= 0) return null;
   return new Date(ms).toISOString();
+}
+
+/**
+ * Read RevenueCat's subscriber record (GET /v1/subscribers/{id}) down to the
+ * plan it entitles right now. Used by the app's "I just paid" sync so the
+ * plan changes the moment the store sheet closes, instead of waiting for the
+ * webhook — which remains the source of truth for everything after.
+ *
+ * Returns null when nothing is active. Pro+ beats Pro when both are.
+ */
+export interface SubscriberRecord {
+  subscriber?: {
+    entitlements?: Record<
+      string,
+      { expires_date?: string | null; product_identifier?: string | null } | undefined
+    >;
+  };
+}
+
+export function planFromSubscriber(
+  record: SubscriberRecord,
+  now: Date = new Date(),
+  mapping = DEFAULT_MAPPING,
+): { plan: Plan; until: string | null; productId: string | null } | null {
+  let best: { plan: Plan; until: string | null; productId: string | null } | null = null;
+  for (const [id, ent] of Object.entries(record.subscriber?.entitlements ?? {})) {
+    if (!ent) continue;
+    const expires = ent.expires_date ? new Date(ent.expires_date) : null;
+    if (expires && (Number.isNaN(expires.getTime()) || expires.getTime() <= now.getTime())) continue;
+    const plan = planFor({ entitlement_ids: [id], product_id: ent.product_identifier ?? '' }, mapping);
+    if (!plan) continue;
+    if (!best || (plan === 'proPlus' && best.plan !== 'proPlus')) {
+      best = { plan, until: expires ? expires.toISOString() : null, productId: ent.product_identifier ?? null };
+    }
+  }
+  return best;
 }

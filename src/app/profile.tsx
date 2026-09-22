@@ -145,6 +145,7 @@ export default function Profile() {
           subtitle={typeof remaining === 'number' && typeof limit === 'number' ? t('upgrade.remaining', { remaining, limit }) : undefined}
           onPress={() => router.push('/upgrade')}
         />
+        <SettingsRow icon="pricetag-outline" title={t('redeem.title')} onPress={() => router.push('/redeem')} />
         <SettingsRow icon="document-text-outline" title={t('legal.exportData')} onPress={exportData} />
         <SettingsRow icon="sparkles-outline" title={t('tabs.ai')} onPress={() => router.push('/coach')} />
         <SettingsRow icon="shield-checkmark-outline" title={t('profile.privacy')} onPress={() => router.push('/privacy')} last />
