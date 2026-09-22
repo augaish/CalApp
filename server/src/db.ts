@@ -2,6 +2,7 @@ import pg from 'pg';
 
 import { HISTORICAL_COST_FALLBACK_USD, HISTORICAL_COST_PER_ACTION_USD } from './pricing.js';
 import type { Language } from './prompts.js';
+import type { CleanPromo, PromoCode } from './promo.js';
 
 /**
  * Optional Postgres-backed cache for equipment analyses. When DATABASE_URL is
@@ -221,6 +222,169 @@ export async function initDb(): Promise<void> {
   // Abandoned attempts (closed the browser, never finished) are the only
   // thing that accumulates here — sweep anything stale on every boot.
   await pool.query(`DELETE FROM whoop_oauth_state WHERE created_at < now() - INTERVAL '1 day'`);
+
+  // Promotion codes and who used them. `redeemed_count` is kept on the row
+  // rather than counted from the redemptions table on every read, because
+  // the same number is also the gate: the UPDATE that increments it is what
+  // enforces the campaign limit, under the row lock, so two taps arriving
+  // together cannot both pass a limit of one. See src/promo.ts.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS promo_codes (
+      code            TEXT PRIMARY KEY,
+      kind            TEXT NOT NULL DEFAULT 'free',
+      plan            TEXT NOT NULL DEFAULT 'pro',
+      percent_off     INTEGER NOT NULL DEFAULT 100,
+      duration_days   INTEGER,
+      offer_ios       TEXT,
+      offer_android   TEXT,
+      max_redemptions INTEGER,
+      redeemed_count  INTEGER NOT NULL DEFAULT 0,
+      starts_at       TIMESTAMPTZ,
+      expires_at      TIMESTAMPTZ,
+      active          BOOLEAN NOT NULL DEFAULT true,
+      note            TEXT,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  // One row per (code, person). The primary key is the rule "once each":
+  // it cannot be raced, and it survives a retry that lost its response.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS promo_redemptions (
+      code  TEXT NOT NULL REFERENCES promo_codes (code) ON DELETE CASCADE,
+      ref   TEXT NOT NULL,
+      plan  TEXT NOT NULL,
+      until TIMESTAMPTZ,
+      at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (code, ref)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS promo_redemptions_at ON promo_redemptions (at DESC)`);
+}
+
+// ── Promotion codes ───────────────────────────────────────────────────────
+
+function promoRow(r: Record<string, unknown>): PromoCode {
+  return {
+    code: r.code as string,
+    kind: (r.kind === 'percent' ? 'percent' : 'free') as PromoCode['kind'],
+    plan: r.plan as Plan,
+    percentOff: Number(r.percent_off ?? 100),
+    durationDays: r.duration_days == null ? null : Number(r.duration_days),
+    offerIos: (r.offer_ios as string) ?? null,
+    offerAndroid: (r.offer_android as string) ?? null,
+    maxRedemptions: r.max_redemptions == null ? null : Number(r.max_redemptions),
+    redeemedCount: Number(r.redeemed_count ?? 0),
+    startsAt: r.starts_at ? new Date(r.starts_at as string).toISOString() : null,
+    expiresAt: r.expires_at ? new Date(r.expires_at as string).toISOString() : null,
+    active: !!r.active,
+    note: (r.note as string) ?? null,
+    createdAt: new Date(r.created_at as string).toISOString(),
+  };
+}
+
+/** Create a code, or edit one that already exists. Counters are never reset. */
+export async function upsertPromo(v: CleanPromo): Promise<PromoCode | null> {
+  if (!pool) return null;
+  const res = await pool.query(
+    `INSERT INTO promo_codes
+       (code, kind, plan, percent_off, duration_days, offer_ios, offer_android,
+        max_redemptions, starts_at, expires_at, active, note)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+     ON CONFLICT (code) DO UPDATE SET
+       kind = EXCLUDED.kind, plan = EXCLUDED.plan, percent_off = EXCLUDED.percent_off,
+       duration_days = EXCLUDED.duration_days, offer_ios = EXCLUDED.offer_ios,
+       offer_android = EXCLUDED.offer_android, max_redemptions = EXCLUDED.max_redemptions,
+       starts_at = EXCLUDED.starts_at, expires_at = EXCLUDED.expires_at,
+       active = EXCLUDED.active, note = EXCLUDED.note
+     RETURNING *`,
+    [v.code, v.kind, v.plan, v.percentOff, v.durationDays, v.offerIos, v.offerAndroid,
+     v.maxRedemptions, v.startsAt, v.expiresAt, v.active, v.note],
+  );
+  return promoRow(res.rows[0]);
+}
+
+export async function listPromos(limit = 200): Promise<PromoCode[]> {
+  if (!pool) return [];
+  const res = await pool.query(
+    `SELECT * FROM promo_codes ORDER BY active DESC, created_at DESC LIMIT $1`,
+    [limit],
+  );
+  return res.rows.map(promoRow);
+}
+
+export async function getPromo(code: string): Promise<PromoCode | null> {
+  if (!pool) return null;
+  const res = await pool.query(`SELECT * FROM promo_codes WHERE code = $1`, [code]);
+  return res.rows[0] ? promoRow(res.rows[0]) : null;
+}
+
+export async function deletePromo(code: string): Promise<boolean> {
+  if (!pool) return false;
+  const res = await pool.query(`DELETE FROM promo_codes WHERE code = $1`, [code]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+export interface PromoRedemption {
+  code: string;
+  ref: string;
+  plan: Plan;
+  until: string | null;
+  at: string;
+}
+
+export async function listRedemptions(code: string, limit = 500): Promise<PromoRedemption[]> {
+  if (!pool) return [];
+  const res = await pool.query(
+    `SELECT code, ref, plan, until, at FROM promo_redemptions WHERE code = $1 ORDER BY at DESC LIMIT $2`,
+    [code, limit],
+  );
+  return res.rows.map((r) => ({
+    code: r.code,
+    ref: r.ref,
+    plan: r.plan as Plan,
+    until: r.until ? new Date(r.until).toISOString() : null,
+    at: new Date(r.at).toISOString(),
+  }));
+}
+
+/**
+ * Claim one redemption of `code` for `ref`, atomically.
+ *
+ * The UPDATE is the gate: it only matches a row that is active, in date, not
+ * exhausted and not already redeemed by this person, and it increments the
+ * counter in the same statement under the row's lock. Two taps arriving at
+ * once therefore cannot both pass a limit of one. Nothing is written when it
+ * does not match, and the caller asks `getPromo` why so the person gets a
+ * reason rather than a shrug.
+ */
+export async function claimPromo(
+  code: string,
+  ref: string,
+  until: string | null,
+): Promise<PromoCode | null> {
+  if (!pool) return null;
+  const res = await pool.query(
+    `WITH gate AS (
+       UPDATE promo_codes
+          SET redeemed_count = redeemed_count + 1
+        WHERE code = $1
+          AND active
+          AND (starts_at IS NULL OR starts_at <= now())
+          AND (expires_at IS NULL OR expires_at > now())
+          AND (max_redemptions IS NULL OR redeemed_count < max_redemptions)
+          AND NOT EXISTS (
+            SELECT 1 FROM promo_redemptions r WHERE r.code = promo_codes.code AND r.ref = $2
+          )
+        RETURNING *
+     ), ins AS (
+       INSERT INTO promo_redemptions (code, ref, plan, until)
+       SELECT g.code, $2, g.plan, $3::timestamptz FROM gate g
+       RETURNING code
+     )
+     SELECT g.* FROM gate g JOIN ins i ON i.code = g.code`,
+    [code, ref, until],
+  );
+  return res.rows[0] ? promoRow(res.rows[0]) : null;
 }
 
 export interface WhoopConnection {

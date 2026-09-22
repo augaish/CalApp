@@ -62,6 +62,11 @@ import {
   setUserEmail,
   setUserPlan,
   setWhoopConnection,
+  getPromo,
+  listPromos,
+  upsertPromo,
+  deletePromo,
+  listRedemptions,
 } from './db.js';
 import {
   citationDomains,
@@ -103,6 +108,7 @@ import {
 } from './deepseek.js';
 import { estimateCostUsd } from './pricing.js';
 import { decide, type RevenueCatEvent } from './revenuecat.js';
+import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining } from './promo.js';
 import {
   bodyReadingPrompt,
   coachAttachmentSummaryPrompt,
@@ -1780,6 +1786,53 @@ app.post('/api/link', async (c) => {
  * non-2xx makes RevenueCat retry forever over something that will never
  * succeed. Genuine failures do return 500, because those deserve a retry.
  */
+/**
+ * Redeem a promotion code.
+ *
+ * A free code applies straight away and the reply carries the new
+ * entitlement, so the app can show the tier without a second round trip. A
+ * percent code returns the store offer to present; the discount itself is
+ * the store's to apply, and only the store's webhook can say a paid
+ * subscription started.
+ */
+app.post('/api/redeem', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ error: 'identify_required' }, 400);
+  const body = await c.req.json<{ code?: string }>().catch(() => ({}) as never);
+  const result = await redeemPromo(String(body.code ?? ''), ref);
+  if (!result.ok) return c.json({ error: result.reason }, result.reason === 'unknown' ? 404 : 409);
+  if (result.kind === 'free') {
+    const access = await checkAccess(ref, 'coach');
+    return c.json({
+      ok: true,
+      kind: 'free',
+      code: result.code,
+      plan: result.plan,
+      until: result.until,
+      entitlement: { plan: access.plan, used: access.used, limit: access.limit, period: access.period },
+    });
+  }
+  const { ok: _ok, ...offer } = result;
+  return c.json({ ok: true, ...offer });
+});
+
+/** Look a code up without spending it — lets the app validate as it is typed. */
+app.get('/api/promo/:code', async (c) => {
+  const code = normalizeCode(c.req.param('code'));
+  const row = code.length >= 3 ? await getPromo(code) : null;
+  if (!row) return c.json({ error: 'unknown' }, 404);
+  const problem = codeProblem(row);
+  if (problem) return c.json({ error: problem }, 409);
+  return c.json({
+    ok: true,
+    code: row.code,
+    kind: row.kind,
+    plan: row.plan,
+    percentOff: row.percentOff,
+    durationDays: row.durationDays,
+  });
+});
+
 app.post('/api/billing/revenuecat', async (c) => {
   const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
   // Without a configured secret anyone could grant themselves Pro, so refuse
@@ -2335,6 +2388,41 @@ app.post('/admin/api/limits', async (c) => {
     proPlus: pick(body.proPlus, cur.proPlus),
   });
   return c.json({ ok: true, limits: await planLimits() });
+});
+
+/** Every code with its counters, newest first. */
+app.get('/admin/api/promos', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const rows = await listPromos();
+  return c.json({
+    promos: rows.map((r) => ({ ...r, remaining: remaining(r), problem: codeProblem(r) })),
+  });
+});
+
+/** Create a code or edit one. Counters survive an edit — they are the history. */
+app.post('/admin/api/promo', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as never);
+  const clean = cleanDraft({ ...body, code: String(body.code ?? '') });
+  if (!clean.ok) return c.json({ error: clean.error }, 400);
+  const saved = await upsertPromo(clean.value);
+  if (!saved) return c.json({ error: 'unavailable' }, 503);
+  return c.json({ ok: true, promo: { ...saved, remaining: remaining(saved), problem: codeProblem(saved) } });
+});
+
+/** Delete a code and its redemption history. */
+app.post('/admin/api/promo-delete', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ code?: string }>().catch(() => ({}) as never);
+  const gone = await deletePromo(normalizeCode(String(body.code ?? '')));
+  return c.json({ ok: gone });
+});
+
+/** Who used a code, and when. */
+app.get('/admin/api/promo-redemptions', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const code = normalizeCode(c.req.query('code') ?? '');
+  return c.json({ code, redemptions: await listRedemptions(code) });
 });
 
 /**
