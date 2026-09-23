@@ -9,6 +9,7 @@ import { setInstallId } from '@/lib/api';
 import { syncAuthIdentity } from '@/lib/auth';
 import { useEntitlement } from '@/lib/entitlement';
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
+import { startRestAlerts } from '@/lib/rest-alert';
 import { useAppStore } from '@/lib/store';
 
 SplashScreen.preventAutoHideAsync();
@@ -29,6 +30,9 @@ export default function RootLayout() {
     // Identify this install to the server so AI usage is metered per user,
     // then pull the current plan / remaining allowance.
     setInstallId(useAppStore.getState().ensureInstallId());
+    // The rest timer's alert for when the phone is locked or the app is
+    // in the background; it follows the session from any screen.
+    startRestAlerts();
     // If a Supabase session exists, meter against the account instead so the
     // plan follows the person across devices.
     syncAuthIdentity().finally(() => useEntitlement.getState().refresh());

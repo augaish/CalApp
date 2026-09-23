@@ -27,6 +27,8 @@ const base = (lang = 'en') => ({
 let fails = 0;
 const results = [];
 const check = (l, c, e = '') => { if (!c) fails++; results.push({ label: l, pass: !!c, extra: e }); console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  → ' + e : ''}`); };
+// The main session button counts: "Complete set 1 of 3" … "Complete last set (3 of 3)".
+const completeSet = (page) => page.getByText(/^Complete (set \d+ of \d+|last set \(\d+ of \d+\))$/).click();
 const squash = (s) => s.replace(/\s+/g, ' ');
 const browser = await chromium.launch();
 
@@ -151,7 +153,7 @@ const sched = { [today.getDay()]: { title: 'Upper body', exerciseIds: ['builtin:
 ({ ctx, page } = await open({ ...base(), schedule: sched }, '/training', 'E5-session-recovery'));
 await page.getByText('Start workout', { exact: true }).click(); await page.waitForTimeout(1500);
 check('E5 Start opens the session', /\/session/.test(page.url()));
-await page.getByText('Complete set', { exact: true }).click(); await page.waitForTimeout(800);
+await completeSet(page); await page.waitForTimeout(800);
 st = await store(page);
 check('E5 one set recorded, session at set 2', st.workouts.length === 1 && st.workouts[0].sets.length === 1 && st.activeSession?.index === 0);
 b = await body(page);
@@ -176,10 +178,14 @@ await close(ctx, page);
 // ═══ E6: session Undo reverses exactly one set (AT07) ═══
 console.log('\n=== E6 Undo last set ===');
 ({ ctx, page } = await open({ ...base(), schedule: sched, activeSession: { startedAt: at(0, 17), dayKey: key(today), exerciseIds: ['builtin:bench-press', 'builtin:seated-row'], index: 0, restEndsAt: null, restSeconds: 90 } }, '/session', 'E6-undo-set'));
-await page.getByText('Complete set', { exact: true }).click(); await page.waitForTimeout(500);
-await page.getByText('Complete set', { exact: true }).click(); await page.waitForTimeout(700);
+await completeSet(page); await page.waitForTimeout(500);
+await completeSet(page); await page.waitForTimeout(700);
 st = await store(page);
 check('E6 two sets completed', st.workouts[0]?.sets.length === 2, String(st.workouts[0]?.sets.length));
+b = await body(page);
+check('E6 the last planned set moves on to the next exercise, saying so', st.activeSession?.currentId === 'builtin:seated-row' && /Bench press done → Seated/i.test(b), b.match(/[^.]{0,30}done →[^.]{0,30}/)?.[0]);
+await page.getByText('Back', { exact: true }).last().click(); await page.waitForTimeout(600);
+check('E6 Back returns to the exercise just finished', (await store(page)).activeSession?.currentId === 'builtin:bench-press');
 await page.getByText('Undo', { exact: true }).click(); await page.waitForTimeout(600);
 st = await store(page); b = await body(page);
 check('E6 Undo removes exactly the last set', st.workouts[0]?.sets.length === 1, String(st.workouts[0]?.sets.length));
@@ -224,7 +230,7 @@ await page.getByText('Apply and start', { exact: true }).click(); await page.wai
 check('E7 Apply and start opens the session', /\/session/.test(page.url()), page.url().replace(BASE, ''));
 b = await body(page);
 check('E7 the session shows the Lower body target from the Lower body template', /Squat/i.test(b) && /80/.test(b), b.match(/Target.{0,30}/)?.[0]);
-await page.getByText('Complete set', { exact: true }).click(); await page.waitForTimeout(800);
+await completeSet(page); await page.waitForTimeout(800);
 st = await store(page); await shot(page, 'E7-performed');
 const w = st.workouts[0];
 check('E7 the set is recorded with today’s performed time', w && key(new Date(w.at)) === key(today));

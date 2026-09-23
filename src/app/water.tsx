@@ -19,8 +19,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
-
-const QUICK_ML = [250, 500, 750];
+import { waterButtons } from '@/lib/water-buttons';
 
 export default function WaterSheet() {
   const { t } = useTranslation();
@@ -28,6 +27,9 @@ export default function WaterSheet() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const logWater = useAppStore((s) => s.logWater);
+  const water = useAppStore((s) => s.water);
+  // 250 / 330 / 500 to start; an amount typed again and again becomes a button.
+  const quick = waterButtons(water);
   const [custom, setCustom] = useState('');
 
   const add = (ml: number) => {
@@ -57,7 +59,7 @@ export default function WaterSheet() {
           </View>
 
           <View style={styles.quickRow}>
-            {QUICK_ML.map((ml) => (
+            {quick.map((ml) => (
               <Pressable
                 key={ml}
                 onPress={() => add(ml)}
@@ -83,7 +85,7 @@ export default function WaterSheet() {
               onChangeText={(v) => setCustom(normalizeDigits(v))}
               keyboardType="number-pad"
               maxLength={4}
-              placeholder="330"
+              placeholder="750"
               placeholderTextColor={theme.textTertiary}
               style={[
                 styles.input,

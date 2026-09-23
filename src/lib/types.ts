@@ -662,6 +662,9 @@ export interface ActiveSession {
   currentId?: string;
   /** ISO time the current rest ends, or null when not resting. */
   restEndsAt: string | null;
+  /** What comes after this rest ("Next: set 3 of 3 · Bench press"), for the
+   * alert that fires when it ends with the app out of sight. */
+  restNext?: string;
   restSeconds: number;
   /** Set when this session performs a moved occurrence (S42). */
   occurrenceId?: string;

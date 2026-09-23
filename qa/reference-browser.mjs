@@ -68,6 +68,8 @@ const seed = { state: {
   whoopBurnByDay: {}, whoopWorkoutsByDay: {},
 }, version: 13 };
 
+// The session's main button counts its sets, then offers an extra one.
+const MAIN_BUTTON = /^(Complete (set \d+ of \d+|last set \(\d+ of \d+\))|Add extra set \(\d+\))$/;
 let fails = 0;
 const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  → ' + e : ''}`); };
 
@@ -118,7 +120,7 @@ check('tapping × 12 sets the reps field', (await inputVal(1)) === '12', await i
 const repsField = page.locator('input').nth(1);
 await repsField.fill('7');
 await page.waitForTimeout(200);
-await page.getByText('Complete set').first().click();
+await page.getByText(MAIN_BUTTON).first().click();
 await page.waitForTimeout(800);
 body = squash(await page.textContent('body'));
 check('Complete set with the field still focused logs the typed 7', /4\s*25 kg × 7\s*Undo/.test(body), body.match(/Completed sets[^]{0,120}/)?.[0]);
@@ -238,7 +240,7 @@ await page.waitForTimeout(2500);
 body = squash(await page.textContent('body'));
 check('the session opens on set 1 of Lateral Raise', /Lateral Raise\s*Set 1/.test(body), body.match(/Lateral Raise.{0,20}/)?.[0]);
 for (let i = 0; i < 3; i++) {
-  await page.getByText('Complete set').first().click();
+  await page.getByText(MAIN_BUTTON).first().click();
   await page.waitForTimeout(500);
   const skip = page.getByText('Skip rest');
   if (await skip.count()) await skip.first().click();

@@ -17,6 +17,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { calendarDaysBetween, timestampFor } from '@/lib/day';
 import { exerciseName, findExercise, logStyleFor } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { afterSet, completeLabel, setGoal } from '@/lib/session-flow';
 import {
   bestSetEver,
   bestSetIndex,
@@ -45,6 +46,11 @@ type SetShape = Pick<WorkoutSet, 'weightKg' | 'reps' | 'seconds' | 'distanceM'>;
  * React Compiler's purity rule forbids reading the clock inside a component. */
 function restEndsAtFrom(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString();
+}
+
+/** Epoch ms `ms` from now (same reason as above). */
+function msFromNow(ms: number): number {
+  return Date.now() + ms;
 }
 
 /**
@@ -77,6 +83,8 @@ export default function SessionScreen() {
   const endSession = useAppStore((s) => s.endSession);
 
   const [finishing, setFinishing] = useState(false);
+  /** After the last set moves the person on: where from, for the Back link. */
+  const [moved, setMoved] = useState<{ fromId: string; fromName: string; toName: string; until: number } | null>(null);
   const [showGuidance, setShowGuidance] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -163,8 +171,13 @@ export default function SessionScreen() {
 
   const restRemaining = session?.restEndsAt ? Math.max(0, Math.ceil((new Date(session.restEndsAt).getTime() - now) / 1000)) : 0;
   useEffect(() => {
-    if (session?.restEndsAt && restRemaining === 0) updateSession({ restEndsAt: null });
-  }, [session?.restEndsAt, restRemaining, updateSession]);
+    if (!session?.restEndsAt || restRemaining > 0) return;
+    // Rest just ran out with the screen in front: say so with a buzz. (Out
+    // of sight, the scheduled alert does it — see rest-alert.ts.) A rest
+    // that ended long ago while the app was closed passes silently.
+    if (now - new Date(session.restEndsAt).getTime() < 3000) successHaptic();
+    updateSession({ restEndsAt: null });
+  }, [session?.restEndsAt, restRemaining, now, updateSession]);
 
   if (!session) return null;
 
@@ -172,11 +185,19 @@ export default function SessionScreen() {
   const total = ids.length;
   const isLast = index >= total - 1;
   const nextEx = !isLast ? findExercise(ids[index + 1], custom) : undefined;
-  // Dots for the sets: the plan's count, or one more than done when there
-  // is no plan (or it has been exceeded).
-  const dotCount = Math.max(planned.length, setNo + 1);
-  const allPlannedDone = planned.length > 0 && setNo >= planned.length;
   const continuous = logStyleFor(ex) === 'continuous';
+  // The sets this exercise aims for: the plan's count, three when the plan
+  // does not say. A continuous log (a run, a ride) is one entry.
+  const goalFor = (id: string): number => {
+    const e = findExercise(id, custom);
+    if (logStyleFor(e) === 'continuous') return 1;
+    return setGoal(dayPlan?.plans?.[id]?.length ?? 0);
+  };
+  const goal = continuous ? 1 : setGoal(planned.length);
+  // Dots for the sets: the goal, or one more than done once it is exceeded.
+  const dotCount = Math.max(goal, setNo + 1);
+  const allSetsDone = setNo >= goal;
+  const button = completeLabel(setNo + 1, goal);
   const loggedContinuous = continuous && (todayWorkout?.sets.length ?? 0) > 0;
 
   const label = (s: SetShape | undefined): string => {
@@ -222,14 +243,67 @@ export default function SessionScreen() {
       distanceM: type === 'distance_time' ? distance : undefined,
       done: true,
     };
-    if (continuous && todayWorkout && todayWorkout.sets.length > 0) {
+    const firstContinuousLog = continuous && !(todayWorkout && todayWorkout.sets.length > 0);
+    if (continuous && !firstContinuousLog && todayWorkout) {
       updateSet(todayWorkout.id, 0, set, timestampFor(day));
     } else {
       logSet({ id: ex.id, name: exerciseName(ex, lang), type, category: ex.category }, set, timestampFor(day));
     }
     successHaptic();
     useCelebrate.getState().celebrate(t('celebrate.setLogged'));
-    if (!continuous) updateSession({ restEndsAt: restEndsAtFrom(session.restSeconds) });
+    setMoved(null);
+
+    // Re-saving a run already logged changes nothing about where you are.
+    if (continuous && !firstContinuousLog) return;
+
+    // Where next, from the store as it is now that the set is in.
+    const fresh = useAppStore.getState().workouts;
+    const doneByIndex = ids.map((id) => workoutFor(fresh, id, day)?.sets.filter((st) => st.done).length ?? 0);
+    const goals = ids.map(goalFor);
+    const n = continuous ? 1 : setNo + 1;
+    const next = afterSet(n, index, doneByIndex, goals);
+    const restEndsAt = continuous ? null : restEndsAtFrom(session.restSeconds);
+    const name = exerciseName(ex, lang);
+
+    if (next.kind === 'finish') {
+      // Every exercise has met its goal: the workout is done.
+      updateSession({ restEndsAt: null });
+      setFinishing(true);
+      return;
+    }
+    if (next.kind === 'next') {
+      // The last set moves you on straight away; the rest keeps running, so
+      // you can get to the next machine while you recover.
+      const toId = ids[next.index];
+      const to = findExercise(toId, custom);
+      const toName = to ? exerciseName(to, lang) : toId;
+      const toDone = doneByIndex[next.index];
+      updateSession({
+        index: next.index,
+        currentId: toId,
+        restEndsAt,
+        restNext: t('session.restNextExercise', { name: toName, n: toDone + 1, total: goals[next.index] }),
+      });
+      setMoved({ fromId: ex.id, fromName: name, toName, until: msFromNow(8000) });
+      return;
+    }
+    updateSession({
+      restEndsAt,
+      restNext:
+        n + 1 <= goal
+          ? t('session.restNextSet', { name, n: n + 1, total: goal })
+          : t('session.restNextExtra', { name, n: n + 1 }),
+    });
+  };
+
+  /** From the "moved on" banner: back to the exercise just finished, rest intact. */
+  const backToMoved = () => {
+    if (!moved) return;
+    const i = ids.indexOf(moved.fromId);
+    setMoved(null);
+    if (i < 0) return;
+    updateSession({ index: i, currentId: moved.fromId });
+    lightHaptic();
   };
 
   const undoLast = () => {
@@ -241,6 +315,7 @@ export default function SessionScreen() {
 
   const jumpTo = (next: number) => {
     if (next === index || next < 0 || next >= total) return;
+    setMoved(null);
     updateSession({ index: next, currentId: ids[next], restEndsAt: null });
     lightHaptic();
   };
@@ -326,7 +401,11 @@ export default function SessionScreen() {
       header={<PageHeader title={title} subtitle={t('session.exerciseOf', { n: index + 1, total })} onBack={leave} />}
       footer={
         <View style={{ gap: Spacing.xs }}>
-          <Button label={continuous ? t('track.saveSession') : t('session.completeSet')} icon="checkmark" onPress={completeSet} />
+          <Button
+            label={continuous ? t('track.saveSession') : t(button.key, { n: button.n, total: button.total })}
+            icon={button.key === 'session.completeLastSet' && !continuous ? 'flag' : 'checkmark'}
+            onPress={completeSet}
+          />
           {keyboardShown ? (
             <Button label={t('common.done')} variant="secondary" icon="chevron-down" onPress={() => Keyboard.dismiss()} />
           ) : (
@@ -343,9 +422,9 @@ export default function SessionScreen() {
           const e = findExercise(id, custom);
           const w = workoutFor(workouts, id, day);
           const done = w?.sets.filter((st) => st.done).length ?? 0;
-          const plannedN = dayPlan?.plans?.[id]?.length ?? 0;
+          const goalN = goalFor(id);
           const current = i === index;
-          const complete = done > 0 && (plannedN === 0 || done >= plannedN);
+          const complete = done >= goalN;
           const name = e ? exerciseName(e, lang) : id;
           return (
             <Pressable
@@ -377,7 +456,7 @@ export default function SessionScreen() {
               </Text>
               {done > 0 && (
                 <Text style={{ color: current ? theme.onPrimary : theme.textSecondary, fontSize: 11, fontWeight: '700' }}>
-                  {plannedN ? `${done}/${plannedN}` : done}
+                  {`${done}/${goalN}`}
                 </Text>
               )}
             </Pressable>
@@ -385,17 +464,25 @@ export default function SessionScreen() {
         })}
       </ScrollView>
 
+      {moved && now < moved.until && (
+        <View style={[styles.movedBanner, { backgroundColor: theme.success + '22' }]} accessibilityLiveRegion="polite">
+          <Ionicons name="checkmark-circle" size={20} color={theme.successText} />
+          <Text style={{ color: theme.text, flex: 1, fontWeight: '600' }} numberOfLines={2}>
+            {t('session.movedOn', { from: moved.fromName, to: moved.toName })}
+          </Text>
+          <ActionButton label={t('common.back')} variant="secondary" onPress={backToMoved} />
+        </View>
+      )}
+
       <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
         <Text style={[styles.exerciseName, { color: theme.text }]}>{ex ? exerciseName(ex, lang) : exId}</Text>
         <View style={styles.setLine}>
           <Text style={{ color: theme.textSecondary, fontSize: 16 }}>
             {continuous
               ? t(loggedContinuous ? 'track.sessionLogged' : 'session.thisSession')
-              : allPlannedDone
-                ? `${t('session.setNumber', { n: setNo + 1 })} · ${t('session.allPlannedDone')}`
-                : planned.length > 0
-                  ? t('session.setOf', { n: setNo + 1, total: planned.length })
-                  : t('session.setNumber', { n: setNo + 1 })}
+              : allSetsDone
+                ? `${t('session.setNumber', { n: setNo + 1 })} · ${t('session.allSetsDone', { total: goal })}`
+                : t('session.setOf', { n: setNo + 1, total: goal })}
           </Text>
           {!continuous && (
             <View style={styles.dots} accessible accessibilityLabel={t('track.setsSummary', { count: setNo })}>
@@ -599,6 +686,14 @@ const styles = StyleSheet.create({
   refRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
   ref: { flex: 1, borderRadius: Radius.control, padding: Spacing.ms, gap: 2, minHeight: 78 },
   refValue: { fontSize: 20, fontWeight: '800' },
+  movedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderRadius: Radius.control,
+    padding: Spacing.ms,
+    marginBottom: Spacing.sm,
+  },
   restCard: { borderRadius: Radius.control, padding: Spacing.ms, marginTop: Spacing.md, gap: Spacing.sm },
   restRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   restTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },

@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import i18n from './i18n';
 import { isSameDay, streakDays, useAppStore, workoutStreakDays } from './store';
@@ -13,7 +13,8 @@ type NotificationsModule = typeof import('expo-notifications');
 
 let cached: NotificationsModule | null | undefined;
 
-function notifications(): NotificationsModule | null {
+/** The notifications module, or null where it is unavailable (web, old binaries). */
+export function notifications(): NotificationsModule | null {
   if (cached !== undefined) return cached;
   // The web build has no scheduling API; every caller already treats null as "not available".
   if (Platform.OS === 'web') return (cached = null);
@@ -21,12 +22,17 @@ function notifications(): NotificationsModule | null {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const mod = require('expo-notifications') as NotificationsModule;
     mod.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: true,
-        shouldShowList: true,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-      }),
+      handleNotification: async (n) => {
+        // The rest alert is for when the app is out of sight. On screen, the
+        // timer itself finishes (with a haptic), so a banner would be noise.
+        const inApp = n.request.content.data?.kind === 'rest' && AppState.currentState === 'active';
+        return {
+          shouldShowBanner: !inApp,
+          shouldShowList: !inApp,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        };
+      },
     });
     cached = mod;
   } catch {
@@ -35,6 +41,9 @@ function notifications(): NotificationsModule | null {
   return cached;
 }
 
+/** The rest timer's end-of-rest alert; reminders never cancel it. */
+export const REST_ALERT_ID = 'calgym-rest';
+
 const WATER_HOURS = [10, 15, 20];
 const MEAL_PROMPT: Record<'breakfast' | 'lunch' | 'dinner', { hour: number; minute: number }> = {
   breakfast: { hour: 9, minute: 0 },
@@ -42,7 +51,7 @@ const MEAL_PROMPT: Record<'breakfast' | 'lunch' | 'dinner', { hour: number; minu
   dinner: { hour: 20, minute: 0 },
 };
 
-async function requestPermission(mod: NotificationsModule): Promise<boolean> {
+export async function requestPermission(mod: NotificationsModule): Promise<boolean> {
   const settings = await mod.getPermissionsAsync();
   if (settings.granted) return true;
   const req = await mod.requestPermissionsAsync();
@@ -95,11 +104,17 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
   const s = useAppStore.getState();
   const anyOn = s.remindMeals || s.remindWater || s.remindWorkouts;
 
-  // Wipe every scheduled local notification (this module is the only thing
-  // in the app that schedules any) rather than cancelling by a fixed ID list
+  // Wipe every scheduled reminder rather than cancelling by a fixed ID list
   // — a toggle switched off must never leave a stray notification still
-  // firing, including any left over from an older identifier scheme.
-  await mod.cancelAllScheduledNotificationsAsync();
+  // firing, including any left over from an older identifier scheme. The one
+  // exception is a running rest timer's alert (rest-alert.ts), which belongs
+  // to the workout in progress, not to these settings.
+  const scheduled = await mod.getAllScheduledNotificationsAsync();
+  await Promise.all(
+    scheduled
+      .filter((n) => n.identifier !== REST_ALERT_ID)
+      .map((n) => mod.cancelScheduledNotificationAsync(n.identifier)),
+  );
   if (!anyOn) return { granted: true };
   if (!(await requestPermission(mod))) return { granted: false };
 
