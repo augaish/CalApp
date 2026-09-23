@@ -167,17 +167,26 @@ export async function deepseekToolCall(
 ): Promise<DeepseekToolResult> {
   const key = process.env.DEEPSEEK_API_KEY;
   if (!key) throw new Error('DEEPSEEK_API_KEY not set');
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      messages,
-      tools,
-      tool_choice: forceTool ? { type: 'function', function: { name: forceTool } } : 'auto',
-    }),
-  });
+  const send = (msgs: DeepseekChatMessage[], toolChoice: unknown) =>
+    fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, messages: msgs, tools, tool_choice: toolChoice }),
+    });
+  let res = await send(messages, forceTool ? { type: 'function', function: { name: forceTool } } : 'auto');
+  // Naming the one function to call is refused by some DeepSeek models (the
+  // reasoning ones reject a forced tool_choice with a 400), which failed the
+  // recipe and programme routes outright. Ask again with the choice left to
+  // the model and an instruction to use that function; the callers also read
+  // a JSON answer written as plain text, so either way something usable comes back.
+  if (!res.ok && res.status === 400 && forceTool) {
+    const first = await res.text().catch(() => '');
+    console.warn(`DeepSeek refused forced tool "${forceTool}", retrying unforced: ${first.slice(0, 200)}`);
+    res = await send(
+      [...messages, { role: 'system', content: `Answer by calling the function "${forceTool}" with the complete result. Do not reply in prose.` }],
+      'auto',
+    );
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`DeepSeek tool request failed: ${res.status} ${body.slice(0, 300)}`);

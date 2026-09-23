@@ -116,7 +116,7 @@ export default function GymResult() {
         </View>
       }
     >
-      <Title>{analysis.name}</Title>
+      <Title close>{analysis.name}</Title>
 
       {/* Held back while the group is still unanswered — nothing has been
           written yet, so saying "saved to library" would be untrue. */}

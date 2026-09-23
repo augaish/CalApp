@@ -74,7 +74,7 @@ export default function MealEdit() {
   if (!meal) {
     return (
       <Screen>
-        <Title>{t('mealEdit.title')}</Title>
+        <Title close>{t('mealEdit.title')}</Title>
         <Text style={{ color: theme.textSecondary }}>{t('mealEdit.notFound')}</Text>
         <Button label={t('common.close')} variant="ghost" onPress={() => router.back()} />
       </Screen>
@@ -267,7 +267,7 @@ export default function MealEdit() {
             <Ionicons name="share-outline" size={20} color={theme.primary} />
           </Pressable>
         )}
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>

@@ -115,7 +115,7 @@ export default function ExerciseLibrary() {
       <View style={styles.header}>
         <Ionicons name="barbell" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('exercises.title')}</Text>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>

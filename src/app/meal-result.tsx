@@ -181,7 +181,7 @@ export default function MealResult() {
         </View>
       }
     >
-      <Title>{t('mealResult.title')}</Title>
+      <Title close>{t('mealResult.title')}</Title>
       <Subtitle>{t('mealResult.editHint2')}</Subtitle>
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}

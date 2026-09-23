@@ -135,7 +135,7 @@ export default function ProgramScreen() {
       >
         <View style={styles.header}>
           <Title>{t('program.title')}</Title>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
             <Ionicons name="close" size={24} color={theme.textSecondary} />
           </Pressable>
         </View>
@@ -182,7 +182,7 @@ export default function ProgramScreen() {
       <Screen>
         <View style={styles.header}>
           <Title>{t('program.title')}</Title>
-          <Pressable onPress={() => router.back()} hitSlop={10}>
+          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
             <Ionicons name="close" size={24} color={theme.textSecondary} />
           </Pressable>
         </View>
@@ -277,7 +277,7 @@ export default function ProgramScreen() {
     >
       <View style={styles.header}>
         <Title>{t('program.title')}</Title>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>

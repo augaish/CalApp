@@ -105,7 +105,7 @@ export default function Describe() {
           </View>
         }
       >
-        <Title>{t('describe.title')}</Title>
+        <Title close>{t('describe.title')}</Title>
         <Subtitle>{t('describe.tip')}</Subtitle>
         {isMockMode && <Subtitle>{t('scan.mockBadge')}</Subtitle>}
         <TextInput

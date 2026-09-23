@@ -81,7 +81,7 @@ export default function ScheduleImport() {
   if (loading) {
     return (
       <Screen footer={<Button label={t('common.close')} onPress={() => router.back()} />}>
-        <Title>{t('scheduleImport.title')}</Title>
+        <Title close>{t('scheduleImport.title')}</Title>
         <View style={[styles.empty, { borderColor: theme.border }]}>
           <ActivityIndicator color={theme.primary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
@@ -95,7 +95,7 @@ export default function ScheduleImport() {
   if (!payload || days.length === 0) {
     return (
       <Screen footer={<Button label={t('common.close')} onPress={() => router.replace('/(tabs)/training')} />}>
-        <Title>{t('scheduleImport.title')}</Title>
+        <Title close>{t('scheduleImport.title')}</Title>
         <View style={[styles.empty, { borderColor: theme.border }]}>
           <Ionicons name="alert-circle-outline" size={32} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
@@ -120,7 +120,7 @@ export default function ScheduleImport() {
         </View>
       }
     >
-      <Title>{t('scheduleImport.title')}</Title>
+      <Title close>{t('scheduleImport.title')}</Title>
       <Subtitle>
         {t('scheduleImport.summary', { days: days.length, exercises: totalExercises })}
       </Subtitle>

@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -96,9 +97,35 @@ export function Screen({
   );
 }
 
-export function Title({ children }: { children: React.ReactNode }) {
+/**
+ * A screen's title. `close` adds an X beside it, so a screen opened on its
+ * own (a modal form, a result, an import) always has a way out at the top,
+ * not only a Cancel at the bottom: `true` goes back (or home when there is
+ * nothing to go back to); a function runs instead, e.g. a form that asks
+ * before discarding changes.
+ */
+export function Title({ children, close }: { children: React.ReactNode; close?: boolean | (() => void) }) {
   const t = useTheme();
-  return <Text style={[Type.title, { color: t.text, marginBottom: Spacing.sm }]}>{children}</Text>;
+  const { t: tr } = useTranslation();
+  const router = useRouter();
+  const text = <Text style={[Type.title, { color: t.text, marginBottom: Spacing.sm, flexShrink: 1 }]}>{children}</Text>;
+  if (!close) return text;
+  const onClose =
+    typeof close === 'function' ? close : () => (router.canGoBack() ? router.back() : router.replace('/'));
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm }}>
+      <View style={{ flex: 1 }}>{text}</View>
+      <Pressable
+        onPress={onClose}
+        hitSlop={10}
+        accessibilityRole="button"
+        accessibilityLabel={tr('common.close')}
+        style={({ pressed }) => [{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: -6 }, pressed && { opacity: 0.6 }]}
+      >
+        <Ionicons name="close" size={26} color={t.textSecondary} />
+      </Pressable>
+    </View>
+  );
 }
 
 export function Subtitle({ children }: { children: React.ReactNode }) {

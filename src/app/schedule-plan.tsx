@@ -46,7 +46,7 @@ export default function SchedulePlan() {
   if (!exercise || !id) {
     return (
       <Screen footer={<Button label={t('common.close')} onPress={() => router.back()} />}>
-        <Title>{t('schedulePlan.title')}</Title>
+        <Title close>{t('schedulePlan.title')}</Title>
         <Text style={{ color: theme.textSecondary }}>{t('mealEdit.notFound')}</Text>
       </Screen>
     );
@@ -83,7 +83,7 @@ export default function SchedulePlan() {
         <View style={{ flex: 1 }}>
           <Title>{exerciseName(exercise, lang)}</Title>
         </View>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>

@@ -87,6 +87,7 @@ import {
   type MealAnalysis,
 } from './parse.js';
 import { classifyAiError, describeAiError } from './ai-failure.js';
+import { withProviderFallback } from './provider-fallback.js';
 import { ACTION_TOOLS, sanitizeCoachActions } from './coach-actions.js';
 import {
   buildAuthorizeUrl,
@@ -1583,48 +1584,48 @@ app.post('/api/generate-recipe', async (c) => {
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   const claim = await reserve(ref, access, 'recipe');
   if (!claim.ok) return c.json(quotaError(access), 402);
+  const system = recipePrompt(language, request, contextText(body.context));
   try {
-    if ((await providerFor(access)) === 'deepseek') {
-      const ds = await withOneRetry(() =>
-        deepseekToolCall(
-          [
-            { role: 'system', content: recipePrompt(language, request, contextText(body.context)) },
-            { role: 'user', content: request },
-          ],
-          [toDeepseekTool(RECIPE_TOOL)],
-          8000,
-          'write_recipe',
-        ),
-      );
-      await trackUsage({ ref, kind: 'recipe' }, ds.model, {
-        input_tokens: ds.inputTokens,
-        output_tokens: ds.outputTokens,
-      });
-      const call = ds.toolCalls.find((t) => t.name === 'write_recipe');
-      // Same belt and braces as the programme route: a model that writes the
-      // JSON as prose instead of calling the tool still gives a usable recipe.
-      const recipe = sanitizeRecipe(call ? call.args : extractJson(ds.text));
-      if (!recipe) {
-        await release(ref, 'recipe');
-        return c.json({ error: 'analysis_failed' }, 502);
-      }
-      return c.json(recipe);
-    }
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      // Up to 20 ingredients with four macros each plus 15 steps; cut off
-      // mid-JSON and the whole tool call is unusable.
-      max_tokens: 4000,
-      system: recipePrompt(language, request, contextText(body.context)),
-      messages: [{ role: 'user', content: request }],
-      tools: [RECIPE_TOOL],
-      tool_choice: { type: 'tool', name: 'write_recipe' },
+    const recipe = await withProviderFallback('/api/generate-recipe', await providerFor(access), {
+      deepseek: async () => {
+        const ds = await withOneRetry(() =>
+          deepseekToolCall(
+            [
+              { role: 'system', content: system },
+              { role: 'user', content: request },
+            ],
+            [toDeepseekTool(RECIPE_TOOL)],
+            8000,
+            'write_recipe',
+          ),
+        );
+        await trackUsage({ ref, kind: 'recipe' }, ds.model, {
+          input_tokens: ds.inputTokens,
+          output_tokens: ds.outputTokens,
+        });
+        const call = ds.toolCalls.find((t) => t.name === 'write_recipe');
+        // Same belt and braces as the programme route: a model that writes the
+        // JSON as prose instead of calling the tool still gives a usable recipe.
+        return sanitizeRecipe(call ? call.args : extractJson(ds.text));
+      },
+      claude: async () => {
+        const response = await anthropic.messages.create({
+          model: MODEL,
+          // Up to 20 ingredients with four macros each plus 15 steps; cut off
+          // mid-JSON and the whole tool call is unusable.
+          max_tokens: 4000,
+          system,
+          messages: [{ role: 'user', content: request }],
+          tools: [RECIPE_TOOL],
+          tool_choice: { type: 'tool', name: 'write_recipe' },
+        });
+        await trackUsage({ ref, kind: 'recipe' }, MODEL, response.usage);
+        const toolUse = response.content.find(
+          (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'write_recipe',
+        );
+        return toolUse ? sanitizeRecipe(toolUse.input) : undefined;
+      },
     });
-    await trackUsage({ ref, kind: 'recipe' }, MODEL, response.usage);
-    const toolUse = response.content.find(
-      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'write_recipe',
-    );
-    const recipe = toolUse ? sanitizeRecipe(toolUse.input) : undefined;
     if (!recipe) {
       await release(ref, 'recipe');
       return c.json({ error: 'analysis_failed' }, 502);
@@ -1645,54 +1646,54 @@ app.post('/api/generate-program', async (c) => {
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   const claim = await reserve(ref, access, 'program');
   if (!claim.ok) return c.json(quotaError(access), 402);
+  const system = programPrompt(language, contextText(body.context));
   try {
-    if ((await providerFor(access)) === 'deepseek') {
-      // Far more headroom than Claude's 9000: on a reasoning model the
-      // chain-of-thought shares this budget with the answer, and the answer
-      // here is a week of training plus a week of named meals with macros.
-      const ds = await withOneRetry(() =>
-        deepseekToolCall(
-          [
-            { role: 'system', content: programPrompt(language, contextText(body.context)) },
-            { role: 'user', content: 'Design my program.' },
-          ],
-          [toDeepseekTool(PROGRAM_TOOL)],
-          20000,
-          'propose_program',
-        ),
-      );
-      await trackUsage({ ref, kind: 'program' }, ds.model, {
-        input_tokens: ds.inputTokens,
-        output_tokens: ds.outputTokens,
-      });
-      const call = ds.toolCalls.find((t) => t.name === 'propose_program');
-      // Belt and braces: a model that ignores tool_choice and just writes the
-      // JSON as prose still produces a usable program, and costs nothing to
-      // try before giving up.
-      const program = sanitizeProgram(call ? call.args : extractJson(ds.text));
-      if (!program) {
-        await release(ref, 'program');
-        return c.json({ error: 'analysis_failed' }, 502);
-      }
-      return c.json(program);
-    }
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      // A full week's schedule AND a full week of named meals with macros
-      // alongside targets and a real summary — a 7-day meal plan alone is
-      // ~4k tokens of tool JSON, so this needs far more room than a coach
-      // reply. Cut off mid-JSON and the whole tool call is unusable.
-      max_tokens: 9000,
-      system: programPrompt(language, contextText(body.context)),
-      messages: [{ role: 'user', content: 'Design my program.' }],
-      tools: [PROGRAM_TOOL],
-      tool_choice: { type: 'tool', name: 'propose_program' },
+    const program = await withProviderFallback('/api/generate-program', await providerFor(access), {
+      deepseek: async () => {
+        // Far more headroom than Claude's 9000: on a reasoning model the
+        // chain-of-thought shares this budget with the answer, and the answer
+        // here is a week of training plus a week of named meals with macros.
+        const ds = await withOneRetry(() =>
+          deepseekToolCall(
+            [
+              { role: 'system', content: system },
+              { role: 'user', content: 'Design my program.' },
+            ],
+            [toDeepseekTool(PROGRAM_TOOL)],
+            20000,
+            'propose_program',
+          ),
+        );
+        await trackUsage({ ref, kind: 'program' }, ds.model, {
+          input_tokens: ds.inputTokens,
+          output_tokens: ds.outputTokens,
+        });
+        const call = ds.toolCalls.find((t) => t.name === 'propose_program');
+        // Belt and braces: a model that ignores tool_choice and just writes the
+        // JSON as prose still produces a usable program, and costs nothing to
+        // try before giving up.
+        return sanitizeProgram(call ? call.args : extractJson(ds.text));
+      },
+      claude: async () => {
+        const response = await anthropic.messages.create({
+          model: MODEL,
+          // A full week's schedule AND a full week of named meals with macros
+          // alongside targets and a real summary — a 7-day meal plan alone is
+          // ~4k tokens of tool JSON, so this needs far more room than a coach
+          // reply. Cut off mid-JSON and the whole tool call is unusable.
+          max_tokens: 9000,
+          system,
+          messages: [{ role: 'user', content: 'Design my program.' }],
+          tools: [PROGRAM_TOOL],
+          tool_choice: { type: 'tool', name: 'propose_program' },
+        });
+        await trackUsage({ ref, kind: 'program' }, MODEL, response.usage);
+        const toolUse = response.content.find(
+          (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_program',
+        );
+        return toolUse ? sanitizeProgram(toolUse.input) : undefined;
+      },
     });
-    await trackUsage({ ref, kind: 'program' }, MODEL, response.usage);
-    const toolUse = response.content.find(
-      (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_program',
-    );
-    const program = toolUse ? sanitizeProgram(toolUse.input) : undefined;
     if (!program) {
       await release(ref, 'program');
       return c.json({ error: 'analysis_failed' }, 502);

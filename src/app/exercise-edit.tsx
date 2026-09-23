@@ -130,7 +130,7 @@ export default function ExerciseEdit() {
 
   return (
     <Screen footer={<Button label={t('exerciseEdit.save')} icon="checkmark" onPress={save} disabled={!editable} />}>
-      <Title>{existing ? t('exerciseEdit.editTitle') : t('exerciseEdit.addTitle')}</Title>
+      <Title close>{existing ? t('exerciseEdit.editTitle') : t('exerciseEdit.addTitle')}</Title>
 
       {photo ? (
         <Pressable onPress={() => router.push('/scan?mode=photo')}>

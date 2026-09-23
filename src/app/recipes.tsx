@@ -150,7 +150,12 @@ export default function Recipes() {
 
   return (
     <Screen
-      header={<BrandHeader title={t('common.appName')} />}
+      header={
+        <BrandHeader
+          title={t('recipes.title')}
+          onBack={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/food'))}
+        />
+      }
       footer={
         <View>
           <View style={styles.footerRow}>

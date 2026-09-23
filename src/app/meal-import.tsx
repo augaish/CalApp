@@ -57,7 +57,7 @@ export default function MealImport() {
   if (loading) {
     return (
       <Screen footer={<Button label={t('common.close')} onPress={() => router.back()} />}>
-        <Title>{t('mealImport.title')}</Title>
+        <Title close>{t('mealImport.title')}</Title>
         <View style={[styles.empty, { borderColor: theme.border }]}>
           <ActivityIndicator color={theme.primary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
@@ -75,7 +75,7 @@ export default function MealImport() {
       <Screen
         footer={<Button label={t('common.close')} onPress={() => router.replace('/(tabs)/food')} />}
       >
-        <Title>{t('mealImport.title')}</Title>
+        <Title close>{t('mealImport.title')}</Title>
         <View style={[styles.empty, { borderColor: theme.border }]}>
           <Ionicons name="alert-circle-outline" size={32} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
@@ -102,7 +102,7 @@ export default function MealImport() {
         </View>
       }
     >
-      <Title>{t('mealImport.title')}</Title>
+      <Title close>{t('mealImport.title')}</Title>
       <Subtitle>{t('mealImport.summary', { count: foodCount })}</Subtitle>
 
       {payload.meals.map((meal, mi) => (

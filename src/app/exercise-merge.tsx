@@ -73,7 +73,7 @@ export default function ExerciseMerge() {
 
   return (
     <Screen>
-      <Title>{t('exerciseMerge.title')}</Title>
+      <Title close>{t('exerciseMerge.title')}</Title>
 
       <Card style={{ backgroundColor: theme.cardSubtle, gap: 4 }}>
         <Text style={{ color: theme.text, fontWeight: '700' }}>{exerciseName(source, language)}</Text>

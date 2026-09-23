@@ -66,7 +66,7 @@ export default function EditPortion() {
           />
         }
       >
-        <Title>{t('editPortion.title')}</Title>
+        <Title close>{t('editPortion.title')}</Title>
         <Card style={{ gap: Spacing.sm }}>
           <Text style={{ color: theme.text, fontWeight: '700' }}>{item.name}</Text>
           <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('editPortion.noServings')}</Text>
@@ -139,7 +139,7 @@ export default function EditPortion() {
         </View>
       }
     >
-      <Title>{t('editPortion.title')}</Title>
+      <Title close>{t('editPortion.title')}</Title>
       <Text style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>{item.name}</Text>
 
       {/* What is on record right now. */}

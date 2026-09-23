@@ -328,7 +328,8 @@ st = await store(page);
 check('E12 editing the original creates a separate private copy', st.recipes.length === 1 && st.recipes[0].source === 'custom' && st.recipes[0].id !== 'calgym:chicken-kabsa' && st.recipes[0].name === 'My kabsa', JSON.stringify({ n: st.recipes.length, id: st.recipes[0]?.id, source: st.recipes[0]?.source }));
 check('E12 the editor opened the copy, not the original', /\/recipe\?id=/.test(page.url()) && !/calgym%3Achicken-kabsa|calgym:chicken-kabsa/.test(page.url()), page.url().replace(BASE, ''));
 await page.goto(`${BASE}/recipes`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1500);
-await page.getByText('Calgym', { exact: true }).nth(1).click().catch(() => page.getByText('Calgym', { exact: true }).first().click()); await page.waitForTimeout(500);
+// The header now names the screen (Recipes), so the first "Calgym" is the filter chip.
+await page.getByText('Calgym', { exact: true }).first().click(); await page.waitForTimeout(500);
 b = await body(page); await shot(page, 'E12-calgym-filter');
 check('E12 the Calgym collection still holds the untouched original', /Chicken kabsa/.test(b) && !/My kabsa/.test(b.split('My recipes')[1] ?? ''), b.match(/Chicken kabsa.{0,40}/)?.[0]);
 await page.getByText('My recipes', { exact: true }).click(); await page.waitForTimeout(500);

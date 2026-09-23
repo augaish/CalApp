@@ -302,7 +302,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
     >
       {/* Header */}
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.headerBtn}>
+        <Pressable onPress={() => router.back()} hitSlop={10} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel={t('common.back')}>
           <Ionicons name="chevron-back" size={24} color={theme.text} />
         </Pressable>
         <Text style={[Type.title, { color: theme.text, flex: 1 }]} numberOfLines={1}>

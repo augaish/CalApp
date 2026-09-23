@@ -114,7 +114,7 @@ export default function ScheduleScreen() {
         >
           <Ionicons name="share-outline" size={22} color={theme.primary} />
         </Pressable>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>

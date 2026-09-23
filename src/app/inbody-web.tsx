@@ -108,7 +108,7 @@ export default function InBodyWeb() {
     <View style={styles.container}>
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm, backgroundColor: theme.card }]}>
         <Text style={[styles.title, { color: theme.text }]}>{t('inbodyWeb.title')}</Text>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>

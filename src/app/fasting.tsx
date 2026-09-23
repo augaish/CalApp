@@ -113,7 +113,7 @@ export default function Fasting() {
     >
       <View style={styles.header}>
         <Title>{t('fasting.title')}</Title>
-        <Pressable onPress={() => router.back()} hitSlop={10}>
+        <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
           <Ionicons name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>

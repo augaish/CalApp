@@ -75,7 +75,7 @@ export default function EditProfile() {
 
   return (
     <Screen footer={<Button label={t('editProfile.save')} onPress={save} />}>
-      <Title>{t('editProfile.title')}</Title>
+      <Title close>{t('editProfile.title')}</Title>
       <View style={styles.row}>
         <View style={styles.flex}>
           <OptionRow label={t('onboarding.male')} selected={sex === 'male'} onPress={() => setSex('male')} />

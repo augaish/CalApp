@@ -28,6 +28,7 @@ export function BrandHeader({
   children,
   bottomRadius = true,
   aiRef,
+  onBack,
 }: {
   title: string;
   showLogo?: boolean;
@@ -37,6 +38,8 @@ export function BrandHeader({
   children?: ReactNode;
   bottomRadius?: boolean;
   aiRef?: React.Ref<View>;
+  /** A pushed screen that keeps the brand band (Recipes) still needs a way back. */
+  onBack?: () => void;
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
@@ -51,7 +54,7 @@ export function BrandHeader({
         bottomRadius && { borderBottomLeftRadius: Radius.xl, borderBottomRightRadius: Radius.xl },
       ]}
     >
-      <BrandRow title={title} showLogo={showLogo} right={right} extra={extra} aiRef={aiRef} />
+      <BrandRow title={title} showLogo={showLogo} right={right} extra={extra} aiRef={aiRef} onBack={onBack} />
       {children}
     </LinearGradient>
   );
@@ -70,6 +73,7 @@ export function BrandRow({
   extra,
   compact = false,
   aiRef,
+  onBack,
 }: {
   title: string;
   showLogo?: boolean;
@@ -78,6 +82,8 @@ export function BrandRow({
   compact?: boolean;
   /** Lets the tour spotlight the AI Support entry. */
   aiRef?: React.Ref<View>;
+  /** Shows a back chevron in place of the logo tile. */
+  onBack?: () => void;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -85,7 +91,18 @@ export function BrandRow({
   const size = compact ? 30 : 36;
   return (
     <View style={[styles.row, compact && { minHeight: 40 }]}>
-      {showLogo && (
+      {onBack && (
+        <Pressable
+          onPress={onBack}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back')}
+          style={({ pressed }) => [styles.brandBack, { width: size, height: size, borderRadius: size / 2, backgroundColor: BACKING }, pressed && { opacity: 0.7 }]}
+        >
+          <Ionicons name="chevron-back" size={compact ? 18 : 22} color={theme.onGradient} />
+        </Pressable>
+      )}
+      {showLogo && !onBack && (
         <Image
           source={require('../../assets/images/logo-tile.png')}
           style={[styles.logo, { width: size, height: size, borderRadius: compact ? 8 : 9 }]}
@@ -236,6 +253,7 @@ export function PageHeader({
 }
 
 const styles = StyleSheet.create({
+  brandBack: { alignItems: 'center', justifyContent: 'center' },
   band: { paddingHorizontal: Spacing.page, paddingBottom: Spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minHeight: TOUCH },
   logo: { width: 36, height: 36, borderRadius: 9 },

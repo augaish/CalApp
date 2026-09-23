@@ -197,7 +197,7 @@ export default function RecipeEdit() {
         </View>
       }
     >
-      <Title>{existing ? t('recipeEdit.editTitle') : t('recipeEdit.title')}</Title>
+      <Title close={cancel}>{existing ? t('recipeEdit.editTitle') : t('recipeEdit.title')}</Title>
       <Text style={{ color: theme.textSecondary, marginBottom: Spacing.md }}>{t('recipeEdit.subtitle')}</Text>
 
       {error && (
