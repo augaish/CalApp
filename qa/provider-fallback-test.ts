@@ -52,7 +52,7 @@ globalThis.fetch = (async (_url: string, init: { body: string }) => {
   const body = JSON.parse(init.body);
   bodies.push(body);
   if (typeof body.tool_choice === 'object') {
-    return new Response(JSON.stringify({ error: { message: 'deepseek-reasoner does not support this tool_choice' } }), { status: 400 });
+    return new Response(JSON.stringify({ error: { message: 'Thinking mode does not support this tool_choice', type: 'invalid_request_error' } }), { status: 400 });
   }
   return new Response(JSON.stringify({
     choices: [{ message: { content: '', tool_calls: [{ function: { name: 'write_recipe', arguments: '{"title":"Kabsa"}' } }] } }],
@@ -63,6 +63,10 @@ const ds = await deepseekToolCall([{ role: 'user', content: 'kabsa' }], [], 1000
 check('a 400 on the forced tool is asked again without forcing', bodies.length === 2 && bodies[1].tool_choice === 'auto');
 check('  telling the model which function to use', JSON.stringify(bodies[1].messages).includes('write_recipe'));
 check('  and the tool call from the second answer comes through', ds.toolCalls[0]?.name === 'write_recipe' && (ds.toolCalls[0].args as { title: string }).title === 'Kabsa');
+
+bodies.length = 0;
+await deepseekToolCall([{ role: 'user', content: 'kabsa' }], [], 1000, 'write_recipe');
+check('after one refusal, later calls go straight to the accepted form (one request)', bodies.length === 1 && bodies[0].tool_choice === 'auto', JSON.stringify(bodies.map((b) => b.tool_choice)));
 
 bodies.length = 0;
 globalThis.fetch = (async (_u: string, init: { body: string }) => {

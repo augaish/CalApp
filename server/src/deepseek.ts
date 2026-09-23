@@ -159,6 +159,9 @@ export interface DeepseekToolResult extends DeepseekResult {
  * `forceTool` names a tool the model must call (OpenAI's tool_choice), for
  * the cases where the whole point of the request is a structured payload.
  */
+/** Set when this model has refused a forced tool_choice; see deepseekToolCall. */
+let forcedToolRefused = false;
+
 export async function deepseekToolCall(
   messages: DeepseekChatMessage[],
   tools: DeepseekTool[],
@@ -173,7 +176,18 @@ export async function deepseekToolCall(
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({ model: MODEL, max_tokens: maxTokens, messages: msgs, tools, tool_choice: toolChoice }),
     });
-  let res = await send(messages, forceTool ? { type: 'function', function: { name: forceTool } } : 'auto');
+  const unforced = (): Promise<Response> =>
+    send(
+      [...messages, { role: 'system', content: `Answer by calling the function "${forceTool}" with the complete result. Do not reply in prose.` }],
+      'auto',
+    );
+  // Once DeepSeek has refused a forced tool ("Thinking mode does not support
+  // this tool_choice"), every later call would be refused the same way, so
+  // skip straight to the form it accepts rather than paying a round trip.
+  let res =
+    forceTool && forcedToolRefused
+      ? await unforced()
+      : await send(messages, forceTool ? { type: 'function', function: { name: forceTool } } : 'auto');
   // Naming the one function to call is refused by some DeepSeek models (the
   // reasoning ones reject a forced tool_choice with a 400), which failed the
   // recipe and programme routes outright. Ask again with the choice left to
@@ -182,10 +196,8 @@ export async function deepseekToolCall(
   if (!res.ok && res.status === 400 && forceTool) {
     const first = await res.text().catch(() => '');
     console.warn(`DeepSeek refused forced tool "${forceTool}", retrying unforced: ${first.slice(0, 200)}`);
-    res = await send(
-      [...messages, { role: 'system', content: `Answer by calling the function "${forceTool}" with the complete result. Do not reply in prose.` }],
-      'auto',
-    );
+    if (/tool_choice/i.test(first)) forcedToolRefused = true;
+    res = await unforced();
   }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
