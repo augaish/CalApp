@@ -7,6 +7,7 @@ import { AppState, Pressable, StyleSheet, View } from 'react-native';
 import { GlassBacking } from '@/components/glass';
 import { Icon } from '@/components/icon';
 import { TourOverlay } from '@/components/tour-overlay';
+import { useMembershipPrompt } from '@/hooks/use-membership-prompt';
 import { useTheme } from '@/hooks/use-theme';
 import { usePending } from '@/lib/pending';
 import { syncReminders } from '@/lib/reminders';
@@ -81,6 +82,8 @@ export default function TabLayout() {
     });
     return () => sub.remove();
   }, [remindersInitialized, mealCount, workoutCount, waterCount, activeFastId]);
+
+  useMembershipPrompt();
 
   if (nativeTabsAvailable) {
     // iPhone: Apple's own tab bar — Liquid Glass on iOS 26, the system bar

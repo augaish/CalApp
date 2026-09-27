@@ -63,7 +63,7 @@ export function RefineBox({
     } catch (err) {
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
-        router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
       } else if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
         setError(t('common.aiCreditsExhausted'));
       } else if (err instanceof ApiError) {

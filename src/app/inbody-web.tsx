@@ -58,7 +58,7 @@ export default function InBodyWeb() {
 
   const onLocked = (reason: 'quota' | 'coach') => {
     useEntitlement.getState().refresh();
-    router.replace(`/upgrade?reason=${reason}`);
+    router.replace(`/membership?reason=${reason}`);
   };
 
   const capture = async () => {

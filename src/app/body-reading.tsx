@@ -235,7 +235,7 @@ export default function BodyReading() {
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         setUploadStage('idle');
-        router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
         return;
       }
       setUploadStage('error');

@@ -43,7 +43,7 @@ export default function Describe() {
     } catch (err) {
       if (err instanceof QuotaError) {
         useEntitlement.getState().refresh();
-        router.replace('/upgrade?reason=quota');
+        router.replace('/membership?reason=quota');
         return;
       }
       if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {

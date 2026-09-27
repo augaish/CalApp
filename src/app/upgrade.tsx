@@ -1,28 +1,18 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
-import { alertProblem } from '@/lib/alerts';
 import { Segmented } from '@/components/system';
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { SERVER_URL } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
-import {
-  configurePurchases,
-  loadStorePlans,
-  manageSubscription,
-  purchase,
-  purchasesStatus,
-  restorePurchases,
-  type LoadedPlans,
-} from '@/lib/purchases';
-import { annualSaving, type BillingPeriod, type PaidTier } from '@/lib/store-plans';
+import { manageSubscription } from '@/lib/purchases';
+import { annualSaving } from '@/lib/store-plans';
+import { MEMBERSHIP_FEATURES, useStoreOffer } from '@/lib/use-store-offer';
 
 /** Used until `/api/me` answers (and on a server that predates `pricing`) —
  * the same numbers this screen shipped with, so nothing ever renders blank.
@@ -37,14 +27,6 @@ const FALLBACK = {
   coachCap: 5,
 };
 
-const FEATURES: { icon: keyof typeof Ionicons.glyphMap; key: string }[] = [
-  { icon: 'camera', key: 'scan' },
-  { icon: 'sparkles', key: 'describe' },
-  { icon: 'barbell', key: 'equipment' },
-  { icon: 'chatbubbles', key: 'coach' },
-  { icon: 'infinite', key: 'limits' },
-];
-
 export default function Upgrade() {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
@@ -55,40 +37,13 @@ export default function Upgrade() {
   const used = useEntitlement((s) => s.used);
   const limit = useEntitlement((s) => s.limit);
   const pricing = useEntitlement((s) => s.pricing);
-  const billing = useEntitlement((s) => s.billing);
   const promo = useEntitlement((s) => s.promo);
   const pro = plan === 'pro' || plan === 'proPlus';
 
-  const [store, setStore] = useState<LoadedPlans | null>(null);
-  const [storeChecked, setStoreChecked] = useState(false);
-  const [period, setPeriod] = useState<BillingPeriod>('monthly');
-  const [tier, setTier] = useState<PaidTier>(plan === 'pro' ? 'proPlus' : 'pro');
-  const [busy, setBusy] = useState<'buy' | 'restore' | null>(null);
-
-  useEffect(() => {
-    let live = true;
-    (async () => {
-      // The screen can open before launch's refresh has switched the SDK on.
-      configurePurchases(billing);
-      const loaded = await loadStorePlans();
-      if (!live) return;
-      setStore(loaded);
-      setStoreChecked(true);
-    })();
-    return () => {
-      live = false;
-    };
-  }, [billing]);
-
-  const status = purchasesStatus();
-  // Subscriptions are switched on at the server, but this binary predates the
-  // store SDK: say so, rather than show a button that cannot work.
-  const serverSells = Platform.OS === 'ios' ? !!billing?.iosKey : Platform.OS === 'android' ? !!billing?.androidKey : false;
-  const needsUpdate = serverSells && status === 'unlinked';
-  const plans = store?.plans ?? null;
-  const hasAnnual = !!plans && !!(plans.pro.annual || plans.proPlus.annual);
-  const shownPeriod: BillingPeriod = hasAnnual ? period : 'monthly';
-  const selectedPkg = plans ? (plans[tier][shownPeriod] ?? plans[tier].monthly ?? null) : null;
+  const offer = useStoreOffer();
+  const { plans, storeChecked, status, serverSells, needsUpdate, hasAnnual, tier, setTier, selectedPkg, priceFor, storeName, busy } = offer;
+  const shownPeriod = offer.period;
+  const setPeriod = offer.setPeriod;
 
   // Only while the store has nothing to sell.
   const currency = pricing?.currency ?? FALLBACK.currency;
@@ -98,21 +53,12 @@ export default function Upgrade() {
   const monthly = pricing?.pro ?? FALLBACK.pro;
   const savePct = monthly > 0 ? Math.round((1 - yearly / (monthly * 12)) * 100) : 0;
 
-  const storeName = Platform.OS === 'android' ? t('upgrade.storeGoogle') : t('upgrade.storeApple');
   const date = (iso: string) =>
     new Date(iso).toLocaleDateString(i18n.language === 'ar' ? 'ar' : 'en', {
       day: 'numeric',
       month: 'long',
       year: 'numeric',
     });
-
-  const priceFor = (id: PaidTier): { main: string; unit: string } | null => {
-    if (!plans) return null;
-    const pkg = plans[id][shownPeriod] ?? plans[id].monthly;
-    if (!pkg) return null;
-    const annual = pkg === plans[id].annual;
-    return { main: pkg.product.priceString, unit: annual ? t('upgrade.perYearStore') : t('upgrade.perMonthStore') };
-  };
 
   const tiers = [
     {
@@ -135,30 +81,8 @@ export default function Upgrade() {
     },
   ].filter((x) => x.id === 'free' || !plans || plans[x.id].monthly || plans[x.id].annual);
 
-  const buy = async () => {
-    if (!selectedPkg) return;
-    setBusy('buy');
-    const out = await purchase(selectedPkg);
-    setBusy(null);
-    if (out.kind === 'purchased') {
-      Alert.alert(t('upgrade.purchaseDoneTitle'), t('upgrade.purchaseDone', { plan: tier === 'proPlus' ? t('upgrade.planProPlus') : t('upgrade.planPro') }), [
-        { text: t('common.done'), onPress: () => router.back() },
-      ]);
-    } else if (out.kind === 'pending') {
-      Alert.alert(t('upgrade.pendingTitle'), t('upgrade.purchasePending'));
-    } else if (out.kind === 'failed') {
-      alertProblem(t('upgrade.failedTitle'), t('upgrade.purchaseFailed'));
-    }
-  };
-
-  const restore = async () => {
-    setBusy('restore');
-    const out = await restorePurchases();
-    setBusy(null);
-    if (out.kind === 'restored') Alert.alert(t('upgrade.restoredTitle'), t('upgrade.restored'));
-    else if (out.kind === 'nothing') Alert.alert(t('upgrade.restore'), t('upgrade.restoreNone', { store: storeName }));
-    else alertProblem(t('upgrade.failedTitle'), t('upgrade.restoreFailed'));
-  };
+  const buy = () => offer.buy(() => router.back());
+  const restore = offer.restore;
 
   const currentTierSelected = plan === tier && !promo;
 
@@ -258,7 +182,7 @@ export default function Upgrade() {
       )}
 
       <Card>
-        {FEATURES.map((f, i) => (
+        {MEMBERSHIP_FEATURES.map((f, i) => (
           <View
             key={f.key}
             style={[

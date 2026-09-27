@@ -123,7 +123,7 @@ export default function Recipes() {
       const action = aiFailureAction(err, { titleKey: 'recipes.unusableTitle', bodyKey: 'recipes.unusableBody' });
       if (action.kind === 'upgrade') {
         useEntitlement.getState().refresh();
-        router.push(`/upgrade?reason=${action.reason}`);
+        router.push(`/membership?reason=${action.reason}`);
         return;
       }
       alertProblem(t(action.titleKey), t(action.bodyKey, action.values));

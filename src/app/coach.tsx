@@ -100,7 +100,7 @@ export default function Coach() {
     const content = (override ?? input).trim();
     if (!content || busy) return;
     if (!coachUnlocked) {
-      router.push('/upgrade?reason=coach');
+      router.push('/membership?reason=coach');
       return;
     }
     const next: ChatMessage[] = [...messages, { role: 'user', content, at: nowIso(), focus }];
@@ -134,7 +134,7 @@ export default function Coach() {
         // Keep the typed question so nothing is lost on the way to Upgrade.
         setMessages(messages);
         setInput(content);
-        router.push(`/upgrade?reason=${action.reason}`);
+        router.push(`/membership?reason=${action.reason}`);
         return;
       }
       // The failure category is the reply: quota, account credit and service
@@ -307,7 +307,7 @@ export default function Coach() {
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         setAttachStage('idle');
-        router.push(`/upgrade?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
         return;
       }
       const action = aiFailureAction(err, { titleKey: 'coach.attachErrorInvalidFile', bodyKey: 'coach.attachErrorFailed' });
@@ -388,7 +388,7 @@ export default function Coach() {
           </View>
         )}
         {!coachUnlocked && (
-          <Pressable accessibilityRole="button" onPress={() => router.push('/upgrade?reason=coach')} style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/membership?reason=coach')} style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
             <Icon name="lock-closed" size={22} color={theme.primary} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{t('coach.lockedTitle')}</Text>

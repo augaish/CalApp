@@ -1107,6 +1107,12 @@ export const en = {
     reviewNote: 'Review the name, serving size and nutrition before saving.',
     tryAnother: 'Try another barcode',
   },
+  membership: {
+    title: 'Get more from Calgym',
+    subtitle: 'Scan without limits, ask your AI coach anything and get plans built around you.',
+    notNow: 'Not now',
+    comparePlans: 'Compare plans',
+  },
   upgrade: {
     title: 'Calgym Pro',
     subtitle: 'Unlock the AI that does the counting for you.',

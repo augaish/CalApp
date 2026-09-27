@@ -110,6 +110,10 @@ export default function RootLayout() {
           <Stack.Screen name="recipe-edit" options={{ presentation: 'modal' }} />
           <Stack.Screen name="log-portion" options={{ presentation: 'modal' }} />
           <Stack.Screen name="upgrade" options={{ presentation: 'modal' }} />
+          <Stack.Screen
+            name="membership"
+            options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
+          />
           <Stack.Screen name="redeem" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-library" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-edit" options={{ presentation: 'modal' }} />

@@ -62,7 +62,7 @@ export default function PhotoAnalyze() {
         if (err instanceof QuotaError || err instanceof FeatureLockedError) {
           useEntitlement.getState().refresh();
           router.replace(
-            err instanceof QuotaError ? '/upgrade?reason=quota' : '/upgrade?reason=equipment',
+            err instanceof QuotaError ? '/membership?reason=quota' : '/membership?reason=equipment',
           );
           return;
         }

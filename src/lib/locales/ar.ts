@@ -1107,6 +1107,12 @@ export const ar: TranslationSchema = {
     reviewNote: 'راجع الاسم وحجم الحصة والقيم الغذائية قبل الحفظ.',
     tryAnother: 'جرّب باركوداً آخر',
   },
+  membership: {
+    title: 'احصل على المزيد من Calgym',
+    subtitle: 'امسح وجباتك بلا حدود، واسأل مدربك الذكي أي شيء، واحصل على خطط مصممة لك.',
+    notNow: 'ليس الآن',
+    comparePlans: 'قارن الخطط',
+  },
   upgrade: {
     title: 'كالجيم برو',
     subtitle: 'افتح الذكاء الاصطناعي الذي يحسب عنك.',

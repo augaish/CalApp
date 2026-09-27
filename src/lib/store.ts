@@ -6,6 +6,7 @@ import { categoryForMuscles, exactExerciseMatch, findExercise, guessCategory, ma
 import { incompleteFlags, perServing, recipeUnknownNutrients, roundMacros, scaleMacros, servingCountLabel } from './recipes';
 import type { PlannedRecipeMeal } from './shopping';
 import { applyMoves, resolvePlan, undoOp, type OccurrenceMove } from './occurrences';
+import type { MembershipPromptState } from './membership-prompt';
 import { dailyTargets } from './tdee';
 import type {
   AppearancePref,
@@ -58,6 +59,8 @@ interface AppState {
   units: Units;
   /** Absent on stores from before it existed, which reads as 'system'. */
   appearance?: AppearancePref;
+  /** When the membership sheet last offered itself — see membership-prompt.ts. */
+  membershipPrompt?: MembershipPromptState;
   /** S19 focus preference; both by default. */
   focusAreas: FocusArea[];
   profile: Profile | null;
@@ -219,6 +222,7 @@ interface AppState {
   setLanguage: (language: Language) => void;
   setUnits: (units: Units) => void;
   setAppearance: (appearance: AppearancePref) => void;
+  setMembershipPrompt: (state: MembershipPromptState) => void;
   setFocusAreas: (areas: FocusArea[]) => void;
   setProfile: (profile: Profile) => void;
   /** Manually override the daily calorie/macro targets. */
@@ -508,6 +512,7 @@ export const useAppStore = create<AppState>()(
       setLanguage: (language) => set({ language }),
       setUnits: (units) => set({ units }),
       setAppearance: (appearance) => set({ appearance }),
+      setMembershipPrompt: (membershipPrompt) => set({ membershipPrompt }),
       setFocusAreas: (areas) => set({ focusAreas: areas.length ? areas : ['food', 'training'] }),
       setProfile: (profile) => set({ profile, targets: dailyTargets(profile) }),
       setTargets: (targets) => set({ targets }),
@@ -1238,6 +1243,7 @@ export const useAppStore = create<AppState>()(
         language,
         units,
         appearance,
+        membershipPrompt,
         focusAreas,
         profile,
         targets,
@@ -1284,6 +1290,7 @@ export const useAppStore = create<AppState>()(
         language,
         units,
         appearance,
+        membershipPrompt,
         focusAreas,
         profile,
         targets,

@@ -141,7 +141,7 @@ export default function Scan() {
   /** Out of allowance, or the plan doesn't include this — go to upgrade. */
   const onLocked = (reason: 'quota' | 'equipment') => {
     useEntitlement.getState().refresh();
-    router.replace(`/upgrade?reason=${reason}`);
+    router.replace(`/membership?reason=${reason}`);
   };
 
   /** Back to a live viewfinder after a failure, so the shot can be retaken. */
