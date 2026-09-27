@@ -353,6 +353,25 @@ export async function initDb(): Promise<void> {
       at         TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
+  // Day-by-day figures for the admin overview. Monthly counters above stay
+  // the source of truth for allowances; these only draw the charts, and start
+  // on the day this shipped — days before it read as "not recorded", never 0.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usage_daily (
+      day      DATE NOT NULL,
+      kind     TEXT NOT NULL,
+      actions  INTEGER NOT NULL DEFAULT 0,
+      cost_usd NUMERIC(12,6) NOT NULL DEFAULT 0,
+      PRIMARY KEY (day, kind)
+    )
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS user_days (
+      day DATE NOT NULL,
+      ref TEXT NOT NULL,
+      PRIMARY KEY (day, ref)
+    )
+  `);
 }
 
 // ── Promotion codes ───────────────────────────────────────────────────────
@@ -737,6 +756,8 @@ export async function getOrCreateUser(ref: string): Promise<AppUser | null> {
        RETURNING ref, plan, plan_source, plan_until, note, promo_plan, promo_until, promo_code`,
       [ref],
     );
+    // Who used the app today, for the overview's daily-active line.
+    pool.query(`INSERT INTO user_days (day, ref) VALUES (${TODAY_SQL}, $1) ON CONFLICT DO NOTHING`, [ref]).catch(() => {});
     return appUserFrom(res.rows[0]);
   } catch (err) {
     console.error('getOrCreateUser failed:', err);
@@ -796,6 +817,24 @@ export async function setUserPlan(
 // ── Usage metering ────────────────────────────────────────────────────────
 
 /** Billing period key: the calendar month the usage counts against. */
+/** The admin's calendar day, for the daily tables: Saudi time unless ADMIN_TZ says otherwise. */
+export const ADMIN_TZ = process.env.ADMIN_TZ || 'Asia/Riyadh';
+const TODAY_SQL = `(now() AT TIME ZONE '${ADMIN_TZ.replace(/'/g, '')}')::date`;
+
+/** Add to today's action count and cost for a kind. Never throws. */
+async function bumpDaily(kind: string, actions: number, costUsd = 0): Promise<void> {
+  if (!pool) return;
+  try {
+    await pool.query(
+      `INSERT INTO usage_daily (day, kind, actions, cost_usd) VALUES (${TODAY_SQL}, $1, GREATEST(0, $2), $3)
+       ON CONFLICT (day, kind) DO UPDATE SET actions = GREATEST(0, usage_daily.actions + $2), cost_usd = usage_daily.cost_usd + $3`,
+      [kind, actions, costUsd],
+    );
+  } catch (err) {
+    console.error('bumpDaily failed:', err);
+  }
+}
+
 export function currentPeriod(d = new Date()): string {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
 }
@@ -890,6 +929,7 @@ export async function reserveUsage(
       [ref, period, kind, weight],
     );
     await client.query('COMMIT');
+    void bumpDaily(kind, weight);
     return { ok: true, used: used + weight, kindUsed: kindUsed + weight };
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
@@ -910,6 +950,7 @@ export async function refundUsage(ref: string, kind: string, weight = 1): Promis
         WHERE ref = $1 AND period = $2 AND kind = $3`,
       [ref, currentPeriod(), kind, weight],
     );
+    void bumpDaily(kind, -weight);
   } catch (err) {
     // A lost refund only ever costs the user one action; never fail their
     // request over it.
@@ -926,6 +967,7 @@ export async function recordUsage(ref: string, kind: string, weight = 1): Promis
        ON CONFLICT (ref, period, kind) DO UPDATE SET count = usage_counters.count + $4`,
       [ref, currentPeriod(), kind, weight],
     );
+    void bumpDaily(kind, weight);
     return await getUsage(ref);
   } catch (err) {
     console.error('recordUsage failed:', err);
@@ -957,6 +999,7 @@ export async function recordTokens(
         WHERE ref = $1 AND period = $2 AND kind = $3`,
       [ref, currentPeriod(), kind, inputTokens, outputTokens, costUsd],
     );
+    void bumpDaily(kind, 0, costUsd);
   } catch (err) {
     console.error('recordTokens failed:', err);
   }
@@ -2067,5 +2110,113 @@ export async function partnerReport(partnerId: string): Promise<PartnerReport | 
       amountUsd: Number(r.amount_usd),
     })),
     payouts: payouts.rows.map((r) => ({ at: new Date(r.at).toISOString(), amountUsd: Number(r.amount_usd), note: r.note ?? null })),
+  };
+}
+
+// ── Admin overview ────────────────────────────────────────────────────────
+
+export interface OverviewDay {
+  day: string;
+  newUsers: number;
+  /** Null before daily tracking began — "not recorded", not zero. */
+  activeUsers: number | null;
+  aiActions: number | null;
+  aiCostUsd: number | null;
+  purchases: number;
+  renewals: number;
+  cancellations: number;
+  redemptions: number;
+  aiFailures: number;
+}
+
+export interface AdminOverview {
+  days: number;
+  timezone: string;
+  /** First day the daily tables have data for, or null when none yet. */
+  trackingSince: string | null;
+  series: OverviewDay[];
+  recent: {
+    billing: { type: string | null; ref: string | null; email: string | null; at: string }[];
+    redemptions: { code: string; ref: string; email: string | null; at: string }[];
+    signups: { ref: string; email: string | null; device: string | null; at: string }[];
+  };
+  attention: { queue: number; aiFailures24h: number; partnersOwedUsd: number; partnersPendingUsd: number };
+  billingEventsEver: number;
+}
+
+export async function adminOverview(days: number): Promise<AdminOverview | null> {
+  if (!pool) return null;
+  const n = Math.max(1, Math.min(365, Math.round(days)));
+  const tz = ADMIN_TZ.replace(/'/g, '');
+  const local = (col: string) => `(${col} AT TIME ZONE '${tz}')::date`;
+  const [series, since, billing, redemptions, signups, attention] = await Promise.all([
+    pool.query(
+      `WITH d AS (SELECT generate_series(${TODAY_SQL} - ($1::int - 1), ${TODAY_SQL}, interval '1 day')::date AS day)
+       SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
+         (SELECT COUNT(*) FROM app_users u WHERE ${local('u.created_at')} = d.day)::int AS new_users,
+         (SELECT COUNT(*) FROM user_days x WHERE x.day = d.day)::int AS active_users,
+         (SELECT COALESCE(SUM(actions), 0) FROM usage_daily x WHERE x.day = d.day)::int AS ai_actions,
+         (SELECT COALESCE(SUM(cost_usd), 0) FROM usage_daily x WHERE x.day = d.day) AS ai_cost,
+         (SELECT COUNT(*) FROM billing_events b WHERE ${local('b.received_at')} = d.day AND upper(b.type) IN ('INITIAL_PURCHASE','NON_RENEWING_PURCHASE'))::int AS purchases,
+         (SELECT COUNT(*) FROM billing_events b WHERE ${local('b.received_at')} = d.day AND upper(b.type) = 'RENEWAL')::int AS renewals,
+         (SELECT COUNT(*) FROM billing_events b WHERE ${local('b.received_at')} = d.day AND upper(b.type) IN ('CANCELLATION','EXPIRATION'))::int AS cancellations,
+         (SELECT COUNT(*) FROM promo_redemptions r WHERE ${local('r.at')} = d.day)::int AS redemptions,
+         (SELECT COUNT(*) FROM ai_failures f WHERE ${local('f.created_at')} = d.day)::int AS ai_failures
+       FROM d ORDER BY d.day`,
+      [n],
+    ),
+    pool.query(`SELECT to_char(LEAST((SELECT MIN(day) FROM usage_daily), (SELECT MIN(day) FROM user_days)), 'YYYY-MM-DD') AS since`),
+    pool.query(
+      `SELECT b.type, b.ref, u.email, b.received_at FROM billing_events b LEFT JOIN app_users u ON u.ref = b.ref
+        ORDER BY b.received_at DESC LIMIT 12`,
+    ),
+    pool.query(
+      `SELECT r.code, r.ref, u.email, r.at FROM promo_redemptions r LEFT JOIN app_users u ON u.ref = r.ref
+        ORDER BY r.at DESC LIMIT 10`,
+    ),
+    pool.query(`SELECT ref, email, device, created_at FROM app_users ORDER BY created_at DESC LIMIT 10`),
+    pool.query(
+      `SELECT
+         (SELECT COUNT(*) FROM barcode_cache WHERE status = 'pending')::int AS queue,
+         (SELECT COUNT(*) FROM ai_failures WHERE created_at > now() - interval '24 hours')::int AS failures,
+         (SELECT COUNT(*) FROM billing_events)::int AS billing_ever,
+         COALESCE((SELECT SUM(amount_usd) FROM partner_earnings WHERE at <= now() - interval '30 days'), 0)
+           - COALESCE((SELECT SUM(amount_usd) FROM partner_payouts), 0) AS owed,
+         COALESCE((SELECT SUM(amount_usd) FROM partner_earnings WHERE at > now() - interval '30 days'), 0) AS pending`,
+    ),
+  ]);
+  const sinceDay = (since.rows[0]?.since as string | null) ?? null;
+  const a = attention.rows[0] ?? {};
+  return {
+    days: n,
+    timezone: tz,
+    trackingSince: sinceDay,
+    series: series.rows.map((r) => {
+      const tracked = sinceDay != null && r.day >= sinceDay;
+      return {
+        day: r.day,
+        newUsers: Number(r.new_users),
+        activeUsers: tracked ? Number(r.active_users) : null,
+        aiActions: tracked ? Number(r.ai_actions) : null,
+        aiCostUsd: tracked ? Number(r.ai_cost) : null,
+        purchases: Number(r.purchases),
+        renewals: Number(r.renewals),
+        cancellations: Number(r.cancellations),
+        redemptions: Number(r.redemptions),
+        aiFailures: Number(r.ai_failures),
+      };
+    }),
+    recent: {
+      billing: billing.rows.map((r) => ({ type: r.type ?? null, ref: r.ref ?? null, email: r.email ?? null, at: new Date(r.received_at).toISOString() })),
+      redemptions: redemptions.rows.map((r) => ({ code: r.code, ref: r.ref, email: r.email ?? null, at: new Date(r.at).toISOString() })),
+      signups: signups.rows.map((r) => ({ ref: r.ref, email: r.email ?? null, device: r.device ?? null, at: new Date(r.created_at).toISOString() })),
+    },
+    attention: {
+      queue: Number(a.queue ?? 0),
+      aiFailures24h: Number(a.failures ?? 0),
+      partnersOwedUsd: Math.max(0, Math.round(Number(a.owed ?? 0) * 100) / 100),
+      partnersPendingUsd: Math.round(Number(a.pending ?? 0) * 100) / 100,
+    },
+    billingEventsEver: Number(a.billing_ever ?? 0),
   };
 }

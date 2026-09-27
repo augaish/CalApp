@@ -142,6 +142,8 @@ const browser = await chromium.launch();
   await page.goto(`${API}/admin`, { waitUntil: 'networkidle' });
   await page.fill('#token', 'e2e-admin');
   await page.getByRole('button', { name: /sign in/i }).first().click();
+  await page.waitForSelector('#app:not(.hide)');
+  await page.click('#t-codes');
   await page.waitForSelector('#partners', { state: 'visible' });
   await page.waitForTimeout(800);
   const ptText = (await page.textContent('#pt_rows')).replace(/\s+/g, ' ');

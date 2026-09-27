@@ -2,77 +2,236 @@
  * Calgym admin dashboard — a single self-contained page served at /admin.
  * The admin token is entered in the browser and kept in sessionStorage; it is
  * never baked into this file.
+ *
+ * Light only, in tabs: Overview (range, headline cards, a chart with its data
+ * table, what needs attention, the launch checklist, recent activity), Users,
+ * Membership, Codes & partners, AI and Content. The tab lives in the URL hash
+ * so a reload or a shared link opens the same place.
  */
 export const ADMIN_HTML = `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="color-scheme" content="light" />
+<meta name="robots" content="noindex, nofollow" />
 <title>Calgym Admin</title>
 <style>
-  :root { --bg:#F5F3FA; --card:#fff; --text:#2A2440; --muted:#6B6480; --line:#E6E1F0;
-          --primary:#6D5AAB; --green:#7FB89B; --danger:#E5574E; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#17141F; --card:#221D2E; --text:#F2EFF8; --muted:#A69FBA; --line:#332C44; }
-  }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; padding:20px; }
-  .wrap { max-width:1000px; margin:0 auto; }
-  h1 { font-size:22px; margin:0 0 4px; }
-  .sub { color:var(--muted); font-size:14px; margin-bottom:20px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
-    padding:16px; margin-bottom:16px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
-  .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; }
-  .stat b { display:block; font-size:26px; }
+  :root { color-scheme: light;
+    --bg:#EEF0F4; --card:#FFFFFF; --text:#282B34; --muted:#646D7A; --line:#E5E8ED;
+    --primary:#5B4899; --primary-soft:#EFEBFA; --lime:#E2F795; --lime-ink:#3F4A12; --peach:#FFE7DA; --peach-ink:#6B3A22;
+    --orange:#E0673A; --olive:#5E7A0B; --green:#2E7D57; --green-soft:#E3F4EA; --danger:#C0392B; --danger-soft:#FBE9E7;
+    --warn:#8A5A00; --warn-soft:#FFF4D6; --radius:18px; --gap:16px; }
+  * { box-sizing:border-box; }
+  html, body { background:var(--bg); }
+  body { margin:0; color:var(--text); font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  .wrap { max-width:1180px; margin:0 auto; padding:20px 16px 48px; }
+  h1 { font-size:22px; margin:0; letter-spacing:-.2px; }
+  h2 { font-size:17px; margin:0 0 6px; }
+  h3 { font-size:14px; margin:0 0 8px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.4px; }
+  .topbar { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .topbar .spacer { flex:1; }
+  .logo { width:34px; height:34px; border-radius:10px; background:linear-gradient(135deg,#9B86D4,#7FB89B); display:grid; place-items:center; color:#fff; font-weight:800; }
+  .tabs { display:flex; gap:6px; overflow-x:auto; padding:4px; background:var(--card); border:1px solid var(--line); border-radius:14px; margin-bottom:var(--gap); position:sticky; top:8px; z-index:5; box-shadow:0 2px 10px rgba(40,43,52,.05); }
+  .tab { flex:0 0 auto; background:transparent; color:var(--muted); border:0; border-radius:10px; padding:10px 14px; font-weight:700; font-size:14px; cursor:pointer; min-height:42px; display:flex; align-items:center; gap:8px; }
+  .tab:hover { color:var(--text); background:var(--bg); }
+  .tab[aria-selected="true"] { background:var(--primary); color:#fff; }
+  .tab:focus-visible, button:focus-visible, .chip:focus-visible, summary:focus-visible { outline:3px solid #9B86D4; outline-offset:2px; }
+  .badge { background:var(--danger); color:#fff; border-radius:99px; font-size:11px; padding:1px 7px; line-height:18px; }
+  .tab[aria-selected="true"] .badge { background:#fff; color:var(--danger); }
+  .panel[hidden] { display:none; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin-bottom:var(--gap); }
+  .grid { display:grid; gap:var(--gap); }
+  .cols-3 { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .cols-main { grid-template-columns:minmax(0,2fr) minmax(0,1fr); align-items:start; }
+  .cols-2 { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; }
+  @media (max-width: 860px) { .cols-3, .cols-main, .cols-2 { grid-template-columns:1fr; } }
+  .metric { border-radius:var(--radius); padding:18px 20px; border:1px solid var(--line); background:var(--card); }
+  .metric.lime { background:var(--lime); border-color:transparent; color:var(--lime-ink); }
+  .metric.peach { background:var(--peach); border-color:transparent; color:var(--peach-ink); }
+  .metric .label { font-size:14px; font-weight:600; }
+  .metric .value { font-size:34px; font-weight:800; letter-spacing:-.5px; margin:6px 0 2px; font-variant-numeric:tabular-nums; color:var(--text); }
+  .metric .note { font-size:13px; opacity:.85; }
+  .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:var(--gap) 0; }
+  .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
+  .stat b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
   .stat span { color:var(--muted); font-size:13px; }
-  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; }
-  input, select { width:100%; padding:9px 11px; border:1px solid var(--line); border-radius:9px;
-    background:var(--bg); color:var(--text); font-size:14px; }
-  button { background:var(--primary); color:#fff; border:0; border-radius:9px;
-    padding:10px 16px; font-weight:700; cursor:pointer; font-size:14px; }
-  button.ghost { background:transparent; color:var(--primary); border:1px solid var(--primary); }
-  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:flex-end; }
-  .row > div { flex:1; min-width:120px; }
+  .chips { display:flex; gap:8px; flex-wrap:wrap; }
+  .chip { border:1px solid var(--line); background:var(--card); color:var(--text); border-radius:99px; padding:8px 14px; font-weight:600; font-size:14px; cursor:pointer; min-height:40px; }
+  .chip[aria-pressed="true"] { background:var(--primary-soft); border-color:var(--primary); color:var(--primary); }
+  .chart-head { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--muted); margin:4px 0 0; }
+  .legend i { display:inline-block; width:18px; height:3px; border-radius:2px; vertical-align:middle; margin-inline-end:6px; }
+  .chart svg { width:100%; height:auto; display:block; }
+  .linkbtn { background:none; border:0; color:var(--primary); font-weight:700; padding:10px 0; cursor:pointer; font-size:14px; min-height:40px; }
+  .list { list-style:none; margin:0; padding:0; }
+  .list li { display:flex; gap:10px; align-items:flex-start; padding:10px 0; border-bottom:1px solid var(--line); }
+  .list li:last-child { border-bottom:0; }
+  .dot { width:22px; height:22px; border-radius:50%; flex:0 0 22px; display:grid; place-items:center; font-size:13px; font-weight:800; }
+  .dot.ok { background:var(--green-soft); color:var(--green); }
+  .dot.todo { background:var(--warn-soft); color:var(--warn); }
+  .dot.bad { background:var(--danger-soft); color:var(--danger); }
+  .list .grow { flex:1; min-width:0; }
+  .list .hint { color:var(--muted); font-size:13px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:8px 0 4px; font-weight:600; }
+  input, select { width:100%; padding:10px 12px; border:1px solid #D5D9E0; border-radius:10px; background:#fff; color:var(--text); font-size:14px; min-height:42px; }
+  input[type=checkbox] { min-height:0; }
+  input:focus, select:focus { outline:2px solid #9B86D4; border-color:transparent; }
+  button { background:var(--primary); color:#fff; border:0; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; font-size:14px; min-height:42px; }
+  button.ghost { background:#fff; color:var(--primary); border:1px solid #CFC6EC; }
+  button.ghost:hover { background:var(--primary-soft); }
+  .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+  .row > div { flex:1; min-width:140px; }
   .scroll { overflow-x:auto; }
-  table { width:100%; border-collapse:collapse; font-size:13px; min-width:640px; }
-  th, td { text-align:start; padding:8px 6px; border-bottom:1px solid var(--line); }
-  th { color:var(--muted); font-weight:600; }
-  .pill { display:inline-block; padding:2px 9px; border-radius:99px; font-size:12px; font-weight:700; }
-  .pro { background:rgba(127,184,155,.22); color:#3E8B69; }
-  .free { background:var(--line); color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:14px; min-width:640px; }
+  table.compact { min-width:0; }
+  th, td { text-align:start; padding:10px 8px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.3px; background:#FAFBFC; }
+  td.num, th.num { text-align:end; font-variant-numeric:tabular-nums; }
+  td.when { white-space:nowrap; color:var(--muted); }
+  .pill { display:inline-block; padding:2px 10px; border-radius:99px; font-size:12px; font-weight:700; }
+  .pro { background:var(--green-soft); color:var(--green); }
+  .free { background:#EDEFF3; color:var(--muted); }
   .muted { color:var(--muted); }
-  .err { color:var(--danger); font-size:13px; margin-top:8px; }
+  .sub { color:var(--muted); font-size:14px; }
+  .err { color:var(--danger); font-size:14px; margin-top:8px; }
   .hide { display:none; }
+  details.how { margin:2px 0 12px; }
+  details.how summary { cursor:pointer; color:var(--primary); font-weight:600; font-size:14px; list-style:none; display:inline-flex; align-items:center; gap:6px; min-height:32px; }
+  details.how summary::before { content:"ⓘ"; }
+  details.how > div { color:var(--muted); font-size:14px; background:#FAFBFC; border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-top:6px; }
+  .empty { color:var(--muted); font-size:14px; padding:14px 0; }
+  .auth { max-width:420px; margin:12vh auto 0; }
+  code { background:#F3F4F7; padding:1px 5px; border-radius:6px; font-size:13px; }
+  @media (prefers-reduced-motion: no-preference) { .panel { animation:fade .18s ease-out; } @keyframes fade { from { opacity:0 } to { opacity:1 } } }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Calgym Admin</h1>
-  <div class="sub">Subscriptions, AI usage and the sponsor slot.</div>
-
-  <div class="card" id="auth">
-    <label>Admin token</label>
+  <div class="card auth" id="auth">
+    <div class="topbar"><div class="logo" aria-hidden="true">C</div><h1>Calgym Admin</h1></div>
+    <label for="token">Admin token</label>
     <div class="row">
-      <div><input id="token" type="password" placeholder="ADMIN_TOKEN" /></div>
+      <div><input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="current-password" onkeydown="if (event.key === 'Enter') load()" /></div>
       <button onclick="load()">Sign in</button>
     </div>
-    <div class="err hide" id="autherr">Wrong token, or ADMIN_TOKEN is not set on the server.</div>
+    <div class="err hide" id="autherr" role="alert">Wrong token, or ADMIN_TOKEN is not set on the server.</div>
   </div>
 
   <div id="app" class="hide">
-    <div class="grid" style="margin-bottom:16px">
-      <div class="stat"><b id="s_users">0</b><span>Total users</span></div>
-      <div class="stat"><b id="s_pro">0</b><span>Pro users</span></div>
-      <div class="stat"><b id="s_active">0</b><span>Active this month</span></div>
-      <div class="stat"><b id="s_actions">0</b><span>AI actions this month</span></div>
-      <div class="stat"><b id="s_mrr">0</b><span>MRR (SAR, est.)</span></div>
-      <div class="stat"><b id="s_cost">0</b><span>AI cost (SAR, est.)</span></div>
+    <div class="topbar">
+      <div class="logo" aria-hidden="true">C</div>
+      <div><h1>Calgym Admin</h1><div class="sub" id="updated">Loading…</div></div>
+      <div class="spacer"></div>
+      <button class="ghost" onclick="refreshAll()">Refresh</button>
+      <button class="ghost" onclick="signOut()">Sign out</button>
+    </div>
+
+    <nav class="tabs" role="tablist" aria-label="Sections">
+      <button class="tab" role="tab" id="t-overview" aria-controls="p-overview" data-tab="overview">Overview</button>
+      <button class="tab" role="tab" id="t-users" aria-controls="p-users" data-tab="users">Users</button>
+      <button class="tab" role="tab" id="t-membership" aria-controls="p-membership" data-tab="membership">Membership</button>
+      <button class="tab" role="tab" id="t-codes" aria-controls="p-codes" data-tab="codes">Codes &amp; partners</button>
+      <button class="tab" role="tab" id="t-ai" aria-controls="p-ai" data-tab="ai">AI <span class="badge hide" id="b-ai"></span></button>
+      <button class="tab" role="tab" id="t-content" aria-controls="p-content" data-tab="content">Content <span class="badge hide" id="b-content"></span></button>
+    </nav>
+
+    <section class="panel" role="tabpanel" id="p-overview" aria-labelledby="t-overview">
+      <h3>This month</h3>
+      <div class="grid cols-3">
+        <div class="metric lime"><div class="label">Paying members</div><div class="value" id="s_pro">—</div><div class="note">≈ <span id="s_mrr">—</span> <span id="s_cur">SAR</span> a month after store fees (est.)</div></div>
+        <div class="metric peach"><div class="label">Active this month</div><div class="value" id="s_active">—</div><div class="note">of <span id="s_users">—</span> users in total</div></div>
+        <div class="metric"><div class="label muted">AI cost this month</div><div class="value" id="s_cost">—</div><div class="note muted">SAR (est.) · <span id="s_actions">—</span> AI actions</div></div>
+      </div>
+      <div class="chart-head" style="margin:22px 0 0">
+        <h3 style="margin:0">Activity</h3>
+        <div class="chips" role="group" aria-label="Date range">
+          <button class="chip" data-days="7" onclick="setRange(7)">Last 7 days</button>
+          <button class="chip" data-days="30" onclick="setRange(30)">Last 30 days</button>
+          <button class="chip" data-days="90" onclick="setRange(90)">Last 90 days</button>
+        </div>
+      </div>
+      <div class="strip" id="ov_strip" aria-live="polite"></div>
+      <div class="grid cols-main">
+        <div class="card chart" style="margin:0">
+          <div class="chart-head">
+            <h2 id="ov_title" style="margin:0">Growth</h2>
+            <div class="chips" role="group" aria-label="Chart">
+              <button class="chip" data-view="growth" onclick="setView('growth')">Growth</button>
+              <button class="chip" data-view="store" onclick="setView('store')">Store</button>
+              <button class="chip" data-view="ai" onclick="setView('ai')">AI</button>
+            </div>
+          </div>
+          <div class="legend" id="ov_legend"></div>
+          <div id="ov_chart" aria-live="polite"><div class="empty">Loading…</div></div>
+          <div class="sub" id="ov_note"></div>
+          <button class="linkbtn" id="ov_toggle" aria-expanded="false" aria-controls="ov_table" onclick="toggleChartData()">View chart data</button>
+          <div class="scroll hide" id="ov_table"></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:var(--gap)">
+            <h2>Needs attention</h2>
+            <ul class="list" id="ov_attention"><li class="empty">Loading…</li></ul>
+          </div>
+          <div class="card" style="margin:0">
+            <h2>Launch checklist</h2>
+            <div class="sub" id="ov_check_sum" style="margin-bottom:4px"></div>
+            <ul class="list" id="ov_checklist"><li class="empty">Loading…</li></ul>
+          </div>
+        </div>
+      </div>
+      <div class="grid cols-3" style="margin-top:var(--gap)">
+        <div class="card" style="margin:0"><h2>Recent store events</h2><div id="ov_billing" class="scroll"></div></div>
+        <div class="card" style="margin:0"><h2>Recent code redemptions</h2><div id="ov_redeem" class="scroll"></div></div>
+        <div class="card" style="margin:0"><h2>Newest users</h2><div id="ov_signups" class="scroll"></div></div>
+      </div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="p-users" aria-labelledby="t-users" hidden>
+    <div class="card">
+      <h2>Users</h2>
+      <div class="row" style="margin:6px 0 10px"><div><label for="u_search">Find a user</label><input id="u_search" type="search" placeholder="Email, ref, device or note" oninput="renderUsers()" /></div><div class="sub" id="u_count" style="flex:0 0 auto;padding-bottom:10px"></div></div>
+      <div class="err hide" id="rowerr"></div>
+      <details class="how"><summary>How this works</summary><div>"Tokens"/"Cost" are real, tracked from 9/2/2026 onward. "Historical" is a rough per-kind-weighted guess for all-time usage before that (coach and web-search-backed calls cost more than a plain photo scan) — for a sense of scale only, not real data, and won't reconcile exactly against your Anthropic Console bill.</div></details>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Ref</th><th>Email</th><th>Device</th><th>Plan</th><th>Source</th><th>Used</th><th>Tokens</th><th>Cost (SAR)</th><th>Historical (est. SAR)</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
     </div>
 
     <div class="card">
-      <b>Monthly AI allowance</b>
+      <h2>Grant or revoke Pro</h2>
+      <div class="row">
+        <div><label>User ref</label><input id="g_ref" placeholder="paste from the table" /></div>
+        <div><label>Days (blank = forever)</label><input id="g_days" type="number" min="1" /></div>
+        <div><label>Note</label><input id="g_note" placeholder="e.g. beta tester" /></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button onclick="setPlan('pro')">Grant Pro</button>
+        <button onclick="setPlan('proPlus')">Grant Pro+</button>
+        <button class="ghost" onclick="setPlan('free')">Revoke</button>
+      </div>
+    </div>
+    </section>
+
+    <section class="panel" role="tabpanel" id="p-membership" aria-labelledby="t-membership" hidden>
+    <div class="card">
+      <h2>Membership prices</h2>
+      <details class="how"><summary>How this works</summary><div>Used for the revenue estimate above, and shown on the upgrade screen only until the store products are live. <b>Once subscriptions are on, the app shows the store's own price</b> — set in App Store Connect / Google Play, in each person's currency with VAT included — so there is one price to manage, and it is there. These numbers never change what anyone is charged.</div></details>
+      <div class="row">
+        <div><label>Pro / month</label><input id="pr_pro" type="number" step="0.01" /></div>
+        <div><label>Pro+ / month</label><input id="pr_proplus" type="number" step="0.01" /></div>
+        <div><label>Pro / year</label><input id="pr_proyear" type="number" step="0.01" /></div>
+        <div><label>Currency</label><input id="pr_cur" maxlength="8" /></div>
+        <button onclick="savePrices()">Save prices</button>
+      </div>
+      <div id="pr_msg" class="sub hide" style="margin-top:8px"></div>
+    </div>
+
+    <div class="card">
+      <h2>Monthly AI allowance</h2>
       <div class="row">
         <div><label>Free</label><input id="lim_free" type="number" min="0" /></div>
         <div><label>Pro</label><input id="lim_pro" type="number" min="0" /></div>
@@ -83,7 +242,7 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
-      <b>Action costs</b>
+      <h2>Action costs</h2>
       <div class="row">
         <div><label>Meal photo</label><input id="w_meal" type="number" min="1" max="50" /></div>
         <div><label>Describe</label><input id="w_describe" type="number" min="1" max="50" /></div>
@@ -96,39 +255,12 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
       <div class="sub" style="margin:10px 0 0">How many credits each route spends from the allowance above. Designing a programme is a long tool-calling conversation costing many times a single meal photo — charging both as one action is what lets a free user spend the whole month on the most expensive route. Set these from the per-kind spend in the usage table, not by feel.</div>
     </div>
+    </section>
 
-    <div class="card">
-      <b>AI failures</b>
-      <div class="sub" style="margin:4px 0 10px">Why AI calls have been failing, in the provider's own words. Every route used to answer the app with one generic code, so an outage looked the same as a bad request and could only be guessed at. If one code dominates the last 24 hours, that is the outage.</div>
-      <div id="aif_empty" class="muted">No AI failures recorded.</div>
-      <div id="aif_summary"></div>
-      <div id="aif_recent"></div>
-    </div>
-
-    <div class="card">
-      <b>Product review queue</b>
-      <div class="sub" style="margin:4px 0 10px">Products read from a label photo are served back to whoever added them, and to nobody else until checked here. Compare the readings — two people reading the same label differently is the signal something is wrong — then publish the right one to everyone, or reject it.</div>
-      <div id="queue_empty" class="muted">Nothing waiting.</div>
-      <div id="queue"></div>
-    </div>
-
-    <div class="card">
-      <b>Grant or revoke Pro</b>
-      <div class="row">
-        <div><label>User ref</label><input id="g_ref" placeholder="paste from the table" /></div>
-        <div><label>Days (blank = forever)</label><input id="g_days" type="number" min="1" /></div>
-        <div><label>Note</label><input id="g_note" placeholder="e.g. beta tester" /></div>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button onclick="setPlan('pro')">Grant Pro</button>
-        <button onclick="setPlan('proPlus')">Grant Pro+</button>
-        <button class="ghost" onclick="setPlan('free')">Revoke</button>
-      </div>
-    </div>
-
+    <section class="panel" role="tabpanel" id="p-codes" aria-labelledby="t-codes" hidden>
     <div class="card" id="partners">
-      <b>Partners</b>
-      <div class="sub" style="margin:4px 0 10px">People and businesses who share your codes. Give a partner one or more codes below (each code sets its own discount for the buyer and share for the partner), and link a partner's code to the code of whoever brought them in — up to two levels up. Earnings are counted on what each payment brings in after the store's fee and tax, in US dollars. The last 30 days stay <i>pending</i> (the store refund window); <i>Owed</i> is what has cleared, less what you have recorded as paid. Payouts happen outside the app — record them here. Each partner has a private read-only link to their own figures.</div>
+      <h2>Partners</h2>
+      <details class="how"><summary>How this works</summary><div>People and businesses who share your codes. Give a partner one or more codes below (each code sets its own discount for the buyer and share for the partner), and link a partner's code to the code of whoever brought them in — up to two levels up. Earnings are counted on what each payment brings in after the store's fee and tax, in US dollars. The last 30 days stay <i>pending</i> (the store refund window); <i>Owed</i> is what has cleared, less what you have recorded as paid. Payouts happen outside the app — record them here. Each partner has a private read-only link to their own figures.</div></details>
       <div class="row">
         <div><label>Name</label><input id="pt_name" placeholder="e.g. Sara (FitLife gym)" /></div>
         <div><label>Contact</label><input id="pt_contact" placeholder="phone or email" /></div>
@@ -149,8 +281,8 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card" id="codes">
-      <b>Promotion codes</b>
-      <div class="sub" style="margin:4px 0 10px"><b>Free access</b> gives a tier for a number of days at no charge — handled entirely here, no store setup. <b>Percent off</b> is a real discount on a paid subscription, so the store has to know about it: create an offer code in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code) and/or a developer-determined offer on the Google Play base plan, then put those ids below. The store then charges the discounted price, in the person's currency, with VAT. <i>Used</i> counts redemptions in the app; <i>Paid</i> counts purchases matched back to them. To step a discount down (e.g. 50% for the first 100, then 30%), give the first code a use limit or end date and create the next one.</div>
+      <h2>Promotion codes</h2>
+      <details class="how"><summary>How this works</summary><div><b>Free access</b> gives a tier for a number of days at no charge — handled entirely here, no store setup. <b>Percent off</b> is a real discount on a paid subscription, so the store has to know about it: create an offer code in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code) and/or a developer-determined offer on the Google Play base plan, then put those ids below. The store then charges the discounted price, in the person's currency, with VAT. <i>Used</i> counts redemptions in the app; <i>Paid</i> counts purchases matched back to them. To step a discount down (e.g. 50% for the first 100, then 30%), give the first code a use limit or end date and create the next one.</div></details>
       <div class="row">
         <div><label>Code</label><input id="pc_code" placeholder="RAMADAN50" autocomplete="off" /></div>
         <div><label>Type</label><select id="pc_kind" onchange="pcKind()"><option value="free">Free access</option><option value="percent">Percent off</option></select></div>
@@ -194,27 +326,12 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
       <div id="pc_detail" class="hide" style="margin-top:12px"></div>
     </div>
+    </section>
 
+    <section class="panel" role="tabpanel" id="p-ai" aria-labelledby="t-ai" hidden>
     <div class="card">
-      <b>Sponsor slot</b>
-      <div class="sub" style="margin:4px 0 0">The in-app spot you rent to a real advertiser. Leave disabled to hide it.</div>
-      <div class="row">
-        <div><label>Title</label><input id="sp_title" /></div>
-        <div><label>Subtitle</label><input id="sp_sub" /></div>
-      </div>
-      <div class="row">
-        <div><label>Image URL (https)</label><input id="sp_img" /></div>
-        <div><label>Link URL (https)</label><input id="sp_link" /></div>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <label style="margin:0"><input id="sp_on" type="checkbox" style="width:auto" /> Enabled</label>
-        <button onclick="saveSponsor()">Save sponsor</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <b>AI provider by membership</b>
-      <div class="sub" style="margin:4px 0 10px">Which model answers for each tier, across every AI route: meal photo scans, described meals, "refine" edits, exercise info, equipment scans, body readings, coach chat, coach attachments and program design. Takes effect on the next request — no redeploy. Claude stays fully configured either way; it simply isn't called for a tier set to DeepSeek, so it stops costing you anything there.</div>
+      <h2>AI provider by membership</h2>
+      <details class="how"><summary>How this works</summary><div>Which model answers for each tier, across every AI route: meal photo scans, described meals, "refine" edits, exercise info, equipment scans, body readings, coach chat, coach attachments and program design. Takes effect on the next request — no redeploy. Claude stays fully configured either way; it simply isn't called for a tier set to DeepSeek, so it stops costing you anything there.</div></details>
       <div class="row">
         <div><label>Free</label>
           <select id="prov_free"><option value="deepseek">DeepSeek</option><option value="claude">Claude</option></select>
@@ -234,21 +351,25 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
-      <b>Membership prices</b>
-      <div class="sub" style="margin:4px 0 10px">Used for the revenue estimate above, and shown on the upgrade screen only until the store products are live. <b>Once subscriptions are on, the app shows the store's own price</b> — set in App Store Connect / Google Play, in each person's currency with VAT included — so there is one price to manage, and it is there. These numbers never change what anyone is charged.</div>
-      <div class="row">
-        <div><label>Pro / month</label><input id="pr_pro" type="number" step="0.01" /></div>
-        <div><label>Pro+ / month</label><input id="pr_proplus" type="number" step="0.01" /></div>
-        <div><label>Pro / year</label><input id="pr_proyear" type="number" step="0.01" /></div>
-        <div><label>Currency</label><input id="pr_cur" maxlength="8" /></div>
-        <button onclick="savePrices()">Save prices</button>
+      <h2>AI failures</h2>
+      <details class="how"><summary>How this works</summary><div>Why AI calls have been failing, in the provider's own words. Every route used to answer the app with one generic code, so an outage looked the same as a bad request and could only be guessed at. If one code dominates the last 24 hours, that is the outage.</div></details>
+      <div id="aif_empty" class="muted">No AI failures recorded.</div>
+      <div id="aif_summary"></div>
+      <div id="aif_recent"></div>
+    </div>
+
+    <div class="card">
+      <h2>DeepSeek connection test</h2>
+      <details class="how"><summary>How this works</summary><div>Fires one real DeepSeek text call (an exercise-info lookup) so you can confirm the key works and the model is answering, without spending a user's scan on it. Worth running right after changing any tier to DeepSeek above.</div></details>
+      <div class="row" style="margin-bottom:10px">
+        <button class="ghost" onclick="testDeepseekText()">Test DeepSeek text now</button>
       </div>
-      <div id="pr_msg" class="sub hide" style="margin-top:8px"></div>
+      <div id="dstest2" class="sub hide"></div>
     </div>
 
     <div class="card" id="shadowcard">
-      <b>DeepSeek shadow test — meal scans</b>
-      <div class="sub" style="margin:4px 0 10px">Runs only for scans from a tier still set to Claude above: that scan is answered by Claude, and the same photo also goes to DeepSeek in the background and is logged here side by side. A tier already on DeepSeek has nothing to compare, so it makes no shadow call. Empty if <code>DEEPSEEK_API_KEY</code> isn't set on the server.</div>
+      <h2>DeepSeek shadow test — meal scans</h2>
+      <details class="how"><summary>How this works</summary><div>Runs only for scans from a tier still set to Claude above: that scan is answered by Claude, and the same photo also goes to DeepSeek in the background and is logged here side by side. A tier already on DeepSeek has nothing to compare, so it makes no shadow call. Empty if <code>DEEPSEEK_API_KEY</code> isn't set on the server.</div></details>
       <div class="row" style="margin-bottom:10px">
         <button class="ghost" onclick="testDeepseekVision()">Test DeepSeek vision now</button>
       </div>
@@ -262,8 +383,8 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
-      <b>Report test — DeepSeek vs Claude on a real report</b>
-      <div class="sub" style="margin:4px 0 10px">Spot-check either provider on a real report. Pick an InBody/Tanita/DEXA report and both read it with the identical prompt the live route uses, shown field by field below, so you can confirm accuracy before trusting a new report format or re-checking after a model update. A photo or screenshot compares both; a PDF runs Claude only, since our DeepSeek client sends images. <b>This spends on both providers</b> — that is the point — and uses nobody's monthly allowance.</div>
+      <h2>Report test — DeepSeek vs Claude on a real report</h2>
+      <details class="how"><summary>How this works</summary><div>Spot-check either provider on a real report. Pick an InBody/Tanita/DEXA report and both read it with the identical prompt the live route uses, shown field by field below, so you can confirm accuracy before trusting a new report format or re-checking after a model update. A photo or screenshot compares both; a PDF runs Claude only, since our DeepSeek client sends images. <b>This spends on both providers</b> — that is the point — and uses nobody's monthly allowance.</div></details>
       <div class="row" style="margin-bottom:10px">
         <div><label>Report file (image or PDF)</label><input id="rep_file" type="file" accept="image/*,application/pdf" /></div>
         <button class="ghost" onclick="testReport()">Run report test</button>
@@ -277,27 +398,33 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
       <div id="rep_raw" class="sub hide" style="margin-top:8px"></div>
     </div>
+    </section>
 
+    <section class="panel" role="tabpanel" id="p-content" aria-labelledby="t-content" hidden>
     <div class="card">
-      <b>DeepSeek connection test</b>
-      <div class="sub" style="margin:4px 0 10px">Fires one real DeepSeek text call (an exercise-info lookup) so you can confirm the key works and the model is answering, without spending a user's scan on it. Worth running right after changing any tier to DeepSeek above.</div>
-      <div class="row" style="margin-bottom:10px">
-        <button class="ghost" onclick="testDeepseekText()">Test DeepSeek text now</button>
-      </div>
-      <div id="dstest2" class="sub hide"></div>
+      <h2>Product review queue</h2>
+      <details class="how"><summary>How this works</summary><div>Products read from a label photo are served back to whoever added them, and to nobody else until checked here. Compare the readings — two people reading the same label differently is the signal something is wrong — then publish the right one to everyone, or reject it.</div></details>
+      <div id="queue_empty" class="muted">Nothing waiting.</div>
+      <div id="queue"></div>
     </div>
 
     <div class="card">
-      <b>Users</b>
-      <div class="err hide" id="rowerr"></div>
-      <div class="sub" style="margin:4px 0 10px">"Tokens"/"Cost" are real, tracked from 9/2/2026 onward. "Historical" is a rough per-kind-weighted guess for all-time usage before that (coach and web-search-backed calls cost more than a plain photo scan) — for a sense of scale only, not real data, and won't reconcile exactly against your Anthropic Console bill.</div>
-      <div class="scroll">
-        <table>
-          <thead><tr><th>Ref</th><th>Email</th><th>Device</th><th>Plan</th><th>Source</th><th>Used</th><th>Tokens</th><th>Cost (SAR)</th><th>Historical (est. SAR)</th><th>Note</th><th>Last seen</th><th></th></tr></thead>
-          <tbody id="rows"></tbody>
-        </table>
+      <h2>Sponsor slot</h2>
+      <div class="sub" style="margin:4px 0 0">The in-app spot you rent to a real advertiser. Leave disabled to hide it.</div>
+      <div class="row">
+        <div><label>Title</label><input id="sp_title" /></div>
+        <div><label>Subtitle</label><input id="sp_sub" /></div>
+      </div>
+      <div class="row">
+        <div><label>Image URL (https)</label><input id="sp_img" /></div>
+        <div><label>Link URL (https)</label><input id="sp_link" /></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label style="margin:0"><input id="sp_on" type="checkbox" style="width:auto" /> Enabled</label>
+        <button onclick="saveSponsor()">Save sponsor</button>
       </div>
     </div>
+    </section>
   </div>
 </div>
 
@@ -338,7 +465,9 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('s_active').textContent = s.activeThisMonth;
     document.getElementById('s_actions').textContent = s.actionsThisMonth;
     document.getElementById('s_mrr').textContent =
-      Math.round(s.proUsers * monthlyPrice() * (1 - STORE_CUT));
+      Math.round(s.proUsers * monthlyPrice() * (1 - STORE_CUT)).toLocaleString();
+    document.getElementById('s_cur').textContent = (data.prices && data.prices.currency) || 'SAR';
+    document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     document.getElementById('s_cost').textContent =
       (s.costUsdThisMonth * USD_TO_SAR).toFixed(2);
     document.getElementById('lim_free').value = data.limits.free;
@@ -373,9 +502,17 @@ export const ADMIN_HTML = `<!doctype html>
       rowerr.classList.add('hide');
     }
 
+    renderUsers();
+    loadOverview();
+  }
+  function renderUsers() {
+    var q = (document.getElementById('u_search').value || '').trim().toLowerCase();
+    var list = data.users.filter(function (u) {
+      return !q || [u.ref, u.email, u.device, u.note, u.plan].some(function (v) { return v && String(v).toLowerCase().indexOf(q) >= 0; });
+    });
+    document.getElementById('u_count').textContent = q ? list.length + ' of ' + data.users.length : data.users.length + ' users';
     var html = '';
-    data.users.forEach(function (u) {
-      var isPro = u.plan === 'pro' || u.plan === 'proPlus';
+    list.forEach(function (u) {      var isPro = u.plan === 'pro' || u.plan === 'proPlus';
       html += '<tr>' +
         '<td style="font-family:monospace">' + esc(u.ref) + '</td>' +
         '<td>' + (u.email ? esc(u.email) : '<span class="muted">guest</span>') + '</td>' +
@@ -391,7 +528,7 @@ export const ADMIN_HTML = `<!doctype html>
         '<td><button class="ghost" onclick="pick(\\'' + esc(u.ref) + '\\')">Select</button></td>' +
         '</tr>';
     });
-    document.getElementById('rows').innerHTML = html || '<tr><td colspan="12" class="muted">No users yet.</td></tr>';
+    document.getElementById('rows').innerHTML = html || '<tr><td colspan="12" class="muted">' + (q ? 'Nobody matches that search.' : 'No users yet.') + '</td></tr>';
   }
   var PLAN_IDS = ['free', 'pro', 'proPlus'];
   function renderProviders() {
@@ -573,7 +710,12 @@ export const ADMIN_HTML = `<!doctype html>
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
-  function pick(ref) { document.getElementById('g_ref').value = ref; window.scrollTo({ top:0, behavior:'smooth' }); }
+  function pick(ref) {
+    var box = document.getElementById('g_ref');
+    box.value = ref;
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    box.focus();
+  }
   function setPlan(plan) {
     var days = parseInt(document.getElementById('g_days').value, 10);
     api('/admin/api/plan', {
@@ -1131,6 +1273,197 @@ export const ADMIN_HTML = `<!doctype html>
       .then(function (r) { return r.json(); })
       .then(function (d) { partners = d.partners || []; renderPartners(); loadPromos(); })
       .catch(function () {});
+  }
+  // ── Tabs ──
+  var TABS = ['overview', 'users', 'membership', 'codes', 'ai', 'content'];
+  function showTab(name, focus) {
+    if (TABS.indexOf(name) < 0) name = 'overview';
+    TABS.forEach(function (t) {
+      var tab = document.getElementById('t-' + t);
+      var on = t === name;
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+      document.getElementById('p-' + t).hidden = !on;
+    });
+    if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+    if (focus) document.getElementById('t-' + name).focus();
+  }
+  document.querySelectorAll('.tab').forEach(function (tab) {
+    tab.addEventListener('click', function () { showTab(tab.getAttribute('data-tab')); });
+    tab.addEventListener('keydown', function (e) {
+      var i = TABS.indexOf(tab.getAttribute('data-tab'));
+      if (e.key === 'ArrowRight') { e.preventDefault(); showTab(TABS[(i + 1) % TABS.length], true); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); showTab(TABS[(i + TABS.length - 1) % TABS.length], true); }
+      if (e.key === 'Home') { e.preventDefault(); showTab(TABS[0], true); }
+      if (e.key === 'End') { e.preventDefault(); showTab(TABS[TABS.length - 1], true); }
+    });
+  });
+  window.addEventListener('hashchange', function () { showTab(location.hash.slice(1)); });
+  showTab(location.hash.slice(1));
+  function signOut() { sessionStorage.removeItem('ct'); document.getElementById('token').value = ''; location.hash = ''; location.reload(); }
+  function refreshAll() { load(); }
+
+  // ── Overview ──
+  var ovDays = 30, ovView = 'growth', ovData = null, ovShowData = false;
+  var VIEWS = {
+    growth: { title: 'Growth', a: { key: 'newUsers', label: 'New users' }, b: { key: 'activeUsers', label: 'Daily active users' } },
+    store: { title: 'Store', a: { key: 'purchases', label: 'Purchases' }, b: { key: 'cancellations', label: 'Cancellations & expiries' } },
+    ai: { title: 'AI usage', a: { key: 'aiActions', label: 'AI actions' }, b: { key: 'aiFailures', label: 'AI failures' } },
+  };
+  var COLORS = { a: '#E0673A', b: '#5E7A0B' };
+  function setRange(n) { ovDays = n; loadOverview(); }
+  function setView(v) { ovView = v; renderChart(); }
+  window.addEventListener('resize', function () { if (ovData) renderChart(); });
+  function pressed(selector, attr, value) {
+    document.querySelectorAll(selector).forEach(function (el) { el.setAttribute('aria-pressed', el.getAttribute(attr) === String(value) ? 'true' : 'false'); });
+  }
+  function loadOverview() {
+    pressed('.chip[data-days]', 'data-days', ovDays);
+    fetch('/admin/api/overview?days=' + ovDays, { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.ok ? r.json() : r.json().then(function (j) { throw new Error(j.error || r.status); }); })
+      .then(function (d) { ovData = d; renderOverview(); })
+      .catch(function (e) {
+        ovData = null;
+        document.getElementById('ov_chart').innerHTML = '<div class="empty">The overview could not load (' + esc(String(e.message || e)) + ').</div>';
+      });
+  }
+  function fmtDay(day, long) {
+    var d = new Date(day + 'T12:00:00');
+    return d.toLocaleDateString(undefined, long ? { weekday: 'short', day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short' });
+  }
+  function when(iso) {
+    var mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return mins + ' min ago';
+    if (mins < 1440) return Math.round(mins / 60) + ' h ago';
+    return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  }
+  function sumOf(key) {
+    var total = 0, seen = false;
+    ovData.series.forEach(function (d) { if (d[key] != null) { total += d[key]; seen = true; } });
+    return seen ? total : null;
+  }
+  function renderOverview() {
+    var d = ovData;
+    var strip = [
+      ['New users', sumOf('newUsers')],
+      ['Purchases', sumOf('purchases')],
+      ['Renewals', sumOf('renewals')],
+      ['Code redemptions', sumOf('redemptions')],
+      ['AI actions', sumOf('aiActions')],
+      ['AI failures', sumOf('aiFailures')],
+    ];
+    document.getElementById('ov_strip').innerHTML = strip.map(function (x) {
+      return '<div class="stat"><b>' + (x[1] == null ? '<span class="muted" title="Not recorded yet">—</span>' : x[1].toLocaleString()) + '</b><span>' + x[0] + ' · ' + d.days + ' days</span></div>';
+    }).join('');
+    renderChart();
+    // Needs attention
+    var att = d.attention, items = [];
+    if (att.queue) items.push(['bad', '!', att.queue + ' product' + (att.queue === 1 ? '' : 's') + ' waiting for review', 'Content', 'content']);
+    if (att.aiFailures24h) items.push(['bad', '!', att.aiFailures24h + ' AI failure' + (att.aiFailures24h === 1 ? '' : 's') + ' in the last 24 hours', 'AI', 'ai']);
+    if (att.partnersOwedUsd > 0) items.push(['todo', '$', '$' + att.partnersOwedUsd.toFixed(2) + ' owed to partners', 'Codes & partners', 'codes']);
+    var todo = d.checklist.filter(function (c) { return !c.done; }).length;
+    if (todo) items.push(['todo', todo, todo + ' launch step' + (todo === 1 ? '' : 's') + ' left', null, null]);
+    document.getElementById('ov_attention').innerHTML = items.length ? items.map(function (it) {
+      return '<li><span class="dot ' + it[0] + '" aria-hidden="true">' + it[1] + '</span><div class="grow">' + esc(it[2]) +
+        (it[4] ? '<div><button class="linkbtn" style="padding:2px 0;min-height:0" onclick="showTab(&quot;' + it[4] + '&quot;, true)">Open ' + esc(it[3]) + ' →</button></div>' : '') + '</div></li>';
+    }).join('') : '<li><span class="dot ok" aria-hidden="true">✓</span><div class="grow">Nothing needs you right now.</div></li>';
+    setBadge('b-content', att.queue);
+    setBadge('b-ai', att.aiFailures24h);
+    // Launch checklist
+    var done = d.checklist.length - todo;
+    document.getElementById('ov_check_sum').textContent = done + ' of ' + d.checklist.length + ' done';
+    document.getElementById('ov_checklist').innerHTML = d.checklist.map(function (c) {
+      return '<li><span class="dot ' + (c.done ? 'ok' : 'todo') + '" aria-hidden="true">' + (c.done ? '✓' : '○') + '</span><div class="grow"><span class="' + (c.done ? 'muted' : '') + '">' + esc(c.label) + '</span>' +
+        '<span class="hide">' + (c.done ? ' (done)' : ' (to do)') + '</span>' + (c.done ? '' : '<div class="hint">' + esc(c.how) + '</div>') + '</div></li>';
+    }).join('');
+    // Recent
+    var who = function (email, ref) { return email ? esc(email) : '<span class="muted" style="font-family:monospace">' + esc(ref || '—') + '</span>'; };
+    var table = function (rows, head, cells, empty) {
+      return rows.length ? '<table class="compact"><thead><tr>' + head.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>' +
+        rows.map(function (r) { var cs = cells(r); return '<tr>' + cs.map(function (c, i) { return '<td' + (i === cs.length - 1 ? ' class="when"' : '') + '>' + c + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>'
+        : '<div class="empty">' + empty + '</div>';
+    };
+    var TYPE = { INITIAL_PURCHASE: 'Purchase', RENEWAL: 'Renewal', CANCELLATION: 'Cancelled', EXPIRATION: 'Expired', NON_RENEWING_PURCHASE: 'One-off purchase', PRODUCT_CHANGE: 'Plan change', UNCANCELLATION: 'Resumed', BILLING_ISSUE: 'Billing issue', TRANSFER: 'Transfer' };
+    document.getElementById('ov_billing').innerHTML = table(d.recent.billing, ['Event', 'Who', 'When'], function (r) {
+      return [esc(TYPE[(r.type || '').toUpperCase()] || r.type || '—'), who(r.email, r.ref), '<span class="muted">' + when(r.at) + '</span>'];
+    }, 'No store events yet — they arrive once RevenueCat is connected.');
+    document.getElementById('ov_redeem').innerHTML = table(d.recent.redemptions, ['Code', 'Who', 'When'], function (r) {
+      return ['<b style="font-family:monospace">' + esc(r.code) + '</b>', who(r.email, r.ref), '<span class="muted">' + when(r.at) + '</span>'];
+    }, 'No codes redeemed yet.');
+    document.getElementById('ov_signups').innerHTML = table(d.recent.signups, ['Who', 'Device', 'Joined'], function (r) {
+      return [who(r.email, r.ref), '<span class="muted">' + esc(r.device || '—') + '</span>', '<span class="muted">' + when(r.at) + '</span>'];
+    }, 'No users yet.');
+  }
+  function setBadge(id, n) {
+    var el = document.getElementById(id);
+    el.textContent = n ? String(n) : '';
+    el.classList.toggle('hide', !n);
+  }
+  function renderChart() {
+    pressed('.chip[data-view]', 'data-view', ovView);
+    if (!ovData) return;
+    var v = VIEWS[ovView], S = ovData.series;
+    document.getElementById('ov_title').textContent = v.title;
+    document.getElementById('ov_legend').innerHTML =
+      '<span><i style="background:' + COLORS.a + '"></i>' + v.a.label + '</span><span><i style="background:' + COLORS.b + '"></i>' + v.b.label + '</span>';
+    var vals = [];
+    S.forEach(function (d) { [v.a.key, v.b.key].forEach(function (k) { if (d[k] != null) vals.push(d[k]); }); });
+    var host = document.getElementById('ov_chart');
+    var note = document.getElementById('ov_note');
+    var gaps = S.some(function (d) { return d[v.a.key] == null || d[v.b.key] == null; });
+    note.textContent = gaps && ovData.trackingSince
+      ? 'Daily ' + (ovView === 'growth' ? 'active users' : 'AI actions') + ' are recorded from ' + fmtDay(ovData.trackingSince, true) + '; earlier days show as a gap, not zero.'
+      : gaps ? 'Daily figures start recording from today; until then they show as a gap, not zero.' : '';
+    if (!vals.length) {
+      host.innerHTML = '<div class="empty">Nothing recorded in this period yet.</div>';
+      renderChartTable();
+      return;
+    }
+    var max = Math.max(1, Math.max.apply(null, vals));
+    // A top that halves into whole numbers, so the three gridlines read cleanly.
+    var nice = max <= 4 ? 4 : Math.ceil(max / 4) * 4;
+    // Drawn at the width it is shown at, so its labels stay a readable size on a phone.
+    var W = Math.max(300, Math.round(host.clientWidth || 640)), H = W < 520 ? 200 : 240, L = 36, R = 12, T = 12, B = 30;
+    var x = function (i) { return L + (S.length === 1 ? (W - L - R) / 2 : i * (W - L - R) / (S.length - 1)); };
+    var y = function (val) { return T + (H - T - B) * (1 - val / nice); };
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(v.title + ' over the last ' + ovData.days + ' days: ' + v.a.label + ' ' + (sumOf(v.a.key) == null ? 'not recorded' : sumOf(v.a.key)) + ', ' + v.b.label + ' ' + (sumOf(v.b.key) == null ? 'not recorded' : sumOf(v.b.key)) + '. The table below has every day.') + '">';
+    [0, 0.5, 1].forEach(function (f) {
+      var val = Math.round(nice * f);
+      svg += '<line x1="' + L + '" x2="' + (W - R) + '" y1="' + y(val) + '" y2="' + y(val) + '" stroke="#E5E8ED" stroke-dasharray="3 5"/>' +
+        '<text x="' + (L - 8) + '" y="' + (y(val) + 4) + '" text-anchor="end" font-size="11" fill="#646D7A">' + val + '</text>';
+    });
+    var ticks = S.length <= (W < 520 ? 4 : 8) ? S.map(function (d, i) { return i; }) : [0, Math.floor((S.length - 1) / 2), S.length - 1];
+    ticks.forEach(function (i) {
+      svg += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="' + (i === 0 ? 'start' : i === S.length - 1 ? 'end' : 'middle') + '" font-size="11" fill="#646D7A">' + esc(fmtDay(S[i].day)) + '</text>';
+    });
+    // One line per unbroken run: a missing day ends the line rather than
+    // being drawn as zero or bridged over.
+    [['a', 3], ['b', 2]].forEach(function (pair) {
+      var key = v[pair[0]].key, color = COLORS[pair[0]], run = [];
+      var flush = function () {
+        if (run.length === 1) svg += '<circle cx="' + run[0][0] + '" cy="' + run[0][1] + '" r="3.5" fill="' + color + '"/>';
+        else if (run.length > 1) svg += '<polyline fill="none" stroke="' + color + '" stroke-width="' + pair[1] + '" stroke-linejoin="round" stroke-linecap="round" points="' + run.map(function (p) { return p[0] + ',' + p[1]; }).join(' ') + '"/>';
+        run = [];
+      };
+      S.forEach(function (d, i) { if (d[key] == null) flush(); else run.push([x(i), y(d[key])]); });
+      flush();
+    });
+    host.innerHTML = svg + '</svg>';
+    renderChartTable();
+  }
+  function renderChartTable() {
+    var v = VIEWS[ovView], box = document.getElementById('ov_table');
+    var cell = function (n) { return n == null ? '<span class="muted">not recorded</span>' : n.toLocaleString(); };
+    box.innerHTML = '<table class="compact"><thead><tr><th>Day</th><th class="num">' + v.a.label + '</th><th class="num">' + v.b.label + '</th></tr></thead><tbody>' +
+      ovData.series.map(function (d) { return '<tr><td>' + esc(fmtDay(d.day, true)) + '</td><td class="num">' + cell(d[v.a.key]) + '</td><td class="num">' + cell(d[v.b.key]) + '</td></tr>'; }).join('') + '</tbody></table>';
+  }
+  function toggleChartData() {
+    ovShowData = !ovShowData;
+    document.getElementById('ov_table').classList.toggle('hide', !ovShowData);
+    var btn = document.getElementById('ov_toggle');
+    btn.setAttribute('aria-expanded', ovShowData ? 'true' : 'false');
+    btn.textContent = ovShowData ? 'Hide chart data' : 'View chart data';
   }
   if (sessionStorage.getItem('ct')) load();
 </script>

@@ -70,6 +70,7 @@ import {
   clearPromo,
   recordPromoConversion,
   recordPartnerEarnings,
+  adminOverview,
   listPartners,
   savePartner,
   deletePartner,
@@ -2507,6 +2508,32 @@ app.post('/admin/api/promo-delete', async (c) => {
   if (await codeHasEarnings(code)) return c.json({ ok: false, error: 'has_earnings' }, 409);
   const gone = await deletePromo(code);
   return c.json({ ok: gone });
+});
+
+/**
+ * The overview tab: day-by-day figures for the chosen range, the latest
+ * activity, what needs the admin's attention, and a launch checklist of the
+ * settings this server can see for itself.
+ */
+app.get('/admin/api/overview', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const days = Number(c.req.query('days') ?? 30);
+  const [overview, partners] = await Promise.all([adminOverview(Number.isFinite(days) ? days : 30), listPartners()]);
+  if (!overview) return c.json({ error: 'no_database' }, 503);
+  const set = (k: string) => !!process.env[k];
+  const checklist = [
+    { id: 'database', done: cacheEnabled, label: 'Database connected', how: 'Set DATABASE_URL on Railway.' },
+    { id: 'claude', done: set('ANTHROPIC_API_KEY'), label: 'Claude API key', how: 'Set ANTHROPIC_API_KEY on Railway.' },
+    { id: 'deepseek', done: set('DEEPSEEK_API_KEY'), label: 'DeepSeek API key', how: 'Set DEEPSEEK_API_KEY on Railway (optional — without it everything runs on Claude).' },
+    { id: 'rc_ios', done: set('REVENUECAT_IOS_KEY'), label: 'RevenueCat iOS public key', how: 'RevenueCat → Project settings → API keys → Apple public key → REVENUECAT_IOS_KEY.' },
+    { id: 'rc_android', done: set('REVENUECAT_ANDROID_KEY'), label: 'RevenueCat Android public key', how: 'RevenueCat → API keys → Google public key → REVENUECAT_ANDROID_KEY.' },
+    { id: 'rc_secret', done: set('REVENUECAT_SECRET_KEY'), label: 'RevenueCat secret key (server only)', how: 'RevenueCat → API keys → secret key (v1) → REVENUECAT_SECRET_KEY. Never put it in the app.' },
+    { id: 'rc_webhook', done: set('REVENUECAT_WEBHOOK_SECRET'), label: 'RevenueCat webhook secret', how: 'RevenueCat → Integrations → Webhooks → URL /api/billing/revenuecat, authorization header = REVENUECAT_WEBHOOK_SECRET.' },
+    { id: 'rc_first_event', done: overview.billingEventsEver > 0, label: 'First store event received', how: 'Make a sandbox purchase on TestFlight; it appears under Recent store events.' },
+    { id: 'support_email', done: set('SUPPORT_EMAIL'), label: 'Support email for the legal pages', how: 'Set SUPPORT_EMAIL on Railway (otherwise the pages show a personal address).' },
+  ];
+  const owed = Math.round(partners.reduce((sum, p) => sum + p.balance.owed, 0) * 100) / 100;
+  return c.json({ ...overview, attention: { ...overview.attention, partnersOwedUsd: owed }, checklist });
 });
 
 // ── Partners ──────────────────────────────────────────────────────────────

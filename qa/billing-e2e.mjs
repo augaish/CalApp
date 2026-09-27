@@ -53,6 +53,8 @@ console.log('=== Admin console ===');
   await page.goto(`${API}/admin`, { waitUntil: 'networkidle' });
   await page.fill('#token', 'e2e-admin');
   await page.getByRole('button', { name: /sign in|open|enter/i }).first().click();
+  await page.waitForSelector('#app:not(.hide)');
+  await page.click('#t-codes');
   await page.waitForSelector('#codes', { state: 'visible' });
 
   // A free code: 90 days of Pro, two people.
@@ -206,6 +208,8 @@ check('counter: who used the free code is on record', who.length === 1 && who[0]
   await page.goto(`${API}/admin`, { waitUntil: 'networkidle' });
   await page.fill('#token', 'e2e-admin');
   await page.getByRole('button', { name: /sign in|open|enter/i }).first().click();
+  await page.waitForSelector('#app:not(.hide)');
+  await page.click('#t-codes');
   await page.waitForSelector('#codes', { state: 'visible' });
   await page.waitForTimeout(800);
   const rowText = squash(await page.textContent('#pc_rows'));
