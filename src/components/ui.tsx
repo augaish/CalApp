@@ -172,9 +172,13 @@ export function Button({
   style?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
-  const bg =
-    variant === 'primary' ? t.primary : variant === 'secondary' ? t.cardSubtle : 'transparent';
-  const fg = variant === 'primary' ? t.onPrimary : t.primary;
+  // Disabled reads as muted, not faded: fading the whole button took a dark
+  // label down with a dark-mode fill until neither could be seen.
+  const off = !!disabled && !loading;
+  const bg = off
+    ? variant === 'ghost' ? 'transparent' : t.cardSubtle
+    : variant === 'primary' ? t.primary : variant === 'secondary' ? t.cardSubtle : 'transparent';
+  const fg = off ? t.textTertiary : variant === 'primary' ? t.onPrimary : t.primary;
   return (
     <Pressable
       onPress={onPress}
@@ -183,7 +187,7 @@ export function Button({
       accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
       style={({ pressed }) => [
         styles.button,
-        { backgroundColor: bg, opacity: disabled ? 0.4 : 1 },
+        { backgroundColor: bg },
         pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
         style,
       ]}

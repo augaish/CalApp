@@ -260,7 +260,7 @@ export function BodyMap({
     <View style={{ width: outerWidth, height, alignItems: 'center' }}>
       <Svg width={outerWidth} height={height} viewBox={viewBox}>
         {parts.map((part, i) => {
-          let color = theme.cardSubtle;
+          let color = theme.figure;
           let opacity = 1;
           if (muscleMode) {
             const primaryMatch = part.muscle.find((m) => highlightedMuscles!.includes(m));

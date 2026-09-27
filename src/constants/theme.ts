@@ -13,6 +13,8 @@ export const Colors = {
     background: '#F5F3FA',
     card: '#FFFFFF',
     cardSubtle: 'rgba(122,106,184,0.09)',
+    /** The body map's unmeasured parts: a silhouette that must read on a card in either scheme. */
+    figure: 'rgba(122,106,184,0.09)',
     border: 'rgba(33,27,46,0.08)',
     primary: '#6D5AAB',
     primaryDark: '#59478F',
@@ -21,13 +23,13 @@ export const Colors = {
     warning: '#C77D2E',
     success: '#2E9E5C',
     protein: '#3B82F6',
-    carbs: '#E39A2E',
+    carbs: '#C27A12',
     fat: '#C46FB0',
     shadow: '#3A2D5C',
     gradientStart: '#9B86D4',
     gradientEnd: '#7FB89B',
     onGradient: '#FFFFFF',
-    water: '#38BDF8',
+    water: '#0284C7',
     // Handoff v1.1 surfaces and text-safe status inks. The brand purple and
     // gradient above are the authentic Calgym values and stay; these are the
     // neutral surfaces and the darker status variants the boards use for
@@ -44,6 +46,7 @@ export const Colors = {
     background: '#141021',
     card: '#1E1832',
     cardSubtle: 'rgba(167,139,224,0.14)',
+    figure: 'rgba(241,238,248,0.38)',
     border: 'rgba(241,238,248,0.08)',
     primary: '#A78BE0',
     primaryDark: '#8B72C4',

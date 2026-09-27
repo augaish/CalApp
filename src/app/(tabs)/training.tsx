@@ -352,7 +352,7 @@ export default function Training() {
         onPress={() => router.push('/schedules')}
         accessibilityRole="button"
         accessibilityLabel={`${scheduleName} · ${t('training.change')}`}
-        style={({ pressed }) => [styles.schedulePill, { backgroundColor: 'rgba(255,255,255,0.92)' }, pressed && { opacity: 0.85 }]}
+        style={({ pressed }) => [styles.schedulePill, { backgroundColor: theme.card }, pressed && { opacity: 0.85 }]}
       >
         <Icon name="barbell" size={16} color={theme.primary} />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>

@@ -381,14 +381,16 @@ export function ActionButton({
   disabled?: boolean;
 }) {
   const theme = useTheme();
-  const bg = variant === 'primary' ? theme.primary : theme.surfaceTint;
-  const fg = variant === 'primary' ? theme.onPrimary : theme.primaryDark;
+  // Disabled is muted, not faded — see Button in ui.tsx.
+  const bg = disabled ? theme.cardSubtle : variant === 'primary' ? theme.primary : theme.surfaceTint;
+  const fg = disabled ? theme.textTertiary : variant === 'primary' ? theme.onPrimary : theme.primaryDark;
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      style={({ pressed }) => [styles.action, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, pressed && { opacity: 0.85 }, style]}
+      accessibilityState={{ disabled: !!disabled }}
+      style={({ pressed }) => [styles.action, { backgroundColor: bg }, pressed && { opacity: 0.85 }, style]}
     >
       {icon && <Icon name={icon} size={17} color={fg} />}
       {/* Two lines before any clipping: an action label that ends in an ellipsis is not an action label. */}
