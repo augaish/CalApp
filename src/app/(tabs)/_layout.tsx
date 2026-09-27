@@ -1,4 +1,5 @@
 import { Tabs, usePathname, useRouter } from 'expo-router';
+import { NativeTabs } from 'expo-router/unstable-native-tabs';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
@@ -10,6 +11,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { usePending } from '@/lib/pending';
 import { syncReminders } from '@/lib/reminders';
 import { useAppStore } from '@/lib/store';
+import { nativeTabsAvailable } from '@/lib/tab-bar';
+
+/** The centre "+": a general add, so a stale Food-tab meal hint must not steer it. */
+function openAdd(router: ReturnType<typeof useRouter>) {
+  usePending.getState().setMealTypeHint(null);
+  router.push('/add-menu');
+}
 
 export default function TabLayout() {
   const { t } = useTranslation();
@@ -74,6 +82,45 @@ export default function TabLayout() {
     return () => sub.remove();
   }, [remindersInitialized, mealCount, workoutCount, waterCount, activeFastId]);
 
+  if (nativeTabsAvailable) {
+    // iPhone: Apple's own tab bar — Liquid Glass on iOS 26, the system bar
+    // before it — with SF Symbols that fill when selected. "+" is an item
+    // that never becomes selected: tapping it opens the Add sheet over
+    // whichever tab you were on. Screens pad themselves for the bar through
+    // their safe area, so the system's automatic scroll insets are off.
+    return (
+      <>
+        <NativeTabs tintColor={theme.primary}>
+          <NativeTabs.Trigger name="index" disableAutomaticContentInsets>
+            <NativeTabs.Trigger.Icon sf={{ default: 'square.grid.2x2', selected: 'square.grid.2x2.fill' }} />
+            <NativeTabs.Trigger.Label>{t('tabs.overview')}</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+          <NativeTabs.Trigger name="training" disableAutomaticContentInsets>
+            <NativeTabs.Trigger.Icon sf="dumbbell.fill" />
+            <NativeTabs.Trigger.Label>{t('tabs.training')}</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+          <NativeTabs.Trigger
+            name="add"
+            disabled
+            listeners={{ tabPress: () => openAdd(router) }}
+          >
+            <NativeTabs.Trigger.Icon sf="plus.circle.fill" />
+            <NativeTabs.Trigger.Label>{t('tabs.add')}</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+          <NativeTabs.Trigger name="food" disableAutomaticContentInsets>
+            <NativeTabs.Trigger.Icon sf="fork.knife" />
+            <NativeTabs.Trigger.Label>{t('tabs.food')}</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+          <NativeTabs.Trigger name="health" disableAutomaticContentInsets>
+            <NativeTabs.Trigger.Icon sf={{ default: 'heart', selected: 'heart.fill' }} />
+            <NativeTabs.Trigger.Label>{t('tabs.health')}</NativeTabs.Trigger.Label>
+          </NativeTabs.Trigger>
+        </NativeTabs>
+        <TourOverlay />
+      </>
+    );
+  }
+
   return (
     <>
     <Tabs
@@ -115,12 +162,7 @@ export default function TabLayout() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={t('addMenu.title')}
-                onPress={() => {
-                  // A stale hint from a Food-tab "+" the user backed out of
-                  // must not silently redirect this unrelated, general add.
-                  usePending.getState().setMealTypeHint(null);
-                  router.push('/add-menu');
-                }}
+                onPress={() => openAdd(router)}
                 style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.93 }] }]}
               >
                 {/* Brand-tinted glass on iOS 26; the solid brand disc elsewhere. */}

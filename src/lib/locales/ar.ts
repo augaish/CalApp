@@ -211,6 +211,7 @@ export const ar: TranslationSchema = {
   },
   tabs: {
     overview: 'نظرة عامة',
+    add: 'إضافة',
     training: 'التمرين',
     food: 'الطعام',
     ai: 'الدعم الذكي',

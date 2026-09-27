@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoachTour } from '@/components/coach-tour';
 import { useAppStore } from '@/lib/store';
+import { addButtonRect } from '@/lib/tab-bar';
 import { TAB_ROUTES, TOUR_STEPS, useTour } from '@/lib/tour';
 
 /**
@@ -67,7 +68,7 @@ export function TourOverlay() {
   }, [active, paused, step]);
 
   if (!active || paused || !def || !onStepTab) return null;
-  const fab = { x: width / 2 - 34, y: height - insets.bottom - 82, width: 68, height: 68 };
+  const fab = addButtonRect(width, height, insets.bottom);
   const rect = def.key === 'tabs.add' ? fab : (rects[def.key] ?? null);
   if (!rect && !waited) return null;
 

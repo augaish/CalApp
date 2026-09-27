@@ -209,6 +209,7 @@ export const en = {
   },
   tabs: {
     overview: 'Overview',
+    add: 'Add',
     training: 'Training',
     food: 'Food',
     ai: 'AI Support',
