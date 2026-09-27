@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -110,7 +110,7 @@ export default function Redeem() {
         <View style={styles.header}>
           <View style={{ flex: 1 }} />
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-            <Ionicons name="close" size={24} color={theme.textSecondary} />
+            <Icon name="close" size={24} color={theme.textSecondary} />
           </Pressable>
         </View>
         <Title>{t('redeem.title')}</Title>
@@ -152,7 +152,7 @@ export default function Redeem() {
         ) : (
           <Card style={{ borderColor: theme.primary, borderWidth: 1, marginTop: Spacing.md }}>
             <View style={styles.doneRow}>
-              <Ionicons
+              <Icon
                 name={done.kind === 'free' ? 'checkmark-circle' : 'pricetag'}
                 size={26}
                 color={theme.primary}

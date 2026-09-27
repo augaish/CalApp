@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useEntitlement } from '@/lib/entitlement';
@@ -45,7 +45,7 @@ export function SponsorCard() {
         <Image source={{ uri: sponsor.imageUrl }} style={styles.logo} contentFit="cover" />
       ) : (
         <View style={[styles.logo, styles.logoFallback, { backgroundColor: theme.cardSubtle }]}>
-          <Ionicons name="storefront-outline" size={20} color={theme.primary} />
+          <Icon name="storefront-outline" size={20} color={theme.primary} />
         </View>
       )}
       <View style={{ flex: 1 }}>
@@ -63,7 +63,7 @@ export function SponsorCard() {
           {t('sponsor.label')}
         </Text>
         {sponsor.linkUrl ? (
-          <Ionicons name="open-outline" size={15} color={theme.textTertiary} />
+          <Icon name="open-outline" size={15} color={theme.textTertiary} />
         ) : null}
       </View>
     </Pressable>

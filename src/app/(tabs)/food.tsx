@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { HeaderPill } from '@/components/brand-header';
 import { CollapsingScreen } from '@/components/collapsing-screen';
@@ -381,7 +381,7 @@ export default function Food() {
                   {justLogged?.slot === type ? (
                     <View style={styles.actions}>
                       <View style={[styles.loggedNote, { flex: 1 }]}>
-                        <Ionicons name="checkmark-circle" size={16} color={theme.successText} />
+                        <Icon name="checkmark-circle" size={16} color={theme.successText} />
                         <Text style={{ color: theme.successText, fontWeight: '700', fontSize: 13 }}>{t('mealPlan.logged')}</Text>
                       </View>
                       <ActionButton label={t('mealPlan.undo')} icon="arrow-undo" variant="secondary" onPress={undoPlanned} />
@@ -429,7 +429,7 @@ export default function Food() {
                     hitSlop={6}
                     style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.7 }]}
                   >
-                    <Ionicons name="add" size={16} color={theme.primary} />
+                    <Icon name="add" size={16} color={theme.primary} />
                     <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('food.planSlot', { meal: slotLabel })}</Text>
                   </Pressable>
                   <Pressable
@@ -439,7 +439,7 @@ export default function Food() {
                     hitSlop={6}
                     style={({ pressed }) => [styles.roundBtn, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
                   >
-                    <Ionicons name="add" size={18} color={theme.primary} />
+                    <Icon name="add" size={18} color={theme.primary} />
                   </Pressable>
                 </View>
               );
@@ -500,7 +500,7 @@ export default function Food() {
                             )}
                           </View>
                         </View>
-                        <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+                        <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
                       </Pressable>
                     );
                   }),
@@ -510,7 +510,7 @@ export default function Food() {
                   accessibilityRole="button"
                   style={({ pressed }) => [styles.addMore, { borderTopColor: theme.border }, pressed && { opacity: 0.7 }]}
                 >
-                  <Ionicons name="add" size={16} color={theme.primary} />
+                  <Icon name="add" size={16} color={theme.primary} />
                   <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('food.addToSlot', { meal: slotLabel })}</Text>
                 </Pressable>
               </View>
@@ -713,7 +713,7 @@ function PlanDay({
                           {weekdayLabel(weekday, locale)} · {num(plannedMealCalories(option))} {t('common.kcal')}
                         </Text>
                       </View>
-                      {active && <Ionicons name="checkmark-circle" size={16} color={theme.primary} />}
+                      {active && <Icon name="checkmark-circle" size={16} color={theme.primary} />}
                     </Pressable>
                   );
                 })}

@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
@@ -104,7 +104,7 @@ export function Stopwatch({
             pressed && { opacity: 0.8 },
           ]}
         >
-          <Ionicons name={running ? 'pause' : 'play'} size={18} color={theme.onPrimary} />
+          <Icon name={running ? 'pause' : 'play'} size={18} color={theme.onPrimary} />
           <Text style={{ color: theme.onPrimary, fontWeight: '700' }}>
             {t(running ? 'stopwatch.pause' : value > 0 ? 'stopwatch.resume' : 'stopwatch.start')}
           </Text>
@@ -119,7 +119,7 @@ export function Stopwatch({
               pressed && { opacity: 0.7 },
             ]}
           >
-            <Ionicons name="refresh" size={16} color={theme.textSecondary} />
+            <Icon name="refresh" size={16} color={theme.textSecondary} />
             <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>
               {t('stopwatch.reset')}
             </Text>

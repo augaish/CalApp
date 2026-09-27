@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { MealPlanCard } from '@/components/meal-plan-card';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
@@ -137,7 +137,7 @@ export default function ProgramScreen() {
         <View style={styles.header}>
           <Title>{t('program.title')}</Title>
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-            <Ionicons name="close" size={24} color={theme.textSecondary} />
+            <Icon name="close" size={24} color={theme.textSecondary} />
           </Pressable>
         </View>
         <Card style={{ marginBottom: Spacing.md }}>
@@ -184,7 +184,7 @@ export default function ProgramScreen() {
         <View style={styles.header}>
           <Title>{t('program.title')}</Title>
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-            <Ionicons name="close" size={24} color={theme.textSecondary} />
+            <Icon name="close" size={24} color={theme.textSecondary} />
           </Pressable>
         </View>
 
@@ -210,12 +210,12 @@ export default function ProgramScreen() {
 
         <View style={styles.streakRow}>
           <View style={[styles.streakCard, { backgroundColor: theme.card }]}>
-            <Ionicons name="flame" size={18} color={theme.primary} />
+            <Icon name="flame" size={18} color={theme.primary} />
             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 18 }}>{streakDays(meals)}</Text>
             <Text style={{ color: theme.textSecondary, fontSize: 11 }}>{t('program.streak')}</Text>
           </View>
           <View style={[styles.streakCard, { backgroundColor: theme.card }]}>
-            <Ionicons name="barbell" size={18} color={theme.primary} />
+            <Icon name="barbell" size={18} color={theme.primary} />
             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 18 }}>{workoutStreakDays(workouts)}</Text>
             <Text style={{ color: theme.textSecondary, fontSize: 11 }}>{t('program.workoutStreak')}</Text>
           </View>
@@ -279,11 +279,11 @@ export default function ProgramScreen() {
       <View style={styles.header}>
         <Title>{t('program.title')}</Title>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
       <Card>
-        <Ionicons name="sparkles" size={24} color={theme.primary} style={{ marginBottom: Spacing.sm }} />
+        <Icon name="sparkles" size={24} color={theme.primary} style={{ marginBottom: Spacing.sm }} />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, marginBottom: 4 }}>
           {t('program.introTitle')}
         </Text>

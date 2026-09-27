@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -76,7 +76,7 @@ export function DatePickerModal({
               accessibilityRole="button"
               accessibilityLabel={t('calendar.previousMonth')}
             >
-              <Ionicons name="chevron-back" size={22} color={theme.text} />
+              <Icon name="chevron-back" size={22} color={theme.text} />
             </Pressable>
             <Text style={[styles.monthLabel, { color: theme.text }]}>
               {month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
@@ -88,7 +88,7 @@ export function DatePickerModal({
               accessibilityRole="button"
               accessibilityLabel={t('calendar.nextMonth')}
             >
-              <Ionicons
+              <Icon
                 name="chevron-forward"
                 size={22}
                 color={nextMonthInFuture ? theme.border : theme.text}

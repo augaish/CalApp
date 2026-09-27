@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { Segmented } from '@/components/system';
 import { Button, Card, Screen } from '@/components/ui';
@@ -205,7 +206,7 @@ export default function Upgrade() {
       <View style={styles.header}>
         <View style={{ flex: 1 }} />
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
 
@@ -215,7 +216,7 @@ export default function Upgrade() {
         end={{ x: 1, y: 1 }}
         style={styles.hero}
       >
-        <Ionicons name="sparkles" size={30} color="#fff" />
+        <Icon name="sparkles" size={30} color="#fff" />
         <Text style={styles.heroTitle}>{t('upgrade.title')}</Text>
         <Text style={styles.heroSub}>{t('upgrade.subtitle')}</Text>
       </LinearGradient>
@@ -235,7 +236,7 @@ export default function Upgrade() {
       {pro && (
         <Card style={{ borderColor: theme.primary, borderWidth: 1 }}>
           <View style={styles.proRow}>
-            <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+            <Icon name="checkmark-circle" size={20} color={theme.primary} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '700' }}>{t('upgrade.alreadyPro')}</Text>
               {promo ? (
@@ -266,7 +267,7 @@ export default function Upgrade() {
             ]}
           >
             <View style={[styles.featureIcon, { backgroundColor: theme.cardSubtle }]}>
-              <Ionicons name={f.icon} size={17} color={theme.primary} />
+              <Icon name={f.icon} size={17} color={theme.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '600' }}>
@@ -322,7 +323,7 @@ export default function Upgrade() {
             >
               <View style={styles.tierHead}>
                 {selectable ? (
-                  <Ionicons
+                  <Icon
                     name={selected ? 'radio-button-on' : 'radio-button-off'}
                     size={18}
                     color={selected ? theme.primary : theme.textTertiary}
@@ -371,9 +372,9 @@ export default function Upgrade() {
         style={[styles.codeRow, { borderColor: theme.border }]}
         accessibilityRole="button"
       >
-        <Ionicons name="pricetag-outline" size={18} color={theme.primary} />
+        <Icon name="pricetag-outline" size={18} color={theme.primary} />
         <Text style={{ color: theme.primary, fontWeight: '700', flex: 1 }}>{t('upgrade.haveCode')}</Text>
-        <Ionicons name={i18n.dir?.() === 'rtl' ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.textTertiary} />
+        <Icon name={i18n.dir?.() === 'rtl' ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.textTertiary} />
       </Pressable>
 
       <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: Spacing.sm }}>

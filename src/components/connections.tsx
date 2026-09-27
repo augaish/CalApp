@@ -5,6 +5,7 @@ import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,7 +27,7 @@ export function ConnectionRow({
   const theme = useTheme();
   return (
     <View style={styles.connRow}>
-      <Ionicons name={icon} size={22} color={theme.text} />
+      <Icon name={icon} size={22} color={theme.text} />
       <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>{label}</Text>
       <View style={[styles.badge, { backgroundColor: theme.cardSubtle }]}>
         <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>
@@ -125,7 +126,7 @@ export function WhoopConnectionRow() {
       }`}
       style={({ pressed }) => [styles.connRow, pressed && { opacity: 0.6 }]}
     >
-      <Ionicons name="fitness-outline" size={22} color={theme.text} />
+      <Icon name="fitness-outline" size={22} color={theme.text} />
       <Text style={{ color: theme.text, fontSize: 16, flex: 1 }}>{t('profile.whoop')}</Text>
       <View style={[styles.badge, { backgroundColor: theme.cardSubtle }]}>
         <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700' }}>

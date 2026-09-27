@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { WeekBars } from '@/components/charts';
 import { SponsorCard } from '@/components/sponsor-card';
@@ -259,7 +259,7 @@ export default function Overview() {
               <Text style={[Type.title, { color: theme.onGradient }]}>
                 {selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
               </Text>
-              <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.9)" />
+              <Icon name="chevron-down" size={16} color="rgba(255,255,255,0.9)" />
             </Pressable>
             <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '500' }}>{dateLine}</Text>
           </View>
@@ -269,15 +269,15 @@ export default function Overview() {
             accessibilityLabel={t('home.streakTitle', { count: streak })}
             style={[styles.streak, { backgroundColor: 'rgba(33,27,46,0.22)' }]}
           >
-            <Ionicons name="flame" size={15} color="#FFD166" />
+            <Icon name="flame" size={15} color="#FFD166" />
             <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 13 }}>{streak}</Text>
           </Pressable>
           <View style={[styles.arrows, { direction: 'ltr' }]}>
             <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
-              <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
+              <Icon name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
             </Pressable>
             <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('home.nextDay')} style={styles.arrow}>
-              <Ionicons name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
+              <Icon name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
             </Pressable>
           </View>
         </View>
@@ -293,10 +293,10 @@ export default function Overview() {
             onPress={() => useTour.getState().start()}
             style={({ pressed }) => [styles.tourBanner, { backgroundColor: theme.surfaceTint, borderColor: theme.primary }, pressed && { opacity: 0.8 }]}
           >
-            <Ionicons name="sparkles" size={18} color={theme.primary} />
+            <Icon name="sparkles" size={18} color={theme.primary} />
             <Text style={{ color: theme.primary, fontWeight: '700', flex: 1 }}>{t('tour.banner')}</Text>
             <Pressable onPress={setTourSeen} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-              <Ionicons name="close" size={18} color={theme.textTertiary} />
+              <Icon name="close" size={18} color={theme.textTertiary} />
             </Pressable>
           </Pressable>
         )}
@@ -317,9 +317,9 @@ export default function Overview() {
             >
               <View style={{ flex: 1 }}>
                 <View style={styles.eyebrowRow}>
-                  <Ionicons name="barbell" size={15} color={theme.primary} />
+                  <Icon name="barbell" size={15} color={theme.primary} />
                   <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('today.trainingLabel')}</Text>
-                  <Ionicons name="chevron-forward" size={13} color={theme.textTertiary} />
+                  <Icon name="chevron-forward" size={13} color={theme.textTertiary} />
                 </View>
                 <Text style={[styles.stepTitle, { color: theme.text }]} numberOfLines={2}>
                   {trainingTitle}
@@ -338,7 +338,7 @@ export default function Overview() {
                   ) : todayIds.length > 0 ? (
                     todayDoneCount >= todayIds.length ? (
                       <View style={[styles.doneRow, { backgroundColor: theme.surfaceTint }]}>
-                        <Ionicons name="checkmark-circle" size={16} color={theme.successText} />
+                        <Icon name="checkmark-circle" size={16} color={theme.successText} />
                         <Text style={{ color: theme.successText, fontWeight: '700', fontSize: 13 }}>{t('today.workoutDone')}</Text>
                       </View>
                     ) : (
@@ -376,7 +376,7 @@ export default function Overview() {
             >
               <View style={{ flex: 1 }}>
                 <View style={styles.eyebrowRow}>
-                  <Ionicons name="restaurant" size={15} color={theme.carbs} />
+                  <Icon name="restaurant" size={15} color={theme.carbs} />
                   <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>
                     {nextMeal
                       ? nextPlanned
@@ -384,7 +384,7 @@ export default function Overview() {
                         : t('today.nextMealLabel')
                       : t('today.nextMealLabel')}
                   </Text>
-                  <Ionicons name="chevron-forward" size={13} color={theme.textTertiary} />
+                  <Icon name="chevron-forward" size={13} color={theme.textTertiary} />
                 </View>
                 <Text style={[styles.stepTitle, { color: theme.text }]} numberOfLines={2}>
                   {nextMeal ? (nextPlanned ? nextPlanned.name : t(`home.mealTypes.${nextMeal}`)) : t('today.allLogged')}
@@ -440,25 +440,25 @@ export default function Overview() {
         {showChecklist && (
           <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
             <View style={styles.checklistHead}>
-              <Ionicons name="rocket" size={18} color={theme.primary} />
+              <Icon name="rocket" size={18} color={theme.primary} />
               <Text style={[styles.cardTitle, { color: theme.text, flex: 1, marginBottom: 0 }]}>{t('checklist.title')}</Text>
               <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '700' }}>
                 {t('checklist.progress', { done: checklistDone, total: checklist.length })}
               </Text>
               <Pressable onPress={dismissChecklist} hitSlop={8} style={{ padding: 2 }} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-                <Ionicons name="close" size={18} color={theme.textTertiary} />
+                <Icon name="close" size={18} color={theme.textTertiary} />
               </Pressable>
             </View>
             <View style={{ marginTop: Spacing.sm }}>
               {checklist.map((item) => (
                 <Pressable key={item.key} onPress={item.onPress} accessibilityRole="button" style={({ pressed }) => [styles.checklistRow, pressed && { opacity: 0.6 }]}>
                   <View style={[styles.checkCircle, item.done ? { backgroundColor: theme.primary, borderColor: theme.primary } : { borderColor: theme.border }]}>
-                    {item.done && <Ionicons name="checkmark" size={14} color={theme.onPrimary} />}
+                    {item.done && <Icon name="checkmark" size={14} color={theme.onPrimary} />}
                   </View>
                   <Text style={{ flex: 1, color: item.done ? theme.textTertiary : theme.text, fontWeight: '600', textDecorationLine: item.done ? 'line-through' : 'none' }}>
                     {t(`checklist.${item.key}`)}
                   </Text>
-                  {!item.done && <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />}
+                  {!item.done && <Icon name="chevron-forward" size={16} color={theme.textTertiary} />}
                 </Pressable>
               ))}
             </View>
@@ -475,7 +475,7 @@ export default function Overview() {
         >
           <View style={styles.linkTitle}>
             <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, flex: 1 }]}>{t('today.nutritionToday')}</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+            <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
           </View>
           <View style={styles.kcalRow}>
             <Text style={{ color: theme.text }}>
@@ -533,7 +533,7 @@ export default function Overview() {
           ) : (
             <ActionButton label={t('health.addReading')} icon="add" variant="secondary" onPress={() => router.push('/body-reading')} />
           )}
-          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+          <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
         </Pressable>
 
         {/* Water — the row reads; the sheet (S24) writes. */}
@@ -554,7 +554,7 @@ export default function Overview() {
             </Text>
           </View>
           {selectedIsToday && <ActionButton label={t('today.addWater')} icon="add" variant="secondary" onPress={() => router.push('/water')} />}
-          <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+          <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
         </Pressable>
 
         {/* AI program — a row, not a hero: drafts are reviewed in their own screen. */}
@@ -583,7 +583,7 @@ export default function Overview() {
           >
             <Text style={[styles.cardTitle, { color: theme.text, marginBottom: 0, flex: 1 }]}>{t('progress.calories7d')}</Text>
             <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('review.title')}</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+            <Icon name="chevron-forward" size={16} color={theme.primary} />
           </Pressable>
           <WeekBars
             values={calValues}

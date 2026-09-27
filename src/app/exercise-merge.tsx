@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -85,7 +85,7 @@ export default function ExerciseMerge() {
       </Card>
 
       <View style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border }, cardShadow(theme.shadow)]}>
-        <Ionicons name="search" size={18} color={theme.textTertiary} />
+        <Icon name="search" size={18} color={theme.textTertiary} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -95,7 +95,7 @@ export default function ExerciseMerge() {
         />
         {query.length > 0 && (
           <Pressable accessibilityRole="button" accessibilityLabel={t('common.clear')} onPress={() => setQuery('')} hitSlop={8}>
-            <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
+            <Icon name="close-circle" size={18} color={theme.textTertiary} />
           </Pressable>
         )}
       </View>
@@ -117,7 +117,7 @@ export default function ExerciseMerge() {
             ]}
           >
             <View style={[styles.dot, { backgroundColor: MUSCLE_COLORS[ex.category] }]}>
-              <Ionicons name={exerciseIcon(ex)} size={15} color="#fff" />
+              <Icon name={exerciseIcon(ex)} size={15} color="#fff" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '600' }}>{name}</Text>
@@ -125,7 +125,7 @@ export default function ExerciseMerge() {
                 {t(`muscles.${ex.category}`)}
               </Text>
             </View>
-            <Ionicons name="git-merge-outline" size={18} color={theme.textTertiary} />
+            <Icon name="git-merge-outline" size={18} color={theme.textTertiary} />
           </Pressable>
         );
       })}

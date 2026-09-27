@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useViewDay } from '@/lib/day';
@@ -83,7 +83,7 @@ export default function Calendar() {
 
         <View style={styles.monthRow}>
           <Pressable accessibilityRole="button" accessibilityLabel={t('calendar.previousMonth')} onPress={() => changeMonth(-1)} hitSlop={10} style={styles.monthArrow}>
-            <Ionicons name="chevron-back" size={22} color={theme.text} />
+            <Icon name="chevron-back" size={22} color={theme.text} />
           </Pressable>
           <Text style={[styles.monthLabel, { color: theme.text }]}>
             {month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
@@ -94,7 +94,7 @@ export default function Calendar() {
             disabled={nextMonthInFuture}
             style={styles.monthArrow}
           >
-            <Ionicons
+            <Icon
               name="chevron-forward"
               size={22}
               color={nextMonthInFuture ? theme.border : theme.text}

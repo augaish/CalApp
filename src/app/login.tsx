@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
@@ -150,11 +151,11 @@ export default function Login() {
           accessibilityLabel={t('settings.language')}
           style={({ pressed }) => [styles.langPill, { borderColor: theme.primary }, pressed && { opacity: 0.8 }]}
         >
-          <Ionicons name="globe-outline" size={18} color={theme.primary} />
+          <Icon name="globe-outline" size={18} color={theme.primary} />
           <Text style={{ color: theme.primaryDark, fontWeight: '700', fontSize: 15 }}>
             {language === 'en' ? `${t('settings.english')} / ${t('settings.arabic')}` : `${t('settings.arabic')} / ${t('settings.english')}`}
           </Text>
-          <Ionicons name="chevron-down" size={16} color={theme.primary} />
+          <Icon name="chevron-down" size={16} color={theme.primary} />
         </Pressable>
 
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
@@ -179,9 +180,9 @@ export default function Login() {
                       ]}
                     >
                       <View style={[styles.check, { backgroundColor: on ? theme.primary : theme.card }]}>
-                        {on && <Ionicons name="checkmark" size={14} color={theme.onPrimary} />}
+                        {on && <Icon name="checkmark" size={14} color={theme.onPrimary} />}
                       </View>
-                      <Ionicons name={f.icon} size={40} color={theme.primary} />
+                      <Icon name={f.icon} size={40} color={theme.primary} />
                       <Text style={{ color: theme.primaryDark, fontWeight: '800', fontSize: 17, marginTop: Spacing.sm }}>{t(`welcome.focus.${f.key}`)}</Text>
                       <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 2 }}>{t(`welcome.focusHint.${f.key}`)}</Text>
                     </Pressable>
@@ -191,7 +192,7 @@ export default function Login() {
               <Button label={t('welcome.continueGuest')} onPress={() => setAccount({ name: t('welcome.guestName'), provider: 'guest' })} style={{ marginTop: Spacing.md }} />
               {appleReady && (
                 <Pressable onPress={withApple} disabled={busy} accessibilityRole="button" style={({ pressed }) => [styles.appleBtn, pressed && { opacity: 0.85 }]}>
-                  <Ionicons name="logo-apple" size={19} color="#fff" />
+                  <Icon name="logo-apple" size={19} color="#fff" />
                   <Text style={styles.appleLabel}>{t('auth.continueApple')}</Text>
                 </Pressable>
               )}

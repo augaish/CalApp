@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -15,6 +14,7 @@ import {
   View,
 } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { Stopwatch } from '@/components/stopwatch';
@@ -303,7 +303,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={10} style={styles.headerBtn} accessibilityRole="button" accessibilityLabel={t('common.back')}>
-          <Ionicons name="chevron-back" size={24} color={theme.text} />
+          <Icon name="chevron-back" size={24} color={theme.text} />
         </Pressable>
         <Text style={[Type.title, { color: theme.text, flex: 1 }]} numberOfLines={1}>
           {exerciseName(exercise, lang)}
@@ -314,7 +314,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
             hitSlop={10}
             style={styles.headerBtn}
           >
-            <Ionicons name="create-outline" size={22} color={theme.textSecondary} />
+            <Icon name="create-outline" size={22} color={theme.textSecondary} />
           </Pressable>
         )}
       </View>
@@ -410,9 +410,9 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
         accessibilityRole="button"
         accessibilityState={{ expanded: showAnatomy }}
       >
-        <Ionicons name="body" size={18} color={theme.primary} />
+        <Icon name="body" size={18} color={theme.primary} />
         <Text style={{ color: theme.text, fontWeight: '700', flex: 1 }}>{t('exercises.musclesAndForm')}</Text>
-        <Ionicons name={showAnatomy ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
+        <Icon name={showAnatomy ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
       </Pressable>
       {showAnatomy && (
         <>
@@ -462,7 +462,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
         }}
         style={styles.videoLink}
       >
-        <Ionicons name="logo-youtube" size={18} color={theme.danger} />
+        <Icon name="logo-youtube" size={18} color={theme.danger} />
         <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
           {t('gymResult.watchVideo')}
         </Text>
@@ -560,12 +560,12 @@ function TrackTab({
     <View>
       <View style={[styles.dayChip, { justifyContent: 'space-between' }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Ionicons name="calendar-outline" size={14} color={theme.textSecondary} />
+          <Icon name="calendar-outline" size={14} color={theme.textSecondary} />
           <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>{dayLabel}</Text>
         </View>
         {!!caloriesBurned && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-            {fromWhoop && <Ionicons name="watch-outline" size={12} color={theme.carbs} />}
+            {fromWhoop && <Icon name="watch-outline" size={12} color={theme.carbs} />}
             <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 13 }}>
               {caloriesBurned} {t('common.kcal')}
               {fromWhoop ? ` · ${t('track.fromWhoop')}` : ''}
@@ -612,7 +612,7 @@ function TrackTab({
 
         {editing && (
           <View style={[styles.noteWrap, { borderColor: theme.border, backgroundColor: theme.background }]}>
-            <Ionicons name="chatbubble-ellipses-outline" size={16} color={theme.textTertiary} />
+            <Icon name="chatbubble-ellipses-outline" size={16} color={theme.textTertiary} />
             <TextInput
               ref={noteInputRef}
               value={note}
@@ -661,7 +661,7 @@ function TrackTab({
                     <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>
                       {setLabel(s, type, kg, t('track.min'))}
                     </Text>
-                    {isBest && <Ionicons name="trophy" size={14} color={theme.carbs} />}
+                    {isBest && <Icon name="trophy" size={14} color={theme.carbs} />}
                   </View>
                   {s.comment ? (
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -672,13 +672,13 @@ function TrackTab({
                         {s.comment}
                       </Text>
                       <Pressable accessibilityRole="button" accessibilityLabel={t('common.delete')} onPress={() => onDeleteComment(index)} hitSlop={8}>
-                        <Ionicons name="trash-outline" size={13} color={theme.textTertiary} />
+                        <Icon name="trash-outline" size={13} color={theme.textTertiary} />
                       </Pressable>
                     </View>
                   ) : null}
                 </View>
                 <Pressable accessibilityRole="button" accessibilityLabel={t('common.delete')} onPress={() => onDelete(index)} hitSlop={8} style={{ padding: 4 }}>
-                  <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                  <Icon name="trash-outline" size={18} color={theme.textTertiary} />
                 </Pressable>
               </Pressable>
             );
@@ -701,7 +701,7 @@ function TrackTab({
               <View key={i} style={[styles.setRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }, matched && { opacity: 0.5 }]}>
                 <View style={[styles.setNum, { borderWidth: 1, borderColor: theme.border }]}>
                   {matched ? (
-                    <Ionicons name="checkmark" size={14} color={theme.successText} />
+                    <Icon name="checkmark" size={14} color={theme.successText} />
                   ) : (
                     <Text style={{ color: theme.textTertiary, fontWeight: '800', fontSize: 13 }}>{i + 1}</Text>
                   )}
@@ -722,7 +722,7 @@ function TrackTab({
                     accessibilityLabel={`${t('track.logSet')} ${setLabel(s, type, kg, t('track.min'))}`}
                     style={({ pressed }) => [styles.logBtn, { backgroundColor: theme.primary }, pressed && { opacity: 0.7 }]}
                   >
-                    <Ionicons name="checkmark" size={14} color={theme.onPrimary} />
+                    <Icon name="checkmark" size={14} color={theme.onPrimary} />
                     <Text style={{ color: theme.onPrimary, fontWeight: '700', fontSize: 13 }}>{t('track.logSet')}</Text>
                   </Pressable>
                 )}
@@ -742,7 +742,7 @@ function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; typ
   if (sessions.length === 0) {
     return (
       <View style={[styles.emptyBox, { borderColor: theme.border }]}>
-        <Ionicons name="time-outline" size={30} color={theme.textTertiary} />
+        <Icon name="time-outline" size={30} color={theme.textTertiary} />
         <Text style={{ color: theme.textSecondary }}>{t('track.noHistory')}</Text>
       </View>
     );
@@ -774,7 +774,7 @@ function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; typ
                   </Text>
                 ) : null}
               </View>
-              {i === bestSetIndex(w.sets, w.type) && <Ionicons name="trophy" size={13} color={theme.carbs} />}
+              {i === bestSetIndex(w.sets, w.type) && <Icon name="trophy" size={13} color={theme.carbs} />}
               {type === 'weight_reps' && (s.weightKg ?? 0) > 0 && (s.reps ?? 0) > 0 ? (
                 <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                   {t('track.est1rm')} {est1RM(s.weightKg ?? 0, s.reps ?? 0)}
@@ -806,7 +806,7 @@ function GraphTab({
   if (chrono.length < 2) {
     return (
       <View style={[styles.emptyBox, { borderColor: theme.border }]}>
-        <Ionicons name="trending-up" size={30} color={theme.textTertiary} />
+        <Icon name="trending-up" size={30} color={theme.textTertiary} />
         <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>{t('track.noGraph')}</Text>
       </View>
     );

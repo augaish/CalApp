@@ -1,9 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Tabs, usePathname, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppState, Pressable, StyleSheet, View } from 'react-native';
 
+import { GlassBacking } from '@/components/glass';
+import { Icon } from '@/components/icon';
 import { TourOverlay } from '@/components/tour-overlay';
 import { useTheme } from '@/hooks/use-theme';
 import { usePending } from '@/lib/pending';
@@ -92,7 +93,7 @@ export default function TabLayout() {
         options={{
           title: t('tabs.overview'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'grid' : 'grid-outline'} size={23} color={color} />
+            <Icon name={focused ? 'grid' : 'grid-outline'} size={23} color={color} />
           ),
         }}
       />
@@ -101,7 +102,7 @@ export default function TabLayout() {
         options={{
           title: t('tabs.training'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'barbell' : 'barbell-outline'} size={24} color={color} />
+            <Icon name={focused ? 'barbell' : 'barbell-outline'} size={24} color={color} />
           ),
         }}
       />
@@ -120,13 +121,11 @@ export default function TabLayout() {
                   usePending.getState().setMealTypeHint(null);
                   router.push('/add-menu');
                 }}
-                style={({ pressed }) => [
-                  styles.fab,
-                  { backgroundColor: theme.primary },
-                  pressed && { transform: [{ scale: 0.93 }] },
-                ]}
+                style={({ pressed }) => [styles.fab, pressed && { transform: [{ scale: 0.93 }] }]}
               >
-                <Ionicons name="add" size={30} color={theme.onPrimary} />
+                {/* Brand-tinted glass on iOS 26; the solid brand disc elsewhere. */}
+                <GlassBacking radius={26} fallbackColor={theme.primary} tint={theme.primary} />
+                <Icon name="add" size={30} color={theme.onPrimary} />
               </Pressable>
             </View>
           ),
@@ -137,7 +136,7 @@ export default function TabLayout() {
         options={{
           title: t('tabs.food'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'restaurant' : 'restaurant-outline'} size={22} color={color} />
+            <Icon name={focused ? 'restaurant' : 'restaurant-outline'} size={22} color={color} />
           ),
         }}
       />
@@ -150,7 +149,7 @@ export default function TabLayout() {
         options={{
           title: t('tabs.health'),
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'heart' : 'heart-outline'} size={23} color={color} />
+            <Icon name={focused ? 'heart' : 'heart-outline'} size={23} color={color} />
           ),
         }}
       />

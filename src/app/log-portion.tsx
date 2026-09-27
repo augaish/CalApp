@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { Button, Card, Screen } from '@/components/ui';
@@ -110,7 +110,7 @@ export default function LogPortion() {
         loggedMeal ? (
           <View style={{ gap: Spacing.xs }}>
             <View style={[styles.loggedBar, { backgroundColor: theme.cardSubtle, borderColor: theme.border }]}>
-              <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+              <Icon name="checkmark-circle" size={20} color={theme.primary} />
               <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>
                 {t('logPortion.added', { slot: t(`home.mealTypes.${slot}`), portion: portionLabel(portion), day: dayLabel })}
               </Text>
@@ -169,7 +169,7 @@ export default function LogPortion() {
             accessibilityLabel={t('logPortion.less')}
             style={[styles.stepBtn, { backgroundColor: theme.cardSubtle }, stepIndex === 0 && { opacity: 0.4 }]}
           >
-            <Ionicons name="remove" size={22} color={theme.primary} />
+            <Icon name="remove" size={22} color={theme.primary} />
           </Pressable>
           <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20, flex: 1, textAlign: 'center' }}>
             {portionLabel(portion)}
@@ -181,7 +181,7 @@ export default function LogPortion() {
             accessibilityLabel={t('logPortion.more')}
             style={[styles.stepBtn, { backgroundColor: theme.cardSubtle }, stepIndex === SERVING_STEPS.length - 1 && { opacity: 0.4 }]}
           >
-            <Ionicons name="add" size={22} color={theme.primary} />
+            <Icon name="add" size={22} color={theme.primary} />
           </Pressable>
         </View>
         {/* Cooked-weight logging needs a measured batch weight first; the

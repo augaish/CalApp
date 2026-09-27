@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, initialBodyView } from '@/components/body-map';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -123,7 +124,7 @@ export default function GymResult() {
       {!needsGroup && (
         <Card style={{ backgroundColor: theme.cardSubtle }}>
           <View style={{ flexDirection: 'row', gap: Spacing.sm, alignItems: 'center' }}>
-            <Ionicons name="checkmark-circle" size={20} color={theme.primary} />
+            <Icon name="checkmark-circle" size={20} color={theme.primary} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '700' }}>
                 {t(matched ? 'gymResult.matchedTitle' : 'gymResult.savedTitle')}
@@ -236,7 +237,7 @@ function Section({
   return (
     <Card>
       <View style={styles.sectionHead}>
-        <Ionicons name={icon} size={18} color={warning ? theme.warning : theme.primary} />
+        <Icon name={icon} size={18} color={warning ? theme.warning : theme.primary} />
         <Text style={[styles.sectionTitle, { color: titleColor }]}>{title}</Text>
       </View>
       {items.map((item, i) => (

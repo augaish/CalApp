@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +14,7 @@ import {
   type BodyMapMetric,
   type BodyMapView,
 } from '@/components/body-map';
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { MetricTrend } from '@/components/charts';
@@ -178,7 +178,7 @@ export default function Measurements() {
                 </Text>
                 <ActionButton label={t('bodyReading.edit')} variant="secondary" onPress={() => router.push(`/body-reading?date=${ymd(new Date(w.at))}`)} style={{ minHeight: 36, paddingHorizontal: 10 }} />
                 <Pressable onPress={() => confirmDelete(w.at)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.delete')} style={{ padding: 6 }}>
-                  <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                  <Icon name="trash-outline" size={18} color={theme.textTertiary} />
                 </Pressable>
               </View>
             ))}

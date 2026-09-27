@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { BodyMap, zoneIntensityFromSegmental, zoneStatusFromSegmental } from '@/components/body-map';
 import { MetricTrend } from '@/components/charts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
@@ -145,9 +145,9 @@ export default function Health() {
           accessibilityLabel={t('health.lastDays', { days: range })}
           style={({ pressed }) => [styles.rangePill, { backgroundColor: theme.card, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
         >
-          <Ionicons name="calendar-outline" size={16} color={theme.primary} />
+          <Icon name="calendar-outline" size={16} color={theme.primary} />
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{t('health.lastDays', { days: range })}</Text>
-          <Ionicons name={pickingRange ? 'chevron-up' : 'chevron-down'} size={14} color={theme.textTertiary} />
+          <Icon name={pickingRange ? 'chevron-up' : 'chevron-down'} size={14} color={theme.textTertiary} />
         </Pressable>
       </View>
       {pickingRange && (
@@ -203,7 +203,7 @@ export default function Health() {
                 <Pressable onPress={() => router.push('/measurements?metric=weight')} accessibilityRole="button" hitSlop={6} style={styles.historyLink}>
                   <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('health.readingsInRange', { n: series.length })}</Text>
                   <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '700' }}>{t('bodyReading.history')}</Text>
-                  <Ionicons name="chevron-forward" size={14} color={theme.primary} />
+                  <Icon name="chevron-forward" size={14} color={theme.primary} />
                 </Pressable>
               </View>
             ) : (

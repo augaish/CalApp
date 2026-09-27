@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { CoachSchedulePlan } from '@/lib/types';
@@ -40,7 +40,7 @@ export function SchedulePlanCard({
       ]}
     >
       <View style={styles.planHeader}>
-        <Ionicons name="calendar" size={16} color={theme.primary} />
+        <Icon name="calendar" size={16} color={theme.primary} />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }}>
           {t('coach.schedulePlan.cardTitle')}
         </Text>
@@ -57,7 +57,7 @@ export function SchedulePlanCard({
           </Text>
           {day.exercises.map((ex, i) => (
             <View key={i} style={styles.planExerciseRow}>
-              <Ionicons name="barbell-outline" size={13} color={theme.textTertiary} />
+              <Icon name="barbell-outline" size={13} color={theme.textTertiary} />
               <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1 }} numberOfLines={1}>
                 {ex.name}
               </Text>
@@ -79,7 +79,7 @@ export function SchedulePlanCard({
           pressed && !added && { opacity: 0.8 },
         ]}
       >
-        <Ionicons
+        <Icon
           name={added ? 'checkmark-circle' : 'add-circle'}
           size={17}
           color={added ? theme.textSecondary : theme.onPrimary}

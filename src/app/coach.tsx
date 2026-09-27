@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
@@ -348,7 +349,7 @@ export default function Coach() {
           accessibilityLabel={t('common.back')}
           style={styles.stripBtn}
         >
-          <Ionicons name="chevron-back" size={24} color={theme.onGradient} />
+          <Icon name="chevron-back" size={24} color={theme.onGradient} />
         </Pressable>
         <Image source={require('../../assets/images/logo-tile.png')} style={styles.stripLogo} contentFit="contain" accessibilityLabel="Calgym" />
         <View style={{ flex: 1 }}>
@@ -360,7 +361,7 @@ export default function Coach() {
           </Text>
         </View>
         <Pressable onPress={() => router.push('/coach-memory')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('coach.manageContext')} style={styles.stripBtn}>
-          <Ionicons name="options-outline" size={22} color={theme.onGradient} />
+          <Icon name="options-outline" size={22} color={theme.onGradient} />
         </Pressable>
         <Pressable
           onPress={confirmNewConversation}
@@ -370,7 +371,7 @@ export default function Coach() {
           accessibilityLabel={t('coach.newConversation')}
           style={[styles.stripBtn, messages.length === 0 && { opacity: 0.45 }]}
         >
-          <Ionicons name="create-outline" size={22} color={theme.onGradient} />
+          <Icon name="create-outline" size={22} color={theme.onGradient} />
         </Pressable>
       </LinearGradient>
       <ScrollView
@@ -388,12 +389,12 @@ export default function Coach() {
         )}
         {!coachUnlocked && (
           <Pressable accessibilityRole="button" onPress={() => router.push('/upgrade?reason=coach')} style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
-            <Ionicons name="lock-closed" size={22} color={theme.primary} />
+            <Icon name="lock-closed" size={22} color={theme.primary} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{t('coach.lockedTitle')}</Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('coach.lockedBody')}</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+            <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
           </Pressable>
         )}
         {messages.map((m, i) => (
@@ -518,7 +519,7 @@ export default function Coach() {
               accessibilityLabel={t('coach.attach')}
               style={styles.attachBtn}
             >
-              <Ionicons name="attach" size={22} color={theme.textSecondary} />
+              <Icon name="attach" size={22} color={theme.textSecondary} />
             </Pressable>
           )}
           <TextInput
@@ -538,7 +539,7 @@ export default function Coach() {
             accessibilityLabel={t('coach.send')}
             style={({ pressed }) => [styles.sendBtn, { backgroundColor: theme.primary, opacity: canSend ? 1 : 0.4 }, pressed && { transform: [{ scale: 0.92 }] }]}
           >
-            <Ionicons name="paper-plane" size={18} color={theme.onPrimary} />
+            <Icon name="paper-plane" size={18} color={theme.onPrimary} />
           </Pressable>
         </View>
       </View>

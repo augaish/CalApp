@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { RefineBox } from '@/components/refine-box';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -264,11 +264,11 @@ export default function MealEdit() {
             hitSlop={10}
             style={{ marginEnd: Spacing.sm, opacity: sharing ? 0.4 : 1 }}
           >
-            <Ionicons name="share-outline" size={20} color={theme.primary} />
+            <Icon name="share-outline" size={20} color={theme.primary} />
           </Pressable>
         )}
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
       <Subtitle>{t('mealEdit.hint')}</Subtitle>
@@ -294,11 +294,11 @@ export default function MealEdit() {
       </View>
       <View style={[styles.dayRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Pressable accessibilityRole="button" accessibilityLabel={t('home.previousDay')} onPress={() => shiftDay(-1)} hitSlop={10} style={styles.arrow}>
-          <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
+          <Icon name="chevron-back" size={22} color={theme.textSecondary} />
         </Pressable>
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{dayLabel}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={t('home.nextDay')} onPress={() => shiftDay(1)} hitSlop={10} disabled={isToday} style={styles.arrow}>
-          <Ionicons
+          <Icon
             name="chevron-forward"
             size={22}
             color={isToday ? theme.border : theme.textSecondary}
@@ -308,7 +308,7 @@ export default function MealEdit() {
 
       {items.length === 0 && (
         <View style={[styles.emptyNote, { borderColor: theme.border }]}>
-          <Ionicons name="information-circle-outline" size={20} color={theme.textTertiary} />
+          <Icon name="information-circle-outline" size={20} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, flex: 1, fontSize: 13 }}>
             {t('mealEdit.emptyHint')}
           </Text>
@@ -329,7 +329,7 @@ export default function MealEdit() {
               hitSlop={10}
               style={({ pressed }) => [styles.removeItemBtn, pressed && { opacity: 0.5 }]}
             >
-              <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+              <Icon name="trash-outline" size={18} color={theme.textTertiary} />
             </Pressable>
           </View>
 

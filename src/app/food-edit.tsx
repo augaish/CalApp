@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { IconTile, InfoLine, Segmented, StatusPill } from '@/components/system';
 import { Button, Field, MealTypePicker, Screen } from '@/components/ui';
@@ -207,7 +207,7 @@ export default function FoodEdit() {
               accessibilityRole="button"
               style={({ pressed }) => [styles.suggestion, { backgroundColor: theme.card, borderColor: theme.border }, pressed && { opacity: 0.6 }]}
             >
-              <Ionicons name="time-outline" size={16} color={theme.primary} />
+              <Icon name="time-outline" size={16} color={theme.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
                   {item.name}
@@ -274,7 +274,7 @@ export default function FoodEdit() {
 
       {unknown.length > 0 && (
         <View style={[styles.blank, { backgroundColor: theme.cardSubtle }]}>
-          <Ionicons name="help-circle-outline" size={15} color={theme.textSecondary} />
+          <Icon name="help-circle-outline" size={15} color={theme.textSecondary} />
           <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17, flex: 1 }}>{t('foodEdit.blankNote', { list: unknownList })}</Text>
         </View>
       )}
@@ -294,7 +294,7 @@ export default function FoodEdit() {
       <MealTypePicker value={mealType} onChange={setMealType} />
 
       <View style={styles.dateRow}>
-        <Ionicons name="calendar-outline" size={16} color={theme.textSecondary} />
+        <Icon name="calendar-outline" size={16} color={theme.textSecondary} />
         <Text style={{ color: theme.textSecondary, fontSize: 14, flex: 1 }}>{t('foodEdit.loggingTo', { date: dateLabel })}</Text>
         <StatusPill label={t('foodEdit.manualPill')} tone="neutral" icon="pencil-outline" />
       </View>

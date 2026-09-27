@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -56,7 +56,7 @@ export default function WaterSheet() {
         >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
           <View style={styles.titleRow}>
-            <Ionicons name="water" size={22} color={theme.water} />
+            <Icon name="water" size={22} color={theme.water} />
             <Text style={[styles.title, { color: theme.text }]}>{t('waterSheet.title')}</Text>
           </View>
 

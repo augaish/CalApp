@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
@@ -329,7 +329,7 @@ export default function Training() {
             <Text style={[Type.title, { color: theme.onGradient }]}>
               {selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
             </Text>
-            <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.9)" />
+            <Icon name="chevron-down" size={16} color="rgba(255,255,255,0.9)" />
           </Pressable>
           <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '500' }}>
             {selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
@@ -337,10 +337,10 @@ export default function Training() {
         </View>
         <View style={[styles.arrows, { direction: 'ltr' }]}>
           <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
-            <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
+            <Icon name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
           </Pressable>
           <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('home.nextDay')} style={styles.arrow}>
-            <Ionicons name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
+            <Icon name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
           </Pressable>
         </View>
       </View>
@@ -351,12 +351,12 @@ export default function Training() {
         accessibilityLabel={`${scheduleName} · ${t('training.change')}`}
         style={({ pressed }) => [styles.schedulePill, { backgroundColor: 'rgba(255,255,255,0.92)' }, pressed && { opacity: 0.85 }]}
       >
-        <Ionicons name="barbell" size={16} color={theme.primary} />
+        <Icon name="barbell" size={16} color={theme.primary} />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
           {activeSchedule ? t('training.activeSchedule', { name: scheduleName }) : t('training.noSavedSchedule')}
         </Text>
         <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>{activeSchedule ? t('training.change') : t('training.saveSchedule')}</Text>
-        <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+        <Icon name="chevron-forward" size={16} color={theme.primary} />
       </Pressable>
     </>
   );
@@ -365,7 +365,7 @@ export default function Training() {
     <CollapsingScreen title={t('tabs.training')} header={header} scrollRef={pageRef}>
       {lastOp && (
         <View style={[styles.undoBar, { backgroundColor: theme.surfaceTint }]}>
-          <Ionicons name="swap-horizontal" size={16} color={theme.primaryDark} />
+          <Icon name="swap-horizontal" size={16} color={theme.primaryDark} />
           <Text style={{ color: theme.primaryDark, fontSize: 13, flex: 1 }} numberOfLines={2}>
             {lastOp.label}
           </Text>
@@ -380,7 +380,7 @@ export default function Training() {
             <Text style={{ color: theme.primary, fontWeight: '800' }}>{t('reschedule.undo')}</Text>
           </Pressable>
           <Pressable onPress={() => setLastOp(null)} accessibilityRole="button" accessibilityLabel={t('common.close')} hitSlop={6}>
-            <Ionicons name="close" size={16} color={theme.textTertiary} />
+            <Icon name="close" size={16} color={theme.textTertiary} />
           </Pressable>
         </View>
       )}
@@ -471,7 +471,7 @@ export default function Training() {
               />
             ) : allDone ? (
               <View style={[styles.doneBar, { backgroundColor: theme.surfaceTint }]}>
-                <Ionicons name="checkmark-circle" size={18} color={theme.successText} />
+                <Icon name="checkmark-circle" size={18} color={theme.successText} />
                 <Text style={{ color: theme.successText, fontWeight: '700', flex: 1 }}>{t('today.workoutDone')}</Text>
                 <Pressable onPress={() => router.push('/workout-history')} accessibilityRole="button" hitSlop={6}>
                   <Text style={{ color: theme.primary, fontWeight: '700' }}>{t('training.reviewWorkout')}</Text>
@@ -536,7 +536,7 @@ export default function Training() {
                     >
                       <View style={[styles.numBadge, doneToday ? { backgroundColor: theme.primary } : { backgroundColor: theme.surfaceTint }]}>
                         {doneToday ? (
-                          <Ionicons name="checkmark" size={16} color={theme.onPrimary} />
+                          <Icon name="checkmark" size={16} color={theme.onPrimary} />
                         ) : (
                           <Text style={{ color: theme.primaryDark, fontWeight: '800', fontSize: 14 }}>{index + 1}</Text>
                         )}
@@ -572,7 +572,7 @@ export default function Training() {
                           </View>
                         )}
                       </View>
-                      <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+                      <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
                     </Pressable>
                     <Pressable
                       onPress={() => (scheduledIds.includes(exId) ? skipPlanToday(selected, exId) : wToday && confirmDeleteWorkout(wToday.id))}
@@ -581,7 +581,7 @@ export default function Training() {
                       accessibilityLabel={t('common.delete')}
                       style={styles.skipBtn}
                     >
-                      <Ionicons name="close" size={18} color={theme.textTertiary} />
+                      <Icon name="close" size={18} color={theme.textTertiary} />
                     </Pressable>
                   </View>
                 );
@@ -606,15 +606,15 @@ export default function Training() {
             accessibilityRole="button"
             style={({ pressed }) => [styles.editPlan, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.8 }]}
           >
-            <Ionicons name="pencil-outline" size={16} color={theme.primary} />
+            <Icon name="pencil-outline" size={16} color={theme.primary} />
             <Text style={{ color: theme.primaryDark, fontWeight: '700', flex: 1 }}>{t('training.editTodaysPlan')}</Text>
-            <Ionicons name="chevron-forward" size={16} color={theme.primary} />
+            <Icon name="chevron-forward" size={16} color={theme.primary} />
           </Pressable>
 
           {loggedTodayCount > 0 && (
             <View style={{ marginTop: Spacing.sm }}>
               <Pressable onPress={() => setPickingWeekday((v) => !v)} accessibilityRole="button" style={({ pressed }) => [styles.saveDayBtn, pressed && { opacity: 0.6 }]}>
-                <Ionicons name={pickingWeekday ? 'chevron-down' : 'calendar-outline'} size={16} color={theme.primary} />
+                <Icon name={pickingWeekday ? 'chevron-down' : 'calendar-outline'} size={16} color={theme.primary} />
                 <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>{t('training.saveAsScheduleDay')}</Text>
               </Pressable>
               {pickingWeekday && (
@@ -669,7 +669,7 @@ export default function Training() {
           </Text>
           {selectedIsToday && whoopConnected === true && whoopLastFetchedAt && (
             <Pressable onPress={refreshWhoopRecent} hitSlop={8} style={styles.syncRow} accessibilityRole="button">
-              <Ionicons name="refresh" size={11} color={theme.textTertiary} />
+              <Icon name="refresh" size={11} color={theme.textTertiary} />
               <Text style={{ color: theme.textTertiary, fontSize: 11 }}>{t('training.lastSynced', { time: syncedAgoLabel(whoopLastFetchedAt, t) })}</Text>
             </Pressable>
           )}

@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { IconTile, InfoLine } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
@@ -66,7 +66,7 @@ export default function ProductNotFound() {
         style={[styles.consent, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}
       >
         <View style={[styles.box, { borderColor: consent ? theme.primary : theme.textTertiary, backgroundColor: consent ? theme.primary : 'transparent' }]}>
-          {consent && <Ionicons name="checkmark" size={18} color={theme.onPrimary} />}
+          {consent && <Icon name="checkmark" size={18} color={theme.onPrimary} />}
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ color: theme.text, fontSize: 16, fontWeight: '700' }}>{t('productNotFound.shareTitle')}</Text>

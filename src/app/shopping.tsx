@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { ActionButton, Chip, EmptyState, IconTile, Segmented, SettingsRow } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
@@ -150,7 +151,7 @@ export default function Shopping() {
       >
         <IconTile icon="calendar-outline" />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, flex: 1 }}>{rangeLabel}</Text>
-        {!started && <Ionicons name={pickingRange ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />}
+        {!started && <Icon name={pickingRange ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />}
       </Pressable>
       {!started && pickingRange && (
         <View style={styles.chips}>
@@ -219,7 +220,7 @@ export default function Shopping() {
             shownGroups.map((group) => (
               <View key={group.aisle} style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
                 <View style={[styles.groupHead, { borderBottomColor: theme.border }]}>
-                  <Ionicons name={AISLE_ICON[group.aisle] ?? 'cube-outline'} size={18} color={theme.primary} />
+                  <Icon name={AISLE_ICON[group.aisle] ?? 'cube-outline'} size={18} color={theme.primary} />
                   <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{t(`shopping.aisles.${group.aisle}`)}</Text>
                 </View>
                 {group.lines.map((line, i) => {
@@ -242,7 +243,7 @@ export default function Shopping() {
                           accessibilityLabel={line.name}
                           style={styles.checkbox}
                         >
-                          <Ionicons name={done || owned ? 'checkbox' : 'square-outline'} size={26} color={done || owned ? theme.primary : theme.textTertiary} />
+                          <Icon name={done || owned ? 'checkbox' : 'square-outline'} size={26} color={done || owned ? theme.primary : theme.textTertiary} />
                         </Pressable>
                         <Pressable style={{ flex: 1 }} onPress={() => setExpanded(open ? null : line.key)} accessibilityRole="button">
                           <Text
@@ -291,9 +292,9 @@ export default function Shopping() {
                           accessibilityState={{ selected: owned }}
                           style={styles.haveBtn}
                         >
-                          <Ionicons name={owned ? 'home' : 'home-outline'} size={18} color={owned ? theme.primary : theme.textTertiary} />
+                          <Icon name={owned ? 'home' : 'home-outline'} size={18} color={owned ? theme.primary : theme.textTertiary} />
                         </Pressable>
-                        <Ionicons name={open ? 'chevron-up' : 'chevron-forward'} size={16} color={theme.textTertiary} />
+                        <Icon name={open ? 'chevron-up' : 'chevron-forward'} size={16} color={theme.textTertiary} />
                       </View>
                       {open && (
                         <View style={styles.contributors}>
@@ -323,7 +324,7 @@ export default function Shopping() {
               title={t('shopping.batchCooking')}
               subtitle={t('shopping.batchHint')}
               onPress={() => setShowBatch((v) => !v)}
-              right={<Ionicons name={showBatch ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.textTertiary} />}
+              right={<Icon name={showBatch ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.textTertiary} />}
               chevron={false}
               last
             />

@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { goalScenarios, type GoalScenario } from '@/lib/tdee';
@@ -70,7 +70,7 @@ export function GoalScenarioCards({
             <Text style={{ color: theme.textTertiary, fontSize: 12, marginStart: 4, marginEnd: 8 }}>
               {t('common.kcal')}
             </Text>
-            {selected && <Ionicons name="checkmark-circle" size={20} color={theme.primary} />}
+            {selected && <Icon name="checkmark-circle" size={20} color={theme.primary} />}
           </Pressable>
         );
       })}

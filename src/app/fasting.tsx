@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { Ring } from '@/components/ring';
 import { Button, Field, Screen, Title } from '@/components/ui';
@@ -115,13 +115,13 @@ export default function Fasting() {
       <View style={styles.header}>
         <Title>{t('fasting.title')}</Title>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
 
       {streak > 0 && (
         <View style={[styles.streakRow, { backgroundColor: theme.cardSubtle }]}>
-          <Ionicons name="flame" size={16} color="#FF9F45" />
+          <Icon name="flame" size={16} color="#FF9F45" />
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>
             {t('fasting.streak', { count: streak })}
           </Text>
@@ -213,7 +213,7 @@ export default function Fasting() {
                     </Text>
                   </View>
                   <Pressable accessibilityRole="button" accessibilityLabel={t('common.delete')} onPress={() => confirmDelete(f.id)} hitSlop={10}>
-                    <Ionicons name="trash-outline" size={16} color={theme.textTertiary} />
+                    <Icon name="trash-outline" size={16} color={theme.textTertiary} />
                   </Pressable>
                 </View>
               );

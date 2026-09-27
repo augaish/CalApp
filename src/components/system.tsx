@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { selectionHaptic } from '@/lib/feedback';
@@ -35,7 +36,7 @@ export function SectionTitle({
           hitSlop={6}
           style={({ pressed }) => [styles.sectionAction, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
         >
-          {action.icon && <Ionicons name={action.icon} size={15} color={theme.primary} />}
+          {action.icon && <Icon name={action.icon} size={15} color={theme.primary} />}
           <Text maxFontSizeMultiplier={1.3} style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{action.label}</Text>
         </Pressable>
       )}
@@ -75,7 +76,7 @@ export function Segmented<K extends string>({
               pressed && !on && { opacity: 0.7 },
             ]}
           >
-            {o.icon && <Ionicons name={o.icon} size={16} color={on ? theme.onPrimary : theme.primaryDark} />}
+            {o.icon && <Icon name={o.icon} size={16} color={on ? theme.onPrimary : theme.primaryDark} />}
             <Text maxFontSizeMultiplier={1.3} style={{ color: on ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
               {o.label}
             </Text>
@@ -113,7 +114,7 @@ export function Chip({
         pressed && { opacity: 0.8 },
       ]}
     >
-      {icon && <Ionicons name={icon} size={14} color={selected ? theme.onPrimary : theme.primaryDark} />}
+      {icon && <Icon name={icon} size={14} color={selected ? theme.onPrimary : theme.primaryDark} />}
       <Text maxFontSizeMultiplier={1.3} style={{ color: selected ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 13 }}>{label}</Text>
     </Pressable>
   );
@@ -134,7 +135,7 @@ export function IconTile({
   const theme = useTheme();
   return (
     <View style={[{ width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: theme.surfaceTint, alignItems: 'center', justifyContent: 'center' }, style]}>
-      <Ionicons name={icon} size={Math.round(size * 0.55)} color={color ?? theme.primary} />
+      <Icon name={icon} size={Math.round(size * 0.55)} color={color ?? theme.primary} />
     </View>
   );
 }
@@ -144,7 +145,7 @@ export function IllustrationTile({ icon, width = 104, height = 108 }: { icon: ke
   const theme = useTheme();
   return (
     <View style={{ width, height, borderRadius: Radius.control, backgroundColor: theme.surfaceTint, alignItems: 'center', justifyContent: 'center' }}>
-      <Ionicons name={icon} size={Math.round(height * 0.5)} color={theme.primary} />
+      <Icon name={icon} size={Math.round(height * 0.5)} color={theme.primary} />
     </View>
   );
 }
@@ -178,7 +179,7 @@ export function StatTile({
       accessibilityLabel={`${value} ${label}`}
       style={{ width, minHeight: height, borderRadius: Radius.control, backgroundColor: theme.surfaceTint, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 2 }}
     >
-      <Ionicons name={icon} size={20} color={ink} />
+      <Icon name={icon} size={20} color={ink} />
       <Text maxFontSizeMultiplier={1.3} style={{ color: theme.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
@@ -216,7 +217,7 @@ export function StatusPill({
         : theme.surfaceTint;
   return (
     <View style={[styles.statusPill, { backgroundColor: bg }]}>
-      {icon && <Ionicons name={icon} size={13} color={ink} />}
+      {icon && <Icon name={icon} size={13} color={ink} />}
       <Text maxFontSizeMultiplier={1.3} style={{ color: ink, fontSize: 12, fontWeight: '700' }}>{label}</Text>
     </View>
   );
@@ -275,7 +276,7 @@ export function SettingsRow({
       {right}
       {!!value && <Text style={{ color: theme.textSecondary, fontSize: 14, fontWeight: '600' }}>{value}</Text>}
       {badge}
-      {chevron && onPress && <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} style={styles.chevron} />}
+      {chevron && onPress && <Icon name="chevron-forward" size={18} color={theme.textTertiary} style={styles.chevron} />}
     </Pressable>
   );
 }
@@ -314,8 +315,8 @@ export function Tile({
       style={({ pressed }) => [styles.tile, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.8 }, style]}
     >
       <View style={styles.tileHead}>
-        <Ionicons name={icon} size={20} color={theme.primary} />
-        <Ionicons name="chevron-forward" size={15} color={theme.textTertiary} />
+        <Icon name={icon} size={20} color={theme.primary} />
+        <Icon name="chevron-forward" size={15} color={theme.textTertiary} />
       </View>
       <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14 }} numberOfLines={2}>
         {title}
@@ -389,7 +390,7 @@ export function ActionButton({
       accessibilityRole="button"
       style={({ pressed }) => [styles.action, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }, pressed && { opacity: 0.85 }, style]}
     >
-      {icon && <Ionicons name={icon} size={17} color={fg} />}
+      {icon && <Icon name={icon} size={17} color={fg} />}
       {/* Two lines before any clipping: an action label that ends in an ellipsis is not an action label. */}
       <Text maxFontSizeMultiplier={1.5} style={{ color: fg, fontWeight: '700', fontSize: 14, textAlign: 'center', flexShrink: 1 }} numberOfLines={2}>
         {label}
@@ -415,7 +416,7 @@ export function SearchField({
   const theme = useTheme();
   return (
     <View style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border }]}>
-      <Ionicons name="search" size={18} color={theme.textTertiary} />
+      <Icon name="search" size={18} color={theme.textTertiary} />
       <TextInput
         value={value}
         onChangeText={onChangeText}
@@ -428,7 +429,7 @@ export function SearchField({
       />
       {value.length > 0 && (
         <Pressable onPress={() => onChangeText('')} hitSlop={8} accessibilityRole="button" accessibilityLabel={clearLabel}>
-          <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
+          <Icon name="close-circle" size={18} color={theme.textTertiary} />
         </Pressable>
       )}
     </View>
@@ -530,7 +531,7 @@ export function DeltaRows({
       ))}
       {!!note && (
         <View style={[styles.deltaNote, { backgroundColor: theme.surfaceTint }]}>
-          <Ionicons name="information-circle-outline" size={15} color={theme.primaryDark} />
+          <Icon name="information-circle-outline" size={15} color={theme.primaryDark} />
           <Text style={{ color: theme.primaryDark, fontSize: 12, flex: 1 }}>{note}</Text>
         </View>
       )}
@@ -576,7 +577,7 @@ export function ChangeSummary({
       ))}
       {!!note && (
         <View style={[styles.deltaNote, { backgroundColor: theme.surfaceTint }]}>
-          <Ionicons name="information-circle-outline" size={15} color={theme.primaryDark} />
+          <Icon name="information-circle-outline" size={15} color={theme.primaryDark} />
           <Text style={{ color: theme.primaryDark, fontSize: 12, flex: 1 }}>{note}</Text>
         </View>
       )}
@@ -641,7 +642,7 @@ export function InfoLine({ icon = 'information-circle-outline', children }: { ic
   const theme = useTheme();
   return (
     <View style={styles.info}>
-      <Ionicons name={icon} size={15} color={theme.textTertiary} />
+      <Icon name={icon} size={15} color={theme.textTertiary} />
       <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1, lineHeight: 17 }}>{children}</Text>
     </View>
   );

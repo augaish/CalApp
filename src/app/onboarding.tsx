@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { DatePickerModal } from '@/components/date-picker';
 import { GoalScenarioCards } from '@/components/goal-scenario-cards';
@@ -122,7 +122,7 @@ export default function Onboarding() {
       <Screen scroll={false}>
         <View style={styles.welcomeCenter}>
           <View style={[styles.welcomeBadge, { backgroundColor: theme.cardSubtle }]}>
-            <Ionicons name="nutrition" size={44} color={theme.primary} />
+            <Icon name="nutrition" size={44} color={theme.primary} />
           </View>
           <Text style={[Type.display, { color: theme.text, fontSize: 34, textAlign: 'center' }]}>
             {t('onboarding.welcomeTitle')}

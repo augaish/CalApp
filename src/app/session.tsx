@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { PageHeader } from '@/components/brand-header';
 import { Stopwatch } from '@/components/stopwatch';
@@ -395,7 +395,7 @@ export default function SessionScreen() {
                     {r.done.length > 0 ? `${t('track.setsSummary', { count: r.done.length })} · ${t('session.sessionBest')} ${label(r.done[bestIdx])}` : t('session.notStarted')}
                   </Text>
                 </View>
-                <Ionicons name={r.done.length > 0 ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={r.done.length > 0 ? theme.successText : theme.textTertiary} />
+                <Icon name={r.done.length > 0 ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={r.done.length > 0 ? theme.successText : theme.textTertiary} />
               </View>
             );
           })}
@@ -456,7 +456,7 @@ export default function SessionScreen() {
             >
               <View style={[styles.stripNum, current ? { backgroundColor: 'rgba(255,255,255,0.25)' } : { backgroundColor: theme.surfaceTint }]}>
                 {complete && !current ? (
-                  <Ionicons name="checkmark" size={12} color={theme.successText} />
+                  <Icon name="checkmark" size={12} color={theme.successText} />
                 ) : (
                   <Text maxFontSizeMultiplier={1.2} style={{ color: current ? theme.onPrimary : theme.primaryDark, fontSize: 11, fontWeight: '800' }}>{i + 1}</Text>
                 )}
@@ -476,7 +476,7 @@ export default function SessionScreen() {
 
       {moved && now < moved.until && (
         <View style={[styles.movedBanner, { backgroundColor: theme.success + '22' }]} accessibilityLiveRegion="polite">
-          <Ionicons name="checkmark-circle" size={20} color={theme.successText} />
+          <Icon name="checkmark-circle" size={20} color={theme.successText} />
           <Text style={{ color: theme.text, flex: 1, fontWeight: '600' }} numberOfLines={2}>
             {t('session.movedOn', { from: moved.fromName, to: moved.toName })}
           </Text>
@@ -559,7 +559,7 @@ export default function SessionScreen() {
         {!continuous && (
           <View style={styles.lastTime}>
             <View style={styles.lastTimeHead}>
-              <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+              <Icon name="time-outline" size={14} color={theme.textSecondary} />
               <Text style={[Type.caption, { color: theme.textSecondary, flex: 1 }]}>
                 {lastSession ? `${t('session.lastTime')} · ${whenLabel(lastSession.at)}` : t('session.noLastTime')}
               </Text>
@@ -638,7 +638,7 @@ export default function SessionScreen() {
                 <View key={i} style={[styles.doneRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
                   <Text style={{ color: theme.textSecondary, width: 24, fontWeight: '700' }}>{i + 1}</Text>
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>{label(s)}</Text>
-                  {i === bestSetIndex(doneSets, type) && <Ionicons name="trophy" size={14} color={theme.carbs} />}
+                  {i === bestSetIndex(doneSets, type) && <Icon name="trophy" size={14} color={theme.carbs} />}
                   {i === doneSets.length - 1 && (
                     <Pressable onPress={undoLast} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('session.undoLast')}>
                       <Text style={{ color: theme.primary, fontWeight: '700' }}>{t('session.undo')}</Text>
@@ -653,7 +653,7 @@ export default function SessionScreen() {
         <Pressable onPress={() => setShowGuidance((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showGuidance }} style={[styles.guidanceHead, { borderColor: theme.border }]}>
           <IconTile icon="document-text-outline" size={32} />
           <Text style={{ color: theme.text, fontWeight: '700', flex: 1 }}>{t('session.formGuidance')}</Text>
-          <Ionicons name={showGuidance ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
+          <Icon name={showGuidance ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
         </Pressable>
         {showGuidance && ex && (
           <View style={styles.guidance}>
@@ -665,7 +665,7 @@ export default function SessionScreen() {
             <BodyMapViewSwitch view={mapView} onChange={(v) => setViewOverride({ key: exId ?? '', view: v })} />
             {ex.description ? <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19, alignSelf: 'stretch' }}>{ex.description}</Text> : null}
             <Pressable onPress={openVideo} style={styles.videoLink} accessibilityRole="link">
-              <Ionicons name="logo-youtube" size={18} color="#FF0000" />
+              <Icon name="logo-youtube" size={18} color="#FF0000" />
               <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('session.watchVideo')}</Text>
             </Pressable>
           </View>

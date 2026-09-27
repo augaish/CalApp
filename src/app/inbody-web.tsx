@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -110,7 +110,7 @@ export default function InBodyWeb() {
       <View style={[styles.topBar, { paddingTop: insets.top + Spacing.sm, backgroundColor: theme.card }]}>
         <Text style={[styles.title, { color: theme.text }]}>{t('inbodyWeb.title')}</Text>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
       <Text style={[styles.hint, { color: theme.textSecondary, backgroundColor: theme.card }]}>

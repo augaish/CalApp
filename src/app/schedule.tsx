@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,6 +14,7 @@ import {
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -106,11 +106,11 @@ export default function ScheduleScreen() {
       footer={<Button label={t('common.done')} onPress={() => router.back()} />}
     >
       <View style={styles.header}>
-        <Ionicons name="calendar" size={22} color={theme.text} />
+        <Icon name="calendar" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('schedule.title')}</Text>
         {/* Several weeks side by side — gym, home, travel. */}
         <Pressable accessibilityRole="button" accessibilityLabel={t('schedules.title')} onPress={() => router.push('/schedules')} hitSlop={8} style={{ padding: 4 }}>
-          <Ionicons name="bookmarks-outline" size={20} color={theme.text} />
+          <Icon name="bookmarks-outline" size={20} color={theme.text} />
         </Pressable>
         <Pressable accessibilityRole="button" accessibilityLabel={t('common.share')}
           onPress={sharePlan}
@@ -118,10 +118,10 @@ export default function ScheduleScreen() {
           hitSlop={10}
           style={{ marginEnd: Spacing.sm, opacity: sharing ? 0.4 : 1 }}
         >
-          <Ionicons name="share-outline" size={22} color={theme.primary} />
+          <Icon name="share-outline" size={22} color={theme.primary} />
         </Pressable>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
 
@@ -173,7 +173,7 @@ export default function ScheduleScreen() {
       </Text>
       {day.exerciseIds.length === 0 ? (
         <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="barbell-outline" size={28} color={theme.textTertiary} />
+          <Icon name="barbell-outline" size={28} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>{t('schedule.emptyDay')}</Text>
         </View>
       ) : (
@@ -208,7 +208,7 @@ export default function ScheduleScreen() {
                   }
                 >
                   <View style={[styles.rowIcon, { backgroundColor: theme.cardSubtle }]}>
-                    <Ionicons name="barbell" size={15} color={theme.primary} />
+                    <Icon name="barbell" size={15} color={theme.primary} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={{ color: theme.text, fontWeight: '600' }} numberOfLines={1}>
@@ -220,10 +220,10 @@ export default function ScheduleScreen() {
                         : t('schedule.addSets')}
                     </Text>
                   </View>
-                  <Ionicons name="create-outline" size={17} color={theme.textSecondary} />
+                  <Icon name="create-outline" size={17} color={theme.textSecondary} />
                 </Pressable>
                 <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')} onPress={() => removeFromSchedule(weekday, exId)} hitSlop={8} style={{ padding: 4 }}>
-                  <Ionicons name="close-circle" size={20} color={theme.textTertiary} />
+                  <Icon name="close-circle" size={20} color={theme.textTertiary} />
                 </Pressable>
               </View>
             );
@@ -251,7 +251,7 @@ export default function ScheduleScreen() {
                     pressed && { transform: [{ scale: 0.95 }] },
                   ]}
                 >
-                  <Ionicons name="add" size={15} color={theme.primary} />
+                  <Icon name="add" size={15} color={theme.primary} />
                   <Text style={{ color: theme.primary, fontSize: 13, fontWeight: '600' }} numberOfLines={1}>
                     {ex ? exerciseName(ex, lang) : h.name}
                   </Text>

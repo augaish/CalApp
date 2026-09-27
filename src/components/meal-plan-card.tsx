@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { weekdayLabel } from '@/components/schedule-plan-card';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -40,7 +40,7 @@ export function MealPlanCard({
       ]}
     >
       <View style={styles.header}>
-        <Ionicons name="restaurant" size={16} color={theme.primary} />
+        <Icon name="restaurant" size={16} color={theme.primary} />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }}>
           {t('program.weekGlance')}
         </Text>
@@ -68,7 +68,7 @@ export function MealPlanCard({
                   {weekdayLabel(weekday, locale)}
                 </Text>
                 <View style={styles.dayMeta}>
-                  <Ionicons
+                  <Icon
                     name={training ? 'barbell-outline' : 'bed-outline'}
                     size={12}
                     color={training ? theme.primary : theme.textTertiary}
@@ -84,7 +84,7 @@ export function MealPlanCard({
                   )}
                 </View>
               </View>
-              <Ionicons name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textTertiary} />
+              <Icon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={theme.textTertiary} />
             </Pressable>
             {!expanded && day && (
               <Text style={{ color: theme.textSecondary, fontSize: 12 }} numberOfLines={1}>

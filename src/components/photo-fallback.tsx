@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -76,7 +77,7 @@ export function PhotoFallback({
           onError={() => setFailed(true)}
         />
       ) : (
-        <Ionicons name={GLYPH[illustration]} size={Math.round(size * 0.42)} color={theme.primary} />
+        <Icon name={GLYPH[illustration]} size={Math.round(size * 0.42)} color={theme.primary} />
       )}
     </View>
   );

@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { RowGroup, SettingsRow } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
@@ -16,7 +17,7 @@ function GroupHead({ icon, color, title, subtitle }: { icon: keyof typeof Ionico
   const theme = useTheme();
   return (
     <View style={styles.groupHead} accessibilityRole="header">
-      <Ionicons name={icon} size={30} color={color} style={{ width: 36, textAlign: 'center' }} />
+      <Icon name={icon} size={30} color={color} style={{ width: 36, textAlign: 'center' }} />
       <View style={{ flex: 1 }}>
         <Text style={[Type.section, { color: theme.text, fontSize: 19 }]}>{title}</Text>
         <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{subtitle}</Text>
@@ -89,7 +90,7 @@ export default function AddMenu() {
             accessibilityLabel={t('common.close')}
             style={({ pressed }) => [styles.close, pressed && { opacity: 0.7 }]}
           >
-            <Ionicons name="close" size={26} color={theme.textSecondary} />
+            <Icon name="close" size={26} color={theme.textSecondary} />
           </Pressable>
         </View>
 
@@ -127,7 +128,7 @@ export default function AddMenu() {
           )}
 
           <View style={[styles.hint, { backgroundColor: theme.surfaceTint }]}>
-            <Ionicons name="bulb-outline" size={16} color={theme.primaryDark} />
+            <Icon name="bulb-outline" size={16} color={theme.primaryDark} />
             <Text style={{ color: theme.primaryDark, fontSize: 13, flex: 1 }}>
               {t('addMenu.foodPlanningHintLead')} <Text style={{ fontWeight: '800' }}>{t('tabs.food')}</Text>.
             </Text>

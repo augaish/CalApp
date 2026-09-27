@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { EmptyState, InfoLine, RowGroup, SettingsRow } from '@/components/system';
@@ -79,12 +80,12 @@ export default function CoachMemory() {
           {docs.map((doc) => (
             <View key={doc.id} style={[styles.docCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
               <View style={styles.docHeader}>
-                <Ionicons name="document-text-outline" size={18} color={theme.primary} />
+                <Icon name="document-text-outline" size={18} color={theme.primary} />
                 <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
                   {doc.name}
                 </Text>
                 <Pressable onPress={() => confirmRemove(doc.id, doc.name)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.delete')}>
-                  <Ionicons name="trash-outline" size={17} color={theme.textTertiary} />
+                  <Icon name="trash-outline" size={17} color={theme.textTertiary} />
                 </Pressable>
               </View>
               <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 19, marginTop: 6 }}>{doc.summary}</Text>

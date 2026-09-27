@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiError, FeatureLockedError, QuotaError, refineMeal } from '@/lib/api';
@@ -101,7 +101,7 @@ export function RefineBox({
           {loading ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
-            <Ionicons name="arrow-up-circle" size={30} color={canSend ? theme.primary : theme.textTertiary} />
+            <Icon name="arrow-up-circle" size={30} color={canSend ? theme.primary : theme.textTertiary} />
           )}
         </Pressable>
       </View>

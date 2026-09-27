@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { DayStrip, IconTile, InfoLine } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
@@ -117,7 +117,7 @@ export default function ScheduleActivate() {
                 <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{day.title || t('training.todaysWorkout')}</Text>
                 <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{summary(day)}</Text>
               </View>
-              <Ionicons name={on ? 'chevron-down' : 'chevron-forward'} size={18} color={theme.textTertiary} />
+              <Icon name={on ? 'chevron-down' : 'chevron-forward'} size={18} color={theme.textTertiary} />
             </Pressable>
           );
         })}
@@ -151,7 +151,7 @@ export default function ScheduleActivate() {
               <Text style={{ color: theme.textSecondary, fontSize: 11 }} numberOfLines={2}>{summary(before)}</Text>
             </View>
           </View>
-          <Ionicons name="arrow-forward" size={18} color={theme.textTertiary} />
+          <Icon name="arrow-forward" size={18} color={theme.textTertiary} />
           <View style={[styles.side, { backgroundColor: theme.surfaceTint, borderWidth: 1, borderColor: theme.primary }]}>
             <IconTile icon={scheduleIcon(target.name)} size={36} />
             <View style={{ flex: 1 }}>

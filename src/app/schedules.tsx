@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { ActionButton, EmptyState, IconTile, InfoLine, StatusPill } from '@/components/system';
@@ -162,7 +162,7 @@ export default function Schedules() {
                 <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{t('schedules.trainingDays', { count: size.trainingDays })}</Text>
               </View>
               {isActive && <StatusPill label={t('schedules.activeLabel')} tone="active" />}
-              <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+              <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
             </Pressable>
 
             <View style={styles.actions}>
@@ -179,16 +179,16 @@ export default function Schedules() {
             <View style={styles.tools}>
               {isActive && drifted && (
                 <Pressable onPress={() => { updateSavedSchedule(s.id); successHaptic(); }} accessibilityRole="button" hitSlop={6} style={styles.tool}>
-                  <Ionicons name="save-outline" size={15} color={theme.primary} />
+                  <Icon name="save-outline" size={15} color={theme.primary} />
                   <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('schedules.update')}</Text>
                 </Pressable>
               )}
               <View style={{ flex: 1 }} />
               <Pressable onPress={() => startRename(s.id)} accessibilityRole="button" accessibilityLabel={t('schedules.renameTitle')} hitSlop={8} style={styles.tool}>
-                <Ionicons name="pencil-outline" size={16} color={theme.textTertiary} />
+                <Icon name="pencil-outline" size={16} color={theme.textTertiary} />
               </Pressable>
               <Pressable onPress={() => confirmDelete(s.id)} accessibilityRole="button" accessibilityLabel={t('common.delete')} hitSlop={8} style={styles.tool}>
-                <Ionicons name="trash-outline" size={16} color={theme.textTertiary} />
+                <Icon name="trash-outline" size={16} color={theme.textTertiary} />
               </Pressable>
             </View>
           </View>

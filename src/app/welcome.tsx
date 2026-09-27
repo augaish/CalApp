@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { Button, StepDots } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -55,7 +55,7 @@ export default function Welcome() {
           end={{ x: 1, y: 1 }}
           style={styles.circle}
         >
-          <Ionicons name={slide.icon} size={68} color={theme.onGradient} />
+          <Icon name={slide.icon} size={68} color={theme.onGradient} />
         </LinearGradient>
 
         <Text style={[Type.title, styles.title, { color: theme.text }]}>

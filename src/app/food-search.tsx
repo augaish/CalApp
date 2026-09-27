@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { EmptyState, IconTile, InfoLine, SearchField, StatusPill } from '@/components/system';
@@ -84,7 +84,7 @@ export default function FoodSearch() {
             </Text>
           </View>
           {item.basePer100 && <StatusPill label={t('foodEdit.per100')} tone="neutral" />}
-          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+          <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
         </Pressable>
       ))}
 
@@ -114,7 +114,7 @@ export default function FoodSearch() {
               </Text>
             </View>
             {r.source === 'calgym' && <StatusPill label={t('recipes.calgymLabel')} tone="planned" />}
-            <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+            <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
           </Pressable>
         );
       })}

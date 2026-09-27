@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -6,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
+import { Icon } from '@/components/icon';
 import { RefineBox } from '@/components/refine-box';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -199,7 +199,7 @@ export default function MealResult() {
 
       {(!!analysis.notes || !!analysis.sources?.length || analysis.source === 'off') && (
         <View style={styles.infoRow}>
-          <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
+          <Icon name="information-circle-outline" size={14} color={theme.textTertiary} />
           <View style={{ flex: 1, gap: 2 }}>
             {!!analysis.notes && (
               <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
@@ -228,7 +228,7 @@ export default function MealResult() {
 
       {items.length === 0 && (
         <View style={[styles.emptyItems, { borderColor: theme.border }]}>
-          <Ionicons name="fast-food-outline" size={28} color={theme.textTertiary} />
+          <Icon name="fast-food-outline" size={28} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
             {t('mealResult.noItems')}
           </Text>
@@ -240,7 +240,7 @@ export default function MealResult() {
           key={index}
           renderRightActions={() => (
             <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')} onPress={() => removeItem(index)} style={styles.swipeDelete}>
-              <Ionicons name="trash" size={22} color="#fff" />
+              <Icon name="trash" size={22} color="#fff" />
               <Text style={styles.swipeDeleteText}>{t('common.delete')}</Text>
             </Pressable>
           )}
@@ -259,7 +259,7 @@ export default function MealResult() {
               hitSlop={8}
               style={({ pressed }) => [styles.itemDelete, pressed && { opacity: 0.5 }]}
             >
-              <Ionicons name="trash-outline" size={20} color={theme.danger} />
+              <Icon name="trash-outline" size={20} color={theme.danger} />
             </Pressable>
           </View>
           {item._base && (

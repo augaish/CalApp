@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -203,7 +203,7 @@ export default function RecipeEdit() {
 
       {error && (
         <View style={[styles.error, { backgroundColor: theme.cardSubtle, borderColor: theme.danger }]}>
-          <Ionicons name="alert-circle" size={16} color={theme.danger} />
+          <Icon name="alert-circle" size={16} color={theme.danger} />
           <Text style={{ color: theme.danger, flex: 1, fontSize: 13 }}>{error}</Text>
         </View>
       )}
@@ -240,7 +240,7 @@ export default function RecipeEdit() {
               accessibilityRole="button"
               accessibilityLabel={t('recipeEdit.removeIngredient')}
             >
-              <Ionicons name="close-circle" size={22} color={theme.textTertiary} />
+              <Icon name="close-circle" size={22} color={theme.textTertiary} />
             </Pressable>
           </View>
           <View style={styles.rowLine}>
@@ -315,7 +315,7 @@ export default function RecipeEdit() {
             accessibilityRole="button"
             accessibilityLabel={t('recipeEdit.removeStep')}
           >
-            <Ionicons name="close-circle" size={22} color={theme.textTertiary} />
+            <Icon name="close-circle" size={22} color={theme.textTertiary} />
           </Pressable>
         </View>
       ))}

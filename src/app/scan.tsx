@@ -1,4 +1,3 @@
-import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Path } from 'react-native-svg';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { PhotoProgress } from '@/components/photo-progress';
 import { Button } from '@/components/ui';
@@ -322,7 +322,7 @@ export default function Scan() {
                   hitSlop={8}
                 >
                   <View style={styles.galleryIcon}>
-                    <Ionicons name="images" size={24} color="#fff" />
+                    <Icon name="images" size={24} color="#fff" />
                   </View>
                   <Text style={styles.galleryText}>{t('scan.gallery')}</Text>
                 </Pressable>
@@ -335,7 +335,7 @@ export default function Scan() {
             )}
             {isBarcode && (
               <Pressable accessibilityRole="button" onPress={() => router.replace('/scan?mode=meal')} style={styles.galleryBtn}>
-                <Ionicons name="camera-outline" size={26} color="#fff" />
+                <Icon name="camera-outline" size={26} color="#fff" />
                 <Text style={styles.galleryText}>{t('barcode.usePhoto')}</Text>
               </Pressable>
             )}

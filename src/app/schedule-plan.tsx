@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Button, Card, Screen, Stepper, Subtitle, Title } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -84,7 +84,7 @@ export default function SchedulePlan() {
           <Title>{exerciseName(exercise, lang)}</Title>
         </View>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
       <Subtitle>{t('schedulePlan.hint')}</Subtitle>
@@ -117,7 +117,7 @@ export default function SchedulePlan() {
       </Text>
       {sets.length === 0 ? (
         <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="list-outline" size={28} color={theme.textTertiary} />
+          <Icon name="list-outline" size={28} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
             {t('schedulePlan.emptyHint')}
           </Text>
@@ -139,7 +139,7 @@ export default function SchedulePlan() {
                 {setLabel(s, type, kg)}
               </Text>
               <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')} onPress={() => removeAt(i)} hitSlop={8} style={{ padding: 4 }}>
-                <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                <Icon name="trash-outline" size={18} color={theme.textTertiary} />
               </Pressable>
             </View>
           ))}

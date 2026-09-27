@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { Icon } from '@/components/icon';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { selectionHaptic } from '@/lib/feedback';
@@ -123,7 +124,7 @@ export function Title({ children, close }: { children: React.ReactNode; close?: 
         accessibilityLabel={tr('common.close')}
         style={({ pressed }) => [{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginTop: -6 }, pressed && { opacity: 0.6 }]}
       >
-        <Ionicons name="close" size={26} color={t.textSecondary} />
+        <Icon name="close" size={26} color={t.textSecondary} />
       </Pressable>
     </View>
   );
@@ -191,7 +192,7 @@ export function Button({
         <ActivityIndicator color={fg} />
       ) : (
         <View style={styles.buttonInner}>
-          {icon ? <Ionicons name={icon} size={20} color={fg} /> : null}
+          {icon ? <Icon name={icon} size={20} color={fg} /> : null}
           <Text maxFontSizeMultiplier={1.5} style={{ color: fg, fontSize: 17, fontWeight: '700' }}>{label}</Text>
         </View>
       )}
@@ -406,7 +407,7 @@ export function Stepper({
             pressed && { transform: [{ scale: 0.94 }] },
           ]}
         >
-          <Ionicons name="remove" size={22} color={t.primary} />
+          <Icon name="remove" size={22} color={t.primary} />
         </Pressable>
         <View style={styles.stepperValueWrap}>
           <TextInput
@@ -444,7 +445,7 @@ export function Stepper({
             pressed && { transform: [{ scale: 0.94 }] },
           ]}
         >
-          <Ionicons name="add" size={22} color={t.primary} />
+          <Icon name="add" size={22} color={t.primary} />
         </Pressable>
       </View>
     </View>
@@ -517,7 +518,7 @@ export function MetricRow({
       <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1 }}>{label}</Text>
       <Text style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>{value}</Text>
       {delta != null && Math.abs(delta) > 0.01 && (
-        <Ionicons name={delta > 0 ? 'caret-up' : 'caret-down'} size={11} color={color} style={{ marginStart: 3 }} />
+        <Icon name={delta > 0 ? 'caret-up' : 'caret-down'} size={11} color={color} style={{ marginStart: 3 }} />
       )}
     </View>
   );

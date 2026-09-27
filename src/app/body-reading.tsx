@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { DatePickerModal } from '@/components/date-picker';
@@ -436,9 +436,9 @@ export default function BodyReading() {
           accessibilityLabel={`${t('bodyReading.date')}: ${dateLabel}`}
           style={({ pressed }) => [styles.dateRow, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
         >
-          <Ionicons name="calendar-outline" size={18} color={theme.primary} />
+          <Icon name="calendar-outline" size={18} color={theme.primary} />
           <Text style={{ color: theme.text, fontWeight: '600', fontSize: 16, flex: 1 }}>{dateLabel}</Text>
-          <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+          <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
         </Pressable>
         <DatePickerModal
           visible={showDatePicker}
@@ -476,7 +476,7 @@ export default function BodyReading() {
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>{t('bodyReading.source')}</Text>
         <View style={[styles.sourceRow, { backgroundColor: theme.surfaceTint }]}>
-          <Ionicons name={source === 'scan' ? 'scan-outline' : 'pencil-outline'} size={16} color={theme.primary} />
+          <Icon name={source === 'scan' ? 'scan-outline' : 'pencil-outline'} size={16} color={theme.primary} />
           <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
             {source === 'scan' ? (deviceLabel ? t('health.sourceScanNamed', { device: deviceLabel }) : t('health.sourceScan')) : t('health.sourceManual')}
           </Text>
@@ -493,7 +493,7 @@ export default function BodyReading() {
       >
         <IconTile icon="document-text-outline" />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, flex: 1 }}>{t('bodyReading.notes')}</Text>
-        <Ionicons name={showNotes ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
+        <Icon name={showNotes ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
       </Pressable>
       {showNotes && (
         <View style={[styles.card, { backgroundColor: theme.card, marginTop: -Spacing.sm }, cardShadow(theme.shadow)]}>
@@ -518,7 +518,7 @@ export default function BodyReading() {
       >
         <IconTile icon={showMore ? 'remove' : 'add'} />
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 16, flex: 1 }}>{showMore ? t('bodyReading.fewer') : t('bodyReading.addMore')}</Text>
-        <Ionicons name={showMore ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.textTertiary} />
+        <Icon name={showMore ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.textTertiary} />
       </Pressable>
       {showMore && (
         <View style={[styles.card, { backgroundColor: theme.card, marginTop: -Spacing.sm }, cardShadow(theme.shadow)]}>
@@ -542,7 +542,7 @@ export default function BodyReading() {
             />
           ))}
           <Pressable onPress={() => setShowSegmental((v) => !v)} style={styles.subToggle} accessibilityRole="button" accessibilityState={{ expanded: showSegmental }}>
-            <Ionicons name={showSegmental ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
+            <Icon name={showSegmental ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
             <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>{t('bodyReading.segmental')}</Text>
           </Pressable>
           {showSegmental &&
@@ -558,7 +558,7 @@ export default function BodyReading() {
               />
             ))}
           <Pressable onPress={() => setShowSegmentalFat((v) => !v)} style={styles.subToggle} accessibilityRole="button" accessibilityState={{ expanded: showSegmentalFat }}>
-            <Ionicons name={showSegmentalFat ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
+            <Icon name={showSegmentalFat ? 'chevron-down' : 'chevron-forward'} size={16} color={theme.textSecondary} />
             <Text style={{ color: theme.textSecondary, fontWeight: '600', fontSize: 13 }}>{t('bodyReading.segmentalFat')}</Text>
           </Pressable>
           {showSegmentalFat &&
@@ -606,7 +606,7 @@ function UploadProgress({ stage, error }: { stage: 'picking' | 'analyzing' | 'do
   if (stage === 'error') {
     return (
       <View style={[styles.uploadProgress, { backgroundColor: theme.surfaceTint, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }]}>
-        <Ionicons name="alert-circle" size={16} color={theme.errorText} />
+        <Icon name="alert-circle" size={16} color={theme.errorText} />
         <Text style={{ color: theme.errorText, fontSize: 12, flex: 1 }}>{error}</Text>
       </View>
     );

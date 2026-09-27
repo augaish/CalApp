@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -77,7 +77,7 @@ export default function MealImport() {
       >
         <Title close>{t('mealImport.title')}</Title>
         <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="alert-circle-outline" size={32} color={theme.textTertiary} />
+          <Icon name="alert-circle-outline" size={32} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
             {t('mealImport.invalid')}
           </Text>
@@ -114,7 +114,7 @@ export default function MealImport() {
           )}
           {meal.items.map((item, i) => (
             <View key={i} style={styles.itemRow}>
-              <Ionicons name="restaurant-outline" size={15} color={theme.primary} />
+              <Icon name="restaurant-outline" size={15} color={theme.primary} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.text }} numberOfLines={1}>
                   {item.name}

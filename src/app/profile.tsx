@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { RowGroup, SettingsRow, StatusPill } from '@/components/system';
 import { Screen } from '@/components/ui';
@@ -109,7 +109,7 @@ export default function Profile() {
         style={({ pressed }) => [styles.account, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.8 }]}
       >
         <View style={[styles.avatar, { backgroundColor: theme.surfaceTint }]}>
-          <Ionicons name="person" size={34} color={theme.primary} />
+          <Icon name="person" size={34} color={theme.primary} />
         </View>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
@@ -122,7 +122,7 @@ export default function Profile() {
             {account?.email ?? t('profile.onThisDevice')}
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={theme.textTertiary} />
+        <Icon name="chevron-forward" size={20} color={theme.textTertiary} />
       </Pressable>
 
       {isGuest && (

@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { EmptyState } from '@/components/system';
@@ -91,7 +91,7 @@ export default function WorkoutHistory() {
                     {t('training.exerciseCount', { count: g.items.length })} · {dayBurn} {t('common.kcal')}
                   </Text>
                 </View>
-                <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
+                <Icon name={open ? 'chevron-up' : 'chevron-down'} size={18} color={theme.textTertiary} />
               </Pressable>
               {open &&
                 g.items.map((w) => {
@@ -103,7 +103,7 @@ export default function WorkoutHistory() {
                     <View key={w.id} style={[styles.workoutRow, { borderTopColor: theme.border }]}>
                       <Pressable onPress={() => router.push(`/exercise-detail?id=${encodeURIComponent(w.exerciseId)}&tab=history`)} accessibilityRole="button" style={({ pressed }) => [styles.workoutTap, pressed && { opacity: 0.6 }]}>
                         <View style={[styles.workoutIcon, { backgroundColor: accent + '22' }]}>
-                          <Ionicons name={ex ? exerciseIcon(ex) : 'barbell-outline'} size={16} color={accent} />
+                          <Icon name={ex ? exerciseIcon(ex) : 'barbell-outline'} size={16} color={accent} />
                         </View>
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: theme.text, fontWeight: '700' }} numberOfLines={1}>
@@ -113,7 +113,7 @@ export default function WorkoutHistory() {
                         </View>
                         {!!wCalories && (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                            {wFromWhoop && <Ionicons name="watch-outline" size={11} color={theme.carbs} />}
+                            {wFromWhoop && <Icon name="watch-outline" size={11} color={theme.carbs} />}
                             <Text style={{ color: theme.carbs, fontWeight: '700', fontSize: 12 }}>
                               {wCalories} {t('common.kcal')}
                             </Text>
@@ -121,14 +121,14 @@ export default function WorkoutHistory() {
                         )}
                       </Pressable>
                       <Pressable onPress={() => confirmDeleteWorkout(w.id)} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('common.delete')} style={{ padding: 4 }}>
-                        <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
+                        <Icon name="trash-outline" size={18} color={theme.textTertiary} />
                       </Pressable>
                     </View>
                   );
                 })}
               {open && (
                 <Pressable onPress={() => copyDay(g.date)} accessibilityRole="button" style={({ pressed }) => [styles.copyDayBtn, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.6 }]}>
-                  <Ionicons name="copy-outline" size={16} color={theme.primary} />
+                  <Icon name="copy-outline" size={16} color={theme.primary} />
                   <Text style={{ color: theme.primaryDark, fontWeight: '700', fontSize: 14 }}>
                     {selectedIsToday ? t('training.duplicateToToday') : t('training.duplicateTo', { day: selected.toLocaleDateString(lang, { day: 'numeric', month: 'short' }) })}
                   </Text>

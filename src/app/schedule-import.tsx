@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -97,7 +97,7 @@ export default function ScheduleImport() {
       <Screen footer={<Button label={t('common.close')} onPress={() => router.replace('/(tabs)/training')} />}>
         <Title close>{t('scheduleImport.title')}</Title>
         <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="alert-circle-outline" size={32} color={theme.textTertiary} />
+          <Icon name="alert-circle-outline" size={32} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>
             {t('scheduleImport.invalid')}
           </Text>
@@ -126,7 +126,7 @@ export default function ScheduleImport() {
       </Subtitle>
 
       <View style={[styles.warn, { backgroundColor: theme.cardSubtle }]}>
-        <Ionicons name="information-circle-outline" size={16} color={theme.primary} />
+        <Icon name="information-circle-outline" size={16} color={theme.primary} />
         <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1 }}>
           {t('scheduleImport.replaceNote')}
         </Text>
@@ -142,7 +142,7 @@ export default function ScheduleImport() {
           </Text>
           {day.names.map((name, i) => (
             <View key={i} style={styles.exRow}>
-              <Ionicons name="barbell-outline" size={15} color={theme.primary} />
+              <Icon name="barbell-outline" size={15} color={theme.primary} />
               <Text style={{ color: theme.text, flex: 1 }} numberOfLines={1}>
                 {name}
               </Text>

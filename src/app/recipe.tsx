@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
@@ -143,7 +144,7 @@ export default function RecipeScreen() {
           backLabel={t('recipes.title')}
           right={
             <Pressable onPress={toggleFavorite} hitSlop={8} accessibilityRole="button" accessibilityLabel={t(recipe.favorite ? 'recipes.unfavorite' : 'recipes.favorite')} accessibilityState={{ selected: !!recipe.favorite }} style={styles.heart}>
-              <Ionicons name={recipe.favorite ? 'heart' : 'heart-outline'} size={24} color={theme.onGradient} />
+              <Icon name={recipe.favorite ? 'heart' : 'heart-outline'} size={24} color={theme.onGradient} />
             </Pressable>
           }
         />
@@ -216,11 +217,11 @@ export default function RecipeScreen() {
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16, flex: 1 }}>{t('recipe.cookingFor')}</Text>
         <View style={[styles.stepper, { direction: 'ltr' }]}>
           <Pressable testID="cooking-for-minus" onPress={() => setCookingFor((n) => Math.max(1, n - 1))} accessibilityRole="button" accessibilityLabel="−" style={[styles.stepBtn, { backgroundColor: theme.surfaceTint }]} hitSlop={6}>
-            <Ionicons name="remove" size={18} color={theme.primary} />
+            <Icon name="remove" size={18} color={theme.primary} />
           </Pressable>
           <Text style={{ color: theme.text, fontWeight: '800', fontSize: 18, minWidth: 32, textAlign: 'center' }}>{cookingFor}</Text>
           <Pressable testID="cooking-for-plus" onPress={() => setCookingFor((n) => Math.min(24, n + 1))} accessibilityRole="button" accessibilityLabel="+" style={[styles.stepBtn, { backgroundColor: theme.surfaceTint }]} hitSlop={6}>
-            <Ionicons name="add" size={18} color={theme.primary} />
+            <Icon name="add" size={18} color={theme.primary} />
           </Pressable>
         </View>
         <Text style={{ color: theme.textSecondary, fontSize: 14, fontWeight: '600' }}>{t('recipe.servingUnit', { count: cookingFor })}</Text>
@@ -285,7 +286,7 @@ export default function RecipeScreen() {
                   accessibilityLabel={`${t('recipe.edit')} · ${ing.name}`}
                   style={styles.amountTap}
                 >
-                  <Ionicons name="pencil-outline" size={16} color={theme.textTertiary} />
+                  <Icon name="pencil-outline" size={16} color={theme.textTertiary} />
                 </Pressable>
               )}
             </View>
@@ -294,7 +295,7 @@ export default function RecipeScreen() {
         {ingredients.length > COLLAPSED_INGREDIENTS + 1 && (
           <Pressable onPress={() => setShowAll((v) => !v)} accessibilityRole="button" style={[styles.viewAll, { borderTopColor: theme.border }]}>
             <Text style={{ color: theme.primary, fontWeight: '700', flex: 1 }}>{showAll ? t('recipe.showFewer') : t('recipe.viewAll', { n: ingredients.length })}</Text>
-            <Ionicons name={showAll ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.primary} />
+            <Icon name={showAll ? 'chevron-up' : 'chevron-forward'} size={18} color={theme.primary} />
           </Pressable>
         )}
       </View>
@@ -312,7 +313,7 @@ export default function RecipeScreen() {
           </View>
         ))}
         <Pressable onPress={() => router.push(`/recipe-edit?id=${encodeURIComponent(recipe.id)}`)} accessibilityRole="button" style={styles.editLink}>
-          <Ionicons name="pencil-outline" size={16} color={theme.primary} />
+          <Icon name="pencil-outline" size={16} color={theme.primary} />
           <Text style={{ color: theme.primary, fontWeight: '700', textDecorationLine: 'underline' }}>{t('recipe.edit')}</Text>
         </Pressable>
       </View>

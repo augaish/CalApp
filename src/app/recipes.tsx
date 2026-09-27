@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { BrandHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
@@ -245,7 +245,7 @@ export default function Recipes() {
               accessibilityState={{ selected: !!r.favorite }}
               style={styles.heart}
             >
-              <Ionicons name={r.favorite ? 'heart' : 'heart-outline'} size={24} color={r.favorite ? theme.primary : theme.textTertiary} />
+              <Icon name={r.favorite ? 'heart' : 'heart-outline'} size={24} color={r.favorite ? theme.primary : theme.textTertiary} />
             </Pressable>
           </Pressable>
         );

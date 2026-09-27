@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { DeltaRows } from '@/components/system';
@@ -147,7 +147,7 @@ export default function EditTargets() {
           },
         ]}
       >
-        <Ionicons
+        <Icon
           name={mismatch ? 'alert-circle-outline' : 'checkmark-circle-outline'}
           size={16}
           color={mismatch ? theme.fat : theme.textTertiary}
@@ -173,7 +173,7 @@ export default function EditTargets() {
       />
 
       <View style={styles.hintRow}>
-        <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
+        <Icon name="information-circle-outline" size={14} color={theme.textTertiary} />
         <Text style={{ color: theme.textTertiary, fontSize: 12, flex: 1 }}>{t('editTargets.hint')}</Text>
       </View>
     </Screen>

@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -205,7 +205,7 @@ export default function EditPortion() {
         )}
         <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{macroLine(next)}</Text>
         <View style={styles.note}>
-          <Ionicons name="information-circle-outline" size={14} color={theme.textTertiary} />
+          <Icon name="information-circle-outline" size={14} color={theme.textTertiary} />
           <Text style={{ color: theme.textTertiary, fontSize: 12, flex: 1 }}>
             {t('editPortion.scopeNote')}
           </Text>

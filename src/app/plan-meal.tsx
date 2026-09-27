@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { weekdayLabel } from '@/components/schedule-plan-card';
@@ -177,12 +177,12 @@ export default function PlanMeal() {
           </View>
           {currentRecipe && (
             <Pressable onPress={() => router.push(`/recipe?id=${encodeURIComponent(currentRecipe.id)}`)} hitSlop={8} accessibilityRole="button" accessibilityLabel={currentRecipe.name}>
-              <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
+              <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
             </Pressable>
           )}
         </View>
         <View style={{ alignItems: 'center', marginVertical: 4 }}>
-          <Ionicons name="arrow-down" size={18} color={theme.primary} />
+          <Icon name="arrow-down" size={18} color={theme.primary} />
         </View>
         {/* After */}
         <Text style={{ color: theme.text, fontWeight: '700', marginBottom: 6 }}>

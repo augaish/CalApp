@@ -7,6 +7,8 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { GlassBacking } from '@/components/glass';
+import { Icon } from '@/components/icon';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -97,9 +99,10 @@ export function BrandRow({
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={t('common.back')}
-          style={({ pressed }) => [styles.brandBack, { width: size, height: size, borderRadius: size / 2, backgroundColor: BACKING }, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [styles.brandBack, { width: size, height: size, borderRadius: size / 2 }, pressed && { opacity: 0.7 }]}
         >
-          <Ionicons name="chevron-back" size={compact ? 18 : 22} color={theme.onGradient} />
+          <GlassBacking radius={size / 2} fallbackColor={BACKING} />
+          <Icon name="chevron-back" size={compact ? 18 : 22} color={theme.onGradient} />
         </Pressable>
       )}
       {showLogo && !onBack && (
@@ -121,9 +124,10 @@ export function BrandRow({
             onPress={() => router.push('/coach')}
             accessibilityRole="button"
             accessibilityLabel={t('tabs.ai')}
-            style={({ pressed }) => [styles.pill, { backgroundColor: BACKING, minHeight: size }, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [styles.pill, { minHeight: size }, pressed && { opacity: 0.8 }]}
           >
-            <Ionicons name="sparkles" size={15} color={theme.onGradient} />
+            <GlassBacking radius={size / 2} fallbackColor={BACKING} />
+            <Icon name="sparkles" size={15} color={theme.onGradient} />
             <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]}>{t('tabs.ai')}</Text>
           </Pressable>
         </View>
@@ -134,9 +138,10 @@ export function BrandRow({
         onPress={() => router.push('/profile')}
         accessibilityRole="button"
         accessibilityLabel={t('profile.title')}
-        style={({ pressed }) => [styles.avatar, { backgroundColor: BACKING, width: size, height: size, borderRadius: size / 2 }, pressed && { opacity: 0.8 }]}
+        style={({ pressed }) => [styles.avatar, { width: size, height: size, borderRadius: size / 2 }, pressed && { opacity: 0.8 }]}
       >
-        <Ionicons name="person" size={compact ? 16 : 18} color={theme.onGradient} />
+        <GlassBacking radius={size / 2} fallbackColor={BACKING} />
+        <Icon name="person" size={compact ? 16 : 18} color={theme.onGradient} />
       </Pressable>
     </View>
   );
@@ -163,13 +168,14 @@ export function HeaderPill({
       disabled={!onPress}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={accessibilityLabel ?? label}
-      style={({ pressed }) => [styles.pill, { backgroundColor: BACKING }, pressed && { opacity: 0.8 }]}
+      style={({ pressed }) => [styles.pill, pressed && { opacity: 0.8 }]}
     >
-      <Ionicons name={icon} size={15} color={theme.onGradient} />
+      <GlassBacking radius={18} fallbackColor={BACKING} />
+      <Icon name={icon} size={15} color={theme.onGradient} />
       <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]} numberOfLines={1}>
         {label}
       </Text>
-      {trailing && <Ionicons name={trailing} size={13} color={theme.onGradient} />}
+      {trailing && <Icon name={trailing} size={13} color={theme.onGradient} />}
     </Pressable>
   );
 }
@@ -215,7 +221,7 @@ export function PageHeader({
           accessibilityLabel={backLabel ?? (close ? t('common.close') : t('common.back'))}
           style={({ pressed }) => [styles.back, pressed && { opacity: 0.7 }]}
         >
-          <Ionicons name={close ? 'close' : 'chevron-back'} size={24} color={ink} />
+          <Icon name={close ? 'close' : 'chevron-back'} size={24} color={ink} />
           {!close && (
             <Text maxFontSizeMultiplier={1.3} style={{ color: ink, fontSize: 15, fontWeight: '600' }}>{backLabel ?? t('common.back')}</Text>
           )}

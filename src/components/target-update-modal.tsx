@@ -1,7 +1,7 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -60,7 +60,7 @@ export function TargetUpdateModal({
                 {current.calories} {t('common.kcal')}
               </Text>
             </View>
-            <Ionicons name="arrow-forward" size={18} color={theme.textTertiary} />
+            <Icon name="arrow-forward" size={18} color={theme.textTertiary} />
             <View style={styles.compareCell}>
               <Text style={[styles.compareLabel, { color: theme.textTertiary }]}>
                 {t('targetUpdate.recalculated')}

@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { ChangeSummary, Chip, IconTile, InfoLine } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
@@ -162,7 +162,7 @@ export default function Reschedule() {
           <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flex: 1 }}>{long(moving.originalDate)}</Text>
         </View>
         <View style={{ alignItems: 'center', marginVertical: 4 }}>
-          <Ionicons name="arrow-down" size={18} color={theme.primary} />
+          <Icon name="arrow-down" size={18} color={theme.primary} />
         </View>
         <Text style={{ color: theme.text, fontWeight: '700', marginBottom: 6 }}>
           {t('planMeal.after')} <Text style={{ color: theme.textSecondary, fontWeight: '500' }}>{t('reschedule.newDate')}</Text>
@@ -193,7 +193,7 @@ export default function Reschedule() {
       {collision && (
         <View style={[styles.card, { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.warningText }, cardShadow(theme.shadow)]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <Ionicons name="alert-circle-outline" size={20} color={theme.warningText} />
+            <Icon name="alert-circle-outline" size={20} color={theme.warningText} />
             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16, flex: 1 }}>{t('reschedule.collisionTitle', { date: long(to), name: collisionName })}</Text>
           </View>
           <Text style={{ color: theme.textSecondary, fontSize: 14, marginTop: 4, marginBottom: Spacing.sm }}>{t('reschedule.collisionBody')}</Text>

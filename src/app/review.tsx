@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { DayStrip, IconTile } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
@@ -186,7 +187,7 @@ export default function Review() {
 
       {suggestions.map((s, i) => (
         <View key={`${s.kind}-${i}`} style={[styles.hint, { backgroundColor: theme.surfaceTint }]}>
-          <Ionicons name={s.kind === 'onTrack' ? 'checkmark-circle' : 'bulb'} size={22} color={theme.primary} />
+          <Icon name={s.kind === 'onTrack' ? 'checkmark-circle' : 'bulb'} size={22} color={theme.primary} />
           <Text style={{ color: theme.primaryDark, fontSize: 15, lineHeight: 21, flex: 1 }}>{t(`review.suggest.${s.kind}`, s.values ?? {})}</Text>
         </View>
       ))}

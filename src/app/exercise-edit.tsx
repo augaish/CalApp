@@ -1,10 +1,10 @@
-import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { Button, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -137,7 +137,7 @@ export default function ExerciseEdit() {
         <Pressable accessibilityRole="button" onPress={() => router.push('/scan?mode=photo')}>
           <Image source={{ uri: photo }} style={styles.photo} contentFit="cover" />
           <View style={[styles.photoEdit, { backgroundColor: theme.card }]}>
-            <Ionicons name="camera" size={16} color={theme.primary} />
+            <Icon name="camera" size={16} color={theme.primary} />
           </View>
         </Pressable>
       ) : (
@@ -254,7 +254,7 @@ export default function ExerciseEdit() {
         />
         {isUrl(video) && (
           <Pressable accessibilityRole="link" onPress={() => Linking.openURL(video.trim())} style={styles.watchRow}>
-            <Ionicons name="logo-youtube" size={18} color={theme.danger} />
+            <Icon name="logo-youtube" size={18} color={theme.danger} />
             <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
               {t('gymResult.watchVideo')}
             </Text>

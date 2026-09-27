@@ -1,9 +1,9 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, type BodyMapView } from '@/components/body-map';
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -113,16 +113,16 @@ export default function ExerciseLibrary() {
       }
     >
       <View style={styles.header}>
-        <Ionicons name="barbell" size={22} color={theme.text} />
+        <Icon name="barbell" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('exercises.title')}</Text>
         <Pressable onPress={() => router.back()} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.close')}>
-          <Ionicons name="close" size={24} color={theme.textSecondary} />
+          <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
 
       {/* Search */}
       <View style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border }, cardShadow(theme.shadow)]}>
-        <Ionicons name="search" size={18} color={theme.textTertiary} />
+        <Icon name="search" size={18} color={theme.textTertiary} />
         <TextInput
           value={query}
           onChangeText={setQuery}
@@ -132,7 +132,7 @@ export default function ExerciseLibrary() {
         />
         {query.length > 0 && (
           <Pressable accessibilityRole="button" accessibilityLabel={t('common.clear')} onPress={() => setQuery('')} hitSlop={8}>
-            <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
+            <Icon name="close-circle" size={18} color={theme.textTertiary} />
           </Pressable>
         )}
       </View>
@@ -151,7 +151,7 @@ export default function ExerciseLibrary() {
                   { backgroundColor: active ? theme.primary : theme.card, borderColor: active ? theme.primary : theme.border },
                 ]}
               >
-                <Ionicons
+                <Icon
                   name={mode === 'chips' ? 'list-outline' : 'body-outline'}
                   size={14}
                   color={active ? theme.onPrimary : theme.textSecondary}
@@ -242,7 +242,7 @@ export default function ExerciseLibrary() {
 
       {grouped.length === 0 ? (
         <View style={[styles.empty, { borderColor: theme.border }]}>
-          <Ionicons name="search" size={30} color={theme.textTertiary} />
+          <Icon name="search" size={30} color={theme.textTertiary} />
           <Text style={{ color: theme.textSecondary, textAlign: 'center' }}>{t('exercises.noResults')}</Text>
         </View>
       ) : (
@@ -264,19 +264,19 @@ export default function ExerciseLibrary() {
                   ]}
                 >
                   <View style={[styles.rowIcon, { backgroundColor: MUSCLE_COLORS[ex.category] + '22' }]}>
-                    <Ionicons name={exerciseIcon(ex)} size={16} color={MUSCLE_COLORS[ex.category]} />
+                    <Icon name={exerciseIcon(ex)} size={16} color={MUSCLE_COLORS[ex.category]} />
                   </View>
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
                     {exerciseName(ex, lang)}
                   </Text>
                   {pickForSchedule ? (
-                    <Ionicons
+                    <Icon
                       name={picked.includes(ex.id) ? 'checkmark-circle' : 'add-circle-outline'}
                       size={22}
                       color={picked.includes(ex.id) ? theme.primary : theme.textTertiary}
                     />
                   ) : (
-                    <Ionicons name="chevron-forward" size={16} color={theme.textTertiary} />
+                    <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
                   )}
                 </Pressable>
               ))}
