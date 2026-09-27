@@ -365,6 +365,17 @@ export async function initDb(): Promise<void> {
       PRIMARY KEY (day, kind)
     )
   `);
+  // Account deletion asked for from the public web page (the in-app button
+  // deletes at once); the admin completes these by hand.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS deletion_requests (
+      id         BIGSERIAL PRIMARY KEY,
+      email      TEXT NOT NULL,
+      note       TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      done_at    TIMESTAMPTZ
+    )
+  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_days (
       day DATE NOT NULL,
@@ -1010,11 +1021,37 @@ export async function recordTokens(
  * counter, and any id aliases pointing at them. Required by the app stores'
  * account-deletion rules.
  */
+/**
+ * Erase a person from the server. Everything that is theirs is deleted: the
+ * account row, usage, daily activity, a WHOOP connection and its tokens, code
+ * redemptions and shadow-test logs — for this ref and every device id that
+ * was linked to it. Money records the business must keep (store events,
+ * partner earnings) and shared catalogue entries stay, but lose any link to
+ * the person.
+ */
 export async function deleteUser(ref: string): Promise<void> {
   if (!pool) return;
-  await pool.query('DELETE FROM usage_counters WHERE ref = $1', [ref]);
-  await pool.query('DELETE FROM app_users WHERE ref = $1', [ref]);
-  await pool.query('DELETE FROM ref_links WHERE from_ref = $1 OR to_ref = $1', [ref]);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const linked = await client.query('SELECT from_ref FROM ref_links WHERE to_ref = $1', [ref]);
+    const refs = [ref, ...linked.rows.map((r) => r.from_ref as string)];
+    for (const table of ['usage_counters', 'user_days', 'whoop_connections', 'whoop_oauth_state', 'promo_redemptions', 'deepseek_shadow_log']) {
+      await client.query(`DELETE FROM ${table} WHERE ref = ANY($1)`, [refs]);
+    }
+    await client.query(`UPDATE billing_events SET ref = NULL WHERE ref = ANY($1)`, [refs]);
+    await client.query(`UPDATE partner_earnings SET ref = 'deleted' WHERE ref = ANY($1)`, [refs]);
+    await client.query(`UPDATE barcode_submissions SET ref = NULL WHERE ref = ANY($1)`, [refs]);
+    await client.query(`UPDATE barcode_cache SET contributed_by = NULL WHERE contributed_by = ANY($1)`, [refs]);
+    await client.query('DELETE FROM app_users WHERE ref = ANY($1)', [refs]);
+    await client.query('DELETE FROM ref_links WHERE from_ref = ANY($1) OR to_ref = ANY($1)', [refs]);
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
   aliasCache.clear();
 }
 
@@ -2219,4 +2256,55 @@ export async function adminOverview(days: number): Promise<AdminOverview | null>
     },
     billingEventsEver: Number(a.billing_ever ?? 0),
   };
+}
+
+// ── Account deletion requests (from the public page) ──────────────────────
+
+export async function addDeletionRequest(email: string, note: string | null): Promise<boolean> {
+  if (!pool) return false;
+  // The same address asking again while a request is open adds nothing.
+  await pool.query(
+    `INSERT INTO deletion_requests (email, note)
+     SELECT $1, $2 WHERE NOT EXISTS (SELECT 1 FROM deletion_requests WHERE lower(email) = lower($1) AND done_at IS NULL)`,
+    [email, note],
+  );
+  return true;
+}
+
+export interface DeletionRequest {
+  id: number;
+  email: string;
+  note: string | null;
+  createdAt: string;
+  doneAt: string | null;
+  /** Accounts on the server with that address, so the admin can delete the right one. */
+  refs: string[];
+}
+
+export async function listDeletionRequests(): Promise<DeletionRequest[]> {
+  if (!pool) return [];
+  const res = await pool.query(
+    `SELECT d.*, COALESCE((SELECT array_agg(u.ref) FROM app_users u WHERE lower(u.email) = lower(d.email)), '{}') AS refs
+       FROM deletion_requests d ORDER BY (d.done_at IS NULL) DESC, d.created_at DESC LIMIT 200`,
+  );
+  return res.rows.map((r) => ({
+    id: Number(r.id),
+    email: r.email,
+    note: r.note ?? null,
+    createdAt: new Date(r.created_at).toISOString(),
+    doneAt: r.done_at ? new Date(r.done_at).toISOString() : null,
+    refs: (r.refs as string[]) ?? [],
+  }));
+}
+
+export async function markDeletionRequestDone(id: number): Promise<boolean> {
+  if (!pool) return false;
+  const res = await pool.query(`UPDATE deletion_requests SET done_at = now() WHERE id = $1 AND done_at IS NULL`, [id]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+export async function openDeletionRequests(): Promise<number> {
+  if (!pool) return 0;
+  const res = await pool.query(`SELECT COUNT(*)::int AS n FROM deletion_requests WHERE done_at IS NULL`);
+  return Number(res.rows[0]?.n ?? 0);
 }

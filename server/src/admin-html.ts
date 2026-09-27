@@ -129,7 +129,7 @@ export const ADMIN_HTML = `<!doctype html>
 
     <nav class="tabs" role="tablist" aria-label="Sections">
       <button class="tab" role="tab" id="t-overview" aria-controls="p-overview" data-tab="overview">Overview</button>
-      <button class="tab" role="tab" id="t-users" aria-controls="p-users" data-tab="users">Users</button>
+      <button class="tab" role="tab" id="t-users" aria-controls="p-users" data-tab="users">Users <span class="badge hide" id="b-users"></span></button>
       <button class="tab" role="tab" id="t-membership" aria-controls="p-membership" data-tab="membership">Membership</button>
       <button class="tab" role="tab" id="t-codes" aria-controls="p-codes" data-tab="codes">Codes &amp; partners</button>
       <button class="tab" role="tab" id="t-ai" aria-controls="p-ai" data-tab="ai">AI <span class="badge hide" id="b-ai"></span></button>
@@ -188,6 +188,11 @@ export const ADMIN_HTML = `<!doctype html>
     </section>
 
     <section class="panel" role="tabpanel" id="p-users" aria-labelledby="t-users" hidden>
+    <div class="card" id="delreq">
+      <h2>Account deletion requests</h2>
+      <details class="how"><summary>How this works</summary><div>People who ask to delete their account from the public page (<code>/account-deletion</code>) — Google Play requires one. In the app, deletion is immediate and never shows up here. Delete the matching account(s) and close the request within 30 days, then confirm to the person by email.</div></details>
+      <div id="dr_rows"><div class="empty">Loading…</div></div>
+    </div>
     <div class="card">
       <h2>Users</h2>
       <div class="row" style="margin:6px 0 10px"><div><label for="u_search">Find a user</label><input id="u_search" type="search" placeholder="Email, ref, device or note" oninput="renderUsers()" /></div><div class="sub" id="u_count" style="flex:0 0 auto;padding-bottom:10px"></div></div>
@@ -504,6 +509,53 @@ export const ADMIN_HTML = `<!doctype html>
 
     renderUsers();
     loadOverview();
+    loadDeletionRequests();
+  }
+  function loadDeletionRequests() {
+    fetch('/admin/api/deletion-requests', { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { renderDeletionRequests(d.requests || []); })
+      .catch(function () {});
+  }
+  function renderDeletionRequests(rows) {
+    var host = document.getElementById('dr_rows');
+    if (!rows.length) { host.innerHTML = '<div class="empty">No requests.</div>'; return; }
+    host.innerHTML = '';
+    var scroll = document.createElement('div');
+    scroll.className = 'scroll';
+    var table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Email</th><th>Note</th><th>Asked</th><th>Accounts found</th><th></th></tr></thead>';
+    var body = document.createElement('tbody');
+    rows.forEach(function (r) {
+      var tr = document.createElement('tr');
+      // Text nodes only: every field here was typed by a member of the public.
+      [r.email, r.note || '—', new Date(r.createdAt).toLocaleDateString(), r.refs.length ? r.refs.join(', ') : 'none with this email'].forEach(function (v, i) {
+        var td = document.createElement('td');
+        td.textContent = String(v);
+        if (i > 0) td.className = 'muted';
+        tr.appendChild(td);
+      });
+      var act = document.createElement('td');
+      if (r.doneAt) {
+        act.innerHTML = '<span class="pill pro">done ' + esc(new Date(r.doneAt).toLocaleDateString()) + '</span>';
+      } else {
+        var del = document.createElement('button');
+        del.textContent = r.refs.length ? 'Delete ' + r.refs.length + ' account' + (r.refs.length === 1 ? '' : 's') + ' & close' : 'Close';
+        del.addEventListener('click', function () {
+          if (r.refs.length && !confirm('Permanently delete the account(s) and sign-in for ' + r.email + '? This cannot be undone.')) return;
+          api('/admin/api/deletion-request-done', { id: r.id, deleteRefs: r.refs }).then(function (res) {
+            if (res.account === 'not_configured') alert('Records deleted. The sign-in account was not: set SUPABASE_SERVICE_ROLE_KEY on the server, or delete ' + r.email + ' in Supabase → Authentication.');
+            loadDeletionRequests(); loadOverview();
+          }).catch(function () { alert('Could not delete the sign-in account; the request is still open — try again.'); });
+        });
+        act.appendChild(del);
+      }
+      tr.appendChild(act);
+      body.appendChild(tr);
+    });
+    table.appendChild(body);
+    scroll.appendChild(table);
+    host.appendChild(scroll);
   }
   function renderUsers() {
     var q = (document.getElementById('u_search').value || '').trim().toLowerCase();
@@ -1363,6 +1415,7 @@ export const ADMIN_HTML = `<!doctype html>
     if (att.aiFailures24h) items.push(['bad', '!', att.aiFailures24h + ' AI failure' + (att.aiFailures24h === 1 ? '' : 's') + ' in the last 24 hours', 'AI', 'ai']);
     if (att.partnersOwedUsd > 0) items.push(['todo', '$', '$' + att.partnersOwedUsd.toFixed(2) + ' owed to partners', 'Codes & partners', 'codes']);
     var todo = d.checklist.filter(function (c) { return !c.done; }).length;
+    if (att.deletionRequests) items.push(['bad', '!', att.deletionRequests + ' account deletion request' + (att.deletionRequests === 1 ? '' : 's') + ' waiting', 'Users', 'users']);
     if (todo) items.push(['todo', todo, todo + ' launch step' + (todo === 1 ? '' : 's') + ' left', null, null]);
     document.getElementById('ov_attention').innerHTML = items.length ? items.map(function (it) {
       return '<li><span class="dot ' + it[0] + '" aria-hidden="true">' + it[1] + '</span><div class="grow">' + esc(it[2]) +
@@ -1370,6 +1423,7 @@ export const ADMIN_HTML = `<!doctype html>
     }).join('') : '<li><span class="dot ok" aria-hidden="true">✓</span><div class="grow">Nothing needs you right now.</div></li>';
     setBadge('b-content', att.queue);
     setBadge('b-ai', att.aiFailures24h);
+    setBadge('b-users', att.deletionRequests || 0);
     // Launch checklist
     var done = d.checklist.length - todo;
     document.getElementById('ov_check_sum').textContent = done + ' of ' + d.checklist.length + ' done';

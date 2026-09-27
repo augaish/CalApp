@@ -4,7 +4,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
-import { PRIVACY_HTML, TERMS_HTML } from './legal-html.js';
+import { PRIVACY_HTML, SUPPORT_HTML, TERMS_HTML, accountDeletionHtml } from './legal-html.js';
 import {
   actionWeights,
   aiProviders,
@@ -71,6 +71,10 @@ import {
   recordPromoConversion,
   recordPartnerEarnings,
   adminOverview,
+  addDeletionRequest,
+  listDeletionRequests,
+  markDeletionRequestDone,
+  openDeletionRequests,
   listPartners,
   savePartner,
   deletePartner,
@@ -124,6 +128,7 @@ import {
 import { estimateCostUsd } from './pricing.js';
 import { decide, planFromSubscriber, type RevenueCatEvent, type SubscriberRecord } from './revenuecat.js';
 import { cleanEarning, cleanPartner } from './partners.js';
+import { deleteAuthUser, deleteAuthUserByEmail, supabaseAdminConfigured } from './supabase-admin.js';
 import { partnerNotFoundHtml, partnerPageHtml } from './partner-html.js';
 import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining } from './promo.js';
 import {
@@ -1980,9 +1985,18 @@ app.post('/api/identify', async (c) => {
 app.delete('/api/me', async (c) => {
   const ref = await callerRef(c);
   if (!ref) return c.json({ error: 'invalid_request' }, 400);
+  // A signed-in person also sends their sign-in token, so the account itself
+  // can be deleted and not only the records attached to it.
+  const bearer = (c.req.header('authorization') ?? '').match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
   try {
+    const account = await deleteAuthUser(bearer);
+    if (account === 'not_configured') console.error('account deletion: SUPABASE_SERVICE_ROLE_KEY is not set; the sign-in account was left in place');
+    if (account === 'failed' || account === 'invalid_token') {
+      // Leave the records in place too, so the person can simply try again.
+      return c.json({ error: 'account_delete_failed', account }, 502);
+    }
     await deleteUser(ref);
-    return c.json({ ok: true });
+    return c.json({ ok: true, account });
   } catch (err) {
     console.error('delete account failed:', err);
     return c.json({ error: 'delete_failed' }, 500);
@@ -1991,6 +2005,28 @@ app.delete('/api/me', async (c) => {
 
 app.get('/privacy', (c) => c.html(PRIVACY_HTML));
 app.get('/terms', (c) => c.html(TERMS_HTML));
+app.get('/support', (c) => c.html(SUPPORT_HTML));
+
+// Account deletion without the app (Google Play requires a web page for it).
+// Requests are few and human-reviewed; a small per-address cap keeps a
+// script from filling the table.
+const deletionHits = new Map<string, { n: number; since: number }>();
+app.get('/account-deletion', (c) => c.html(accountDeletionHtml()));
+app.post('/account-deletion', async (c) => {
+  const form = await c.req.parseBody().catch(() => ({}) as Record<string, unknown>);
+  const email = String(form.email ?? '').trim().slice(0, 200);
+  const note = String(form.note ?? '').trim().slice(0, 500) || null;
+  // A filled hidden field is a bot; answer as if it worked.
+  if (String(form.website ?? '')) return c.html(accountDeletionHtml('sent'));
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return c.html(accountDeletionHtml('invalid', email), 400);
+  const ip = c.req.header('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  const now = Date.now();
+  const hit = deletionHits.get(ip);
+  if (hit && now - hit.since < 3600_000 && hit.n >= 5) return c.html(accountDeletionHtml('sent'));
+  deletionHits.set(ip, hit && now - hit.since < 3600_000 ? { n: hit.n + 1, since: hit.since } : { n: 1, since: now });
+  await addDeletionRequest(email, note);
+  return c.html(accountDeletionHtml('sent'));
+});
 
 // ── WHOOP ─────────────────────────────────────────────────────────────────
 // Connecting a wearable (see the growth playbook's wearable-sync entry).
@@ -2518,7 +2554,7 @@ app.post('/admin/api/promo-delete', async (c) => {
 app.get('/admin/api/overview', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const days = Number(c.req.query('days') ?? 30);
-  const [overview, partners] = await Promise.all([adminOverview(Number.isFinite(days) ? days : 30), listPartners()]);
+  const [overview, partners, deletions] = await Promise.all([adminOverview(Number.isFinite(days) ? days : 30), listPartners(), openDeletionRequests()]);
   if (!overview) return c.json({ error: 'no_database' }, 503);
   const set = (k: string) => !!process.env[k];
   const checklist = [
@@ -2530,10 +2566,32 @@ app.get('/admin/api/overview', async (c) => {
     { id: 'rc_secret', done: set('REVENUECAT_SECRET_KEY'), label: 'RevenueCat secret key (server only)', how: 'RevenueCat → API keys → secret key (v1) → REVENUECAT_SECRET_KEY. Never put it in the app.' },
     { id: 'rc_webhook', done: set('REVENUECAT_WEBHOOK_SECRET'), label: 'RevenueCat webhook secret', how: 'RevenueCat → Integrations → Webhooks → URL /api/billing/revenuecat, authorization header = REVENUECAT_WEBHOOK_SECRET.' },
     { id: 'rc_first_event', done: overview.billingEventsEver > 0, label: 'First store event received', how: 'Make a sandbox purchase on TestFlight; it appears under Recent store events.' },
+    { id: 'account_delete', done: supabaseAdminConfigured(), label: 'Account deletion removes the sign-in account', how: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (Supabase → Project settings → API) on Railway. Required by both stores.' },
     { id: 'support_email', done: set('SUPPORT_EMAIL'), label: 'Support email for the legal pages', how: 'Set SUPPORT_EMAIL on Railway (otherwise the pages show a personal address).' },
   ];
   const owed = Math.round(partners.reduce((sum, p) => sum + p.balance.owed, 0) * 100) / 100;
-  return c.json({ ...overview, attention: { ...overview.attention, partnersOwedUsd: owed }, checklist });
+  return c.json({ ...overview, attention: { ...overview.attention, partnersOwedUsd: owed, deletionRequests: deletions }, checklist });
+});
+
+/** Deletion requests from the public page, open ones first. */
+app.get('/admin/api/deletion-requests', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ requests: await listDeletionRequests() });
+});
+
+/** Delete the account(s) behind a request and close it. */
+app.post('/admin/api/deletion-request-done', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ id?: number; deleteRefs?: string[] }>().catch(() => ({}) as never);
+  const refs = Array.isArray(body.deleteRefs) ? body.deleteRefs.filter((r) => typeof r === 'string' && r).slice(0, 10) : [];
+  const request = (await listDeletionRequests()).find((r) => r.id === Number(body.id));
+  if (!request) return c.json({ error: 'not_found' }, 404);
+  // The sign-in account first: if that fails the request stays open to retry.
+  const account = await deleteAuthUserByEmail(request.email);
+  if (account === 'failed') return c.json({ error: 'account_delete_failed' }, 502);
+  for (const ref of refs) await deleteUser(ref);
+  await markDeletionRequestDone(request.id);
+  return c.json({ ok: true, deleted: refs.length, account });
 });
 
 // ── Partners ──────────────────────────────────────────────────────────────
