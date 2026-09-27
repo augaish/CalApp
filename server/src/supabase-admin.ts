@@ -13,6 +13,15 @@
 
 export type AuthDeletion = 'deleted' | 'not_signed_in' | 'not_configured' | 'invalid_token' | 'failed';
 
+/**
+ * Headers for the admin calls. A new-style secret key (sb_secret_…) is not a
+ * JWT and goes only in `apikey`; a legacy service_role key (a JWT) also goes
+ * in Authorization, as Supabase expects for those.
+ */
+export function adminHeaders(key: string): Record<string, string> {
+  return key.startsWith('sb_') ? { apikey: key } : { apikey: key, Authorization: `Bearer ${key}` };
+}
+
 export function supabaseAdminConfigured(): boolean {
   return !!process.env.SUPABASE_URL && !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
@@ -27,7 +36,7 @@ export async function deleteAuthUser(accessToken: string | null, fetchImpl: type
     if (!me.ok) return 'invalid_token';
     const id = ((await me.json()) as { id?: string })?.id;
     if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return 'invalid_token';
-    const admin = { apikey: key, Authorization: `Bearer ${key}` };
+    const admin = adminHeaders(key);
     await fetchImpl(`${url}/rest/v1/user_data?user_id=eq.${id}`, { method: 'DELETE', headers: admin }).catch(() => null);
     const del = await fetchImpl(`${url}/auth/v1/admin/users/${id}`, { method: 'DELETE', headers: admin });
     return del.ok || del.status === 404 ? 'deleted' : 'failed';
@@ -45,7 +54,7 @@ export async function deleteAuthUserByEmail(email: string, fetchImpl: typeof fet
   const url = (process.env.SUPABASE_URL ?? '').replace(/\/+$/, '');
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
   if (!url || !key) return 'not_configured';
-  const admin = { apikey: key, Authorization: `Bearer ${key}` };
+  const admin = adminHeaders(key);
   const want = email.trim().toLowerCase();
   try {
     for (let page = 1; page <= 50; page++) {

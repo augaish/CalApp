@@ -55,6 +55,16 @@ calls.length = 0;
 check('a good token deletes the backup and the account', (await deleteAuthUser('good', fake(true))) === 'deleted' &&
   calls.includes('DELETE /rest/v1/user_data?user_id=eq.11111111-2222-3333-4444-555555555555') &&
   calls.includes('DELETE /auth/v1/admin/users/11111111-2222-3333-4444-555555555555'), calls.join(' | '));
+const seen: Record<string, string>[] = [];
+const spy = (async (url: string, init?: RequestInit) => { seen.push({ ...(init?.headers as Record<string, string>), url }); return fake(true)(url, init); }) as typeof fetch;
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'sb_secret_abc';
+await deleteAuthUser('good', spy);
+const adminCall = seen.find((h) => h.url.includes('/admin/users/'))!;
+check('a new-style secret key goes only in apikey, never as a Bearer token', adminCall.apikey === 'sb_secret_abc' && !adminCall.Authorization, JSON.stringify(adminCall));
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'eyJlegacy';
+seen.length = 0;
+await deleteAuthUser('good', spy);
+check('a legacy service_role key also goes in Authorization', seen.find((h) => h.url.includes('/admin/users/'))!.Authorization === 'Bearer eyJlegacy');
 check('a store-side failure is reported, not hidden', (await deleteAuthUser('good', fake(true, 500))) === 'failed');
 
 await db.end();
