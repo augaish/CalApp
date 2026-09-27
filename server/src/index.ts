@@ -69,6 +69,17 @@ import {
   listRedemptions,
   clearPromo,
   recordPromoConversion,
+  recordPartnerEarnings,
+  listPartners,
+  savePartner,
+  deletePartner,
+  rotatePartnerToken,
+  addPayout,
+  partnerReport,
+  getPartnerByToken,
+  setCodeEarning,
+  codeHasEarnings,
+  codeEarningTotals,
 } from './db.js';
 import {
   citationDomains,
@@ -111,6 +122,8 @@ import {
 } from './deepseek.js';
 import { estimateCostUsd } from './pricing.js';
 import { decide, planFromSubscriber, type RevenueCatEvent, type SubscriberRecord } from './revenuecat.js';
+import { cleanEarning, cleanPartner } from './partners.js';
+import { partnerNotFoundHtml, partnerPageHtml } from './partner-html.js';
 import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining } from './promo.js';
 import {
   bodyReadingPrompt,
@@ -1866,6 +1879,14 @@ app.post('/api/billing/revenuecat', async (c) => {
       return c.json({ ok: true, result: 'duplicate' });
     }
 
+    // Partner earnings follow the money rather than the plan, so they are
+    // settled before `decide`, which ignores refunds and out-of-order events.
+    // A failure here is logged and never blocks the plan change below.
+    if (event.app_user_id) {
+      const payer = await resolveRef(event.app_user_id);
+      await recordPartnerEarnings(payer, event).catch((err) => console.error('partner earnings failed:', err));
+    }
+
     const action = decide(event);
     if (action.kind === 'ignore') return c.json({ ok: true, result: 'ignored', reason: action.reason });
 
@@ -2453,9 +2474,9 @@ app.post('/admin/api/limits', async (c) => {
 /** Every code with its counters, newest first. */
 app.get('/admin/api/promos', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const rows = await listPromos();
+  const [rows, totals] = await Promise.all([listPromos(), codeEarningTotals()]);
   return c.json({
-    promos: rows.map((r) => ({ ...r, remaining: remaining(r), problem: codeProblem(r) })),
+    promos: rows.map((r) => ({ ...r, remaining: remaining(r), problem: codeProblem(r), earned: totals[r.code] ?? null })),
   });
 });
 
@@ -2465,8 +2486,15 @@ app.post('/admin/api/promo', async (c) => {
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as never);
   const clean = cleanDraft({ ...body, code: String(body.code ?? '') });
   if (!clean.ok) return c.json({ error: clean.error }, 400);
+  // Who earns from it: checked against the codes that exist, for the link.
+  const all = await listPromos(1000);
+  const byCode = new Map(all.map((p) => [p.code, { partnerId: p.earning?.partnerId ?? null, parentCode: p.earning?.parentCode ?? null }]));
+  const earning = cleanEarning(clean.value.code, body, (code) => byCode.get(code) ?? null);
+  if (!earning.ok) return c.json({ error: earning.error }, 400);
   const saved = await upsertPromo(clean.value);
   if (!saved) return c.json({ error: 'unavailable' }, 503);
+  await setCodeEarning(saved.code, earning.value);
+  saved.earning = earning.value;
   return c.json({ ok: true, promo: { ...saved, remaining: remaining(saved), problem: codeProblem(saved) } });
 });
 
@@ -2474,8 +2502,76 @@ app.post('/admin/api/promo', async (c) => {
 app.post('/admin/api/promo-delete', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json<{ code?: string }>().catch(() => ({}) as never);
-  const gone = await deletePromo(normalizeCode(String(body.code ?? '')));
+  const code = normalizeCode(String(body.code ?? ''));
+  // A code that has earned anyone money is part of their history: turn it off instead.
+  if (await codeHasEarnings(code)) return c.json({ ok: false, error: 'has_earnings' }, 409);
+  const gone = await deletePromo(code);
   return c.json({ ok: gone });
+});
+
+// ── Partners ──────────────────────────────────────────────────────────────
+
+/** Every partner with their codes, sales and money. */
+app.get('/admin/api/partners', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({ partners: await listPartners() });
+});
+
+/** Create a partner (no id) or edit one. */
+app.post('/admin/api/partner', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as never);
+  const clean = cleanPartner(body);
+  if (!clean.ok) return c.json({ error: clean.error }, 400);
+  const id = typeof body.id === 'string' && body.id ? body.id : null;
+  const saved = await savePartner(id, clean.value);
+  if (!saved) return c.json({ error: id ? 'not_found' : 'unavailable' }, id ? 404 : 503);
+  return c.json({ ok: true, partner: saved });
+});
+
+app.post('/admin/api/partner-delete', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ id?: string }>().catch(() => ({}) as never);
+  const out = await deletePartner(String(body.id ?? ''));
+  return out === 'deleted' ? c.json({ ok: true }) : c.json({ ok: false, error: out }, out === 'has_earnings' ? 409 : 404);
+});
+
+/** A fresh private link for a partner; the old one stops working. */
+app.post('/admin/api/partner-token', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ id?: string }>().catch(() => ({}) as never);
+  const saved = await rotatePartnerToken(String(body.id ?? ''));
+  return saved ? c.json({ ok: true, partner: saved }) : c.json({ error: 'not_found' }, 404);
+});
+
+/** Record money paid to a partner (outside the app). */
+app.post('/admin/api/partner-payout', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ id?: string; amountUsd?: unknown; note?: unknown }>().catch(() => ({}) as never);
+  const amount = Math.round(Number(body.amountUsd) * 100) / 100;
+  if (!Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) return c.json({ error: 'amount_out_of_range' }, 400);
+  const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 200) : null;
+  const ok = await addPayout(String(body.id ?? ''), amount, note);
+  return ok ? c.json({ ok: true }) : c.json({ error: 'not_found' }, 404);
+});
+
+/** One partner in full — the same figures their private page shows. */
+app.get('/admin/api/partner-report', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const report = await partnerReport(c.req.query('id') ?? '');
+  return report ? c.json(report) : c.json({ error: 'not_found' }, 404);
+});
+
+/** A partner's own read-only page, reached by the secret link the admin shares. */
+app.get('/partner/:token', async (c) => {
+  c.header('X-Robots-Tag', 'noindex, nofollow');
+  c.header('Cache-Control', 'no-store');
+  c.header('Referrer-Policy', 'no-referrer');
+  const partner = await getPartnerByToken(c.req.param('token'));
+  if (!partner) return c.html(partnerNotFoundHtml(), 404);
+  const report = await partnerReport(partner.id);
+  if (!report) return c.html(partnerNotFoundHtml(), 404);
+  return c.html(partnerPageHtml(report));
 });
 
 /** Who used a code, and when. */

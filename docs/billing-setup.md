@@ -67,3 +67,25 @@ account (Paid Apps agreement on Apple, a merchant profile on Google).
   100 people, then 30%), give the first code a use limit or an end date and
   create the next code.
 - Links: `calapp://redeem?code=RAMADAN50` opens the app with the code filled in.
+
+## Partners and commissions (admin console → Partners)
+
+A **partner** is someone who shares your codes and earns from the sales they bring in.
+
+1. **Add the partner** in the Partners card (name, contact, notes such as bank details).
+2. **Give them a code** in the Promotion codes form:
+   - *Owner* — the partner.
+   - *Owner's share %* — their cut of each payment made through the code.
+   - *Paid on* — every payment, the first payment only, or payments for N months (counted from the buyer's first payment).
+   - *Buyer discount* — as before: a free-access code, or a percent code backed by an App Store offer code / Play offer. A code with no discount can still earn: it just tags the buyer.
+3. **Link partners who brought other partners.** When X brought Z, set Z's code *Linked to* X's code and give X a share. When Z then brings W, link W's code to Z's: Z earns a share of W's sales, and a *two levels up* share goes to X. It never reaches further than two levels.
+
+**How a sale is credited.** A buyer belongs to the first partner code they use (typed in the app's Redeem screen, or as an offer code in the App Store / Play checkout). Every payment RevenueCat reports for that buyer is split: the owner's share, the parent's share and the grandparent's share, each a percentage of what the payment actually brings in — the store price less the store's commission and tax, in US dollars. The term set on the buyer's code decides which payments count. Webhook retries never double-count, and a refund reverses exactly what that payment earned.
+
+**Paying partners.** Earnings stay *pending* for 30 days (the refund window); after that they are *owed*. Pay partners however you like (bank transfer, etc.) and record each payment with *Record payout*. The app never sends money.
+
+**Their own page.** *Copy link* gives each partner a private, read-only page with their codes, payments, earnings, payouts and what is owed. Buyers are never identified on it. *New link* replaces the link if it is shared too widely.
+
+**Testing.** Sandbox (TestFlight) purchases pay nobody. To test the commission flow with sandbox purchases, set `PARTNER_COUNT_SANDBOX=1` on the server, and remove it afterwards.
+
+**Before you launch it:** put the terms (shares, how long they last, when you pay, refunds) in a written agreement with each partner, and check how partner payments are taxed where you and they are.

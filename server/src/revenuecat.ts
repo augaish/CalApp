@@ -37,6 +37,15 @@ export interface RevenueCatEvent {
   /** The offer code the purchase was made with (App Store offer codes, Play promo codes). */
   offer_code?: string | null;
   period_type?: string | null;
+  /** Money: USD price (negative on a refund) and the store's and tax's shares of it. */
+  price?: number | null;
+  commission_percentage?: number | null;
+  tax_percentage?: number | null;
+  takehome_percentage?: number | null;
+  cancel_reason?: string | null;
+  transaction_id?: string | null;
+  original_transaction_id?: string | null;
+  purchased_at_ms?: number | null;
 }
 
 export type BillingAction =

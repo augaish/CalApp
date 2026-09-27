@@ -126,6 +126,28 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
     </div>
 
+    <div class="card" id="partners">
+      <b>Partners</b>
+      <div class="sub" style="margin:4px 0 10px">People and businesses who share your codes. Give a partner one or more codes below (each code sets its own discount for the buyer and share for the partner), and link a partner's code to the code of whoever brought them in — up to two levels up. Earnings are counted on what each payment brings in after the store's fee and tax, in US dollars. The last 30 days stay <i>pending</i> (the store refund window); <i>Owed</i> is what has cleared, less what you have recorded as paid. Payouts happen outside the app — record them here. Each partner has a private read-only link to their own figures.</div>
+      <div class="row">
+        <div><label>Name</label><input id="pt_name" placeholder="e.g. Sara (FitLife gym)" /></div>
+        <div><label>Contact</label><input id="pt_contact" placeholder="phone or email" /></div>
+        <div><label>Note</label><input id="pt_note" placeholder="bank details, agreement…" /></div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label style="margin:0"><input id="pt_active" type="checkbox" checked style="width:auto" /> Active</label>
+        <button onclick="savePartner()">Save partner</button>
+        <button class="ghost" onclick="clearPartnerForm()">Clear form</button>
+      </div>
+      <div id="pt_msg" class="sub hide" style="margin-top:8px"></div>
+      <div class="scroll" style="margin-top:12px">
+        <table>
+          <thead><tr><th>Partner</th><th>Codes</th><th>Payments</th><th>Earned</th><th>Pending</th><th>Paid</th><th>Owed</th><th></th></tr></thead>
+          <tbody id="pt_rows"></tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="card" id="codes">
       <b>Promotion codes</b>
       <div class="sub" style="margin:4px 0 10px"><b>Free access</b> gives a tier for a number of days at no charge — handled entirely here, no store setup. <b>Percent off</b> is a real discount on a paid subscription, so the store has to know about it: create an offer code in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code) and/or a developer-determined offer on the Google Play base plan, then put those ids below. The store then charges the discounted price, in the person's currency, with VAT. <i>Used</i> counts redemptions in the app; <i>Paid</i> counts purchases matched back to them. To step a discount down (e.g. 50% for the first 100, then 30%), give the first code a use limit or end date and create the next one.</div>
@@ -146,6 +168,18 @@ export const ADMIN_HTML = `<!doctype html>
         <div><label>Ends (optional)</label><input id="pc_end" type="datetime-local" /></div>
         <div><label>Note</label><input id="pc_note" placeholder="e.g. gym partnership" /></div>
       </div>
+      <div class="sub" style="margin:14px 0 0"><b>Earnings</b> — who is paid from this code's sales. Leave the owner empty for a code that pays nobody.</div>
+      <div class="row">
+        <div><label>Owner (partner)</label><select id="pc_partner"><option value="">— nobody —</option></select></div>
+        <div><label>Owner's share %</label><input id="pc_comm" type="number" min="0" max="100" step="0.5" placeholder="e.g. 20" /></div>
+        <div><label>Paid on</label><select id="pc_term" onchange="pcTerm()"><option value="lifetime">every payment</option><option value="first">first payment only</option><option value="months">payments for N months</option></select></div>
+        <div class="pc-months hide"><label>Months</label><input id="pc_months" type="number" min="1" max="120" value="12" /></div>
+      </div>
+      <div class="row">
+        <div><label>Linked to (who brought the owner)</label><select id="pc_parent" onchange="pcParent()"><option value="">— not linked —</option></select></div>
+        <div class="pc-link hide"><label>Their share %</label><input id="pc_ppct" type="number" min="0" max="100" step="0.5" placeholder="e.g. 5" /></div>
+        <div class="pc-grand hide"><label id="pc_glabel">Share % two levels up</label><input id="pc_gpct" type="number" min="0" max="100" step="0.5" placeholder="e.g. 2" /></div>
+      </div>
       <div class="row" style="margin-top:10px">
         <label style="margin:0"><input id="pc_active" type="checkbox" checked style="width:auto" /> Active</label>
         <button onclick="savePromo()">Save code</button>
@@ -154,7 +188,7 @@ export const ADMIN_HTML = `<!doctype html>
       <div id="pc_msg" class="sub hide" style="margin-top:8px"></div>
       <div class="scroll" style="margin-top:12px">
         <table>
-          <thead><tr><th>Code</th><th>Gives</th><th>Used</th><th>Left</th><th>Paid</th><th>Window</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Code</th><th>Gives</th><th>Earns</th><th>Used</th><th>Left</th><th>Paid</th><th>Window</th><th>Status</th><th></th></tr></thead>
           <tbody id="pc_rows"></tbody>
         </table>
       </div>
@@ -312,7 +346,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('lim_proplus').value = data.limits.proPlus;
     loadQueue();
     loadAiFailures();
-    loadPromos();
+    loadPartners();
     var W = data.weights || {};
     WEIGHT_KINDS.forEach(function (k) {
       var el = document.getElementById('w_' + k);
@@ -730,6 +764,13 @@ export const ADMIN_HTML = `<!doctype html>
     bad_starts_at: 'The start date is not a date.',
     bad_expires_at: 'The end date is not a date.',
     expires_before_starts: 'The end is before the start.',
+    months_out_of_range: 'Months must be between 1 and 120.',
+    link_to_itself: 'A code cannot be linked to itself.',
+    link_loop: 'That link would loop back to this code.',
+    parent_not_found: 'The linked code does not exist.',
+    parent_has_no_partner: 'The linked code has no owner to pay — give it a partner first.',
+    shares_over_100: 'The shares add up to more than 100%.',
+    has_earnings: 'This code has earned partners money, so it is kept for their history. Turn it off instead.',
   };
   var PC_PROBLEMS = { inactive: 'off', not_started: 'not started', expired: 'ended', exhausted: 'used up' };
   var promos = [];
@@ -758,7 +799,14 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('pc_plan').value = 'pro';
     document.getElementById('pc_active').checked = true;
     document.getElementById('pc_code').disabled = false;
+    ['pc_comm','pc_ppct','pc_gpct'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('pc_partner').value = '';
+    document.getElementById('pc_term').value = 'lifetime';
+    document.getElementById('pc_months').value = 12;
+    document.getElementById('pc_parent').value = '';
     pcKind();
+    pcTerm();
+    pcParent();
   }
   function editPromo(p) {
     document.getElementById('pc_code').value = p.code;
@@ -774,7 +822,18 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('pc_end').value = toLocalInput(p.expiresAt);
     document.getElementById('pc_note').value = p.note || '';
     document.getElementById('pc_active').checked = !!p.active;
+    var e = p.earning || {};
+    fillCodeSelects(p.code);
+    document.getElementById('pc_partner').value = e.partnerId || '';
+    document.getElementById('pc_comm').value = e.partnerId ? e.commissionPct : '';
+    document.getElementById('pc_term').value = e.term || 'lifetime';
+    document.getElementById('pc_months').value = e.termMonths || 12;
+    document.getElementById('pc_parent').value = e.parentCode || '';
+    document.getElementById('pc_ppct').value = e.parentCode ? e.parentPct : '';
+    document.getElementById('pc_gpct').value = e.parentCode ? e.grandparentPct : '';
     pcKind();
+    pcTerm();
+    pcParent();
     pcMsg('Editing ' + p.code + ' — its counters are kept when you save.', false);
     document.getElementById('codes').scrollIntoView({ behavior: 'smooth' });
   }
@@ -793,6 +852,13 @@ export const ADMIN_HTML = `<!doctype html>
       expiresAt: fromLocalInput(document.getElementById('pc_end').value),
       active: document.getElementById('pc_active').checked,
       note: document.getElementById('pc_note').value,
+      partnerId: document.getElementById('pc_partner').value,
+      commissionPct: document.getElementById('pc_comm').value,
+      term: document.getElementById('pc_term').value,
+      termMonths: document.getElementById('pc_months').value,
+      parentCode: document.getElementById('pc_parent').value,
+      parentPct: document.getElementById('pc_ppct').value,
+      grandparentPct: document.getElementById('pc_gpct').value,
     };
     Object.keys(overrides || {}).forEach(function (k) { body[k] = overrides[k]; });
     return body;
@@ -813,11 +879,22 @@ export const ADMIN_HTML = `<!doctype html>
     }).catch(function (e) { pcMsg('Request failed: ' + e, true); });
   }
   function togglePromo(p) {
-    postPromo(Object.assign({}, p, { active: !p.active })).then(loadPromos);
+    // The earning terms travel with the code, or saving would clear them.
+    postPromo(Object.assign({}, p, p.earning || {}, { active: !p.active })).then(function (r) {
+      if (!r.ok) pcMsg(PC_ERRORS[r.body.error] || ('Not saved: ' + (r.body.error || 'error')), true);
+      loadPromos();
+    });
   }
   function removePromo(p) {
     if (!confirm('Delete ' + p.code + ' and its ' + p.redeemedCount + ' redemption record(s)? People who already redeemed a free code keep their access.')) return;
-    api('/admin/api/promo-delete', { code: p.code }).then(loadPromos);
+    fetch('/admin/api/promo-delete', {
+      method: 'POST',
+      headers: { 'x-admin-token': tok(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: p.code }),
+    }).then(function (r) { return r.json(); }).then(function (j) {
+      if (!j.ok && j.error) pcMsg(PC_ERRORS[j.error] || j.error, true);
+      loadPromos();
+    });
   }
   function showRedemptions(p) {
     var host = document.getElementById('pc_detail');
@@ -846,7 +923,7 @@ export const ADMIN_HTML = `<!doctype html>
     var body = document.getElementById('pc_rows');
     body.innerHTML = '';
     if (!promos.length) {
-      body.innerHTML = '<tr><td colspan="8" class="muted">No codes yet.</td></tr>';
+      body.innerHTML = '<tr><td colspan="9" class="muted">No codes yet.</td></tr>';
       return;
     }
     promos.forEach(function (p) {
@@ -859,6 +936,7 @@ export const ADMIN_HTML = `<!doctype html>
       tr.innerHTML =
         '<td><span style="font-family:monospace;font-weight:700">' + esc(p.code) + '</span>' + (p.note ? '<div class="muted">' + esc(p.note) + '</div>' : '') + '</td>' +
         '<td>' + esc(gives) + '</td>' +
+        '<td>' + earnsCell(p) + '</td>' +
         '<td>' + p.redeemedCount + (p.maxRedemptions ? ' / ' + p.maxRedemptions : '') + '</td>' +
         '<td>' + (p.remaining == null ? '∞' : p.remaining) + '</td>' +
         '<td>' + (p.kind === 'percent' ? (p.convertedCount || 0) : '<span class="muted">—</span>') + '</td>' +
@@ -881,7 +959,177 @@ export const ADMIN_HTML = `<!doctype html>
   function loadPromos() {
     fetch('/admin/api/promos', { headers: { 'x-admin-token': tok() } })
       .then(function (r) { return r.json(); })
-      .then(function (d) { promos = d.promos || []; renderPromos(); })
+      .then(function (d) { promos = d.promos || []; fillCodeSelects(document.getElementById('pc_code').disabled ? document.getElementById('pc_code').value : ''); renderPromos(); })
+      .catch(function () {});
+  }
+  function pcTerm() {
+    document.querySelectorAll('.pc-months').forEach(function (el) { el.classList.toggle('hide', document.getElementById('pc_term').value !== 'months'); });
+  }
+  function codeByName(code) { for (var i = 0; i < promos.length; i++) if (promos[i].code === code) return promos[i]; return null; }
+  function partnerName(id) { for (var i = 0; i < partners.length; i++) if (partners[i].id === id) return partners[i].name; return id ? '?' : ''; }
+  function pcParent() {
+    var parent = codeByName(document.getElementById('pc_parent').value);
+    var grand = parent && parent.earning && parent.earning.parentCode ? codeByName(parent.earning.parentCode) : null;
+    document.querySelectorAll('.pc-link').forEach(function (el) { el.classList.toggle('hide', !parent); });
+    document.querySelectorAll('.pc-grand').forEach(function (el) { el.classList.toggle('hide', !grand); });
+    if (grand) document.getElementById('pc_glabel').textContent = partnerName(grand.earning.partnerId) + ' (via ' + grand.code + ') share %';
+  }
+  function fillCodeSelects(editing) {
+    var sel = document.getElementById('pc_partner');
+    var keep = sel.value;
+    sel.innerHTML = '<option value="">— nobody —</option>';
+    partners.forEach(function (pt) {
+      var o = document.createElement('option');
+      o.value = pt.id;
+      o.textContent = pt.name + (pt.active ? '' : ' (off)');
+      sel.appendChild(o);
+    });
+    sel.value = keep;
+    var par = document.getElementById('pc_parent');
+    var keepP = par.value;
+    par.innerHTML = '<option value="">— not linked —</option>';
+    promos.forEach(function (p) {
+      // Only a code with an owner can be paid, and a code cannot follow itself.
+      if (!p.earning || !p.earning.partnerId || p.code === editing) return;
+      var o = document.createElement('option');
+      o.value = p.code;
+      o.textContent = p.code + ' — ' + partnerName(p.earning.partnerId);
+      par.appendChild(o);
+    });
+    par.value = keepP;
+    pcParent();
+  }
+  function money(n) { return (n < 0 ? '-' : '') + '$' + Math.abs(n || 0).toFixed(2); }
+  function earnsCell(p) {
+    var e = p.earning || {};
+    var parts = [];
+    if (e.partnerId) {
+      var term = e.term === 'first' ? 'first payment' : e.term === 'months' ? e.termMonths + ' mo' : 'every payment';
+      parts.push(esc(partnerName(e.partnerId)) + ' ' + e.commissionPct + '% <span class="muted">(' + term + ')</span>');
+    }
+    if (e.parentCode) {
+      var parent = codeByName(e.parentCode);
+      parts.push('<span class="muted">↳ ' + esc(parent ? partnerName(parent.earning.partnerId) : e.parentCode) + ' ' + e.parentPct + '%</span>');
+      var grand = parent && parent.earning && parent.earning.parentCode ? codeByName(parent.earning.parentCode) : null;
+      if (grand && e.grandparentPct > 0) parts.push('<span class="muted">↳↳ ' + esc(partnerName(grand.earning.partnerId)) + ' ' + e.grandparentPct + '%</span>');
+    }
+    if (p.earned) parts.push('<span class="muted">' + p.earned.buyers + ' buyer(s) · ' + p.earned.sales + ' payment(s) · ' + money(p.earned.netUsd) + ' net</span>');
+    return parts.length ? parts.join('<br>') : '<span class="muted">—</span>';
+  }
+  // ── Partners ──
+  var partners = [];
+  var editingPartner = null;
+  var PT_ERRORS = { name_required: 'A partner needs a name.', has_earnings: 'This partner has earnings, so they are kept for the record. Turn them off instead.', not_found: 'That partner no longer exists.' };
+  function ptMsg(text, bad) {
+    var box = document.getElementById('pt_msg');
+    box.textContent = text;
+    box.className = bad ? 'err' : 'sub';
+    box.style.marginTop = '8px';
+  }
+  function clearPartnerForm() {
+    editingPartner = null;
+    ['pt_name','pt_contact','pt_note'].forEach(function (id) { document.getElementById(id).value = ''; });
+    document.getElementById('pt_active').checked = true;
+  }
+  function postJson(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      headers: { 'x-admin-token': tok(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); });
+  }
+  function savePartner() {
+    postJson('/admin/api/partner', {
+      id: editingPartner,
+      name: document.getElementById('pt_name').value,
+      contact: document.getElementById('pt_contact').value,
+      note: document.getElementById('pt_note').value,
+      active: document.getElementById('pt_active').checked,
+    }).then(function (r) {
+      if (!r.ok) { ptMsg(PT_ERRORS[r.body.error] || ('Not saved: ' + (r.body.error || 'error')), true); return; }
+      ptMsg('Saved ' + r.body.partner.name + '.', false);
+      clearPartnerForm();
+      loadPartners();
+    });
+  }
+  function editPartner(pt) {
+    editingPartner = pt.id;
+    document.getElementById('pt_name').value = pt.name;
+    document.getElementById('pt_contact').value = pt.contact || '';
+    document.getElementById('pt_note').value = pt.note || '';
+    document.getElementById('pt_active').checked = !!pt.active;
+    ptMsg('Editing ' + pt.name + '.', false);
+    document.getElementById('partners').scrollIntoView({ behavior: 'smooth' });
+  }
+  function partnerLink(pt) { return location.origin + '/partner/' + pt.token; }
+  function copyLink(pt) {
+    var link = partnerLink(pt);
+    (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
+      function () { ptMsg('Copied ' + pt.name + "'s private link.", false); },
+      function () { prompt('Private link for ' + pt.name, link); });
+  }
+  function newLink(pt) {
+    if (!confirm('Make a new private link for ' + pt.name + '? The old link stops working.')) return;
+    postJson('/admin/api/partner-token', { id: pt.id }).then(function () { ptMsg('New link made — copy it again.', false); loadPartners(); });
+  }
+  function payPartner(pt) {
+    var amount = prompt('Amount paid to ' + pt.name + ' (USD). Owed now: ' + money(pt.balance.owed), pt.balance.owed > 0 ? pt.balance.owed.toFixed(2) : '');
+    if (amount == null || amount === '') return;
+    var note = prompt('Note (e.g. bank transfer ref) — optional', '') || '';
+    postJson('/admin/api/partner-payout', { id: pt.id, amountUsd: Number(amount), note: note }).then(function (r) {
+      if (!r.ok) { ptMsg(r.body.error === 'amount_out_of_range' ? 'Enter an amount above zero.' : ('Not saved: ' + r.body.error), true); return; }
+      ptMsg('Recorded ' + money(Number(amount)) + ' paid to ' + pt.name + '.', false);
+      loadPartners();
+    });
+  }
+  function togglePartner(pt) {
+    postJson('/admin/api/partner', Object.assign({}, pt, { active: !pt.active })).then(loadPartners);
+  }
+  function removePartner(pt) {
+    if (!confirm('Delete ' + pt.name + '? Their codes stay, with no owner.')) return;
+    postJson('/admin/api/partner-delete', { id: pt.id }).then(function (r) {
+      if (!r.ok) ptMsg(PT_ERRORS[r.body.error] || r.body.error, true);
+      loadPartners();
+    });
+  }
+  function renderPartners() {
+    var body = document.getElementById('pt_rows');
+    body.innerHTML = '';
+    if (!partners.length) {
+      body.innerHTML = '<tr><td colspan="8" class="muted">No partners yet.</td></tr>';
+      return;
+    }
+    partners.forEach(function (pt) {
+      var tr = document.createElement('tr');
+      var b = pt.balance || {};
+      tr.innerHTML =
+        '<td><b>' + esc(pt.name) + '</b>' + (pt.active ? '' : ' <span class="pill free">off</span>') + (pt.contact ? '<div class="muted">' + esc(pt.contact) + '</div>' : '') + '</td>' +
+        '<td style="font-family:monospace">' + (pt.codes.length ? pt.codes.map(esc).join('<br>') : '<span class="muted">—</span>') + '</td>' +
+        '<td>' + pt.sales + '</td>' +
+        '<td>' + money(b.earned) + '</td>' +
+        '<td class="muted">' + money(b.pending) + '</td>' +
+        '<td>' + money(b.paid) + '</td>' +
+        '<td><b>' + money(b.owed) + '</b></td>' +
+        '<td style="white-space:nowrap"></td>';
+      var actions = tr.lastChild;
+      [['Page', function () { window.open(partnerLink(pt), '_blank', 'noopener'); }], ['Copy link', copyLink], ['Record payout', payPartner],
+       ['Edit', editPartner], [pt.active ? 'Turn off' : 'Turn on', togglePartner], ['New link', newLink], ['Delete', removePartner]].forEach(function (a) {
+        var btn = document.createElement('button');
+        btn.className = 'ghost';
+        btn.style.marginInlineEnd = '4px';
+        btn.style.marginBottom = '4px';
+        btn.style.padding = '6px 10px';
+        btn.textContent = a[0];
+        btn.addEventListener('click', function () { a[1](pt); });
+        actions.appendChild(btn);
+      });
+      body.appendChild(tr);
+    });
+  }
+  function loadPartners() {
+    fetch('/admin/api/partners', { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) { partners = d.partners || []; renderPartners(); loadPromos(); })
       .catch(function () {});
   }
   if (sessionStorage.getItem('ct')) load();

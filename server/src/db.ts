@@ -1,8 +1,23 @@
+import { randomBytes } from 'node:crypto';
+
 import pg from 'pg';
 
 import { HISTORICAL_COST_FALLBACK_USD, HISTORICAL_COST_PER_ACTION_USD } from './pricing.js';
 import type { Language } from './prompts.js';
-import { effectivePlan, type CleanPromo, type PromoCode } from './promo.js';
+import {
+  balanceFromTotals,
+  isRefundEvent,
+  isSaleEvent,
+  netRevenue,
+  splitSale,
+  withinTerm,
+  type CleanPartner,
+  type CodeEarning,
+  type CommissionTerm,
+  type Partner,
+  type PartnerBalance,
+} from './partners.js';
+import { effectivePlan, normalizeCode, type CleanPromo, type PromoCode } from './promo.js';
 
 /**
  * Optional Postgres-backed cache for equipment analyses. When DATABASE_URL is
@@ -273,6 +288,71 @@ export async function initDb(): Promise<void> {
       ADD COLUMN IF NOT EXISTS promo_until TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS promo_code  TEXT
   `);
+  // Partners and what their codes earn — see src/partners.ts. A code may have
+  // an owner, a commission and a term, and a link to the code of whoever
+  // brought its owner in. Earnings are ledger lines, one per partner per
+  // store transaction; a payout is recorded by hand.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS partners (
+      id         TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      contact    TEXT,
+      note       TEXT,
+      token      TEXT NOT NULL UNIQUE,
+      active     BOOLEAN NOT NULL DEFAULT true,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+  await pool.query(`
+    ALTER TABLE promo_codes
+      ADD COLUMN IF NOT EXISTS partner_id        TEXT REFERENCES partners (id) ON DELETE SET NULL,
+      ADD COLUMN IF NOT EXISTS commission_pct    NUMERIC(5,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS commission_term   TEXT NOT NULL DEFAULT 'lifetime',
+      ADD COLUMN IF NOT EXISTS commission_months INTEGER,
+      ADD COLUMN IF NOT EXISTS parent_code       TEXT,
+      ADD COLUMN IF NOT EXISTS parent_pct        NUMERIC(5,2) NOT NULL DEFAULT 0,
+      ADD COLUMN IF NOT EXISTS grandparent_pct   NUMERIC(5,2) NOT NULL DEFAULT 0
+  `);
+  // Whose code brought this person — the first partner code they used — and
+  // when their first credited sale was, which a code's term counts from.
+  await pool.query(`
+    ALTER TABLE app_users
+      ADD COLUMN IF NOT EXISTS attributed_code TEXT,
+      ADD COLUMN IF NOT EXISTS attributed_at   TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS first_sale_at   TIMESTAMPTZ
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS partner_earnings (
+      id              BIGSERIAL PRIMARY KEY,
+      transaction_id  TEXT NOT NULL,
+      original_transaction_id TEXT,
+      kind            TEXT NOT NULL,
+      level           SMALLINT NOT NULL,
+      partner_id      TEXT NOT NULL,
+      via_code        TEXT NOT NULL,
+      sold_code       TEXT NOT NULL,
+      ref             TEXT NOT NULL,
+      pct             NUMERIC(5,2) NOT NULL,
+      net_usd         NUMERIC(12,2) NOT NULL,
+      amount_usd      NUMERIC(12,2) NOT NULL,
+      estimated       BOOLEAN NOT NULL DEFAULT false,
+      product_id      TEXT,
+      event_type      TEXT,
+      at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (transaction_id, kind, level)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS partner_earnings_partner ON partner_earnings (partner_id, at DESC)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS partner_earnings_sold ON partner_earnings (sold_code)`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS partner_payouts (
+      id         BIGSERIAL PRIMARY KEY,
+      partner_id TEXT NOT NULL REFERENCES partners (id) ON DELETE CASCADE,
+      amount_usd NUMERIC(12,2) NOT NULL,
+      note       TEXT,
+      at         TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
 }
 
 // ── Promotion codes ───────────────────────────────────────────────────────
@@ -294,6 +374,15 @@ function promoRow(r: Record<string, unknown>): PromoCode {
     note: (r.note as string) ?? null,
     createdAt: new Date(r.created_at as string).toISOString(),
     convertedCount: r.converted_count == null ? undefined : Number(r.converted_count),
+    earning: {
+      partnerId: (r.partner_id as string) ?? null,
+      commissionPct: Number(r.commission_pct ?? 0),
+      term: (['first', 'months'].includes(r.commission_term as string) ? r.commission_term : 'lifetime') as CommissionTerm,
+      termMonths: r.commission_months == null ? null : Number(r.commission_months),
+      parentCode: (r.parent_code as string) ?? null,
+      parentPct: Number(r.parent_pct ?? 0),
+      grandparentPct: Number(r.grandparent_pct ?? 0),
+    },
   };
 }
 
@@ -1606,4 +1695,377 @@ export async function listShadowTests(limit = 30): Promise<ShadowTestRow[]> {
     deepseekCostUsd: r.deepseek_cost_usd == null ? null : Number(r.deepseek_cost_usd),
     createdAt: r.created_at,
   }));
+}
+
+// ── Partners and their earnings ───────────────────────────────────────────
+
+
+const newToken = () => randomBytes(18).toString('base64url');
+
+function partnerRow(r: Record<string, unknown>): Partner {
+  return {
+    id: r.id as string,
+    name: r.name as string,
+    contact: (r.contact as string) ?? null,
+    note: (r.note as string) ?? null,
+    token: r.token as string,
+    active: !!r.active,
+    createdAt: new Date(r.created_at as string).toISOString(),
+  };
+}
+
+export interface PartnerSummary extends Partner {
+  codes: string[];
+  /** Credited sales (level 0 lines) through the partner's own codes. */
+  sales: number;
+  balance: PartnerBalance;
+}
+
+const HOLD_SQL = `now() - interval '30 days'`;
+
+export async function listPartners(): Promise<PartnerSummary[]> {
+  if (!pool) return [];
+  const res = await pool.query(`
+    SELECT p.*,
+      COALESCE((SELECT array_agg(c.code ORDER BY c.code) FROM promo_codes c WHERE c.partner_id = p.id), '{}') AS codes,
+      (SELECT COUNT(*) FROM partner_earnings e WHERE e.partner_id = p.id AND e.level = 0 AND e.kind = 'sale')::int AS sales,
+      COALESCE((SELECT SUM(amount_usd) FROM partner_earnings e WHERE e.partner_id = p.id), 0) AS earned,
+      COALESCE((SELECT SUM(amount_usd) FROM partner_earnings e WHERE e.partner_id = p.id AND e.at <= ${HOLD_SQL}), 0) AS settled,
+      COALESCE((SELECT SUM(amount_usd) FROM partner_payouts o WHERE o.partner_id = p.id), 0) AS paid
+    FROM partners p ORDER BY p.active DESC, p.created_at DESC`);
+  return res.rows.map((r) => ({
+    ...partnerRow(r),
+    codes: (r.codes as string[]) ?? [],
+    sales: Number(r.sales ?? 0),
+    balance: balanceFromTotals(Number(r.earned), Number(r.settled), Number(r.paid)),
+  }));
+}
+
+export async function getPartner(id: string): Promise<Partner | null> {
+  if (!pool) return null;
+  const res = await pool.query(`SELECT * FROM partners WHERE id = $1`, [id]);
+  return res.rows[0] ? partnerRow(res.rows[0]) : null;
+}
+
+export async function getPartnerByToken(token: string): Promise<Partner | null> {
+  if (!pool || !token) return null;
+  const res = await pool.query(`SELECT * FROM partners WHERE token = $1`, [token]);
+  return res.rows[0] ? partnerRow(res.rows[0]) : null;
+}
+
+/** Create a partner (no id) or edit one. A new partner gets a fresh private-page token. */
+export async function savePartner(id: string | null, v: CleanPartner): Promise<Partner | null> {
+  if (!pool) return null;
+  if (id) {
+    const res = await pool.query(
+      `UPDATE partners SET name = $2, contact = $3, note = $4, active = $5 WHERE id = $1 RETURNING *`,
+      [id, v.name, v.contact, v.note, v.active],
+    );
+    return res.rows[0] ? partnerRow(res.rows[0]) : null;
+  }
+  const res = await pool.query(
+    `INSERT INTO partners (id, name, contact, note, token, active) VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [`p_${randomBytes(5).toString('hex')}`, v.name, v.contact, v.note, newToken(), v.active],
+  );
+  return partnerRow(res.rows[0]);
+}
+
+/** A new private link; the old one stops working at once. */
+export async function rotatePartnerToken(id: string): Promise<Partner | null> {
+  if (!pool) return null;
+  const res = await pool.query(`UPDATE partners SET token = $2 WHERE id = $1 RETURNING *`, [id, newToken()]);
+  return res.rows[0] ? partnerRow(res.rows[0]) : null;
+}
+
+/** Only a partner with no earnings can be deleted; one with history is switched off instead. */
+export async function deletePartner(id: string): Promise<'deleted' | 'has_earnings' | 'not_found'> {
+  if (!pool) return 'not_found';
+  const used = await pool.query(`SELECT 1 FROM partner_earnings WHERE partner_id = $1 LIMIT 1`, [id]);
+  if (used.rowCount) return 'has_earnings';
+  const res = await pool.query(`DELETE FROM partners WHERE id = $1`, [id]);
+  return (res.rowCount ?? 0) > 0 ? 'deleted' : 'not_found';
+}
+
+export async function addPayout(partnerId: string, amountUsd: number, note: string | null): Promise<boolean> {
+  if (!pool) return false;
+  const res = await pool.query(
+    `INSERT INTO partner_payouts (partner_id, amount_usd, note)
+     SELECT id, $2, $3 FROM partners WHERE id = $1`,
+    [partnerId, amountUsd, note],
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** Store a code's earning terms (after cleanEarning has checked them). */
+export async function setCodeEarning(code: string, e: Omit<CodeEarning, 'code'>): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `UPDATE promo_codes SET partner_id = $2, commission_pct = $3, commission_term = $4, commission_months = $5,
+            parent_code = $6, parent_pct = $7, grandparent_pct = $8
+      WHERE code = $1`,
+    [code, e.partnerId, e.commissionPct, e.term, e.termMonths, e.parentCode, e.parentPct, e.grandparentPct],
+  );
+}
+
+/** Whether a code has earned anyone anything — such a code is kept, not deleted. */
+export async function codeHasEarnings(code: string): Promise<boolean> {
+  if (!pool) return false;
+  const res = await pool.query(`SELECT 1 FROM partner_earnings WHERE sold_code = $1 OR via_code = $1 LIMIT 1`, [code]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** Per code: distinct buyers, credited sales and what it earned its owner. */
+export async function codeEarningTotals(): Promise<Record<string, { buyers: number; sales: number; netUsd: number; ownerUsd: number }>> {
+  if (!pool) return {};
+  const res = await pool.query(`
+    SELECT sold_code AS code,
+           COUNT(DISTINCT ref) FILTER (WHERE kind = 'sale')::int AS buyers,
+           COUNT(*) FILTER (WHERE kind = 'sale')::int AS sales,
+           COALESCE(SUM(net_usd), 0) AS net_usd,
+           COALESCE(SUM(amount_usd), 0) AS owner_usd
+      FROM partner_earnings WHERE level = 0 GROUP BY sold_code`);
+  const out: Record<string, { buyers: number; sales: number; netUsd: number; ownerUsd: number }> = {};
+  for (const r of res.rows) {
+    out[r.code] = { buyers: Number(r.buyers), sales: Number(r.sales), netUsd: Number(r.net_usd), ownerUsd: Number(r.owner_usd) };
+  }
+  return out;
+}
+
+/**
+ * Remember which partner code brought this person, the first time one does.
+ * First come, first served: a later code never takes over someone already
+ * brought by another. Codes that pay nobody are not recorded.
+ */
+export async function attributeUser(ref: string, code: string): Promise<boolean> {
+  if (!pool) return false;
+  const res = await pool.query(
+    `UPDATE app_users u SET attributed_code = c.code, attributed_at = now()
+       FROM promo_codes c
+      WHERE u.ref = $1 AND u.attributed_code IS NULL AND c.code = $2
+        AND (c.partner_id IS NOT NULL OR c.parent_code IS NOT NULL)`,
+    [ref, code],
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/** The fields of a RevenueCat event the earnings side reads. */
+export interface EarningEvent {
+  type?: string;
+  id?: string;
+  transaction_id?: string | null;
+  original_transaction_id?: string | null;
+  product_id?: string;
+  environment?: string;
+  offer_code?: string | null;
+  cancel_reason?: string | null;
+  price?: unknown;
+  commission_percentage?: unknown;
+  tax_percentage?: unknown;
+  takehome_percentage?: unknown;
+  event_timestamp_ms?: number | null;
+  purchased_at_ms?: number | null;
+}
+
+export type EarningOutcome =
+  | { kind: 'credited'; lines: number }
+  | { kind: 'reversed'; lines: number }
+  | { kind: 'skipped'; reason: string };
+
+async function codeWithPartner(code: string | null): Promise<{ code: CodeEarning; partner: Partner | null } | null> {
+  if (!pool || !code) return null;
+  const res = await pool.query(
+    `SELECT c.*, p.id AS p_id, p.name AS p_name, p.contact AS p_contact, p.note AS p_note, p.token AS p_token,
+            p.active AS p_active, p.created_at AS p_created_at
+       FROM promo_codes c LEFT JOIN partners p ON p.id = c.partner_id WHERE c.code = $1`,
+    [code],
+  );
+  const r = res.rows[0];
+  if (!r) return null;
+  const row = promoRow(r);
+  return {
+    code: { code: row.code, ...(row.earning as Omit<CodeEarning, 'code'>) },
+    partner: r.p_id
+      ? partnerRow({ id: r.p_id, name: r.p_name, contact: r.p_contact, note: r.p_note, token: r.p_token, active: r.p_active, created_at: r.p_created_at })
+      : null,
+  };
+}
+
+/**
+ * Credit (or, for a refund, reverse) what one store transaction earns the
+ * partners behind the buyer. Safe to call for every webhook event: anything
+ * that is not money, not attributed or already recorded is skipped.
+ */
+export async function recordPartnerEarnings(ref: string, event: EarningEvent, now: Date = new Date()): Promise<EarningOutcome> {
+  if (!pool) return { kind: 'skipped', reason: 'no_database' };
+  if ((event.environment ?? '').toUpperCase() === 'SANDBOX' && process.env.PARTNER_COUNT_SANDBOX !== '1') {
+    return { kind: 'skipped', reason: 'sandbox' };
+  }
+  const txn = event.transaction_id || event.id;
+  if (!txn) return { kind: 'skipped', reason: 'no_transaction' };
+
+  if (isRefundEvent(event)) {
+    // Undo exactly what that transaction earned — by its own id, or failing
+    // that the latest sale in its subscription.
+    const sale = await pool.query(
+      `SELECT * FROM partner_earnings WHERE kind = 'sale' AND transaction_id = (
+         SELECT transaction_id FROM partner_earnings
+          WHERE kind = 'sale' AND ref = $3 AND (transaction_id = $1 OR ($2::text IS NOT NULL AND original_transaction_id = $2))
+          ORDER BY (transaction_id = $1) DESC, at DESC LIMIT 1)`,
+      [txn, event.original_transaction_id ?? null, ref],
+    );
+    let n = 0;
+    for (const l of sale.rows) {
+      const ins = await pool.query(
+        `INSERT INTO partner_earnings (transaction_id, original_transaction_id, kind, level, partner_id, via_code, sold_code, ref,
+                                       pct, net_usd, amount_usd, estimated, product_id, event_type, at)
+         VALUES ($1,$2,'refund',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+         ON CONFLICT (transaction_id, kind, level) DO NOTHING`,
+        [l.transaction_id, l.original_transaction_id, l.level, l.partner_id, l.via_code, l.sold_code, l.ref,
+         l.pct, -Number(l.net_usd), -Number(l.amount_usd), l.estimated, l.product_id, event.type ?? null, now.toISOString()],
+      );
+      n += ins.rowCount ?? 0;
+    }
+    return n ? { kind: 'reversed', lines: n } : { kind: 'skipped', reason: 'nothing_to_reverse' };
+  }
+
+  if (!isSaleEvent(event.type)) return { kind: 'skipped', reason: 'not_a_sale' };
+  const net = netRevenue(event);
+  if (!net || net.usd <= 0) return { kind: 'skipped', reason: 'no_revenue' };
+
+  // Someone who typed a partner's code into the App Store directly never
+  // passed through our redeem screen; the offer code on the sale finds it.
+  let user = await pool.query(`SELECT attributed_code, first_sale_at FROM app_users WHERE ref = $1`, [ref]);
+  if (!user.rows[0]?.attributed_code && event.offer_code) {
+    const offer = normalizeCode(event.offer_code);
+    const match = await pool.query(
+      `SELECT code FROM promo_codes
+        WHERE (partner_id IS NOT NULL OR parent_code IS NOT NULL)
+          AND (code = $1 OR regexp_replace(upper(COALESCE(offer_ios, '')), '[^A-Z0-9]', '', 'g') = $1
+                         OR regexp_replace(upper(COALESCE(offer_android, '')), '[^A-Z0-9]', '', 'g') = $1)
+        LIMIT 1`,
+      [offer],
+    );
+    if (match.rows[0]) {
+      await getOrCreateUser(ref);
+      await attributeUser(ref, match.rows[0].code);
+      user = await pool.query(`SELECT attributed_code, first_sale_at FROM app_users WHERE ref = $1`, [ref]);
+    }
+  }
+  const soldCode = user.rows[0]?.attributed_code as string | undefined;
+  if (!soldCode) return { kind: 'skipped', reason: 'not_attributed' };
+
+  const sold = await codeWithPartner(soldCode);
+  if (!sold) return { kind: 'skipped', reason: 'code_gone' };
+  const saleAt = event.purchased_at_ms ? new Date(Number(event.purchased_at_ms)) : now;
+  const firstSaleAt = user.rows[0]?.first_sale_at ? new Date(user.rows[0].first_sale_at).toISOString() : null;
+  if (!withinTerm(sold.code.term, sold.code.termMonths, firstSaleAt, saleAt)) {
+    return { kind: 'skipped', reason: 'term_over' };
+  }
+  const parent = await codeWithPartner(sold.code.parentCode);
+  const grand = parent ? await codeWithPartner(parent.code.parentCode) : null;
+  const chain = [sold, ...(parent ? [parent] : []), ...(parent && grand ? [grand] : [])];
+  const lines = splitSale(net.usd, chain);
+
+  let n = 0;
+  for (const l of lines) {
+    const ins = await pool.query(
+      `INSERT INTO partner_earnings (transaction_id, original_transaction_id, kind, level, partner_id, via_code, sold_code, ref,
+                                     pct, net_usd, amount_usd, estimated, product_id, event_type, at)
+       VALUES ($1,$2,'sale',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+       ON CONFLICT (transaction_id, kind, level) DO NOTHING`,
+      [txn, event.original_transaction_id ?? null, l.level, l.partnerId, l.viaCode, soldCode, ref,
+       l.pct, net.usd, l.amountUsd, net.estimated, event.product_id ?? null, event.type ?? null, saleAt.toISOString()],
+    );
+    n += ins.rowCount ?? 0;
+  }
+  // The term counts from the first sale, whether or not it paid anyone.
+  if (!firstSaleAt) await pool.query(`UPDATE app_users SET first_sale_at = $2 WHERE ref = $1 AND first_sale_at IS NULL`, [ref, saleAt.toISOString()]);
+  return n ? { kind: 'credited', lines: n } : { kind: 'skipped', reason: lines.length ? 'already_recorded' : 'no_shares' };
+}
+
+export interface PartnerReport {
+  partner: Partner;
+  balance: PartnerBalance;
+  /** The partner's own codes with what each has done. */
+  codes: {
+    code: string;
+    percentOff: number;
+    kind: string;
+    commissionPct: number;
+    term: CommissionTerm;
+    termMonths: number | null;
+    active: boolean;
+    redemptions: number;
+    buyers: number;
+    sales: number;
+    earnedUsd: number;
+  }[];
+  /** Earned by level: 0 own codes, 1 partners they brought, 2 those partners' partners. */
+  byLevel: { level: number; sales: number; earnedUsd: number }[];
+  /** Recent lines, newest first — no buyer identities. */
+  recent: { at: string; kind: string; level: number; code: string; netUsd: number; pct: number; amountUsd: number }[];
+  payouts: { at: string; amountUsd: number; note: string | null }[];
+}
+
+export async function partnerReport(partnerId: string): Promise<PartnerReport | null> {
+  if (!pool) return null;
+  const partner = await getPartner(partnerId);
+  if (!partner) return null;
+  const [codes, levels, recent, payouts, totals] = await Promise.all([
+    pool.query(
+      `SELECT c.code, c.kind, c.percent_off, c.commission_pct, c.commission_term, c.commission_months, c.active, c.redeemed_count,
+              (SELECT COUNT(DISTINCT e.ref) FROM partner_earnings e WHERE e.sold_code = c.code AND e.level = 0 AND e.kind = 'sale')::int AS buyers,
+              (SELECT COUNT(*) FROM partner_earnings e WHERE e.sold_code = c.code AND e.level = 0 AND e.kind = 'sale')::int AS sales,
+              COALESCE((SELECT SUM(e.amount_usd) FROM partner_earnings e WHERE e.sold_code = c.code AND e.level = 0 AND e.partner_id = $1), 0) AS earned
+         FROM promo_codes c WHERE c.partner_id = $1 ORDER BY c.created_at DESC`,
+      [partnerId],
+    ),
+    pool.query(
+      `SELECT level, COUNT(*) FILTER (WHERE kind = 'sale')::int AS sales, COALESCE(SUM(amount_usd), 0) AS earned
+         FROM partner_earnings WHERE partner_id = $1 GROUP BY level ORDER BY level`,
+      [partnerId],
+    ),
+    pool.query(
+      `SELECT at, kind, level, sold_code, net_usd, pct, amount_usd FROM partner_earnings
+        WHERE partner_id = $1 ORDER BY at DESC, id DESC LIMIT 100`,
+      [partnerId],
+    ),
+    pool.query(`SELECT at, amount_usd, note FROM partner_payouts WHERE partner_id = $1 ORDER BY at DESC`, [partnerId]),
+    pool.query(
+      `SELECT COALESCE(SUM(amount_usd), 0) AS earned,
+              COALESCE(SUM(amount_usd) FILTER (WHERE at <= ${HOLD_SQL}), 0) AS settled,
+              (SELECT COALESCE(SUM(amount_usd), 0) FROM partner_payouts WHERE partner_id = $1) AS paid
+         FROM partner_earnings WHERE partner_id = $1`,
+      [partnerId],
+    ),
+  ]);
+  const t = totals.rows[0] ?? {};
+  return {
+    partner,
+    balance: balanceFromTotals(Number(t.earned ?? 0), Number(t.settled ?? 0), Number(t.paid ?? 0)),
+    codes: codes.rows.map((r) => ({
+      code: r.code,
+      kind: r.kind,
+      percentOff: Number(r.percent_off),
+      commissionPct: Number(r.commission_pct),
+      term: r.commission_term,
+      termMonths: r.commission_months == null ? null : Number(r.commission_months),
+      active: !!r.active,
+      redemptions: Number(r.redeemed_count),
+      buyers: Number(r.buyers),
+      sales: Number(r.sales),
+      earnedUsd: Number(r.earned),
+    })),
+    byLevel: levels.rows.map((r) => ({ level: Number(r.level), sales: Number(r.sales), earnedUsd: Number(r.earned) })),
+    recent: recent.rows.map((r) => ({
+      at: new Date(r.at).toISOString(),
+      kind: r.kind,
+      level: Number(r.level),
+      code: r.sold_code,
+      netUsd: Number(r.net_usd),
+      pct: Number(r.pct),
+      amountUsd: Number(r.amount_usd),
+    })),
+    payouts: payouts.rows.map((r) => ({ at: new Date(r.at).toISOString(), amountUsd: Number(r.amount_usd), note: r.note ?? null })),
+  };
 }

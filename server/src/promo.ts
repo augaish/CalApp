@@ -23,6 +23,7 @@
  * two taps could race through.
  */
 import type { Plan } from './billing.js';
+import type { CodeEarning } from './partners.js';
 
 export type PromoKind = 'free' | 'percent';
 
@@ -48,6 +49,8 @@ export interface PromoCode {
   createdAt: string;
   /** Redemptions a purchase was matched to (percent codes). */
   convertedCount?: number;
+  /** Who earns from this code's sales, and how much — see partners.ts. */
+  earning?: Omit<CodeEarning, 'code'>;
 }
 
 export type RedeemFailure =
@@ -281,7 +284,7 @@ export function grantUntil(durationDays: number | null, now: Date = new Date()):
  * record that this person was given the offer.
  */
 export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemResult> {
-  const { claimPromo, getOrCreateUser, getPromo, getRedemption, grantPromo } = await import('./db.js');
+  const { attributeUser, claimPromo, getOrCreateUser, getPromo, getRedemption, grantPromo } = await import('./db.js');
   const code = normalizeCode(rawCode);
   if (code.length < 3) return { ok: false, reason: 'unknown' };
 
@@ -320,6 +323,10 @@ export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemR
     }
     return { ok: false, reason: codeProblem(now) ?? 'already_redeemed' };
   }
+
+  // A partner's code: this person's future sales now count for that partner
+  // (unless another partner's code got there first).
+  await attributeUser(ref, code).catch((err) => console.error('attribution failed:', err));
 
   if (claimed.kind === 'free') {
     await grantPromo(ref, claimed.plan, code, until as string);
