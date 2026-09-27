@@ -602,7 +602,7 @@ export default function Training() {
           )}
 
           <Pressable
-            onPress={() => router.push(`/schedule-plan?weekday=${planWeekday}`)}
+            onPress={() => router.push(`/schedule?weekday=${planWeekday}`)}
             accessibilityRole="button"
             style={({ pressed }) => [styles.editPlan, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.8 }]}
           >
@@ -636,7 +636,7 @@ export default function Training() {
           title={selectedIsToday ? t('training.restDay') : t('training.nothingLogged')}
           body={t('training.restDayHint')}
           action={{ label: t('training.addExercise'), icon: 'add', onPress: () => router.push('/exercise-library') }}
-          secondary={{ label: t('training.editTodaysPlan'), icon: 'pencil-outline', onPress: () => router.push(`/schedule-plan?weekday=${planWeekday}`) }}
+          secondary={{ label: t('training.editTodaysPlan'), icon: 'pencil-outline', onPress: () => router.push(`/schedule?weekday=${planWeekday}`) }}
         />
       )}
       </View>

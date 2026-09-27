@@ -812,6 +812,7 @@ export const en = {
     addSets: 'Tap to plan target sets',
   },
   schedulePlan: {
+    notFound: 'This exercise is no longer in the plan.',
     title: 'Plan sets',
     hint: 'Add your target sets and reps. This is your plan — nothing is marked done until you check it on the training day.',
     addSet: 'Add planned set',

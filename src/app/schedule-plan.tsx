@@ -47,7 +47,7 @@ export default function SchedulePlan() {
     return (
       <Screen footer={<Button label={t('common.close')} onPress={() => router.back()} />}>
         <Title close>{t('schedulePlan.title')}</Title>
-        <Text style={{ color: theme.textSecondary }}>{t('mealEdit.notFound')}</Text>
+        <Text style={{ color: theme.textSecondary }}>{t('schedulePlan.notFound')}</Text>
       </Screen>
     );
   }

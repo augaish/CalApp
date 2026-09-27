@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -46,7 +46,12 @@ export default function ScheduleScreen() {
   const setScheduleTitle = useAppStore((s) => s.setScheduleTitle);
   const viewDay = useViewDay((s) => s.day);
 
-  const [weekday, setWeekday] = useState<number>(viewDay.getDay());
+  // Opened from Training's "Edit today's plan" on the day being viewed.
+  const params = useLocalSearchParams<{ weekday?: string }>();
+  const asked = Number(params.weekday);
+  const [weekday, setWeekday] = useState<number>(
+    Number.isInteger(asked) && asked >= 0 && asked <= 6 ? asked : viewDay.getDay(),
+  );
   const pageRef = useAnimatedRef<ScrollView>();
   const [sharing, setSharing] = useState(false);
   const day = schedule[weekday] ?? { exerciseIds: [] };

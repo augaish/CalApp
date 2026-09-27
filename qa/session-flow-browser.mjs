@@ -104,6 +104,17 @@ await page.screenshot({ path: `${OUT}/moved-on-ar.png` });
 check('ar: no page errors', realErrors(page).length === 0, realErrors(page).join(' | '));
 await ctx.close();
 
+console.log('\n=== Edit today\'s plan ===');
+({ ctx, page } = await open(base('en', { activeSession: null }), '/training'));
+await page.getByText("Edit today's plan", { exact: true }).first().click(); await page.waitForTimeout(1500);
+b = await body(page);
+check("Edit today's plan opens the day's plan editor", /\/schedule(\?|$)/.test(page.url()) && !/schedule-plan/.test(page.url()), page.url());
+check('  listing that day\'s exercises', /Barbell Bench Press/.test(b) && /Shoulder Press/i.test(b));
+check('  and never a "not found" page', !/no longer be found|no longer in the plan/.test(b));
+check('edit plan: no page errors', realErrors(page).length === 0, realErrors(page).join(' | '));
+await page.screenshot({ path: `${OUT}/edit-plan.png` });
+await ctx.close();
+
 console.log('\n=== Water buttons ===');
 ({ ctx, page } = await open(base('en', { activeSession: null }), '/water'));
 b = await body(page);
