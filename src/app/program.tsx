@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { MealPlanCard } from '@/components/meal-plan-card';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { Button, Card, MacroTile, Screen, Title } from '@/components/ui';
@@ -69,7 +70,7 @@ export default function ProgramScreen() {
         router.push(`/upgrade?reason=${action.reason}`);
         return;
       }
-      Alert.alert(t(action.titleKey), t(action.bodyKey, action.values));
+      alertProblem(t(action.titleKey), t(action.bodyKey, action.values));
     } finally {
       setBusy(false);
     }
@@ -100,7 +101,7 @@ export default function ProgramScreen() {
       return;
     }
     const days = resolved.overlapWeekdays.map((wd) => weekdayLabel(wd, locale)).join(' · ');
-    Alert.alert(
+    alertDestructive(
       t('coach.schedulePlan.overwriteTitle'),
       t('coach.schedulePlan.overwriteBody', { days }),
       [
@@ -111,7 +112,7 @@ export default function ProgramScreen() {
   };
 
   const endProgram = () => {
-    Alert.alert(t('program.endConfirmTitle'), t('program.endConfirmBody'), [
+    alertDestructive(t('program.endConfirmTitle'), t('program.endConfirmBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('program.endConfirmCta'), style: 'destructive', onPress: () => setActiveProgram(null) },
     ]);

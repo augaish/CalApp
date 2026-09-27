@@ -97,6 +97,7 @@ export function Stopwatch({
       <View style={styles.buttons}>
         <Pressable
           onPress={toggle}
+          accessibilityRole="button"
           style={({ pressed }) => [
             styles.button,
             { backgroundColor: running ? theme.danger : theme.primary },
@@ -111,6 +112,7 @@ export function Stopwatch({
         {value > 0 && !running && (
           <Pressable
             onPress={reset}
+            accessibilityRole="button"
             style={({ pressed }) => [
               styles.button,
               { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.border },

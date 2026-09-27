@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, IconTile, InfoLine, StatusPill } from '@/components/system';
@@ -121,7 +122,7 @@ export default function RecipeScreen() {
   };
 
   const remove = () => {
-    Alert.alert(t('recipe.deleteTitle'), t('recipe.deleteBody'), [
+    alertDestructive(t('recipe.deleteTitle'), t('recipe.deleteBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),

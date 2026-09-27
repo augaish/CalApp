@@ -71,6 +71,8 @@ export function SchedulePlanCard({
       <Pressable
         onPress={onAdd}
         disabled={added}
+        accessibilityRole="button"
+        accessibilityState={{ disabled: added }}
         style={({ pressed }) => [
           styles.planAddBtn,
           { backgroundColor: added ? theme.cardSubtle : theme.primary },

@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { InfoLine, RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
@@ -25,7 +26,7 @@ export default function Privacy() {
   const resetAll = useAppStore((s) => s.resetAll);
 
   const confirmSignOut = () =>
-    Alert.alert(t('profile.signOut'), t('profile.signOutConfirm'), [
+    alertDestructive(t('profile.signOut'), t('profile.signOutConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('profile.signOut'),
@@ -38,13 +39,13 @@ export default function Privacy() {
     ]);
 
   const confirmReset = () =>
-    Alert.alert(t('settings.resetData'), t('settings.resetDataConfirm'), [
+    alertDestructive(t('settings.resetData'), t('settings.resetDataConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('settings.reset'), style: 'destructive', onPress: () => resetAll() },
     ]);
 
   const confirmDeleteAccount = () =>
-    Alert.alert(t('legal.deleteAccount'), t('legal.deleteConfirm'), [
+    alertDestructive(t('legal.deleteAccount'), t('legal.deleteConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('legal.deleteConfirmCta'),

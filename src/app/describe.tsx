@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, TextInput, View } from 'react-native';
 
+import { alertProblem } from '@/lib/alerts';
 import { Button, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -59,7 +60,7 @@ export default function Describe() {
       // exactly as typed, with the unstated nutrients kept unknown.
       const typed = reachedServer ? extractTypedNutrition(text) : null;
       if (typed) {
-        Alert.alert(t('describe.failedTitle'), `${t('describe.failed')}\n\n${t('describe.typedFound', { kcal: Math.round(typed.calories) })}`, [
+        alertProblem(t('describe.failedTitle'), `${t('describe.failed')}\n\n${t('describe.typedFound', { kcal: Math.round(typed.calories) })}`, [
           { text: t('common.cancel'), style: 'cancel' },
           {
             text: t('describe.useTyped'),
@@ -72,7 +73,7 @@ export default function Describe() {
         setBusy(false);
         return;
       }
-      Alert.alert(
+      alertProblem(
         t('describe.failedTitle'),
         reachedServer ? t('describe.failed') : t('describe.offline'),
       );

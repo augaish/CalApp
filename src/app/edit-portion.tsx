@@ -162,7 +162,7 @@ export default function EditPortion() {
         {SERVING_STEPS.map((p) => {
           const active = servings === p;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={p}
               onPress={() => {
                 lightHaptic();

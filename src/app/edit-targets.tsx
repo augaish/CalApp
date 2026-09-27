@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertProblem } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { DeltaRows } from '@/components/system';
 import { Button, Field, Screen } from '@/components/ui';
@@ -33,7 +34,7 @@ export default function EditTargets() {
   const save = () => {
     const c = parseInt(calories, 10);
     if (!c || c < 500 || c > 8000) {
-      Alert.alert(t('onboarding.invalidInput'));
+      alertProblem(t('onboarding.invalidInput'));
       return;
     }
     setTargets({
@@ -156,7 +157,7 @@ export default function EditTargets() {
           {mismatch ? ` · ${t('editTargets.macroMismatch', { kcal: goalKcal })}` : ''}
         </Text>
         {mismatch && (
-          <Pressable onPress={fixWithCarbs} hitSlop={8}>
+          <Pressable accessibilityRole="button" onPress={fixWithCarbs} hitSlop={8}>
             <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
               {t('editTargets.macroFix')}
             </Text>

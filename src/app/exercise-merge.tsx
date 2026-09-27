@@ -94,7 +94,7 @@ export default function ExerciseMerge() {
           style={[styles.searchInput, { color: theme.text }]}
         />
         {query.length > 0 && (
-          <Pressable onPress={() => setQuery('')} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.clear')} onPress={() => setQuery('')} hitSlop={8}>
             <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
           </Pressable>
         )}
@@ -107,7 +107,7 @@ export default function ExerciseMerge() {
       {matches.map((ex) => {
         const name = exerciseName(ex, language);
         return (
-          <Pressable
+          <Pressable accessibilityRole="button"
             key={ex.id}
             onPress={() => confirm(ex.id, name)}
             style={({ pressed }) => [

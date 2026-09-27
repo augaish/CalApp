@@ -50,6 +50,7 @@ export function GoalScenarioCards({
           <Pressable
             key={`${s.goal}-${s.paceKgPerWeek}`}
             onPress={() => onSelect(s.goal, s.paceKgPerWeek)}
+            accessibilityRole="radio"
             style={[
               styles.card,
               {

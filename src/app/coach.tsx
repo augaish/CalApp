@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alertDestructive } from '@/lib/alerts';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
@@ -39,7 +40,7 @@ import { formatWeight } from '@/lib/units';
 
 const FOCUS: CoachFocus[] = ['food', 'training', 'health'];
 /** Starter questions for an empty thread — the same chip row the follow-ups use. */
-const STARTERS = ['eat', 'train', 'trend'] as const;
+const STARTERS = ['eat', 'log', 'train', 'trend'] as const;
 
 /** Timestamp for a sent message; module-level so the clock is never read during render. */
 const nowIso = () => new Date().toISOString();
@@ -171,7 +172,7 @@ export default function Coach() {
       return;
     }
     const days = resolved.overlapWeekdays.map((wd) => weekdayLabel(wd, locale)).join(' · ');
-    Alert.alert(t('coach.schedulePlan.overwriteTitle'), t('coach.schedulePlan.overwriteBody', { days }), [
+    alertDestructive(t('coach.schedulePlan.overwriteTitle'), t('coach.schedulePlan.overwriteBody', { days }), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('coach.schedulePlan.overwriteCta'), style: 'destructive', onPress: commit },
     ]);
@@ -268,7 +269,7 @@ export default function Coach() {
 
   const confirmNewConversation = () => {
     if (messages.length === 0) return;
-    Alert.alert(t('coach.newConversation'), t('coach.newConversationConfirm'), [
+    alertDestructive(t('coach.newConversation'), t('coach.newConversationConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('coach.newConversation'), style: 'destructive', onPress: resetCoachChat },
     ]);
@@ -383,11 +384,10 @@ export default function Coach() {
           <View style={{ marginBottom: Spacing.xs }}>
             <Text style={[Type.section, { color: theme.text, fontSize: 19 }]}>{t('coach.emptyTitle')}</Text>
             <Text style={{ color: theme.textSecondary, fontSize: 15, lineHeight: 21, marginTop: 2 }}>{t('coach.emptyBody')}</Text>
-            <Text style={{ color: theme.textTertiary, fontSize: 13, lineHeight: 19, marginTop: Spacing.sm }}>{t('coach.canAct')}</Text>
           </View>
         )}
         {!coachUnlocked && (
-          <Pressable onPress={() => router.push('/upgrade?reason=coach')} style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/upgrade?reason=coach')} style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
             <Ionicons name="lock-closed" size={22} color={theme.primary} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{t('coach.lockedTitle')}</Text>

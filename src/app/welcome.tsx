@@ -41,7 +41,7 @@ export default function Welcome() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.top, { paddingTop: insets.top + Spacing.sm }]}>
-        <Pressable onPress={setTutorialSeen} hitSlop={10} style={styles.skip}>
+        <Pressable accessibilityRole="button" onPress={setTutorialSeen} hitSlop={10} style={styles.skip}>
           <Text style={{ color: theme.textSecondary, fontSize: 15, fontWeight: '600' }}>
             {t('tutorial.skip')}
           </Text>

@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { alertProblem } from '@/lib/alerts';
 import { BrandHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, EmptyState, SearchField, StatusPill } from '@/components/system';
@@ -125,7 +126,7 @@ export default function Recipes() {
         router.push(`/upgrade?reason=${action.reason}`);
         return;
       }
-      Alert.alert(t(action.titleKey), t(action.bodyKey, action.values));
+      alertProblem(t(action.titleKey), t(action.bodyKey, action.values));
     } finally {
       setBusy(false);
     }

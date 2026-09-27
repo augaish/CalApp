@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertProblem } from '@/lib/alerts';
 import { Segmented } from '@/components/system';
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -145,7 +146,7 @@ export default function Upgrade() {
     } else if (out.kind === 'pending') {
       Alert.alert(t('upgrade.pendingTitle'), t('upgrade.purchasePending'));
     } else if (out.kind === 'failed') {
-      Alert.alert(t('upgrade.failedTitle'), t('upgrade.purchaseFailed'));
+      alertProblem(t('upgrade.failedTitle'), t('upgrade.purchaseFailed'));
     }
   };
 
@@ -155,7 +156,7 @@ export default function Upgrade() {
     setBusy(null);
     if (out.kind === 'restored') Alert.alert(t('upgrade.restoredTitle'), t('upgrade.restored'));
     else if (out.kind === 'nothing') Alert.alert(t('upgrade.restore'), t('upgrade.restoreNone', { store: storeName }));
-    else Alert.alert(t('upgrade.failedTitle'), t('upgrade.restoreFailed'));
+    else alertProblem(t('upgrade.failedTitle'), t('upgrade.restoreFailed'));
   };
 
   const currentTierSelected = plan === tier && !promo;

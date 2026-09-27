@@ -6,6 +6,7 @@ import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
+import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { Button } from '@/components/ui';
@@ -16,6 +17,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { useViewDay } from '@/lib/day';
 import { exerciseName, findExercise, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { estimateMinutes } from '@/lib/session-flow';
 import { dayExerciseIds } from '@/lib/day-plan';
 import { keyToDate, pendingOccurrences } from '@/lib/occurrences';
 import { usePending } from '@/lib/pending';
@@ -50,14 +52,6 @@ function weekdayLabel(i: number, locale: string): string {
 /** Whole minutes, for cardio durations stored as seconds. */
 function toMin(seconds: number | undefined): number {
   return Math.round((seconds ?? 0) / 60);
-}
-
-/** A rough session length from its shape: roughly nine minutes per exercise
- * of three sets with rest — a planning aid, labelled "about", never a record. */
-export function estimateMinutes(exerciseCount: number, setsTotal: number): number {
-  if (exerciseCount === 0) return 0;
-  const sets = setsTotal > 0 ? setsTotal : exerciseCount * 3;
-  return Math.max(10, Math.round((sets * 2.5 + exerciseCount * 2) / 5) * 5);
 }
 
 /** How long ago the WHOOP numbers were actually fetched. */
@@ -271,7 +265,7 @@ export default function Training() {
   const openExercise = (id: string) => router.push(`/exercise-detail?id=${encodeURIComponent(id)}`);
 
   const confirmDeleteWorkout = (id: string) =>
-    Alert.alert(t('training.deleteWorkoutConfirm'), undefined, [
+    alertDestructive(t('training.deleteWorkoutConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => removeWorkout(id) },
     ]);
@@ -288,7 +282,7 @@ export default function Training() {
       Alert.alert(t('training.savedToSchedule', { count: n, day: label }));
     };
     if (existing.length === 0) return commit('replace');
-    Alert.alert(t('training.scheduleExists', { day: label }), t('training.scheduleExistsBody'), [
+    alertDestructive(t('training.scheduleExists', { day: label }), t('training.scheduleExistsBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('training.scheduleMerge'), onPress: () => commit('merge') },
       { text: t('training.scheduleReplace'), style: 'destructive', onPress: () => commit('replace') },
@@ -329,16 +323,23 @@ export default function Training() {
     <>
       <View style={styles.dateRow}>
         <View style={{ flex: 1 }}>
-          <Text style={[Type.title, { color: theme.onGradient }]}>{t('tabs.training')}</Text>
-          <Pressable onPress={() => router.push('/calendar')} accessibilityRole="button" accessibilityLabel={dateLine} hitSlop={6}>
-            <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '500' }}>{dateLine}</Text>
+          {/* Same shape as Overview: the band names the screen, the big line
+              names the day, the small line gives its date. */}
+          <Pressable onPress={() => router.push('/calendar')} accessibilityRole="button" accessibilityLabel={dateLine} hitSlop={6} style={styles.dateTap}>
+            <Text style={[Type.title, { color: theme.onGradient }]}>
+              {selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { day: 'numeric', month: 'long' })}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="rgba(255,255,255,0.9)" />
           </Pressable>
+          <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '500' }}>
+            {selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
+          </Text>
         </View>
         <View style={[styles.arrows, { direction: 'ltr' }]}>
-          <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.arrow}>
+          <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
             <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
           </Pressable>
-          <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('common.next')} style={styles.arrow}>
+          <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('home.nextDay')} style={styles.arrow}>
             <Ionicons name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
           </Pressable>
         </View>
@@ -354,14 +355,14 @@ export default function Training() {
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 14, flex: 1 }} numberOfLines={1}>
           {activeSchedule ? t('training.activeSchedule', { name: scheduleName }) : t('training.noSavedSchedule')}
         </Text>
-        <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>{t('training.change')}</Text>
+        <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 14 }}>{activeSchedule ? t('training.change') : t('training.saveSchedule')}</Text>
         <Ionicons name="chevron-forward" size={16} color={theme.primary} />
       </Pressable>
     </>
   );
 
   return (
-    <CollapsingScreen title={t('common.appName')} compactTitle={t('tabs.training')} header={header} scrollRef={pageRef}>
+    <CollapsingScreen title={t('tabs.training')} header={header} scrollRef={pageRef}>
       {lastOp && (
         <View style={[styles.undoBar, { backgroundColor: theme.surfaceTint }]}>
           <Ionicons name="swap-horizontal" size={16} color={theme.primaryDark} />
@@ -370,7 +371,7 @@ export default function Training() {
           </Text>
           <Pressable
             onPress={() => {
-              if (!undoOccurrenceOp(lastOp.opId)) Alert.alert(t('reschedule.undoFailedTitle'), t('reschedule.undoFailedBody'));
+              if (!undoOccurrenceOp(lastOp.opId)) alertProblem(t('reschedule.undoFailedTitle'), t('reschedule.undoFailedBody'));
               setLastOp(null);
             }}
             accessibilityRole="button"
@@ -397,7 +398,15 @@ export default function Training() {
               </Text>
             </View>
           </View>
-          <ActionButton label={t('reschedule.doToday')} icon="play" onPress={() => router.push(`/reschedule?date=${nextPending.originalDate}&to=${dateKey(new Date())}`)} style={{ marginTop: Spacing.ms }} />
+          {/* One filled button per screen: when today has its own workout to
+              start below, catching up on the missed one is the secondary path. */}
+          <ActionButton
+            label={t('reschedule.doToday')}
+            icon="play"
+            variant={visiblePlanIds.length > 0 && !allDone ? 'secondary' : 'primary'}
+            onPress={() => router.push(`/reschedule?date=${nextPending.originalDate}&to=${dateKey(new Date())}`)}
+            style={{ marginTop: Spacing.ms }}
+          />
           <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
             <ActionButton label={t('reschedule.move')} icon="calendar-outline" variant="secondary" onPress={() => router.push(`/reschedule?date=${nextPending.originalDate}`)} style={{ flex: 1 }} />
             <ActionButton
@@ -691,6 +700,7 @@ export function summarize(w: LoggedWorkout, sets: string, top: string, kg: strin
 }
 
 const styles = StyleSheet.create({
+  dateTap: { flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start' },
   dateRow: { flexDirection: 'row', alignItems: 'flex-end', gap: Spacing.sm, marginTop: Spacing.sm, marginBottom: Spacing.ms },
   arrows: { flexDirection: 'row', gap: 2 },
   arrow: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },

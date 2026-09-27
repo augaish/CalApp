@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { ActionButton, EmptyState, IconTile, InfoLine, StatusPill } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
@@ -68,7 +69,7 @@ export default function Schedules() {
   const confirmDelete = (id: string) => {
     const target = saved.find((s) => s.id === id);
     if (!target) return;
-    Alert.alert(t('schedules.deleteTitle'), t('schedules.deleteBody', { name: nameOf(target) }), [
+    alertDestructive(t('schedules.deleteTitle'), t('schedules.deleteBody', { name: nameOf(target) }), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => deleteSchedule(id) },
     ]);

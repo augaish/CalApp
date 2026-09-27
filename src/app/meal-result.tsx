@@ -239,7 +239,7 @@ export default function MealResult() {
         <Swipeable
           key={index}
           renderRightActions={() => (
-            <Pressable onPress={() => removeItem(index)} style={styles.swipeDelete}>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')} onPress={() => removeItem(index)} style={styles.swipeDelete}>
               <Ionicons name="trash" size={22} color="#fff" />
               <Text style={styles.swipeDeleteText}>{t('common.delete')}</Text>
             </Pressable>
@@ -254,7 +254,7 @@ export default function MealResult() {
               style={[styles.itemNameInput, { color: theme.text, borderColor: theme.border }]}
             />
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')}
               onPress={() => removeItem(index)}
               hitSlop={8}
               style={({ pressed }) => [styles.itemDelete, pressed && { opacity: 0.5 }]}
@@ -270,7 +270,7 @@ export default function MealResult() {
               {PORTIONS.map(({ m, label }) => {
                 const active = Math.abs((item._mult ?? 1) - m) < 0.001;
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     key={m}
                     onPress={() => setMult(index, m)}
                     style={[

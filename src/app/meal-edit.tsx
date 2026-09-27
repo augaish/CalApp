@@ -258,7 +258,7 @@ export default function MealEdit() {
           <Title>{t('mealEdit.title')}</Title>
         </View>
         {items.length > 0 && (
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.share')}
             onPress={share}
             disabled={sharing}
             hitSlop={10}
@@ -285,7 +285,7 @@ export default function MealEdit() {
           {t('mealEdit.day')}
         </Text>
         {!isToday && (
-          <Pressable onPress={() => setDay(new Date())} hitSlop={8}>
+          <Pressable accessibilityRole="button" onPress={() => setDay(new Date())} hitSlop={8}>
             <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>
               {t('mealEdit.jumpToday')}
             </Text>
@@ -293,11 +293,11 @@ export default function MealEdit() {
         )}
       </View>
       <View style={[styles.dayRow, { backgroundColor: theme.card, borderColor: theme.border }]}>
-        <Pressable onPress={() => shiftDay(-1)} hitSlop={10} style={styles.arrow}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('home.previousDay')} onPress={() => shiftDay(-1)} hitSlop={10} style={styles.arrow}>
           <Ionicons name="chevron-back" size={22} color={theme.textSecondary} />
         </Pressable>
         <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{dayLabel}</Text>
-        <Pressable onPress={() => shiftDay(1)} hitSlop={10} disabled={isToday} style={styles.arrow}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('home.nextDay')} onPress={() => shiftDay(1)} hitSlop={10} disabled={isToday} style={styles.arrow}>
           <Ionicons
             name="chevron-forward"
             size={22}
@@ -324,7 +324,7 @@ export default function MealEdit() {
               style={[styles.itemNameInput, { color: theme.text, borderColor: theme.border }]}
             />
             <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
-            <Pressable
+            <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')}
               onPress={() => removeItem(index)}
               hitSlop={10}
               style={({ pressed }) => [styles.removeItemBtn, pressed && { opacity: 0.5 }]}
@@ -355,7 +355,7 @@ export default function MealEdit() {
               {PORTIONS.map(({ m, label }) => {
                 const active = Math.abs((mults[index] ?? 1) - m) < 0.001;
                 return (
-                  <Pressable
+                  <Pressable accessibilityRole="button"
                     key={m}
                     onPress={() => setPortion(index, m)}
                     style={[

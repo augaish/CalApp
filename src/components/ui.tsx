@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { selectionHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
 import type { MetricTrend } from '@/lib/store';
 
@@ -177,6 +178,8 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: bg, opacity: disabled ? 0.4 : 1 },
@@ -235,6 +238,8 @@ export function OptionRow({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
       style={({ pressed }) => [
         styles.option,
         {
@@ -348,6 +353,7 @@ export function Stepper({
   suffix?: string;
 }) {
   const t = useTheme();
+  const { t: tr } = useTranslation();
   const clamp = (v: number) => Math.min(max, Math.max(min, v));
   const fmt = (v: number) => (decimals > 0 ? String(v) : String(Math.round(v)));
   // While the field is focused we show the raw text the user is typing, so
@@ -379,6 +385,7 @@ export function Stepper({
 
   const bump = (delta: number) => {
     const next = clamp(Number((value + delta).toFixed(3)));
+    if (next !== value) selectionHaptic();
     emit(next);
     setText(fmt(next));
   };
@@ -391,6 +398,8 @@ export function Stepper({
       <View style={[styles.stepperRow, { direction: 'ltr' }]}>
         <Pressable
           onPress={() => bump(-step)}
+          accessibilityRole="button"
+          accessibilityLabel={`${tr('common.decrease')} ${label}`}
           style={({ pressed }) => [
             styles.stepperBtn,
             { backgroundColor: t.cardSubtle, borderColor: t.border },
@@ -427,6 +436,8 @@ export function Stepper({
         </View>
         <Pressable
           onPress={() => bump(step)}
+          accessibilityRole="button"
+          accessibilityLabel={`${tr('common.increase')} ${label}`}
           style={({ pressed }) => [
             styles.stepperBtn,
             { backgroundColor: t.cardSubtle, borderColor: t.border },
@@ -461,6 +472,8 @@ export function MealTypePicker({
           <Pressable
             key={type}
             onPress={() => onChange(type)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: active }}
             style={[
               styles.mealTypeChip,
               { backgroundColor: active ? t.primary : t.card, borderColor: active ? t.primary : t.border },

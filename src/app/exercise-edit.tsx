@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { Button, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -107,7 +108,7 @@ export default function ExerciseEdit() {
       setLowConfidence(typeof info.confidence === 'number' && info.confidence < 0.4);
       successHaptic();
     } catch {
-      Alert.alert(t('common.error'));
+      alertProblem(t('common.error'));
     } finally {
       setAiBusy(false);
     }
@@ -115,7 +116,7 @@ export default function ExerciseEdit() {
 
   const del = () => {
     if (!existing) return;
-    Alert.alert(t('exerciseEdit.editTitle'), t('exerciseEdit.deleteConfirm'), [
+    alertDestructive(t('exerciseEdit.editTitle'), t('exerciseEdit.deleteConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('exerciseEdit.delete'),
@@ -133,7 +134,7 @@ export default function ExerciseEdit() {
       <Title close>{existing ? t('exerciseEdit.editTitle') : t('exerciseEdit.addTitle')}</Title>
 
       {photo ? (
-        <Pressable onPress={() => router.push('/scan?mode=photo')}>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/scan?mode=photo')}>
           <Image source={{ uri: photo }} style={styles.photo} contentFit="cover" />
           <View style={[styles.photoEdit, { backgroundColor: theme.card }]}>
             <Ionicons name="camera" size={16} color={theme.primary} />
@@ -184,7 +185,7 @@ export default function ExerciseEdit() {
         {MUSCLE_GROUPS.map((cat) => {
           const active = category === cat;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={cat}
               onPress={() => editable && setCategory(cat)}
               style={[
@@ -208,7 +209,7 @@ export default function ExerciseEdit() {
         {TYPES.map((tp) => {
           const active = type === tp;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={tp}
               onPress={() => editable && setType(tp)}
               style={[
@@ -252,7 +253,7 @@ export default function ExerciseEdit() {
           editable={editable}
         />
         {isUrl(video) && (
-          <Pressable onPress={() => Linking.openURL(video.trim())} style={styles.watchRow}>
+          <Pressable accessibilityRole="link" onPress={() => Linking.openURL(video.trim())} style={styles.watchRow}>
             <Ionicons name="logo-youtube" size={18} color={theme.danger} />
             <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>
               {t('gymResult.watchVideo')}

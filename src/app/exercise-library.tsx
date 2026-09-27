@@ -131,7 +131,7 @@ export default function ExerciseLibrary() {
           style={[styles.searchInput, { color: theme.text }]}
         />
         {query.length > 0 && (
-          <Pressable onPress={() => setQuery('')} hitSlop={8}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.clear')} onPress={() => setQuery('')} hitSlop={8}>
             <Ionicons name="close-circle" size={18} color={theme.textTertiary} />
           </Pressable>
         )}
@@ -144,7 +144,7 @@ export default function ExerciseLibrary() {
         {(['chips', 'map'] as const).map((mode) => {
           const active = pickerMode === mode;
           return (
-            <Pressable key={mode} onPress={() => setPickerMode(mode)} hitSlop={6}>
+            <Pressable accessibilityRole="button" key={mode} onPress={() => setPickerMode(mode)} hitSlop={6}>
               <View
                 style={[
                   styles.modeChip,
@@ -176,7 +176,7 @@ export default function ExerciseLibrary() {
             const active = category === cat;
             const accent = cat === 'all' ? theme.primary : MUSCLE_COLORS[cat];
             return (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={cat}
                 onPress={() => setCategoryAndResetSub(cat)}
                 style={[
@@ -219,7 +219,7 @@ export default function ExerciseLibrary() {
             const active = subMuscle === m;
             const accent = category !== 'all' ? MUSCLE_COLORS[category] : theme.primary;
             return (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={m}
                 onPress={() => setSubMuscle(m)}
                 style={[
@@ -254,7 +254,7 @@ export default function ExerciseLibrary() {
             </View>
             <View style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
               {g.items.map((ex, i) => (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={ex.id}
                   onPress={() => onPickExercise(ex)}
                   style={({ pressed }) => [

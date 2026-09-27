@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { Ring } from '@/components/ring';
 import { Button, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -72,7 +73,7 @@ export default function Fasting() {
     if (!activeFast) return;
     const elapsedHours = (now - new Date(activeFast.startedAt).getTime()) / 3600000;
     if (elapsedHours < activeFast.targetHours) {
-      Alert.alert(t('fasting.endConfirmTitle'), t('fasting.endConfirmEarly'), [
+      alertDestructive(t('fasting.endConfirmTitle'), t('fasting.endConfirmEarly'), [
         { text: t('common.cancel'), style: 'cancel' },
         { text: t('fasting.end'), style: 'destructive', onPress: endFast },
       ]);
@@ -82,14 +83,14 @@ export default function Fasting() {
   };
 
   const confirmCancel = () => {
-    Alert.alert(t('fasting.cancelConfirmTitle'), t('fasting.cancelConfirm'), [
+    alertDestructive(t('fasting.cancelConfirmTitle'), t('fasting.cancelConfirm'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('fasting.cancel'), style: 'destructive', onPress: cancelFast },
     ]);
   };
 
   const confirmDelete = (id: string) =>
-    Alert.alert(t('fasting.deleteConfirm'), undefined, [
+    alertDestructive(t('fasting.deleteConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => deleteFastingSession(id) },
     ]);
@@ -154,7 +155,7 @@ export default function Fasting() {
             {[...PRESETS, 'custom' as const].map((p) => {
               const active = selected === p;
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={p}
                   onPress={() => setSelected(p)}
                   style={[
@@ -211,7 +212,7 @@ export default function Fasting() {
                       {met ? t('fasting.goalMet') : t('fasting.goalShort')}
                     </Text>
                   </View>
-                  <Pressable onPress={() => confirmDelete(f.id)} hitSlop={10}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('common.delete')} onPress={() => confirmDelete(f.id)} hitSlop={10}>
                     <Ionicons name="trash-outline" size={16} color={theme.textTertiary} />
                   </Pressable>
                 </View>

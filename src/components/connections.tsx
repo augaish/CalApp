@@ -3,8 +3,9 @@ import { useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { disconnectWhoop, fetchWhoopStatus, whoopAuthorizeUrl } from '@/lib/api';
@@ -86,7 +87,7 @@ export function WhoopConnectionRow() {
         if (params.get('status') === 'success') {
           successHaptic();
         } else {
-          Alert.alert(t('profile.whoopConnectFailed'), params.get('reason') || undefined);
+          alertProblem(t('profile.whoopConnectFailed'), params.get('reason') || undefined);
         }
       }
     } finally {
@@ -96,7 +97,7 @@ export function WhoopConnectionRow() {
   };
 
   const confirmDisconnect = () => {
-    Alert.alert(t('profile.whoopDisconnectConfirm'), undefined, [
+    alertDestructive(t('profile.whoopDisconnectConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.disconnect'),

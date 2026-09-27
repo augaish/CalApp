@@ -16,7 +16,7 @@ import { resolvePlan } from '@/lib/occurrences';
 import { useCelebrate } from '@/lib/celebrate';
 import { calendarDaysBetween, timestampFor } from '@/lib/day';
 import { exerciseName, findExercise, logStyleFor } from '@/lib/exercises';
-import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { lightHaptic, recordHaptic, successHaptic } from '@/lib/feedback';
 import { afterSet, completeLabel, setGoal } from '@/lib/session-flow';
 import {
   bestSetEver,
@@ -24,6 +24,7 @@ import {
   dayBurnAllocation,
   isSameDay,
   lastSessionBefore,
+  setScore,
   useAppStore,
   whoopCalibrationFactor,
   workoutFor,
@@ -249,8 +250,17 @@ export default function SessionScreen() {
     } else {
       logSet({ id: ex.id, name: exerciseName(ex, lang), type, category: ex.category }, set, timestampFor(day));
     }
-    successHaptic();
-    useCelebrate.getState().celebrate(t('celebrate.setLogged'));
+    // A new all-time best gets its own moment: the heavy thud and its own
+    // words, not the everyday "set logged". The first set ever of an
+    // exercise has nothing to beat, so it is an ordinary set.
+    const newRecord = !continuous && !!best && setScore(set, type) > setScore(best.set, type);
+    if (newRecord) {
+      recordHaptic();
+      useCelebrate.getState().celebrate(t('celebrate.newRecord', { set: label(set) }));
+    } else {
+      successHaptic();
+      useCelebrate.getState().celebrate(t('celebrate.setLogged'));
+    }
     setMoved(null);
 
     // Re-saving a run already logged changes nothing about where you are.

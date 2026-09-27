@@ -1,8 +1,8 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert } from 'react-native';
 
+import { alertProblem } from '@/lib/alerts';
 import { PhotoProgress } from '@/components/photo-progress';
 import { analyzeEquipment, analyzeMeal, FeatureLockedError, QuotaError } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
@@ -66,7 +66,7 @@ export default function PhotoAnalyze() {
           );
           return;
         }
-        Alert.alert(t('common.error'));
+        alertProblem(t('common.error'));
         router.back();
       }
     })();

@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import {Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertProblem } from '@/lib/alerts';
 import { DatePickerModal } from '@/components/date-picker';
 import { GoalScenarioCards } from '@/components/goal-scenario-cards';
 import { Button, Card, Field, OptionRow, Screen, StepDots, Subtitle, Title } from '@/components/ui';
@@ -92,7 +93,7 @@ export default function Onboarding() {
   const submitAbout = () => {
     const bad = invalidField();
     if (bad) {
-      Alert.alert(
+      alertProblem(
         t('onboarding.invalidInput'),
         t(bad === 'birthDate' ? 'onboarding.invalidBirthDate' : bad === 'height' ? 'onboarding.invalidHeight' : 'onboarding.invalidWeight'),
       );
@@ -169,7 +170,7 @@ export default function Onboarding() {
           {/* A non-editable TextInput can still swallow the tap itself on some
               platforms rather than letting it bubble to a wrapping Pressable —
               an overlay guarantees the tap is actually caught. */}
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowBirthDatePicker(true)} />
+          <Pressable accessibilityRole="button" accessibilityLabel={t('onboarding.birthDate')} style={StyleSheet.absoluteFill} onPress={() => setShowBirthDatePicker(true)} />
         </View>
         <Field label={t('onboarding.height')} value={height} onChangeText={(v) => setHeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="cm" />
         <Field label={t('onboarding.weight')} value={weight} onChangeText={(v) => setWeight(normalizeDigits(v))} keyboardType="decimal-pad" maxLength={5} suffix="kg" />

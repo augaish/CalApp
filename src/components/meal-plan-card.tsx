@@ -59,6 +59,8 @@ export function MealPlanCard({
           <View key={weekday} style={[styles.day, { borderTopColor: theme.border }]}>
             <Pressable
               onPress={() => setOpen(expanded ? null : weekday)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded }}
               style={({ pressed }) => [styles.dayHead, pressed && { opacity: 0.7 }]}
             >
               <View style={{ flex: 1 }}>

@@ -59,3 +59,11 @@ export function afterSet(
   }
   return { kind: 'finish' };
 }
+
+/** A rough session length from its shape: roughly nine minutes per exercise
+ * of three sets with rest — a planning aid, labelled "about", never a record. */
+export function estimateMinutes(exerciseCount: number, setsTotal: number): number {
+  if (exerciseCount === 0) return 0;
+  const sets = setsTotal > 0 ? setsTotal : exerciseCount * 3;
+  return Math.max(10, Math.round((sets * 2.5 + exerciseCount * 2) / 5) * 5);
+}

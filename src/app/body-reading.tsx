@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { DatePickerModal } from '@/components/date-picker';
 import { ProgressBar } from '@/components/progress-bar';
@@ -259,7 +260,7 @@ export default function BodyReading() {
   /** Cancel with unsaved edits offers Keep editing / Discard (S04). */
   const cancel = () => {
     if (!dirty) return leave();
-    Alert.alert(t('bodyReading.discardTitle'), t('bodyReading.discardBody'), [
+    alertDestructive(t('bodyReading.discardTitle'), t('bodyReading.discardBody'), [
       { text: t('bodyReading.keepEditing'), style: 'cancel' },
       { text: t('bodyReading.discard'), style: 'destructive', onPress: leave },
     ]);

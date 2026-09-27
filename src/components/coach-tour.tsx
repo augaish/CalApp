@@ -61,7 +61,7 @@ export function CoachTour({
     <Modal transparent visible animationType="fade" onRequestClose={onSkip} statusBarTranslucent>
       <View style={{ flex: 1 }}>
         {/* Tap anywhere on the dim area to advance */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={onNext} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onNext} accessible={false} focusable={false} />
 
         <Svg width={W} height={H} style={StyleSheet.absoluteFill} pointerEvents="none">
           <Defs>
@@ -100,17 +100,18 @@ export function CoachTour({
           <Text style={[styles.title, { color: theme.text }]}>{step.title}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>{step.body}</Text>
           <View style={styles.row}>
-            <Pressable onPress={onSkip} hitSlop={8} style={styles.skip}>
+            <Pressable onPress={onSkip} hitSlop={8} style={styles.skip} accessibilityRole="button">
               <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('tutorial.skip')}</Text>
             </Pressable>
             <View style={{ flex: 1 }} />
             {onTry && tryLabel && (
-              <Pressable onPress={onTry} hitSlop={8} style={[styles.next, { backgroundColor: theme.surfaceTint, marginEnd: Spacing.sm }]}>
+              <Pressable onPress={onTry} hitSlop={8} accessibilityRole="button" style={[styles.next, { backgroundColor: theme.surfaceTint, marginEnd: Spacing.sm }]}>
                 <Text style={{ color: theme.primaryDark, fontWeight: '700' }}>{tryLabel}</Text>
               </Pressable>
             )}
             <Pressable
               onPress={onNext}
+              accessibilityRole="button"
               style={({ pressed }) => [
                 styles.next,
                 { backgroundColor: theme.primary },

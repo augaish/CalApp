@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alertProblem } from '@/lib/alerts';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -87,14 +88,14 @@ export default function Login() {
       if (outcome === 'restored') Alert.alert(t('auth.restored'));
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      if (!/canceled|cancelled|ERR_REQUEST_CANCELED/i.test(msg)) Alert.alert(t('auth.signInFailed'), reason(err));
+      if (!/canceled|cancelled|ERR_REQUEST_CANCELED/i.test(msg)) alertProblem(t('auth.signInFailed'), reason(err));
       setBusy(false);
     }
   };
 
   const requestCode = async () => {
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      Alert.alert(t('auth.invalidEmail'));
+      alertProblem(t('auth.invalidEmail'));
       return;
     }
     setBusy(true);
@@ -102,7 +103,7 @@ export default function Login() {
       await sendEmailCode(email);
       setStep('code');
     } catch (err) {
-      Alert.alert(t('auth.signInFailed'), reason(err));
+      alertProblem(t('auth.signInFailed'), reason(err));
     } finally {
       setBusy(false);
     }
@@ -110,7 +111,7 @@ export default function Login() {
 
   const confirmCode = async () => {
     if (code.trim().length < 6) {
-      Alert.alert(t('auth.invalidCode'));
+      alertProblem(t('auth.invalidCode'));
       return;
     }
     setBusy(true);
@@ -120,7 +121,7 @@ export default function Login() {
       setAccount(account);
       if (outcome === 'restored') Alert.alert(t('auth.restored'));
     } catch (err) {
-      Alert.alert(t('auth.invalidCode'), reason(err));
+      alertProblem(t('auth.invalidCode'), reason(err));
       setBusy(false);
     }
   };

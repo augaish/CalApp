@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alertProblem } from '@/lib/alerts';
 import { PhotoProgress } from '@/components/photo-progress';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
@@ -95,7 +96,7 @@ export default function Scan() {
       setMeal({ items: [found.item], confidence: 1, source: found.source ?? undefined }, null);
       router.replace('/meal-result');
     } catch {
-      Alert.alert(t('common.error'));
+      alertProblem(t('common.error'));
       setAnalyzing(false);
     }
   };
@@ -175,11 +176,11 @@ export default function Scan() {
         return;
       }
       if (err instanceof ApiError && err.code === 'no_reading_detected') {
-        Alert.alert(t('common.error'), t('bodyReading.errorNoReading'));
+        alertProblem(t('common.error'), t('bodyReading.errorNoReading'));
         reset();
         return;
       }
-      Alert.alert(t('common.error'));
+      alertProblem(t('common.error'));
       reset();
     }
   };
@@ -206,11 +207,11 @@ export default function Scan() {
         return;
       }
       if (err instanceof ApiError && err.code === 'no_reading_detected') {
-        Alert.alert(t('common.error'), t('bodyReading.errorNoReading'));
+        alertProblem(t('common.error'), t('bodyReading.errorNoReading'));
         reset();
         return;
       }
-      Alert.alert(t('common.error'));
+      alertProblem(t('common.error'));
       reset();
     }
   };
@@ -315,7 +316,7 @@ export default function Scan() {
                 {/* Always shown. It used to disappear entirely on a build
                     without the image-picker module, which read as a missing
                     feature; tapping it now explains that instead. */}
-                <Pressable
+                <Pressable accessibilityRole="button"
                   onPress={pickFromGallery}
                   style={({ pressed }) => [styles.galleryBtn, pressed && { opacity: 0.6 }]}
                   hitSlop={8}
@@ -325,7 +326,7 @@ export default function Scan() {
                   </View>
                   <Text style={styles.galleryText}>{t('scan.gallery')}</Text>
                 </Pressable>
-                <Pressable onPress={capture} style={styles.shutterOuter}>
+                <Pressable accessibilityRole="button" accessibilityLabel={t('scan.shutter')} onPress={capture} style={styles.shutterOuter}>
                   <View style={styles.shutterInner} />
                 </Pressable>
                 {/* Spacer keeps the shutter centered opposite the gallery button. */}
@@ -333,12 +334,12 @@ export default function Scan() {
               </View>
             )}
             {isBarcode && (
-              <Pressable onPress={() => router.replace('/scan?mode=meal')} style={styles.galleryBtn}>
+              <Pressable accessibilityRole="button" onPress={() => router.replace('/scan?mode=meal')} style={styles.galleryBtn}>
                 <Ionicons name="camera-outline" size={26} color="#fff" />
                 <Text style={styles.galleryText}>{t('barcode.usePhoto')}</Text>
               </Pressable>
             )}
-            <Pressable onPress={() => router.back()} style={styles.cancel}>
+            <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.cancel}>
               <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
           </>

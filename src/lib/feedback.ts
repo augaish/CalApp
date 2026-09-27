@@ -22,3 +22,25 @@ export function successHaptic() {
 export function lightHaptic() {
   safeHaptic((h) => h.impactAsync(h.ImpactFeedbackStyle.Light));
 }
+
+/**
+ * The rest of the vocabulary. Each buzz means one thing across the app, so
+ * the hand learns it: a tick for choosing, a double tap for "careful", a
+ * sharp one for "that did not work", and a heavy thud reserved for a
+ * personal best.
+ */
+export function selectionHaptic() {
+  safeHaptic((h) => h.selectionAsync());
+}
+
+export function warningHaptic() {
+  safeHaptic((h) => h.notificationAsync(h.NotificationFeedbackType.Warning));
+}
+
+export function errorHaptic() {
+  safeHaptic((h) => h.notificationAsync(h.NotificationFeedbackType.Error));
+}
+
+export function recordHaptic() {
+  safeHaptic((h) => h.impactAsync(h.ImpactFeedbackStyle.Heavy));
+}

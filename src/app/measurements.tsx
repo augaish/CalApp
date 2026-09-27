@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import {Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import {
   BodyMap,
@@ -15,6 +15,7 @@ import {
   type BodyMapMetric,
   type BodyMapView,
 } from '@/components/body-map';
+import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { MetricTrend } from '@/components/charts';
 import { ActionButton, Chip, EmptyState, InfoLine, SectionTitle } from '@/components/system';
@@ -91,7 +92,7 @@ export default function Measurements() {
   const activeStatus = zoneStatusFromSegmental(activeMap === 'fat' ? latestFatSeg?.segmentalFatMassStatus : latestSeg?.segmentalLeanMassStatus);
 
   const confirmDelete = (at: string) =>
-    Alert.alert(t('bodyReading.deleteReadingConfirm'), undefined, [
+    alertDestructive(t('bodyReading.deleteReadingConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => deleteWeight(at) },
     ]);

@@ -61,6 +61,8 @@ export function WeekBars({
               <Pressable
                 key={i}
                 disabled={!onSelect}
+                accessibilityRole={onSelect ? 'button' : undefined}
+                accessibilityLabel={`${labels[i] ?? ''} ${Math.round(v)}`}
                 onPress={() => onSelect?.(i)}
                 style={{
                   flex: 1,

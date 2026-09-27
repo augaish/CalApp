@@ -309,7 +309,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
           {exerciseName(exercise, lang)}
         </Text>
         {exercise.source !== 'builtin' && (
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel={t('common.edit')}
             onPress={() => router.push(`/exercise-edit?id=${encodeURIComponent(exercise.id)}`)}
             hitSlop={10}
             style={styles.headerBtn}
@@ -337,7 +337,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
         {(['track', 'history', 'graph'] as Tab[]).map((tb) => {
           const active = tab === tb;
           return (
-            <Pressable
+            <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }}
               key={tb}
               onPress={() => {
                 lightHaptic();
@@ -454,7 +454,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
           {exercise.description}
         </Text>
       ) : null}
-      <Pressable
+      <Pressable accessibilityRole="link"
         onPress={() => {
           const url = exercise.videoUrl?.trim();
           const query = encodeURIComponent(t('gymResult.videoQuery', { name: exerciseName(exercise, lang) }));
@@ -644,7 +644,7 @@ function TrackTab({
             const active = editingIndex === index;
             const isBest = i === bestSetIndex(sets.map((r) => r.set), type);
             return (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={index}
                 onPress={() => onSelect(s, index)}
                 style={[
@@ -671,13 +671,13 @@ function TrackTab({
                       >
                         {s.comment}
                       </Text>
-                      <Pressable onPress={() => onDeleteComment(index)} hitSlop={8}>
+                      <Pressable accessibilityRole="button" accessibilityLabel={t('common.delete')} onPress={() => onDeleteComment(index)} hitSlop={8}>
                         <Ionicons name="trash-outline" size={13} color={theme.textTertiary} />
                       </Pressable>
                     </View>
                   ) : null}
                 </View>
-                <Pressable onPress={() => onDelete(index)} hitSlop={8} style={{ padding: 4 }}>
+                <Pressable accessibilityRole="button" accessibilityLabel={t('common.delete')} onPress={() => onDelete(index)} hitSlop={8} style={{ padding: 4 }}>
                   <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
                 </Pressable>
               </Pressable>

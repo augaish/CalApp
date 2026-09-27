@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { EmptyState } from '@/components/system';
 import { Screen } from '@/components/ui';
@@ -48,7 +49,7 @@ export default function WorkoutHistory() {
   };
 
   const confirmDeleteWorkout = (id: string) =>
-    Alert.alert(t('training.deleteWorkoutConfirm'), undefined, [
+    alertDestructive(t('training.deleteWorkoutConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => removeWorkout(id) },
     ]);

@@ -97,7 +97,7 @@ export function RefineBox({
           onFocus={() => scrollRef && scrollInputIntoView(scrollRef, inputRef)}
           multiline
         />
-        <Pressable onPress={send} disabled={!canSend} hitSlop={8} style={styles.sendBtn}>
+        <Pressable onPress={send} disabled={!canSend} hitSlop={8} style={styles.sendBtn} accessibilityRole="button" accessibilityLabel={t('refine.send')}>
           {loading ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (

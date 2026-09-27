@@ -34,7 +34,7 @@ export function DatePickerModal({
   /** Defaults to today — a body reading can't be dated in the future. */
   maxDate?: Date;
 }) {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
   const [month, setMonth] = useState(() => startOfMonth(value));
@@ -60,9 +60,11 @@ export function DatePickerModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose}>
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
+      <View style={styles.backdrop}>
+        {/* Tap outside to close: a layer behind the sheet, not a wrapper around
+            it — wrapped, VoiceOver read the whole sheet as one "Close" button. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel={t('common.close')} />
+        <View onStartShouldSetResponder={() => true}
           style={[styles.sheet, { backgroundColor: theme.background }]}
         >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
@@ -71,6 +73,8 @@ export function DatePickerModal({
             <Pressable
               onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
               hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('calendar.previousMonth')}
             >
               <Ionicons name="chevron-back" size={22} color={theme.text} />
             </Pressable>
@@ -81,6 +85,8 @@ export function DatePickerModal({
               onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
               hitSlop={10}
               disabled={nextMonthInFuture}
+              accessibilityRole="button"
+              accessibilityLabel={t('calendar.nextMonth')}
             >
               <Ionicons
                 name="chevron-forward"
@@ -105,7 +111,15 @@ export function DatePickerModal({
               const isToday = sameDay(d, new Date());
               const isFuture = d.getTime() > max.getTime() && !sameDay(d, max);
               return (
-                <Pressable key={i} onPress={() => pick(d)} disabled={isFuture} style={styles.cell}>
+                <Pressable
+                  key={i}
+                  onPress={() => pick(d)}
+                  disabled={isFuture}
+                  style={styles.cell}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isSelected, disabled: isFuture }}
+                  accessibilityLabel={d.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
+                >
                   <View
                     style={[
                       styles.dayCircle,
@@ -126,8 +140,8 @@ export function DatePickerModal({
               );
             })}
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }

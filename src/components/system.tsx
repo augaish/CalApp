@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type View
 
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { selectionHaptic } from '@/lib/feedback';
 import { knownLabel } from '@/lib/recipes';
 import type { NutrientKey } from '@/lib/types';
 
@@ -62,7 +63,10 @@ export function Segmented<K extends string>({
         return (
           <Pressable
             key={o.key}
-            onPress={() => onChange(o.key)}
+            onPress={() => {
+              if (o.key !== value) selectionHaptic();
+              onChange(o.key);
+            }}
             accessibilityRole="tab"
             accessibilityState={{ selected: on }}
             style={({ pressed }) => [
@@ -97,7 +101,10 @@ export function Chip({
   const theme = useTheme();
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        selectionHaptic();
+        onPress();
+      }}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       style={({ pressed }) => [
@@ -138,6 +145,46 @@ export function IllustrationTile({ icon, width = 104, height = 108 }: { icon: ke
   return (
     <View style={{ width, height, borderRadius: Radius.control, backgroundColor: theme.surfaceTint, alignItems: 'center', justifyContent: 'center' }}>
       <Ionicons name={icon} size={Math.round(height * 0.5)} color={theme.primary} />
+    </View>
+  );
+}
+
+/**
+ * The side tile on an Overview card: a number that matters for the next
+ * step ("~20 min", "680 kcal left") where an illustration used to sit. The
+ * picture repeated the card's own icon; the number answers the question the
+ * person opens the card with.
+ */
+export function StatTile({
+  icon,
+  value,
+  label,
+  color,
+  width = 104,
+  height = 108,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  value: string;
+  label: string;
+  color?: string;
+  width?: number;
+  height?: number;
+}) {
+  const theme = useTheme();
+  const ink = color ?? theme.primary;
+  return (
+    <View
+      accessible
+      accessibilityLabel={`${value} ${label}`}
+      style={{ width, minHeight: height, borderRadius: Radius.control, backgroundColor: theme.surfaceTint, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 2 }}
+    >
+      <Ionicons name={icon} size={20} color={ink} />
+      <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>
+        {value}
+      </Text>
+      <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600', textAlign: 'center' }} numberOfLines={2}>
+        {label}
+      </Text>
     </View>
   );
 }

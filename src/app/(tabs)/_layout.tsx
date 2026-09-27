@@ -109,6 +109,8 @@ export default function TabLayout() {
           tabBarButton: () => (
             <View style={styles.fabWrap}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('addMenu.title')}
                 onPress={() => {
                   // A stale hint from a Food-tab "+" the user backed out of
                   // must not silently redirect this unrelated, general add.

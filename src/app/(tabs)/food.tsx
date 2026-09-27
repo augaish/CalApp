@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { HeaderPill } from '@/components/brand-header';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
@@ -168,7 +169,7 @@ export default function Food() {
   };
 
   const confirmDelete = (id: string) =>
-    Alert.alert(t('home.deleteMealConfirm'), undefined, [
+    alertDestructive(t('home.deleteMealConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => removeMeal(id) },
     ]);
@@ -176,7 +177,7 @@ export default function Food() {
   /** A scan that finds several dishes still saves as one LoggedMeal with
    * several items; each is its own row, and deleting the last deletes the meal. */
   const confirmDeleteItem = (meal: LoggedMeal, itemIndex: number) =>
-    Alert.alert(t('home.deleteMealConfirm'), undefined, [
+    alertDestructive(t('home.deleteMealConfirm'), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('common.delete'),
@@ -489,12 +490,16 @@ export default function Food() {
                             {item.portion ? `${item.portion} · ` : ''}
                             {kcalLabel}
                           </Text>
+                          {/* Under the text rather than beside it, so the meal
+                              and its time are never the part that gets cut off. */}
+                          <View style={{ flexDirection: 'row', marginTop: 4 }}>
+                            {unknown.length > 0 ? (
+                              <StatusPill label={t('mealPlan.incomplete')} tone="review" icon="alert-circle-outline" />
+                            ) : (
+                              <StatusPill label={t('mealPlan.logged')} tone="logged" icon="checkmark" />
+                            )}
+                          </View>
                         </View>
-                        {unknown.length > 0 ? (
-                          <StatusPill label={t('mealPlan.incomplete')} tone="review" icon="alert-circle-outline" />
-                        ) : (
-                          <StatusPill label={t('mealPlan.logged')} tone="logged" icon="checkmark" />
-                        )}
                         <Ionicons name="chevron-forward" size={18} color={theme.textTertiary} />
                       </Pressable>
                     );

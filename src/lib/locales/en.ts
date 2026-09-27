@@ -1,5 +1,11 @@
 export const en = {
   common: {
+    edit: 'Edit',
+    share: 'Share',
+    clear: 'Clear',
+    remove: 'Remove',
+    increase: 'Increase',
+    decrease: 'Decrease',
     appName: 'Calgym',
     next: 'Next',
     back: 'Back',
@@ -17,11 +23,11 @@ export const en = {
     aiDisclaimer: 'AI estimates can be inaccurate. Values are guidance, not medical advice.',
     aiCreditsExhaustedTitle: 'AI credits are out',
     offlineTitle: 'No connection',
-    aiDownTitle: 'The AI service is unavailable',
+    aiDownTitle: 'AI isn’t available right now',
     aiDownBody:
-      "This is a fault on our side, not with what you asked for — rewording it will not help. Nothing was saved and your allowance was not charged. It has been reported; please try again later.",
+      'The fault is on our side, so rewording won’t help. Nothing was saved or charged. Please try again later.',
     aiDownBusy:
-      'The AI service is busy or slow right now. Nothing was saved and your allowance was not charged. Try again in a minute.',
+      'AI is busy right now. Nothing was saved or charged. Try again in a minute.',
     offlineBody: "This needs the internet. Your saved recipes still open without it.",
     errorCode: 'The server could not complete this ({{code}}).',
     aiCreditsExhausted:
@@ -78,6 +84,8 @@ export const en = {
     invalidWeight: 'Weight must be between 30 and 300 kg.',
   },
   home: {
+    previousDay: 'Previous day',
+    nextDay: 'Next day',
     today: 'Today',
     remaining: 'Remaining',
     consumed: 'Eaten',
@@ -192,9 +200,12 @@ export const en = {
     logWater: 'Log some water',
   },
   celebrate: {
-    mealLogged: 'Meal logged! 🎉',
-    setLogged: 'Nice set! 💪',
-    workoutDone: 'Logged — keep it up! ✅',
+    mealLogged: 'Meal logged',
+    setLogged: 'Nice set',
+    workoutDone: 'Workout saved — keep it up',
+    newRecord: 'New best · {{set}}',
+    proteinGoal: 'Protein goal reached today',
+    waterGoal: 'Water goal reached today',
   },
   tabs: {
     overview: 'Overview',
@@ -640,6 +651,9 @@ export const en = {
     reset: 'Reset',
   },
   today: {
+    tileExercisesDone: 'exercises done',
+    tileMinutes: 'minutes (approx.)',
+    tileProteinLeft: 'protein left today',
     workout: 'Workout',
     restDay: 'Rest day',
     restDayHint: 'Nothing planned. Add an exercise or scan a machine to train anyway.',
@@ -772,7 +786,8 @@ export const en = {
     workoutHistoryHint: 'Every session, with its actual sets',
     reviewWorkout: 'Review workout',
     activeSchedule: '{{name}} · Active',
-    noSavedSchedule: 'Week not saved yet',
+    noSavedSchedule: 'This week’s plan isn’t saved',
+    saveSchedule: 'Save',
     change: 'Change',
   },
   schedule: {
@@ -1226,11 +1241,12 @@ export const en = {
     usesAllowance: 'Uses your AI allowance',
     allowanceLeft: '{{left}} of {{cap}} AI Support messages left this month',
     emptyTitle: 'Ask about your own numbers',
-    emptyBody: 'Meals, macros, training, recovery, trends — answered from what you have logged, in either language.',
+    emptyBody: 'Answered from what you’ve logged. Ask it to log or change something and it prepares a card — nothing changes until you apply it.',
     starter: {
       eat: 'What should I eat tonight?',
       train: "Plan this week's training",
       trend: 'How am I trending?',
+      log: 'Log 2 eggs for breakfast',
     },
     programDraft: 'Program draft',
     recipeDraft: 'Recipe draft',
@@ -1240,7 +1256,7 @@ export const en = {
     reviewRecipeDraft: 'Review recipe draft',
     draftRemoved: 'This draft was deleted from your recipes.',
     allowanceLoading: 'Checking your allowance…',
-    allowanceUnavailable: 'Allowance unavailable right now',
+    allowanceUnavailable: 'Allowance unavailable',
     programDraftBody: 'A weekly schedule with {{count}} training days. Review it before adding it.',
     reviewProgramDraft: 'Review program draft',
     hideDraft: 'Hide draft',
@@ -1409,6 +1425,7 @@ export const en = {
     fastEndBody: 'Your fast is complete — end it in the app whenever you break it.',
   },
   scan: {
+    shutter: 'Take photo',
     mealTitle: 'Scan your meal',
     gymTitle: 'Scan equipment',
     bodyTitle: 'Scan a body reading',
@@ -1432,7 +1449,12 @@ export const en = {
     grantPermission: 'Allow camera',
     mockBadge: 'Demo mode — no AI server configured',
   },
+  calendar: {
+    previousMonth: 'Previous month',
+    nextMonth: 'Next month',
+  },
   refine: {
+    send: 'Send',
     placeholder: "Tell the AI what's wrong, e.g. \"it's boneless\" or \"no rice\"",
     error: "Couldn't apply that — try again.",
     offline: 'No connection — check your internet and try again.',

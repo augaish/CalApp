@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alertProblem } from '@/lib/alerts';
 import { RowGroup, SettingsRow } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -58,18 +59,20 @@ export default function AddMenu() {
     try {
       uri = await pickPhoto();
     } catch {
-      Alert.alert(t('common.error'));
+      alertProblem(t('common.error'));
     }
     setPicking(false);
     if (uri) go(`/photo-analyze?mode=meal&uri=${encodeURIComponent(uri)}`);
   };
 
   return (
-    <Pressable style={styles.backdrop} onPress={() => router.back()} accessibilityLabel={t('common.close')}>
-      <Pressable
+    <View style={styles.backdrop}>
+      {/* Tap outside to close: a layer behind the sheet, not a wrapper around
+          it — wrapped, VoiceOver read the whole sheet as one "Close" button. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('common.close')} />
+      <View onStartShouldSetResponder={() => true}
         style={[styles.sheet, { backgroundColor: theme.background, maxHeight: '92%' }, cardShadow(theme.shadow)]}
         // Swallow taps inside the sheet so it does not close under your finger.
-        onPress={() => {}}
       >
         <View style={[styles.grabber, { backgroundColor: theme.border }]} />
         <View style={styles.titleRow}>
@@ -130,8 +133,8 @@ export default function AddMenu() {
             </Text>
           </View>
         </ScrollView>
-      </Pressable>
-    </Pressable>
+      </View>
+    </View>
   );
 }
 

@@ -8,7 +8,9 @@ const OUT = '/tmp/claude-0/-home-user-CalApp/ecae7b05-0468-5173-bf98-63d45483ae6
 
 const today = new Date();
 const key = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-const at = (daysAgo, h = 12) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); d.setHours(h, 0, 0, 0); return d.toISOString(); };
+// Never in the future: run before 08:00 and "today at 08:00" would be a
+// reading the app rightly ignores, failing the suite for the clock's sake.
+const at = (daysAgo, h = 12) => { const d = new Date(today); d.setDate(d.getDate() - daysAgo); d.setHours(h, 0, 0, 0); return new Date(Math.min(d.getTime(), Date.now() - 60_000)).toISOString(); };
 
 const ing = (name, amount, kcal, extra = {}) => ({ name, key: name.toLowerCase().replace(/\s+/g, '_'), amount, unit: 'g', state: 'raw', calories: kcal, proteinG: 10, carbsG: 20, fatG: 5, aisle: 'pantry', ...extra });
 const recipe = (id, name, over = {}) => ({ id, name, servings: 4, createdAt: at(1), language: 'en', source: 'ai', ingredients: [ing('Rice', 400, 1400), ing('Chicken', 600, 660)], steps: ['Cook.', 'Serve.'], ...over });

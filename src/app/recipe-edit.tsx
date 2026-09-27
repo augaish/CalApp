@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -178,7 +179,7 @@ export default function RecipeEdit() {
       router.back();
       return;
     }
-    Alert.alert(t('recipeEdit.discardTitle'), t('recipeEdit.discardBody'), [
+    alertDestructive(t('recipeEdit.discardTitle'), t('recipeEdit.discardBody'), [
       { text: t('recipeEdit.keepEditing'), style: 'cancel' },
       { text: t('recipeEdit.discard'), style: 'destructive', onPress: () => router.back() },
     ]);

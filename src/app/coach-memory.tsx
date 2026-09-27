@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import {Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
+import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { EmptyState, InfoLine, RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
@@ -35,7 +36,7 @@ export default function CoachMemory() {
   const setCoachShare = useAppStore((s) => s.setCoachShare);
 
   const confirmRemove = (id: string, name: string) =>
-    Alert.alert(t('coach.memoryDeleteConfirm', { name }), undefined, [
+    alertDestructive(t('coach.memoryDeleteConfirm', { name }), undefined, [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('common.delete'), style: 'destructive', onPress: () => removeCoachReferenceDoc(id) },
     ]);

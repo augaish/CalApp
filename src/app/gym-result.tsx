@@ -145,7 +145,7 @@ export default function GymResult() {
           <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('gymResult.pickGroupBody')}</Text>
           <View style={styles.groupGrid}>
             {MUSCLE_GROUPS.map((g) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={g}
                 onPress={() => setPickedCategory(g)}
                 style={({ pressed }) => [

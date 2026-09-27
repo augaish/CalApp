@@ -69,9 +69,11 @@ export default function Calendar() {
     new Date(month.getFullYear(), month.getMonth() + 1, 1).getTime() > today.getTime();
 
   return (
-    <Pressable style={styles.backdrop} onPress={() => router.back()}>
-      <Pressable
-        onPress={(e) => e.stopPropagation()}
+    <View style={styles.backdrop}>
+      {/* Tap outside to close: a layer behind the sheet, not a wrapper around
+          it — wrapped, VoiceOver read the whole sheet as one "Close" button. */}
+      <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('common.close')} />
+      <View onStartShouldSetResponder={() => true}
         style={[
           styles.sheet,
           { backgroundColor: theme.background, paddingBottom: insets.bottom + Spacing.lg },
@@ -80,13 +82,13 @@ export default function Calendar() {
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
         <View style={styles.monthRow}>
-          <Pressable onPress={() => changeMonth(-1)} hitSlop={10} style={styles.monthArrow}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('calendar.previousMonth')} onPress={() => changeMonth(-1)} hitSlop={10} style={styles.monthArrow}>
             <Ionicons name="chevron-back" size={22} color={theme.text} />
           </Pressable>
           <Text style={[styles.monthLabel, { color: theme.text }]}>
             {month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
           </Text>
-          <Pressable
+          <Pressable accessibilityRole="button" accessibilityLabel={t('calendar.nextMonth')}
             onPress={() => changeMonth(1)}
             hitSlop={10}
             disabled={nextMonthInFuture}
@@ -129,7 +131,7 @@ export default function Calendar() {
             const hasWorkout = workoutDays.has(key);
             const hasMeal = mealDays.has(key);
             return (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={i}
                 onPress={() => pick(d)}
                 disabled={isFuture}
@@ -171,8 +173,8 @@ export default function Calendar() {
             );
           })}
         </View>
-      </Pressable>
-    </Pressable>
+      </View>
+    </View>
   );
 }
 

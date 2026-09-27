@@ -29,7 +29,7 @@ export default function WaterSheet() {
   const logWater = useAppStore((s) => s.logWater);
   const water = useAppStore((s) => s.water);
   // 250 / 330 / 500 to start; an amount typed again and again becomes a button.
-  const quick = waterButtons(water);
+  const quick = waterButtons(Array.isArray(water) ? water : []);
   const [custom, setCustom] = useState('');
 
   const add = (ml: number) => {
@@ -44,9 +44,11 @@ export default function WaterSheet() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Pressable style={styles.backdrop} onPress={() => router.back()}>
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
+      <View style={styles.backdrop}>
+        {/* Tap outside to close: a layer behind the sheet, not a wrapper around
+            it — wrapped, VoiceOver read the whole sheet as one "Close" button. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('common.close')} />
+        <View onStartShouldSetResponder={() => true}
           style={[
             styles.sheet,
             { backgroundColor: theme.background, paddingBottom: insets.bottom + Spacing.lg },
@@ -60,7 +62,7 @@ export default function WaterSheet() {
 
           <View style={styles.quickRow}>
             {quick.map((ml) => (
-              <Pressable
+              <Pressable accessibilityRole="button"
                 key={ml}
                 onPress={() => add(ml)}
                 style={({ pressed }) => [
@@ -99,8 +101,8 @@ export default function WaterSheet() {
               style={{ flex: 1 }}
             />
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </KeyboardAvoidingView>
   );
 }

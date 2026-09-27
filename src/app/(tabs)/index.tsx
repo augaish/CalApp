@@ -7,10 +7,11 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { WeekBars } from '@/components/charts';
 import { SponsorCard } from '@/components/sponsor-card';
-import { ActionButton, DayStrip, IconTile, IllustrationTile, MacroRow, ProgressTrack, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
+import { ActionButton, DayStrip, IconTile, IllustrationTile, MacroRow, StatTile, ProgressTrack, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { estimateMinutes } from '@/lib/session-flow';
 import { resolvePlan } from '@/lib/occurrences';
 import { formatWeight } from '@/lib/units';
 import { fetchWhoopDayBurn } from '@/lib/api';
@@ -177,6 +178,9 @@ export default function Overview() {
   const unplannedDoneIds = [...todayDoneIds].filter((id) => !scheduledIds.includes(id));
   const todayIds = applyOrder([...scheduledIds, ...unplannedDoneIds], dayOrder[dateKey(selected)]);
   const todayDoneCount = todayIds.filter((id) => todayDoneIds.has(id)).length;
+  // The workout card leads (its button is the filled one) while there is
+  // a session to resume or a workout left to start.
+  const trainingLeads = !!activeSession || (todayIds.length > 0 && todayDoneCount < todayIds.length);
   const todayOnlyUnplanned = scheduledIds.length === 0 && unplannedDoneIds.length > 0;
   const todayNames = todayIds.map((id) => {
     const ex = findExercise(id, exercises);
@@ -269,10 +273,10 @@ export default function Overview() {
             <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 13 }}>{streak}</Text>
           </Pressable>
           <View style={[styles.arrows, { direction: 'ltr' }]}>
-            <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('common.back')} style={styles.arrow}>
+            <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
               <Ionicons name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
             </Pressable>
-            <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('common.next')} style={styles.arrow}>
+            <Pressable onPress={() => shift(1)} hitSlop={10} disabled={selectedIsToday} accessibilityRole="button" accessibilityLabel={t('home.nextDay')} style={styles.arrow}>
               <Ionicons name="chevron-forward" size={20} color={selectedIsToday ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.95)'} />
             </Pressable>
           </View>
@@ -283,9 +287,9 @@ export default function Overview() {
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
-      <CollapsingScreen title={t('common.appName')} header={header}>
+      <CollapsingScreen title={t('tabs.overview')} header={header}>
         {!tourSeen && !tourActive && (
-          <Pressable
+          <Pressable accessibilityRole="button"
             onPress={() => useTour.getState().start()}
             style={({ pressed }) => [styles.tourBanner, { backgroundColor: theme.surfaceTint, borderColor: theme.primary }, pressed && { opacity: 0.8 }]}
           >
@@ -355,7 +359,13 @@ export default function Overview() {
                   <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: 6 }}>{t('today.noFurtherPlanned')}</Text>
                 )}
               </View>
-              <IllustrationTile icon="barbell" />
+              {activeSession || todayIds.length === 0 ? (
+                <IllustrationTile icon="barbell" />
+              ) : todayDoneCount > 0 ? (
+                <StatTile icon="checkmark-done" value={`${todayDoneCount}/${todayIds.length}`} label={t('today.tileExercisesDone')} color={theme.successText} />
+              ) : (
+                <StatTile icon="time-outline" value={String(estimateMinutes(todayIds.length, 0))} label={t('today.tileMinutes')} />
+              )}
             </Pressable>
 
             <Pressable
@@ -399,7 +409,15 @@ export default function Overview() {
                     />
                   ) : nextMeal ? (
                     <View style={{ flexDirection: 'row', gap: 6 }}>
-                      <ActionButton label={t('today.scan')} icon="camera" onPress={() => openMealEntry(nextMeal, 'scan')} style={{ flex: 1 }} />
+                      {/* One filled button per screen: Scan is the lead only
+                          when the workout card above has nothing to start. */}
+                      <ActionButton
+                        label={t('today.scan')}
+                        icon="camera"
+                        variant={trainingLeads ? 'secondary' : 'primary'}
+                        onPress={() => openMealEntry(nextMeal, 'scan')}
+                        style={{ flex: 1 }}
+                      />
                       <ActionButton label={t('today.log')} icon="add" variant="secondary" onPress={() => openMealEntry(nextMeal, 'menu')} style={{ flex: 1 }} />
                     </View>
                   ) : (
@@ -407,7 +425,14 @@ export default function Overview() {
                   )}
                 </View>
               </View>
-              <IllustrationTile icon="restaurant" />
+              {/* Protein, not calories: the calorie figure is on the card
+                  right below, and protein is what a meal choice most moves. */}
+              <StatTile
+                icon="nutrition-outline"
+                value={`${num(Math.max(0, Math.round(targets.proteinG - totals.proteinG)))} g`}
+                label={t('today.tileProteinLeft')}
+                color={theme.protein}
+              />
             </Pressable>
           </>
         )}

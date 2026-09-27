@@ -2,6 +2,12 @@ import type { TranslationSchema } from './en';
 
 export const ar: TranslationSchema = {
   common: {
+    edit: 'تعديل',
+    share: 'مشاركة',
+    clear: 'مسح',
+    remove: 'إزالة',
+    increase: 'زيادة',
+    decrease: 'إنقاص',
     appName: 'كالجيم',
     next: 'التالي',
     back: 'رجوع',
@@ -19,11 +25,11 @@ export const ar: TranslationSchema = {
     aiDisclaimer: 'تقديرات الذكاء الاصطناعي قد تكون غير دقيقة. القيم إرشادية وليست نصيحة طبية.',
     aiCreditsExhaustedTitle: 'رصيد الذكاء الاصطناعي نفد',
     offlineTitle: 'لا يوجد اتصال',
-    aiDownTitle: 'خدمة الذكاء الاصطناعي غير متاحة',
+    aiDownTitle: 'الذكاء الاصطناعي غير متاح الآن',
     aiDownBody:
-      'هذا خلل من جهتنا وليس في ما طلبته — إعادة صياغته لن تفيد. لم يُحفظ شيء ولم يُخصم من رصيدك. تم تسجيل المشكلة؛ حاول لاحقًا.',
+      'الخلل من جهتنا، فإعادة الصياغة لن تفيد. لم يُحفظ شيء ولم يُخصم شيء. حاول لاحقًا.',
     aiDownBusy:
-      'خدمة الذكاء الاصطناعي مشغولة أو بطيئة الآن. لم يُحفظ شيء ولم يُخصم من رصيدك. حاول بعد دقيقة.',
+      'الذكاء الاصطناعي مشغول الآن. لم يُحفظ شيء ولم يُخصم شيء. حاول بعد دقيقة.',
     offlineBody: 'هذا يحتاج إلى الإنترنت. وصفاتك المحفوظة تفتح بدونه.',
     errorCode: 'تعذّر على الخادم إتمام هذا ({{code}}).',
     aiCreditsExhausted:
@@ -80,6 +86,8 @@ export const ar: TranslationSchema = {
     invalidWeight: 'يجب أن يكون الوزن بين 30 و300 كجم.',
   },
   home: {
+    previousDay: 'اليوم السابق',
+    nextDay: 'اليوم التالي',
     today: 'اليوم',
     remaining: 'المتبقي',
     consumed: 'المستهلك',
@@ -194,9 +202,12 @@ export const ar: TranslationSchema = {
     logWater: 'سجّل بعض الماء',
   },
   celebrate: {
-    mealLogged: 'تم تسجيل الوجبة! 🎉',
-    setLogged: 'مجموعة رائعة! 💪',
-    workoutDone: 'تم — واصل! ✅',
+    mealLogged: 'تم تسجيل الوجبة',
+    setLogged: 'مجموعة رائعة',
+    workoutDone: 'حُفظ التمرين — واصل',
+    newRecord: 'رقم قياسي جديد · {{set}}',
+    proteinGoal: 'حققت هدف البروتين اليوم',
+    waterGoal: 'حققت هدف الماء اليوم',
   },
   tabs: {
     overview: 'نظرة عامة',
@@ -640,6 +651,9 @@ export const ar: TranslationSchema = {
     reset: 'تصفير',
   },
   today: {
+    tileExercisesDone: 'تمارين مكتملة',
+    tileMinutes: 'دقيقة تقريبًا',
+    tileProteinLeft: 'بروتين متبقٍ اليوم',
     workout: 'التمرين',
     restDay: 'يوم راحة',
     restDayHint: 'لا يوجد تمرين مخطط. أضف تمرينًا أو امسح جهازًا للتدريب على أي حال.',
@@ -772,7 +786,8 @@ export const ar: TranslationSchema = {
     workoutHistoryHint: 'كل جلسة بمجموعاتها الفعلية',
     reviewWorkout: 'مراجعة التمرين',
     activeSchedule: '{{name}} · نشط',
-    noSavedSchedule: 'الأسبوع غير محفوظ بعد',
+    noSavedSchedule: 'خطة هذا الأسبوع غير محفوظة',
+    saveSchedule: 'حفظ',
     change: 'تغيير',
   },
   schedule: {
@@ -1225,11 +1240,12 @@ export const ar: TranslationSchema = {
     usesAllowance: 'يستخدم رصيد الذكاء الاصطناعي',
     allowanceLeft: 'بقي {{left}} من {{cap}} رسائل دعم ذكي هذا الشهر',
     emptyTitle: 'اسأل عن أرقامك أنت',
-    emptyBody: 'الوجبات والماكروز والتمرين والتعافي والاتجاهات — إجابات مما سجّلته، بأي من اللغتين.',
+    emptyBody: 'إجابات مما سجّلته. اطلب منه تسجيل شيء أو تعديله فيجهّز بطاقة — لا يتغيّر شيء حتى تطبّقها.',
     starter: {
       eat: 'ماذا آكل الليلة؟',
       train: 'خطّط تمرين هذا الأسبوع',
       trend: 'كيف تسير أرقامي؟',
+      log: 'سجّل بيضتين على الفطور',
     },
     programDraft: 'مسودة برنامج',
     recipeDraft: 'مسودة وصفة',
@@ -1239,7 +1255,7 @@ export const ar: TranslationSchema = {
     reviewRecipeDraft: 'مراجعة مسودة الوصفة',
     draftRemoved: 'حُذفت هذه المسودة من وصفاتك.',
     allowanceLoading: 'جارٍ التحقق من رصيدك…',
-    allowanceUnavailable: 'الرصيد غير متاح الآن',
+    allowanceUnavailable: 'الرصيد غير متاح',
     programDraftBody: 'جدول أسبوعي بـ {{count}} أيام تمرين. راجعه قبل إضافته.',
     reviewProgramDraft: 'مراجعة مسودة البرنامج',
     hideDraft: 'إخفاء المسودة',
@@ -1405,6 +1421,7 @@ export const ar: TranslationSchema = {
     fastEndBody: 'صومك خلص — أنهِه في التطبيق متى ما فطرت.',
   },
   scan: {
+    shutter: 'التقاط صورة',
     mealTitle: 'صوّر وجبتك',
     gymTitle: 'صوّر الجهاز',
     bodyTitle: 'صوّر قراءة الجسم',
@@ -1428,7 +1445,12 @@ export const ar: TranslationSchema = {
     grantPermission: 'السماح للكاميرا',
     mockBadge: 'وضع تجريبي — لم يتم إعداد خادم الذكاء الاصطناعي',
   },
+  calendar: {
+    previousMonth: 'الشهر السابق',
+    nextMonth: 'الشهر التالي',
+  },
   refine: {
+    send: 'إرسال',
     placeholder: 'أخبر الذكاء الاصطناعي بالخطأ، مثلاً "بدون عظم" أو "بدون أرز"',
     error: 'تعذّر تطبيق ذلك — حاول مرة أخرى.',
     offline: 'لا يوجد اتصال — تحقق من الإنترنت وحاول مرة أخرى.',

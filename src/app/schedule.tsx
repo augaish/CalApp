@@ -15,6 +15,7 @@ import {
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
+import { alertProblem } from '@/lib/alerts';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -70,7 +71,7 @@ export default function ScheduleScreen() {
     const url = await createShareLink({ v: 1, schedule, exercises: exported });
     setSharing(false);
     if (!url) {
-      Alert.alert(t('schedule.shareFailed'));
+      alertProblem(t('schedule.shareFailed'));
       return;
     }
     try {
@@ -103,10 +104,10 @@ export default function ScheduleScreen() {
         <Ionicons name="calendar" size={22} color={theme.text} />
         <Text style={[Type.title, { color: theme.text, flex: 1 }]}>{t('schedule.title')}</Text>
         {/* Several weeks side by side — gym, home, travel. */}
-        <Pressable onPress={() => router.push('/schedules')} hitSlop={8} style={{ padding: 4 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={t('schedules.title')} onPress={() => router.push('/schedules')} hitSlop={8} style={{ padding: 4 }}>
           <Ionicons name="bookmarks-outline" size={20} color={theme.text} />
         </Pressable>
-        <Pressable
+        <Pressable accessibilityRole="button" accessibilityLabel={t('common.share')}
           onPress={sharePlan}
           disabled={sharing}
           hitSlop={10}
@@ -129,7 +130,7 @@ export default function ScheduleScreen() {
           const active = weekday === i;
           const has = (schedule[i]?.exerciseIds.length ?? 0) > 0;
           return (
-            <Pressable
+            <Pressable accessibilityRole="button"
               key={i}
               onPress={() => setWeekday(i)}
               style={[
@@ -195,7 +196,7 @@ export default function ScheduleScreen() {
                   i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
                 ]}
               >
-                <Pressable
+                <Pressable accessibilityRole="button"
                   style={({ pressed }) => [styles.rowTap, pressed && { opacity: 0.6 }]}
                   onPress={() =>
                     router.push(`/schedule-plan?weekday=${weekday}&id=${encodeURIComponent(exId)}`)
@@ -216,7 +217,7 @@ export default function ScheduleScreen() {
                   </View>
                   <Ionicons name="create-outline" size={17} color={theme.textSecondary} />
                 </Pressable>
-                <Pressable onPress={() => removeFromSchedule(weekday, exId)} hitSlop={8} style={{ padding: 4 }}>
+                <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')} onPress={() => removeFromSchedule(weekday, exId)} hitSlop={8} style={{ padding: 4 }}>
                   <Ionicons name="close-circle" size={20} color={theme.textTertiary} />
                 </Pressable>
               </View>
@@ -236,7 +237,7 @@ export default function ScheduleScreen() {
             {historyToAdd.map((h) => {
               const ex = findExercise(h.id, custom);
               return (
-                <Pressable
+                <Pressable accessibilityRole="button"
                   key={h.id}
                   onPress={() => addToSchedule(weekday, h.id)}
                   style={({ pressed }) => [

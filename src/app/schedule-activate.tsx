@@ -14,7 +14,7 @@ import { successHaptic } from '@/lib/feedback';
 import { useAppStore } from '@/lib/store';
 
 import { scheduleIcon } from './schedules';
-import { estimateMinutes } from './(tabs)/training';
+import { estimateMinutes } from '@/lib/session-flow';
 
 /** The week (Sunday-first) containing a day. */
 function weekOf(day: Date): Date[] {

@@ -138,7 +138,7 @@ export default function SchedulePlan() {
               <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flex: 1 }}>
                 {setLabel(s, type, kg)}
               </Text>
-              <Pressable onPress={() => removeAt(i)} hitSlop={8} style={{ padding: 4 }}>
+              <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')} onPress={() => removeAt(i)} hitSlop={8} style={{ padding: 4 }}>
                 <Ionicons name="trash-outline" size={18} color={theme.textTertiary} />
               </Pressable>
             </View>

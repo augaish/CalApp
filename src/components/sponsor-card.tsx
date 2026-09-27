@@ -33,6 +33,7 @@ export function SponsorCard() {
     <Pressable
       onPress={open}
       disabled={!sponsor.linkUrl}
+      accessibilityRole="link"
       style={({ pressed }) => [
         styles.card,
         { backgroundColor: theme.card, borderColor: theme.border },

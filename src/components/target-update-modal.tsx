@@ -36,9 +36,11 @@ export function TargetUpdateModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
-      <Pressable style={styles.backdrop} onPress={onDismiss}>
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
+      <View style={styles.backdrop}>
+        {/* Tap outside to close: a layer behind the sheet, not a wrapper around
+            it — wrapped, VoiceOver read the whole sheet as one "Close" button. */}
+        <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityRole="button" accessibilityLabel={t('common.close')} />
+        <View onStartShouldSetResponder={() => true}
           style={[styles.sheet, { backgroundColor: theme.background }]}
         >
           <View style={[styles.handle, { backgroundColor: theme.border }]} />
@@ -76,8 +78,8 @@ export function TargetUpdateModal({
             onPress={onDismiss}
             style={{ marginTop: Spacing.xs }}
           />
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
