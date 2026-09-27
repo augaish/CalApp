@@ -121,6 +121,7 @@ export default function Recipes() {
     } catch (err) {
       // The rule for what to say lives in aiFailureAction, where it is tested.
       const action = aiFailureAction(err, { titleKey: 'recipes.unusableTitle', bodyKey: 'recipes.unusableBody' });
+      if (action.kind === 'none') return;
       if (action.kind === 'upgrade') {
         useEntitlement.getState().refresh();
         router.push(`/membership?reason=${action.reason}`);

@@ -9,7 +9,7 @@ import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { Button, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeExercise, fetchVideoTitle } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeExercise, fetchVideoTitle } from '@/lib/api';
 import { findExercise, MUSCLE_GROUPS } from '@/lib/exercises';
 import { successHaptic } from '@/lib/feedback';
 import { usePending } from '@/lib/pending';
@@ -107,8 +107,8 @@ export default function ExerciseEdit() {
       // pointing at rather than blocking on.
       setLowConfidence(typeof info.confidence === 'number' && info.confidence < 0.4);
       successHaptic();
-    } catch {
-      alertProblem(t('common.error'));
+    } catch (err) {
+      if (!(err instanceof AiConsentDeclinedError)) alertProblem(t('common.error'));
     } finally {
       setAiBusy(false);
     }

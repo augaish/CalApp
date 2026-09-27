@@ -65,6 +65,7 @@ export default function ProgramScreen() {
         titleKey: 'program.unusableTitle',
         bodyKey: 'program.unusableBody',
       });
+      if (action.kind === 'none') return;
       if (action.kind === 'upgrade') {
         useEntitlement.getState().refresh();
         router.push(`/membership?reason=${action.reason}`);

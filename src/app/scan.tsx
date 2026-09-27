@@ -20,17 +20,7 @@ import { PhotoProgress } from '@/components/photo-progress';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import {
-  analyzeBodyReading,
-  analyzeEquipment,
-  analyzeMeal,
-  ApiError,
-  FeatureLockedError,
-  isMockMode,
-  lookupBarcode,
-  QuotaError,
-  reportBarcode,
-} from '@/lib/api';
+import { AiConsentDeclinedError, analyzeBodyReading, analyzeEquipment, analyzeMeal, ApiError, FeatureLockedError, isMockMode, lookupBarcode, QuotaError, reportBarcode } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { webviewAvailable } from '@/lib/native-modules';
@@ -168,6 +158,10 @@ export default function Scan() {
       setShot(photo.uri);
       await processImage(photo.uri);
     } catch (err) {
+      if (err instanceof AiConsentDeclinedError) {
+        reset();
+        return;
+      }
       if (err instanceof QuotaError) return onLocked('quota');
       if (err instanceof FeatureLockedError) return onLocked('equipment');
       if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {

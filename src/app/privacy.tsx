@@ -24,6 +24,18 @@ export default function Privacy() {
   const account = useAppStore((s) => s.account);
   const signOut = useAppStore((s) => s.signOut);
   const resetAll = useAppStore((s) => s.resetAll);
+  const aiConsent = useAppStore((s) => s.aiConsent);
+  const setAiConsent = useAppStore((s) => s.setAiConsent);
+  const toggleAiConsent = () => {
+    if (!aiConsent) {
+      setAiConsent('granted');
+      return;
+    }
+    Alert.alert(t('aiConsent.withdrawTitle'), t('aiConsent.withdrawBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('aiConsent.withdraw'), style: 'destructive', onPress: () => setAiConsent(undefined) },
+    ]);
+  };
 
   const confirmSignOut = () =>
     alertDestructive(t('profile.signOut'), t('profile.signOutConfirm'), [
@@ -60,13 +72,21 @@ export default function Privacy() {
   return (
     <Screen header={<PageHeader title={t('profile.privacy')} />}>
       <RowGroup title={t('privacy.sharing')}>
+        <SettingsRow
+          icon="shield-checkmark-outline"
+          title={t('aiConsent.row')}
+          subtitle={aiConsent ? t('aiConsent.allowed') : t('aiConsent.notAllowed')}
+          onPress={toggleAiConsent}
+          chevron={false}
+        />
         <SettingsRow icon="sparkles-outline" title={t('coach.manageContext')} subtitle={t('privacy.aiHint')} onPress={() => router.push('/coach-memory')} />
         <SettingsRow icon="notifications-outline" title={t('notifications.title')} onPress={() => router.push('/notifications')} />
         <SettingsRow icon="link-outline" title={t('profile.connections')} subtitle={t('privacy.connectionsHint')} onPress={() => router.push('/connections')} last />
       </RowGroup>
       <RowGroup title={t('legal.section')}>
         <SettingsRow icon="shield-checkmark-outline" title={t('legal.privacy')} onPress={() => Linking.openURL(`${SERVER_URL}/privacy`)} />
-        <SettingsRow icon="document-text-outline" title={t('legal.terms')} onPress={() => Linking.openURL(`${SERVER_URL}/terms`)} last />
+        <SettingsRow icon="document-text-outline" title={t('legal.terms')} onPress={() => Linking.openURL(`${SERVER_URL}/terms`)} />
+        <SettingsRow icon="help-circle-outline" title={t('legal.support')} onPress={() => Linking.openURL(`${SERVER_URL}/support`)} last />
       </RowGroup>
       <RowGroup title={t('privacy.dangerZone')}>
         {account?.email && <SettingsRow icon="log-out-outline" iconColor={theme.danger} title={t('profile.signOut')} onPress={confirmSignOut} chevron={false} />}

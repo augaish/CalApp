@@ -9,7 +9,7 @@ import { alertProblem } from '@/lib/alerts';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { webviewAvailable, viewShotAvailable } from '@/lib/native-modules';
 import { usePending } from '@/lib/pending';
@@ -72,6 +72,10 @@ export default function InBodyWeb() {
       setBodyReading(analysis, saved.uri);
       router.replace('/body-reading?fromScan=1');
     } catch (err) {
+      if (err instanceof AiConsentDeclinedError) {
+        setBusy(false);
+        return;
+      }
       if (err instanceof QuotaError) return onLocked('quota');
       if (err instanceof FeatureLockedError) return onLocked('coach');
       alertProblem(

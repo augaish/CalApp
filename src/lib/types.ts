@@ -668,6 +668,8 @@ export interface ActiveSession {
   /** What comes after this rest ("Next: set 3 of 3 · Bench press"), for the
    * alert that fires when it ends with the app out of sight. */
   restNext?: string;
+  /** The lock-screen countdown showing this rest (iPhone), so a relaunch can end one left behind. */
+  restActivityId?: string;
   restSeconds: number;
   /** Set when this session performs a moved occurrence (S42). */
   occurrenceId?: string;

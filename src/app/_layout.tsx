@@ -13,6 +13,7 @@ import { useEntitlement } from '@/lib/entitlement';
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
 import { startMilestones } from '@/lib/milestones';
 import { startRestAlerts } from '@/lib/rest-alert';
+import { startRestLiveActivity } from '@/lib/rest-live-activity';
 import { useAppStore } from '@/lib/store';
 
 SplashScreen.preventAutoHideAsync();
@@ -57,6 +58,7 @@ export default function RootLayout() {
     // The rest timer's alert for when the phone is locked or the app is
     // in the background; it follows the session from any screen.
     startRestAlerts();
+    startRestLiveActivity();
     startMilestones();
     // If a Supabase session exists, meter against the account instead so the
     // plan follows the person across devices.

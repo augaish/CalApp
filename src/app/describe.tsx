@@ -7,7 +7,7 @@ import { alertProblem } from '@/lib/alerts';
 import { Button, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, analyzeText, isMockMode, QuotaError } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeText, ApiError, isMockMode, QuotaError } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { useAppStore } from '@/lib/store';
@@ -41,6 +41,10 @@ export default function Describe() {
       setMeal(analysis, null);
       router.replace('/meal-result');
     } catch (err) {
+      if (err instanceof AiConsentDeclinedError) {
+        setBusy(false);
+        return;
+      }
       if (err instanceof QuotaError) {
         useEntitlement.getState().refresh();
         router.replace('/membership?reason=quota');

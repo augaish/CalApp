@@ -129,6 +129,12 @@ export default function Coach() {
       ]);
     } catch (err) {
       const action = aiFailureAction(err, { titleKey: 'common.error', bodyKey: 'common.error' });
+      if (action.kind === 'none') {
+        // Nothing was sent: give the question back, untouched.
+        setMessages(messages);
+        setInput(content);
+        return;
+      }
       if (action.kind === 'upgrade') {
         useEntitlement.getState().refresh();
         // Keep the typed question so nothing is lost on the way to Upgrade.

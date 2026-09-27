@@ -59,6 +59,8 @@ interface AppState {
   units: Units;
   /** Absent on stores from before it existed, which reads as 'system'. */
   appearance?: AppearancePref;
+  /** Whether AI requests may leave the device — see ai-consent.ts. Absent until asked. */
+  aiConsent?: 'granted';
   /** When the membership sheet last offered itself — see membership-prompt.ts. */
   membershipPrompt?: MembershipPromptState;
   /** S19 focus preference; both by default. */
@@ -222,6 +224,7 @@ interface AppState {
   setLanguage: (language: Language) => void;
   setUnits: (units: Units) => void;
   setAppearance: (appearance: AppearancePref) => void;
+  setAiConsent: (value: 'granted' | undefined) => void;
   setMembershipPrompt: (state: MembershipPromptState) => void;
   setFocusAreas: (areas: FocusArea[]) => void;
   setProfile: (profile: Profile) => void;
@@ -512,6 +515,7 @@ export const useAppStore = create<AppState>()(
       setLanguage: (language) => set({ language }),
       setUnits: (units) => set({ units }),
       setAppearance: (appearance) => set({ appearance }),
+      setAiConsent: (aiConsent) => set({ aiConsent }),
       setMembershipPrompt: (membershipPrompt) => set({ membershipPrompt }),
       setFocusAreas: (areas) => set({ focusAreas: areas.length ? areas : ['food', 'training'] }),
       setProfile: (profile) => set({ profile, targets: dailyTargets(profile) }),
@@ -1243,6 +1247,7 @@ export const useAppStore = create<AppState>()(
         language,
         units,
         appearance,
+        aiConsent,
         membershipPrompt,
         focusAreas,
         profile,
@@ -1290,6 +1295,7 @@ export const useAppStore = create<AppState>()(
         language,
         units,
         appearance,
+        aiConsent,
         membershipPrompt,
         focusAreas,
         profile,

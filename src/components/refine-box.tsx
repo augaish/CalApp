@@ -14,7 +14,7 @@ import {
 import { Icon } from '@/components/icon';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiError, FeatureLockedError, QuotaError, refineMeal } from '@/lib/api';
+import { AiConsentDeclinedError, ApiError, FeatureLockedError, QuotaError, refineMeal } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { scrollInputIntoView } from '@/lib/scroll-to-input';
@@ -61,7 +61,9 @@ export function RefineBox({
       setMessage('');
       successHaptic();
     } catch (err) {
-      if (err instanceof QuotaError || err instanceof FeatureLockedError) {
+      if (err instanceof AiConsentDeclinedError) {
+        // Nothing was sent; the typed request stays in the box.
+      } else if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
       } else if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {

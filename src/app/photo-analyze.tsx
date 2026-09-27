@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { alertProblem } from '@/lib/alerts';
 import { PhotoProgress } from '@/components/photo-progress';
-import { analyzeEquipment, analyzeMeal, FeatureLockedError, QuotaError } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeEquipment, analyzeMeal, FeatureLockedError, QuotaError } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { prepareImage } from '@/lib/photo';
 import { usePending } from '@/lib/pending';
@@ -59,6 +59,10 @@ export default function PhotoAnalyze() {
         }
       } catch (err) {
         if (!alive) return;
+        if (err instanceof AiConsentDeclinedError) {
+          router.back();
+          return;
+        }
         if (err instanceof QuotaError || err instanceof FeatureLockedError) {
           useEntitlement.getState().refresh();
           router.replace(

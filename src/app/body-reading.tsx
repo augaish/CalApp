@@ -15,7 +15,7 @@ import { Button, Field, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { displayToKg, formatWeight, kgToDisplay, weightUnit } from '@/lib/units';
-import { analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
 import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
@@ -232,6 +232,10 @@ export default function BodyReading() {
       setPdfName(picked.name);
       setUploadStage('idle');
     } catch (err) {
+      if (err instanceof AiConsentDeclinedError) {
+        setUploadStage('idle');
+        return;
+      }
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         setUploadStage('idle');

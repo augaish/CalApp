@@ -30,6 +30,14 @@ export class FeatureLockedError extends Error {
   }
 }
 
+/** Raised before sending anything when the person has not allowed AI processing. */
+export class AiConsentDeclinedError extends Error {
+  constructor() {
+    super('ai_consent_declined');
+    this.name = 'AiConsentDeclinedError';
+  }
+}
+
 /** Raised when the server answered, and answered with a refusal. */
 export class ApiError extends Error {
   constructor(public code: string) {
@@ -58,6 +66,8 @@ const RETRYABLE_CODES = ['ai_rate_limited', 'ai_overloaded', 'ai_timeout'];
 export type AiFailureAction =
   /** Nothing to explain in a dialog: the upgrade screen states the case. */
   | { kind: 'upgrade'; reason: 'quota' | 'coach' }
+  /** The person chose not to send it: nothing to report. */
+  | { kind: 'none' }
   | { kind: 'alert'; titleKey: string; bodyKey: string; values?: Record<string, string> };
 
 /**
@@ -80,6 +90,9 @@ export function aiFailureAction(
 ): AiFailureAction {
   if (err instanceof QuotaError) return { kind: 'upgrade', reason: 'quota' };
   if (err instanceof FeatureLockedError) return { kind: 'upgrade', reason: 'coach' };
+  // They just chose "Not now" on the permission question: nothing was sent
+  // and nothing went wrong, so there is nothing to tell them.
+  if (err instanceof AiConsentDeclinedError) return { kind: 'none' };
 
   // Not an ApiError means the request never got an answer at all: fetch()
   // rejects rather than resolving when there is no route to the server.

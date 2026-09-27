@@ -1,6 +1,7 @@
 import { SERVER_URL } from './api';
 import { signOutAuth } from './auth';
 import { useAppStore } from './store';
+import { getSupabase } from './supabase';
 import { deleteRemoteData } from './sync';
 
 /**
@@ -36,6 +37,14 @@ export function buildExport(): string {
 export async function deleteAccount(): Promise<boolean> {
   const ref = useAppStore.getState().installId;
   let serverOk = true;
+  // Read before anything is signed out: the server needs it to delete the
+  // sign-in account itself, not only the records attached to it.
+  let token: string | null = null;
+  try {
+    token = (await getSupabase().auth.getSession()).data.session?.access_token ?? null;
+  } catch {
+    token = null;
+  }
   // The cloud backup goes first: wiping the device while a copy of the same
   // logs sits in the account would not be a deletion at all.
   try {
@@ -47,7 +56,7 @@ export async function deleteAccount(): Promise<boolean> {
     try {
       const res = await fetch(`${SERVER_URL}/api/me`, {
         method: 'DELETE',
-        headers: { 'x-calgym-user': ref },
+        headers: { 'x-calgym-user': ref, ...(token ? { Authorization: `Bearer ${token}` } : {}) },
       });
       serverOk = res.ok && serverOk;
     } catch {

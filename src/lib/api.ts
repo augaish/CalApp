@@ -1,4 +1,5 @@
-import { ApiError, FeatureLockedError, QuotaError } from './api-errors';
+import { AiConsentDeclinedError, ApiError, FeatureLockedError, QuotaError } from './api-errors';
+import { ensureAiConsent } from './ai-consent';
 import { deviceLabel } from './device';
 import { useAppStore } from './store';
 import type {
@@ -66,9 +67,25 @@ function authHeaders(): Record<string, string> {
 // Defined in a leaf module so the rule for what to say about each failure
 // can be tested without dragging React Native in. Re-exported here because
 // every screen already imports them from '@/lib/api'.
-export { ApiError, FeatureLockedError, QuotaError } from './api-errors';
+export { AiConsentDeclinedError, ApiError, FeatureLockedError, QuotaError } from './api-errors';
+
+/** Routes that send the person's photos, reports or words to an AI provider. */
+const AI_PATHS = new Set([
+  '/api/analyze-meal',
+  '/api/analyze-equipment',
+  '/api/analyze-body-reading',
+  '/api/analyze-exercise',
+  '/api/analyze-text',
+  '/api/refine-meal',
+  '/api/coach-attachment',
+  '/api/coach',
+  '/api/generate-program',
+  '/api/generate-recipe',
+]);
 
 async function post<T>(path: string, body: unknown): Promise<T> {
+  // Asked once, before the first thing ever leaves for an AI provider.
+  if (AI_PATHS.has(path) && !(await ensureAiConsent())) throw new AiConsentDeclinedError();
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
