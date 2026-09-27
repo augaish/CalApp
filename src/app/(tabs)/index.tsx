@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { TodayPill } from '@/components/brand-header';
 import { Icon } from '@/components/icon';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { WeekBars } from '@/components/charts';
@@ -15,7 +16,7 @@ import { estimateMinutes } from '@/lib/session-flow';
 import { resolvePlan } from '@/lib/occurrences';
 import { formatWeight } from '@/lib/units';
 import { fetchWhoopDayBurn } from '@/lib/api';
-import { useViewDay } from '@/lib/day';
+import { useViewDay, weekPageFor } from '@/lib/day';
 import { exerciseName, findExercise } from '@/lib/exercises';
 import { usePending } from '@/lib/pending';
 import {
@@ -53,17 +54,6 @@ function nextMealSlot(logged: Set<MealType>): MealType | null {
   if (now === 'snack') return null;
   const from = MAIN_MEALS.indexOf(now);
   return MAIN_MEALS.slice(from).find((m) => !logged.has(m)) ?? null;
-}
-
-/** Seven days ending on (and including) the given day. */
-function sevenDaysEnding(end: Date): Date[] {
-  const days: Date[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(end);
-    d.setDate(d.getDate() - i);
-    days.push(d);
-  }
-  return days;
 }
 
 /**
@@ -200,11 +190,9 @@ export default function Overview() {
     router.push(via === 'scan' ? '/scan?mode=meal' : '/add-menu?scope=food');
   };
 
-  // The strip shows the current week (ending today) whenever the selected day
-  // is still inside it, so tapping a day in view never reshuffles the row.
-  // Only once you arrow back past that window does it start following you.
-  const thisWeek = sevenDaysEnding(new Date());
-  const days = thisWeek.some((d) => isSameDay(d.toISOString(), selected)) ? thisWeek : sevenDaysEnding(selected);
+  // Whole-week pages counted back from today: arrowing through days moves
+  // the highlight across a still row and turns the page only at its edge.
+  const days = weekPageFor(selected);
   const chartLabels = days.map((d) => d.toLocaleDateString(locale, { weekday: 'narrow' }));
   const calValues = days.map((d) => Math.round(totalsForDay(meals, d).calories));
   // "As of" the day currently being viewed — the most recent reading on or
@@ -263,15 +251,21 @@ export default function Overview() {
             </Pressable>
             <Text style={{ color: 'rgba(255,255,255,0.88)', fontSize: 14, fontWeight: '500' }}>{dateLine}</Text>
           </View>
-          <Pressable
-            onPress={() => Alert.alert(t('home.streakTitle', { count: streak }), t('home.streakBody'))}
-            accessibilityRole="button"
-            accessibilityLabel={t('home.streakTitle', { count: streak })}
-            style={[styles.streak, { backgroundColor: 'rgba(33,27,46,0.22)' }]}
-          >
-            <Icon name="flame" size={15} color="#FFD166" />
-            <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 13 }}>{streak}</Text>
-          </Pressable>
+          {/* Away from today, the streak (a today fact) gives way to the
+              one-tap way back. */}
+          {selectedIsToday ? (
+            <Pressable
+              onPress={() => Alert.alert(t('home.streakTitle', { count: streak }), t('home.streakBody'))}
+              accessibilityRole="button"
+              accessibilityLabel={t('home.streakTitle', { count: streak })}
+              style={[styles.streak, { backgroundColor: 'rgba(33,27,46,0.22)' }]}
+            >
+              <Icon name="flame" size={15} color="#FFD166" />
+              <Text style={{ color: theme.onGradient, fontWeight: '800', fontSize: 13 }}>{streak}</Text>
+            </Pressable>
+          ) : (
+            <TodayPill onPress={() => setDay(new Date())} />
+          )}
           <View style={[styles.arrows, { direction: 'ltr' }]}>
             <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
               <Icon name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />

@@ -78,3 +78,24 @@ export const useViewDay = create<DayState>((set, get) => ({
     set({ day: notFuture(d) });
   },
 }));
+
+/**
+ * The seven days the strip shows for a selected day. Weeks are fixed pages
+ * counted back from today — today's page ends today, the one before ends a
+ * week ago, and so on — so stepping a day at a time moves the highlight
+ * across a still row and only turns the page at its edge, instead of the
+ * whole row sliding under your finger on every tap.
+ */
+export function weekPageFor(selected: Date, today: Date = new Date()): Date[] {
+  const start = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const back = Math.max(0, Math.round((start(today).getTime() - start(selected).getTime()) / 86_400_000));
+  const end = start(today);
+  end.setDate(end.getDate() - Math.floor(back / 7) * 7);
+  const days: Date[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(end);
+    d.setDate(end.getDate() - i);
+    days.push(d);
+  }
+  return days;
+}

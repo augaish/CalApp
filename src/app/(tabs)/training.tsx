@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
+import { TodayPill } from '@/components/brand-header';
 import { Icon } from '@/components/icon';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
@@ -132,6 +133,7 @@ export default function Training() {
   const restorePlanToday = useAppStore((s) => s.restorePlanToday);
   const selected = useViewDay((s) => s.day);
   const shift = useViewDay((s) => s.shift);
+  const setDay = useViewDay((s) => s.setDay);
 
   const occurrences = useAppStore((s) => s.occurrences);
   const applyOccurrenceMoves = useAppStore((s) => s.applyOccurrenceMoves);
@@ -335,6 +337,7 @@ export default function Training() {
             {selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
           </Text>
         </View>
+        {!selectedIsToday && <TodayPill onPress={() => setDay(new Date())} />}
         <View style={[styles.arrows, { direction: 'ltr' }]}>
           <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
             <Icon name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />

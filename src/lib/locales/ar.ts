@@ -89,6 +89,7 @@ export const ar: TranslationSchema = {
     previousDay: 'اليوم السابق',
     nextDay: 'اليوم التالي',
     today: 'اليوم',
+    backToToday: 'العودة إلى اليوم',
     remaining: 'المتبقي',
     consumed: 'المستهلك',
     target: 'الهدف',

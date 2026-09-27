@@ -15,6 +15,9 @@ import { useTheme } from '@/hooks/use-theme';
 /** Translucent dark backing keeps white header text legible over the mint end
  * of the gradient (C02 "contrast backing"). */
 const BACKING = 'rgba(33,27,46,0.22)';
+// Glass over the pale gradient turns nearly white, and the white text on it
+// disappeared. A dark tint keeps the glass but gives the text its contrast.
+const GLASS_TINT = 'rgba(33,27,46,0.4)';
 
 /**
  * C02 Brand header — the compact gradient band every root destination shares:
@@ -101,7 +104,7 @@ export function BrandRow({
           accessibilityLabel={t('common.back')}
           style={({ pressed }) => [styles.brandBack, { width: size, height: size, borderRadius: size / 2 }, pressed && { opacity: 0.7 }]}
         >
-          <GlassBacking radius={size / 2} fallbackColor={BACKING} />
+          <GlassBacking radius={size / 2} fallbackColor={BACKING} tint={GLASS_TINT} />
           <Icon name="chevron-back" size={compact ? 18 : 22} color={theme.onGradient} />
         </Pressable>
       )}
@@ -126,7 +129,7 @@ export function BrandRow({
             accessibilityLabel={t('tabs.ai')}
             style={({ pressed }) => [styles.pill, { minHeight: size }, pressed && { opacity: 0.8 }]}
           >
-            <GlassBacking radius={size / 2} fallbackColor={BACKING} />
+            <GlassBacking radius={size / 2} fallbackColor={BACKING} tint={GLASS_TINT} />
             <Icon name="sparkles" size={15} color={theme.onGradient} />
             <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]}>{t('tabs.ai')}</Text>
           </Pressable>
@@ -140,7 +143,7 @@ export function BrandRow({
         accessibilityLabel={t('profile.title')}
         style={({ pressed }) => [styles.avatar, { width: size, height: size, borderRadius: size / 2 }, pressed && { opacity: 0.8 }]}
       >
-        <GlassBacking radius={size / 2} fallbackColor={BACKING} />
+        <GlassBacking radius={size / 2} fallbackColor={BACKING} tint={GLASS_TINT} />
         <Icon name="person" size={compact ? 16 : 18} color={theme.onGradient} />
       </Pressable>
     </View>
@@ -170,12 +173,32 @@ export function HeaderPill({
       accessibilityLabel={accessibilityLabel ?? label}
       style={({ pressed }) => [styles.pill, pressed && { opacity: 0.8 }]}
     >
-      <GlassBacking radius={18} fallbackColor={BACKING} />
+      <GlassBacking radius={18} fallbackColor={BACKING} tint={GLASS_TINT} />
       <Icon name={icon} size={15} color={theme.onGradient} />
       <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]} numberOfLines={1}>
         {label}
       </Text>
       {trailing && <Icon name={trailing} size={13} color={theme.onGradient} />}
+    </Pressable>
+  );
+}
+
+/** Shown on the gradient while you look at another day: one tap back to today. */
+export function TodayPill({ onPress }: { onPress: () => void }) {
+  const { t } = useTranslation();
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      accessibilityRole="button"
+      accessibilityLabel={t('home.backToToday')}
+      style={({ pressed }) => [styles.pill, styles.todayPill, pressed && { opacity: 0.8 }]}
+    >
+      <GlassBacking radius={16} fallbackColor={BACKING} tint={GLASS_TINT} />
+      <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]} numberOfLines={1}>
+        {t('home.today')}
+      </Text>
     </Pressable>
   );
 }
@@ -276,6 +299,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   pillText: { fontSize: 13, fontWeight: '700' },
+  todayPill: { minHeight: 32, paddingHorizontal: 12, flexShrink: 0 },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   back: { flexDirection: 'row', alignItems: 'center', minHeight: TOUCH, minWidth: TOUCH, gap: 2, zIndex: 1 },
   titleWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },

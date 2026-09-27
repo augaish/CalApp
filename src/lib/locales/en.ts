@@ -87,6 +87,7 @@ export const en = {
     previousDay: 'Previous day',
     nextDay: 'Next day',
     today: 'Today',
+    backToToday: 'Back to today',
     remaining: 'Remaining',
     consumed: 'Eaten',
     target: 'Target',
