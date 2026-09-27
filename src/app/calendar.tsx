@@ -104,7 +104,7 @@ export default function Calendar() {
 
         <View style={styles.weekdayRow}>
           {weekdayLabels.map((w, i) => (
-            <Text key={i} style={[styles.weekday, { color: theme.textTertiary }]}>
+            <Text maxFontSizeMultiplier={1.2} key={i} style={[styles.weekday, { color: theme.textTertiary }]}>
               {w}
             </Text>
           ))}
@@ -144,7 +144,7 @@ export default function Calendar() {
                     isToday && !isSelected && { borderWidth: 1.5, borderColor: theme.primary },
                   ]}
                 >
-                  <Text
+                  <Text maxFontSizeMultiplier={1.2}
                     style={{
                       color: isSelected
                         ? theme.onPrimary

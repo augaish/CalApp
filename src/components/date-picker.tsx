@@ -127,7 +127,7 @@ export function DatePickerModal({
                       isToday && !isSelected && { borderWidth: 1.5, borderColor: theme.primary },
                     ]}
                   >
-                    <Text
+                    <Text maxFontSizeMultiplier={1.2}
                       style={{
                         color: isSelected ? theme.onPrimary : isFuture ? theme.textTertiary : theme.text,
                         fontWeight: isSelected || isToday ? '700' : '500',

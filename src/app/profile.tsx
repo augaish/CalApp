@@ -65,6 +65,16 @@ export default function Profile() {
       { text: t('common.cancel'), style: 'cancel' },
     ]);
 
+  const appearance = useAppStore((s) => s.appearance) ?? 'system';
+  const setAppearance = useAppStore((s) => s.setAppearance);
+  const chooseAppearance = () =>
+    Alert.alert(t('appearance.title'), t('appearance.note'), [
+      { text: t('appearance.system'), onPress: () => setAppearance('system') },
+      { text: t('appearance.light'), onPress: () => setAppearance('light') },
+      { text: t('appearance.dark'), onPress: () => setAppearance('dark') },
+      { text: t('common.cancel'), style: 'cancel' },
+    ]);
+
   const chooseUnits = () =>
     Alert.alert(t('units.title'), t('units.note'), [
       { text: t('units.metric'), onPress: () => setUnits('metric' as Units) },
@@ -124,6 +134,7 @@ export default function Profile() {
       <RowGroup title={t('profile.preferences')}>
         <SettingsRow icon="globe-outline" title={t('settings.language')} value={language === 'ar' ? t('settings.arabic') : t('settings.english')} onPress={chooseLanguage} />
         <SettingsRow icon="resize-outline" title={t('units.title')} value={unitsLabel} onPress={chooseUnits} />
+        <SettingsRow icon="contrast-outline" title={t('appearance.title')} value={t(`appearance.${appearance}`)} onPress={chooseAppearance} />
         <SettingsRow icon="notifications-outline" title={t('notifications.title')} onPress={() => router.push('/notifications')} last />
       </RowGroup>
 

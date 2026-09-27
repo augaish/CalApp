@@ -109,7 +109,7 @@ export function Title({ children, close }: { children: React.ReactNode; close?: 
   const t = useTheme();
   const { t: tr } = useTranslation();
   const router = useRouter();
-  const text = <Text style={[Type.title, { color: t.text, marginBottom: Spacing.sm, flexShrink: 1 }]}>{children}</Text>;
+  const text = <Text maxFontSizeMultiplier={1.6} style={[Type.title, { color: t.text, marginBottom: Spacing.sm, flexShrink: 1 }]}>{children}</Text>;
   if (!close) return text;
   const onClose =
     typeof close === 'function' ? close : () => (router.canGoBack() ? router.back() : router.replace('/'));
@@ -192,7 +192,7 @@ export function Button({
       ) : (
         <View style={styles.buttonInner}>
           {icon ? <Ionicons name={icon} size={20} color={fg} /> : null}
-          <Text style={{ color: fg, fontSize: 17, fontWeight: '700' }}>{label}</Text>
+          <Text maxFontSizeMultiplier={1.5} style={{ color: fg, fontSize: 17, fontWeight: '700' }}>{label}</Text>
         </View>
       )}
     </Pressable>

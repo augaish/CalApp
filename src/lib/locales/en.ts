@@ -1453,6 +1453,13 @@ export const en = {
     previousMonth: 'Previous month',
     nextMonth: 'Next month',
   },
+  appearance: {
+    title: 'Appearance',
+    note: 'System follows your phone’s light or dark setting.',
+    system: 'System',
+    light: 'Light',
+    dark: 'Dark',
+  },
   refine: {
     send: 'Send',
     placeholder: "Tell the AI what's wrong, e.g. \"it's boneless\" or \"no rice\"",

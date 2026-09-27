@@ -36,7 +36,7 @@ export function SectionTitle({
           style={({ pressed }) => [styles.sectionAction, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
         >
           {action.icon && <Ionicons name={action.icon} size={15} color={theme.primary} />}
-          <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{action.label}</Text>
+          <Text maxFontSizeMultiplier={1.3} style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{action.label}</Text>
         </Pressable>
       )}
     </View>
@@ -76,7 +76,7 @@ export function Segmented<K extends string>({
             ]}
           >
             {o.icon && <Ionicons name={o.icon} size={16} color={on ? theme.onPrimary : theme.primaryDark} />}
-            <Text style={{ color: on ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: on ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 14 }} numberOfLines={1}>
               {o.label}
             </Text>
           </Pressable>
@@ -114,7 +114,7 @@ export function Chip({
       ]}
     >
       {icon && <Ionicons name={icon} size={14} color={selected ? theme.onPrimary : theme.primaryDark} />}
-      <Text style={{ color: selected ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 13 }}>{label}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={{ color: selected ? theme.onPrimary : theme.primaryDark, fontWeight: '700', fontSize: 13 }}>{label}</Text>
     </Pressable>
   );
 }
@@ -179,10 +179,10 @@ export function StatTile({
       style={{ width, minHeight: height, borderRadius: Radius.control, backgroundColor: theme.surfaceTint, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 2 }}
     >
       <Ionicons name={icon} size={20} color={ink} />
-      <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>
+      <Text maxFontSizeMultiplier={1.3} style={{ color: theme.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
-      <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600', textAlign: 'center' }} numberOfLines={2}>
+      <Text maxFontSizeMultiplier={1.3} style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600', textAlign: 'center' }} numberOfLines={2}>
         {label}
       </Text>
     </View>
@@ -217,7 +217,7 @@ export function StatusPill({
   return (
     <View style={[styles.statusPill, { backgroundColor: bg }]}>
       {icon && <Ionicons name={icon} size={13} color={ink} />}
-      <Text style={{ color: ink, fontSize: 12, fontWeight: '700' }}>{label}</Text>
+      <Text maxFontSizeMultiplier={1.3} style={{ color: ink, fontSize: 12, fontWeight: '700' }}>{label}</Text>
     </View>
   );
 }
@@ -391,7 +391,7 @@ export function ActionButton({
     >
       {icon && <Ionicons name={icon} size={17} color={fg} />}
       {/* Two lines before any clipping: an action label that ends in an ellipsis is not an action label. */}
-      <Text style={{ color: fg, fontWeight: '700', fontSize: 14, textAlign: 'center', flexShrink: 1 }} numberOfLines={2}>
+      <Text maxFontSizeMultiplier={1.5} style={{ color: fg, fontWeight: '700', fontSize: 14, textAlign: 'center', flexShrink: 1 }} numberOfLines={2}>
         {label}
       </Text>
     </Pressable>
@@ -443,7 +443,7 @@ export function ProgressTrack({ value, max, color, height = 12, approx = false }
   return (
     <View style={[styles.track, { backgroundColor: theme.surfaceTint, height, borderRadius: height / 2 }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: percent }}>
       <View style={[styles.fill, { backgroundColor: color ?? theme.primary, width: `${percent}%`, height, borderRadius: height / 2 }]}>
-        {pct > 0.18 && <Text style={styles.trackLabel}>{approx ? '≥' : ''}{percent}%</Text>}
+        {pct > 0.18 && <Text maxFontSizeMultiplier={1.3} style={styles.trackLabel}>{approx ? '≥' : ''}{percent}%</Text>}
       </View>
     </View>
   );
@@ -625,10 +625,10 @@ export function DayStrip({
             accessibilityLabel={day.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
             style={[styles.day, { backgroundColor: bg, opacity: disabled ? 0.45 : 1 }]}
           >
-            <Text style={{ color: ink, fontSize: 11, fontWeight: '600', opacity: active ? 1 : 0.85 }}>
+            <Text maxFontSizeMultiplier={1.2} style={{ color: ink, fontSize: 11, fontWeight: '600', opacity: active ? 1 : 0.85 }}>
               {day.toLocaleDateString(locale, { weekday: 'narrow' })}
             </Text>
-            <Text style={{ color: ink, fontSize: 15, fontWeight: '800' }}>{day.toLocaleDateString(locale, { day: 'numeric' })}</Text>
+            <Text maxFontSizeMultiplier={1.2} style={{ color: ink, fontSize: 15, fontWeight: '800' }}>{day.toLocaleDateString(locale, { day: 'numeric' })}</Text>
           </Pressable>
         );
       })}
@@ -649,10 +649,10 @@ export function InfoLine({ icon = 'information-circle-outline', children }: { ic
 
 const styles = StyleSheet.create({
   sectionRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.lg, marginBottom: Spacing.ms },
-  sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, height: 34, borderRadius: Radius.pill },
+  sectionAction: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12, paddingVertical: 6, minHeight: 34, borderRadius: Radius.pill },
   segmented: { flexDirection: 'row', padding: 4, borderRadius: Radius.control + 4 },
   segment: { flex: 1, minHeight: 40, flexDirection: 'row', gap: 6, alignItems: 'center', justifyContent: 'center', borderRadius: Radius.control },
-  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, height: 36, borderRadius: Radius.pill },
+  chip: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, minHeight: 36, borderRadius: Radius.pill },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, paddingVertical: 3, borderRadius: Radius.pill },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, paddingVertical: Spacing.ms, minHeight: 56 },
   chevron: { marginStart: 2 },

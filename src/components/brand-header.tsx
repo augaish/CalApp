@@ -110,7 +110,7 @@ export function BrandRow({
           accessibilityLabel="Calgym"
         />
       )}
-      <Text style={[styles.brand, compact && { fontSize: 18 }, { color: theme.onGradient }]} numberOfLines={1}>
+      <Text maxFontSizeMultiplier={1.3} style={[styles.brand, compact && { fontSize: 18 }, { color: theme.onGradient }]} numberOfLines={1}>
         {title}
       </Text>
       <View style={{ flex: 1 }} />
@@ -121,10 +121,10 @@ export function BrandRow({
             onPress={() => router.push('/coach')}
             accessibilityRole="button"
             accessibilityLabel={t('tabs.ai')}
-            style={({ pressed }) => [styles.pill, { backgroundColor: BACKING, height: size }, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [styles.pill, { backgroundColor: BACKING, minHeight: size }, pressed && { opacity: 0.8 }]}
           >
             <Ionicons name="sparkles" size={15} color={theme.onGradient} />
-            <Text style={[styles.pillText, { color: theme.onGradient }]}>{t('tabs.ai')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]}>{t('tabs.ai')}</Text>
           </Pressable>
         </View>
       ) : right === 'none' ? null : (
@@ -166,7 +166,7 @@ export function HeaderPill({
       style={({ pressed }) => [styles.pill, { backgroundColor: BACKING }, pressed && { opacity: 0.8 }]}
     >
       <Ionicons name={icon} size={15} color={theme.onGradient} />
-      <Text style={[styles.pillText, { color: theme.onGradient }]} numberOfLines={1}>
+      <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]} numberOfLines={1}>
         {label}
       </Text>
       {trailing && <Ionicons name={trailing} size={13} color={theme.onGradient} />}
@@ -217,15 +217,15 @@ export function PageHeader({
         >
           <Ionicons name={close ? 'close' : 'chevron-back'} size={24} color={ink} />
           {!close && (
-            <Text style={{ color: ink, fontSize: 15, fontWeight: '600' }}>{backLabel ?? t('common.back')}</Text>
+            <Text maxFontSizeMultiplier={1.3} style={{ color: ink, fontSize: 15, fontWeight: '600' }}>{backLabel ?? t('common.back')}</Text>
           )}
         </Pressable>
         <View style={styles.titleWrap} pointerEvents="none">
-          <Text style={[styles.pageTitle, { color: ink }]} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={1.3} style={[styles.pageTitle, { color: ink }]} numberOfLines={1}>
             {title}
           </Text>
           {!!subtitle && (
-            <Text style={[styles.pageSubtitle, { color: variant === 'gradient' ? 'rgba(255,255,255,0.85)' : theme.textSecondary }]} numberOfLines={1}>
+            <Text maxFontSizeMultiplier={1.3} style={[styles.pageSubtitle, { color: variant === 'gradient' ? 'rgba(255,255,255,0.85)' : theme.textSecondary }]} numberOfLines={1}>
               {subtitle}
             </Text>
           )}
@@ -263,7 +263,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 10,
-    height: 36,
+    paddingVertical: 6,
+    minHeight: 36,
     borderRadius: Radius.pill,
     maxWidth: 190,
     flexShrink: 1,

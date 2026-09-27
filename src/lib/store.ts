@@ -8,6 +8,7 @@ import type { PlannedRecipeMeal } from './shopping';
 import { applyMoves, resolvePlan, undoOp, type OccurrenceMove } from './occurrences';
 import { dailyTargets } from './tdee';
 import type {
+  AppearancePref,
   ActiveSession,
   ChatMessage,
   CoachReferenceDoc,
@@ -55,6 +56,8 @@ interface AppState {
   language: Language | null;
   /** S20 Units: display only — records stay in kg / cm. */
   units: Units;
+  /** Absent on stores from before it existed, which reads as 'system'. */
+  appearance?: AppearancePref;
   /** S19 focus preference; both by default. */
   focusAreas: FocusArea[];
   profile: Profile | null;
@@ -215,6 +218,7 @@ interface AppState {
   signOut: () => void;
   setLanguage: (language: Language) => void;
   setUnits: (units: Units) => void;
+  setAppearance: (appearance: AppearancePref) => void;
   setFocusAreas: (areas: FocusArea[]) => void;
   setProfile: (profile: Profile) => void;
   /** Manually override the daily calorie/macro targets. */
@@ -503,6 +507,7 @@ export const useAppStore = create<AppState>()(
       signOut: () => set({ account: null }),
       setLanguage: (language) => set({ language }),
       setUnits: (units) => set({ units }),
+      setAppearance: (appearance) => set({ appearance }),
       setFocusAreas: (areas) => set({ focusAreas: areas.length ? areas : ['food', 'training'] }),
       setProfile: (profile) => set({ profile, targets: dailyTargets(profile) }),
       setTargets: (targets) => set({ targets }),
@@ -1232,6 +1237,7 @@ export const useAppStore = create<AppState>()(
         account,
         language,
         units,
+        appearance,
         focusAreas,
         profile,
         targets,
@@ -1277,6 +1283,7 @@ export const useAppStore = create<AppState>()(
         account,
         language,
         units,
+        appearance,
         focusAreas,
         profile,
         targets,

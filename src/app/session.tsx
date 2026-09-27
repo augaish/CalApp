@@ -458,7 +458,7 @@ export default function SessionScreen() {
                 {complete && !current ? (
                   <Ionicons name="checkmark" size={12} color={theme.successText} />
                 ) : (
-                  <Text style={{ color: current ? theme.onPrimary : theme.primaryDark, fontSize: 11, fontWeight: '800' }}>{i + 1}</Text>
+                  <Text maxFontSizeMultiplier={1.2} style={{ color: current ? theme.onPrimary : theme.primaryDark, fontSize: 11, fontWeight: '800' }}>{i + 1}</Text>
                 )}
               </View>
               <Text numberOfLines={1} style={{ color: current ? theme.onPrimary : theme.text, fontSize: 13, fontWeight: '700', maxWidth: 120 }}>

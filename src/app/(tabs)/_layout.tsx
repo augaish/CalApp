@@ -81,6 +81,9 @@ export default function TabLayout() {
         tabBarActiveTintColor: theme.primary,
         tabBarInactiveTintColor: theme.textTertiary,
         tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        // Like the system tab bar, labels stay put under larger text; the
+        // screens themselves carry the larger size.
+        tabBarAllowFontScaling: false,
         tabBarStyle: { backgroundColor: theme.card, borderTopColor: theme.border },
       }}
     >

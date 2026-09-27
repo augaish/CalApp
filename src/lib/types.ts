@@ -3,6 +3,9 @@ export type Language = 'en' | 'ar';
 export type NutrientKey = 'calories' | 'proteinG' | 'carbsG' | 'fatG';
 /** S20 display units. Stored values are always metric. */
 export type Units = 'metric' | 'imperial';
+
+/** Light or dark: follow the phone, or pin one. */
+export type AppearancePref = 'system' | 'light' | 'dark';
 /** S19 focus preference — steers suggestions, never access. */
 export type FocusArea = 'food' | 'training';
 

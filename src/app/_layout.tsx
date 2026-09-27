@@ -1,10 +1,12 @@
-import { DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
+import { Appearance, Platform } from 'react-native';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Celebration } from '@/components/celebration';
+import { useSchemeName, useTheme } from '@/hooks/use-theme';
 import { setInstallId } from '@/lib/api';
 import { syncAuthIdentity } from '@/lib/auth';
 import { useEntitlement } from '@/lib/entitlement';
@@ -21,6 +23,27 @@ export default function RootLayout() {
   const profile = useAppStore((s) => s.profile);
   const account = useAppStore((s) => s.account);
   const tutorialSeen = useAppStore((s) => s.tutorialSeen);
+  const appearance = useAppStore((s) => s.appearance) ?? 'system';
+  const theme = useTheme();
+  const scheme = useSchemeName();
+  // The navigator's own surfaces (behind screens, during transitions) in the
+  // app's palette, so dark mode never flashes the library's default grey.
+  const base = scheme === 'dark' ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: { ...base.colors, background: theme.background, card: theme.card, border: theme.border, primary: theme.primary, text: theme.text },
+  };
+
+  // The app's own colours follow useTheme(); this makes the system's pieces
+  // (alerts, the keyboard, date pickers) match the same choice.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    try {
+      Appearance.setColorScheme(appearance === 'system' ? 'unspecified' : appearance);
+    } catch {
+      // Older runtimes: the app's own colours still follow the choice.
+    }
+  }, [appearance]);
 
   const lang = language ?? deviceLanguage();
 
@@ -45,9 +68,9 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider value={DefaultTheme}>
+      <ThemeProvider value={navTheme}>
         <StatusBar style="light" />
-      <Stack screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Protected guard={!account}>
           <Stack.Screen name="login" />
         </Stack.Protected>
@@ -64,7 +87,7 @@ export default function RootLayout() {
           <Stack.Screen name="gym-result" options={{ presentation: 'modal' }} />
           <Stack.Screen
             name="add-menu"
-            options={{ presentation: 'transparentModal', animation: 'fade' }}
+            options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
           />
           <Stack.Screen name="describe" options={{ presentation: 'modal' }} />
           <Stack.Screen name="food-edit" options={{ presentation: 'modal' }} />
@@ -99,11 +122,11 @@ export default function RootLayout() {
           <Stack.Screen name="photo-analyze" options={{ presentation: 'fullScreenModal' }} />
           <Stack.Screen
             name="water"
-            options={{ presentation: 'transparentModal', animation: 'fade' }}
+            options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
           />
           <Stack.Screen
             name="calendar"
-            options={{ presentation: 'transparentModal', animation: 'fade' }}
+            options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
           />
         </Stack.Protected>
       </Stack>
@@ -112,3 +135,4 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+

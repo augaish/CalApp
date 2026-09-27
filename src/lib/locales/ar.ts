@@ -1449,6 +1449,13 @@ export const ar: TranslationSchema = {
     previousMonth: 'الشهر السابق',
     nextMonth: 'الشهر التالي',
   },
+  appearance: {
+    title: 'المظهر',
+    note: 'خيار النظام يتبع إعداد هاتفك الفاتح أو الداكن.',
+    system: 'النظام',
+    light: 'فاتح',
+    dark: 'داكن',
+  },
   refine: {
     send: 'إرسال',
     placeholder: 'أخبر الذكاء الاصطناعي بالخطأ، مثلاً "بدون عظم" أو "بدون أرز"',
