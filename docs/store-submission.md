@@ -127,6 +127,10 @@ The app only uses standard HTTPS. `ITSAppUsesNonExemptEncryption` is already `fa
 ### Screenshots (6.9" iPhone required; 6.5" optional)
 Suggested order: Overview (today), meal scan result, Training with the schedule, an active workout with the rest timer, Health body composition, AI coach. Take them in light mode, with one Arabic set if you list Arabic.
 
+- **Accepted sizes (portrait):** 1320 × 2868, 1290 × 2796 or 1260 × 2736 pixels.
+- A screenshot from an iPhone Pro Max (15, 16 or 17) is already one of these sizes. Smaller iPhones give a size that is rejected.
+- Upload 3 to 10 screenshots per language. Apple scales the 6.9" set down for smaller phones.
+
 ---
 
 ## Google Play Console
@@ -157,14 +161,132 @@ On Google's form, sending data to a service provider that processes it on your b
 
 ---
 
-## After the bank account (for completeness)
-1. App Store Connect → Agreements, Tax and Banking → Paid Apps.
-2. Create the subscription products and the RevenueCat project (`billing-setup.md`).
-3. Build 12 (below), test purchases with sandbox testers, then submit.
+## Apple, step by step
 
-### Build 12 carries (native changes since build 11)
-- The lock-screen and Dynamic Island rest countdown (`expo-live-activity`, a new widget extension). EAS will create the extension's bundle ID `com.augaish.calapp.LiveActivity` and its profile on the first build.
-- Dark mode "System" for the app chrome (`userInterfaceStyle: automatic`).
+Do these in order. Only the sandbox purchase test at the end waits for the bank account and the Paid Apps agreement.
+
+### 1. Subscriptions (App Store Connect → your app → Monetization → Subscriptions)
+
+**Subscription group**
+- Reference name: `Calgym Membership`
+- Localization → display name:
+  - English: `Calgym Membership`
+  - Arabic: `عضوية كالجيم`
+
+**Four products, all in that one group**
+
+| Reference name | Product ID | Duration | Level | Suggested price (Saudi Arabia) |
+|---|---|---|---|---|
+| Pro+ Monthly | `calgym_proplus_monthly` | 1 month | 1 | SAR 24.99 |
+| Pro+ Yearly | `calgym_proplus_yearly` | 1 year | 1 | SAR 249.99 |
+| Pro Monthly | `calgym_pro_monthly` | 1 month | 2 | SAR 12.99 |
+| Pro Yearly | `calgym_pro_yearly` | 1 year | 2 | SAR 129.99 |
+
+- **Product IDs:** type them exactly as shown. They can never be changed or reused once created, and the app and server rely on these names.
+- **Levels:** Pro+ is level 1 (the higher tier) and Pro is level 2. This is what makes a switch from Pro to Pro+ an immediate upgrade, and Pro+ to Pro a downgrade at renewal.
+- **Prices:** pick the price with **Saudi Arabia** as the base country and let Apple fill in the other countries. The price you choose is what the customer pays, VAT included; Apple deducts the VAT. The suggestions match the admin page's current display prices (13 / 25 / 129) at the nearest Apple price, with yearly about two months cheaper than monthly.
+- **Family Sharing:** leave it **off**. Once turned on, it can't be turned off.
+- **Introductory offers / free trials:** add **none** for now. The paywall doesn't describe trial terms yet, and Apple rejects a trial that isn't explained on the purchase screen. If you want trials later, tell me first and I'll add the wording.
+- **Availability:** all countries and regions.
+
+**Localizations** (display name up to 30 characters, description up to 45)
+
+| Product | English name | English description | Arabic name | Arabic description |
+|---|---|---|---|---|
+| Pro Monthly | Calgym Pro | 150 AI actions a month and the AI coach | كالجيم برو | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Pro Yearly | Calgym Pro (Yearly) | 150 AI actions a month and the AI coach | كالجيم برو (سنوي) | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Pro+ Monthly | Calgym Pro+ | 500 AI actions a month and the AI coach | كالجيم برو+ | ٥٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Pro+ Yearly | Calgym Pro+ (Yearly) | 500 AI actions a month and the AI coach | كالجيم برو+ (سنوي) | ٥٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+
+If you change the allowances in the admin page, update these descriptions to match.
+
+**Review information (each product)**
+- **Screenshot:** the membership sheet or Profile → Membership. Until the store is live, it shows the built-in prices; that's fine for review.
+- **Review notes:** "Subscriptions are offered in Profile → Membership and in the membership sheet that opens when a free limit is reached. Restore purchases and the Terms/Privacy links are on the same screens."
+
+The products stay in "Missing Metadata" or "Ready to Submit" until the Paid Apps agreement is active. That's expected. They're submitted for review together with the first app version that sells them.
+
+### 2. Keys RevenueCat needs (App Store Connect → Users and Access → Integrations)
+
+**In-App Purchase key (required)**
+1. **In-App Purchase** → **+** (Generate) → name it `RevenueCat` → **Generate**.
+2. **Download** the `.p8` file. Apple lets you download it **only once**, so keep it somewhere safe.
+3. Note the **Key ID** (shown in the list) and the **Issuer ID** (shown at the top of the page).
+
+**App-Specific Shared Secret (optional; RevenueCat asks for it for older receipts)**
+- Your app → **App Information** → **App-Specific Shared Secret** → **Manage** → **Generate**, then copy it.
+
+### 3. RevenueCat (app.revenuecat.com)
+
+1. **Create project:** `Calgym`.
+2. **Apps & providers → + App Store app:**
+   - App name `Calgym iOS`, bundle ID `com.augaish.calapp`.
+   - Upload the In-App Purchase key `.p8`, with its Key ID and Issuer ID.
+   - Paste the App-Specific Shared Secret if you made one. Save.
+   - Copy the **Apple Server Notification URL** shown on this page; you need it in step 4.
+3. **Product catalog → Products → + New:** add the four product IDs from the table, one at a time, under the App Store app.
+4. **Product catalog → Entitlements:**
+   - `pro` (description "Pro"): attach `calgym_pro_monthly` and `calgym_pro_yearly`.
+   - `pro_plus` (description "Pro+"): attach `calgym_proplus_monthly` and `calgym_proplus_yearly`.
+5. **Product catalog → Offerings → + New:** identifier `default`, description "Standard". Add four packages:
+
+   | Package | Identifier | Product |
+   |---|---|---|
+   | Monthly | `$rc_monthly` | `calgym_pro_monthly` |
+   | Annual | `$rc_annual` | `calgym_pro_yearly` |
+   | Custom | `proplus_monthly` | `calgym_proplus_monthly` |
+   | Custom | `proplus_annual` | `calgym_proplus_yearly` |
+
+   Then make `default` the **Current** offering. The app sorts packages by product ID, so the custom names work; RevenueCat allows only one standard Monthly and one Annual per offering.
+6. **Project settings → API keys:**
+   - Copy the **App Store public key**, which starts with `appl_`.
+   - **+ New secret API key**, version **V1**, named `Calgym server`. Copy it; it starts with `sk_`.
+7. **Integrations → Webhooks → + Add:**
+   - URL: `https://calapp-production-ab20.up.railway.app/api/billing/revenuecat`
+   - **Authorization header:** a long random string. To make one, run this in the VS Code terminal:
+     `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
+   - Environment: production and sandbox. Events: all. Save.
+
+### 4. Apple → RevenueCat notifications
+App Store Connect → your app → **App Information** → **App Store Server Notifications**:
+- **Production** and **Sandbox** URLs: the Apple Server Notification URL copied from RevenueCat.
+- Version: **2**.
+
+### 5. Railway (server → Variables)
+
+| Variable | Value |
+|---|---|
+| `REVENUECAT_IOS_KEY` | the `appl_…` public key |
+| `REVENUECAT_SECRET_KEY` | the `sk_…` V1 secret key |
+| `REVENUECAT_WEBHOOK_SECRET` | the same random string as the webhook's Authorization header |
+
+After it redeploys, open **admin → Overview → Launch checklist**. The three RevenueCat rows should be ticked. "First store event received" ticks after the first sandbox purchase.
+
+### 6. TestFlight external testing (App Store Connect → TestFlight)
+
+**Test Information** (left sidebar), filled in once:
+- **Beta App Description:** "Calgym is a calorie and workout tracker. Snap a meal for calories and macros, follow your weekly training with a rest timer, and track weight and body composition. Please try logging a meal, a workout and a body reading, and tell us what felt slow or unclear."
+- **Feedback email:** your support address. **Privacy Policy URL:** `/privacy` on the server.
+- **Beta App Review information:** your name, phone and email.
+  - **Sign-in required:** No. Guest mode needs no account.
+  - **Notes:** the same as the App Review notes above.
+
+**External group**
+1. **External Testing → +** → group name `Beta testers`.
+2. **Builds → +** → **build 15** (or the newest).
+3. **What to Test:** "Log meals by photo or text, run a workout from Training (watch the rest timer on the lock screen), try the AI coach, and switch Arabic/English in Profile."
+4. **Submit for Review.** The first external build usually takes 24–48 hours; later builds are often approved automatically.
+5. After approval, add testers by email, or turn on the **Public Link** (up to 10,000 testers) and share it.
+
+### 7. After the bank account
+1. App Store Connect → **Business** → add the bank account. Wait for **Paid Apps Agreement: Active** (up to a day or two).
+2. **Users and Access → Sandbox → Test Accounts** → add a tester with an email not used for any Apple ID.
+3. On your iPhone: **Settings → Developer → Sandbox Apple Account** → sign in with it. Enable Developer Mode if it isn't showing.
+4. Buy Pro in the TestFlight build → Profile shows Pro → the admin shows the purchase.
+5. Submit the app version with the four subscriptions attached for App Review.
+
+### Native changes in builds since 11
+- Build 15: the lock-screen and Dynamic Island rest countdown (the LiveActivity extension), and dark mode "System".
 
 ---
 

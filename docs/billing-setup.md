@@ -21,6 +21,8 @@ account (Paid Apps agreement on Apple, a merchant profile on Google).
 
 ## Steps
 
+> The detailed, click-by-click version for Apple — product names, prices, Arabic text, keys, RevenueCat packages, webhook and TestFlight — is in [`store-submission.md` → Apple, step by step](store-submission.md#apple-step-by-step). The summary below stays for Google.
+
 1. **App Store Connect** → Agreements → Paid Apps (needs the bank account).
    Then Subscriptions → one group "Calgym" with:
    - `calgym_pro_monthly`, `calgym_pro_yearly`
