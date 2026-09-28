@@ -9,8 +9,9 @@ function useGateState() {
   const plan = useEntitlement((s) => s.plan);
   const locks = useEntitlement((s) => s.locks);
   const module = useEntitlement((s) => s.module);
+  const trial = useEntitlement((s) => s.trial);
   const features = useEntitlement((s) => s.features);
-  return { plan, locks, module, features };
+  return { plan, locks, module, trial, features };
 }
 
 /**
@@ -21,20 +22,20 @@ function useGateState() {
 export function usePlanGate() {
   const router = useRouter();
   const state = useGateState();
-  const { plan, locks, module, features } = state;
+  const { plan, locks, module, trial, features } = state;
 
   const isOpen = useCallback(
-    (gate: Gate) => gateOpen(gate, { plan, locks, module, features }),
-    [plan, locks, module, features],
+    (gate: Gate) => gateOpen(gate, { plan, locks, module, trial, features }),
+    [plan, locks, module, trial, features],
   );
 
   const guard = useCallback(
     (gate: Gate) => {
       if (isOpen(gate)) return true;
-      router.push(`/membership?reason=${lockReasonFor(gate, { plan, locks, module, features })}`);
+      router.push(`/membership?reason=${lockReasonFor(gate, { plan, locks, module, trial, features })}`);
       return false;
     },
-    [isOpen, router, plan, locks, module, features],
+    [isOpen, router, plan, locks, module, trial, features],
   );
 
   return {
@@ -42,7 +43,7 @@ export function usePlanGate() {
     guard,
     locks: !!locks,
     readOnly: readOnly({ plan, locks }),
-    visible: visibleModules({ plan, locks, module }),
+    visible: visibleModules({ plan, locks, module, trial }),
   };
 }
 

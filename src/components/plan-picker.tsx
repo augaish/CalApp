@@ -7,6 +7,7 @@ import { Segmented } from '@/components/system';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useEntitlement } from '@/lib/entitlement';
+import { useAppStore } from '@/lib/store';
 import type { Choice } from '@/lib/plan-gates';
 import { annualSaving } from '@/lib/store-plans';
 import type { useStoreOffer } from '@/lib/use-store-offer';
@@ -130,6 +131,9 @@ export function PlanPicker({ offer }: { offer: Offer }) {
           )}
         </Text>
         {trial ? <Text style={{ color: theme.primary, fontWeight: '800', fontSize: 13, marginTop: 4 }}>{t('upgrade.trialBadge', { days: trial })}</Text> : null}
+        {trial && choice !== 'both' ? (
+          <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 4 }}>{t(`plans.trialAllNote.${choice}`, { days: trial })}</Text>
+        ) : null}
 
         <View style={{ gap: 6, marginTop: Spacing.sm }}>
           {INCLUDES.map((k) => (
@@ -163,19 +167,40 @@ export function PlanPicker({ offer }: { offer: Offer }) {
  * a switch, not a purchase.
  */
 export function usePlanAction(offer: Offer, onDone: () => void) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const plan = useEntitlement((s) => s.plan);
   const module = useEntitlement((s) => s.module);
   const promo = useEntitlement((s) => s.promo);
+  const planUntil = useEntitlement((s) => s.planUntil);
+  const pendingSwitch = useAppStore((s) => s.planSwitch);
   const { plans, selectedPkg, choice, tier, priceFor, trialDaysFor, storeName, busy, needsUpdate, storeChecked, serverSells } = offer;
 
   const current = !promo && ((tier === 'pro' && (plan === 'pro' || plan === 'proPlus')) || (tier === 'essentials' && plan === 'essentials' && module === choice));
   const switchFocus = !current && tier === 'essentials' && plan === 'essentials';
+  // From Pro (or its trial) to Essentials: the stores apply it when the
+  // period ends, so the person keeps everything until then.
+  const stepDown = !promo && tier === 'essentials' && (plan === 'pro' || plan === 'proPlus');
   const price = selectedPkg ? priceFor(tier) : null;
-  const trial = selectedPkg && !current && !switchFocus ? trialDaysFor(tier) : null;
+  const trial = selectedPkg && !current && !switchFocus && !stepDown ? trialDaysFor(tier) : null;
+  const planName = choice === 'both' ? t('plans.name.pro') : t(`plans.name.essentials_${choice}`);
 
   if (switchFocus) return { label: t('plans.changeFocus'), disabled: false, loading: false, onPress: () => router.push('/focus'), terms: null };
+  if (stepDown && plans && selectedPkg) {
+    const scheduled = pendingSwitch?.module === choice;
+    const date = planUntil ? new Date(planUntil).toLocaleDateString(i18n.language === 'ar' ? 'ar' : 'en', { day: 'numeric', month: 'long' }) : null;
+    return {
+      label: scheduled ? t('plans.switchScheduled') : t('plans.switchTo', { plan: planName }),
+      disabled: scheduled || busy !== null,
+      loading: busy === 'buy',
+      onPress: () => void offer.buy(onDone),
+      terms: price
+        ? date
+          ? t('plans.switchTerms', { date, plan: planName, price: price.main, unit: price.unit })
+          : t('plans.switchTermsNoDate', { plan: planName, price: price.main, unit: price.unit })
+        : null,
+    };
+  }
   if (plans && selectedPkg) {
     return {
       label: current ? t('upgrade.currentPlan') : trial ? t('upgrade.startTrial', { days: trial }) : t('upgrade.subscribe', { price: price ? `${price.main} ${price.unit}` : '' }),
@@ -184,7 +209,7 @@ export function usePlanAction(offer: Offer, onDone: () => void) {
       onPress: () => void offer.buy(onDone),
       // Apple requires the trial's length, what follows and how to cancel
       // right where the trial is started.
-      terms: trial && price ? t('upgrade.trialTerms', { days: trial, price: price.main, unit: price.unit, store: storeName }) : null,
+      terms: trial && price ? t('upgrade.trialTerms', { days: trial, plan: planName, price: price.main, unit: price.unit, store: storeName }) : null,
     };
   }
   if (needsUpdate) return { label: t('upgrade.updateNeeded'), disabled: true, loading: false, onPress: () => {}, terms: null };

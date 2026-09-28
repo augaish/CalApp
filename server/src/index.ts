@@ -1932,6 +1932,22 @@ app.get('/api/promo/:code', async (c) => {
   });
 });
 
+/**
+ * What RevenueCat says this app user id is entitled to right now — the
+ * source of truth when an event alone can't say (see PRODUCT_CHANGE below).
+ */
+async function subscriberPlan(
+  appUserId: string,
+  key: string,
+): Promise<{ ok: true; found: ReturnType<typeof planFromSubscriber> } | { ok: false; result: string }> {
+  const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`, {
+    headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!res.ok) return { ok: false, result: `revenuecat_${res.status}` };
+  return { ok: true, found: planFromSubscriber((await res.json()) as SubscriberRecord) };
+}
+
 app.post('/api/billing/revenuecat', async (c) => {
   const secret = process.env.REVENUECAT_WEBHOOK_SECRET;
   // Without a configured secret anyone could grant themselves Pro, so refuse
@@ -1957,6 +1973,20 @@ app.post('/api/billing/revenuecat', async (c) => {
     if (event.app_user_id) {
       const payer = await resolveRef(event.app_user_id);
       await recordPartnerEarnings(payer, event).catch((err) => console.error('partner earnings failed:', err));
+    }
+
+    // A product change names the old product, and a downgrade only takes
+    // effect at renewal (an upgrade at once), so the event can't say what the
+    // person has now. RevenueCat's own record can: apply that instead.
+    const key = process.env.REVENUECAT_SECRET_KEY;
+    if ((event.type ?? '').toUpperCase() === 'PRODUCT_CHANGE' && key && event.app_user_id && !event.app_user_id.startsWith('$RCAnonymousID:')) {
+      const read = await subscriberPlan(event.app_user_id, key);
+      if (read.ok) {
+        const ref = await resolveRef(event.app_user_id);
+        const found = read.found;
+        if (found) await setUserPlan(ref, found.plan, found.trial ? 'revenuecat:product_change:trial' : 'revenuecat:product_change', found.until);
+        return c.json({ ok: true, result: found ? 'resynced' : 'resynced_none', plan: found?.plan ?? null });
+      }
     }
 
     const action = decide(event);
@@ -2006,12 +2036,9 @@ app.post('/api/billing/sync', async (c) => {
   try {
     // The store purchase is filed under the id the app configured with,
     // which is the raw header id; the plan goes to whoever that id now is.
-    const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(raw)}`, {
-      headers: { Authorization: `Bearer ${key}`, Accept: 'application/json' },
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!res.ok) return c.json({ ok: false, result: `revenuecat_${res.status}` });
-    const found = planFromSubscriber((await res.json()) as SubscriberRecord);
+    const read = await subscriberPlan(raw, key);
+    if (!read.ok) return c.json({ ok: false, result: read.result });
+    const found = read.found;
     if (found) await setUserPlan(ref, found.plan, found.trial ? 'revenuecat:sync:trial' : 'revenuecat:sync', found.until);
     const access = await checkAccess(ref, 'coach');
     return c.json({

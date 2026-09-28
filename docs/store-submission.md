@@ -99,10 +99,20 @@ For each **sold** product (the four Essentials and Pro ones):
    - Type **Free**, duration **2 Weeks** → Confirm.
 4. **Family Sharing:** leave **off**. Once on, it can't be turned off.
 
-**5.3 Order (levels).** In the group, **Edit Subscription Levels**. Drag them into this order, where 1 is the highest:
-1. Pro+ Monthly and Pro+ Yearly
-2. Pro Monthly and Pro Yearly
-3. Essentials Monthly and Essentials Yearly
+**5.3 Order (levels).** In the group, **Edit Subscription Levels**. Drag the six into this order, where 1 is the highest:
+
+| Level | Product |
+|---|---|
+| 1 | Pro+ Yearly |
+| 2 | Pro+ Monthly |
+| 3 | Pro Yearly |
+| 4 | Pro Monthly |
+| 5 | Essentials Yearly |
+| 6 | Essentials Monthly |
+
+With this order:
+- **Moving up** (Essentials → Pro, or monthly → yearly) happens at once, and Apple refunds the unused part of the old plan.
+- **Moving down** (Pro → Essentials, or yearly → monthly) happens when the current period or trial ends.
 
 **5.4 Localizations.** In each sold product → **App Store Localization → +**:
 
@@ -114,9 +124,16 @@ For each **sold** product (the four Essentials and Pro ones):
 | Pro Yearly | `Calgym Pro (Yearly)` | `Food, Training and Health, 50 AI a month` | `كالجيم برو (سنوي)` | `التغذية والتمارين والصحة، ٥٠ عملية شهرياً` |
 
 **5.5 Review Information.** In each sold product, at the bottom:
-- **Screenshot:** a screenshot of the app's membership screen (Profile → Membership).
+- **Screenshot:** upload the one made for that product. They are in the repository, in `docs/review-screenshots/`, at 1290 × 2796:
+
+  | Product | File |
+  |---|---|
+  | Essentials Monthly | `essentials-monthly.png` |
+  | Essentials Yearly | `essentials-yearly.png` |
+  | Pro Monthly | `pro-monthly.png` |
+  | Pro Yearly | `pro-yearly.png` |
 - **Review Notes:** paste
-  > Calgym is a subscription app with a 14-day free trial. Plans are offered in the membership sheet after onboarding and in Profile → Membership: Essentials (Food or Training) and Pro (both). Without a plan, a person can still view and export everything they recorded. Restore purchases and the Terms/Privacy links are on the same screens.
+  > Calgym is a subscription app with a 14-day free trial that includes every feature, whichever plan follows it. Plans are offered in the membership sheet after onboarding and in Profile → Membership: Essentials (Food or Training) and Pro (both). Without a plan, a person can still view and export everything they recorded. Restore purchases and the Terms/Privacy links are on the same screens.
 
 **Done when:** the four sold products show **Ready to Submit**. Until the Paid Apps agreement is active they may show "Missing Metadata"; that's normal. Leave Pro+ alone.
 
@@ -277,7 +294,7 @@ SMART REMINDERS
 
 Works as a guest — no account needed. English and Arabic.
 
-Calgym Essentials and Calgym Pro are auto-renewing subscriptions, each starting with a 14-day free trial for new subscribers. Essentials covers Food or Training, plus Health, with 20 AI actions a month. Pro covers Food, Training and Health together, with 50 AI actions a month, the AI program builder and a coach that remembers your documents. Without a subscription you can still view and export everything you recorded. Payment is charged to your Apple ID at confirmation. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period; manage them in Settings → Apple ID → Subscriptions.
+Calgym Essentials and Calgym Pro are auto-renewing subscriptions, each starting with a 14-day free trial for new subscribers that includes everything. Essentials covers Food or Training, plus Health, with 20 AI actions a month. Pro covers Food, Training and Health together, with 50 AI actions a month, the AI program builder and a coach that remembers your documents. Without a subscription you can still view and export everything you recorded. Payment is charged to your Apple ID at confirmation. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period; manage them in Settings → Apple ID → Subscriptions.
 Terms: https://calapp-production-ab20.up.railway.app/terms · Privacy: https://calapp-production-ab20.up.railway.app/privacy
 
 Calorie and nutrition figures are AI estimates and may be inaccurate. Not medical advice.
@@ -312,7 +329,7 @@ Arabic:
 
 يعمل دون حساب، بالعربية والإنجليزية.
 
-كالجيم الأساسيات وكالجيم برو اشتراكات تتجدد تلقائياً، ويبدأ كل منهما بتجربة مجانية لمدة ١٤ يوماً للمشتركين الجدد. الأساسيات تشمل التغذية أو التمارين مع الصحة و٢٠ عملية ذكاء اصطناعي شهرياً. برو يشمل التغذية والتمارين والصحة معاً، مع ٥٠ عملية شهرياً ومصمم البرامج الذكي ومدرب يتذكر ملفاتك. وبدون اشتراك يمكنك الاطلاع على كل ما سجّلته وتصديره. يُخصم المبلغ من حساب Apple عند التأكيد، ويتجدد الاشتراك ما لم يُلغَ قبل ٢٤ ساعة على الأقل من نهاية الفترة، ويُدار من الإعدادات ← Apple ID ← الاشتراكات.
+كالجيم الأساسيات وكالجيم برو اشتراكات تتجدد تلقائياً، ويبدأ كل منهما بتجربة مجانية لمدة ١٤ يوماً للمشتركين الجدد تشمل كل المزايا. الأساسيات تشمل التغذية أو التمارين مع الصحة و٢٠ عملية ذكاء اصطناعي شهرياً. برو يشمل التغذية والتمارين والصحة معاً، مع ٥٠ عملية شهرياً ومصمم البرامج الذكي ومدرب يتذكر ملفاتك. وبدون اشتراك يمكنك الاطلاع على كل ما سجّلته وتصديره. يُخصم المبلغ من حساب Apple عند التأكيد، ويتجدد الاشتراك ما لم يُلغَ قبل ٢٤ ساعة على الأقل من نهاية الفترة، ويُدار من الإعدادات ← Apple ID ← الاشتراكات.
 الشروط: https://calapp-production-ab20.up.railway.app/terms · الخصوصية: https://calapp-production-ab20.up.railway.app/privacy
 
 أرقام السعرات تقديرات بالذكاء الاصطناعي وقد تكون غير دقيقة، وليست نصيحة طبية.
@@ -337,7 +354,7 @@ Arabic:
 
 ```
 • No sign-in needed: tap "Continue as guest" on the first screen. Sign in with Apple, Google and email are also offered.
-• Subscriptions: Calgym Essentials (Food or Training, plus Health) and Calgym Pro (both), each with a 14-day free trial. They are offered in the membership sheet after onboarding and in Profile → Membership, where Restore purchases, the trial terms and the Terms/Privacy links are shown. Please start the free trial with the sandbox account to reach every feature; without a plan the app shows recorded data read-only.
+• Subscriptions: Calgym Essentials (Food or Training, plus Health) and Calgym Pro (both), each with a 14-day free trial that includes every feature. They are offered in the membership sheet after onboarding and in Profile → Membership, where Restore purchases, the trial terms and the Terms/Privacy links are shown. Please start the free trial with the sandbox account to reach every feature; without a plan the app shows recorded data read-only.
 • Alternatively, Profile → Redeem a code → APPREVIEW gives Pro for 30 days.
 • AI features (meal photo, describe a meal, body report scan, AI coach, recipe/program generation) ask permission before anything is sent to our AI providers (Anthropic, DeepSeek). This can be changed in Profile → Privacy → AI processing. Photos and messages are processed in real time and not stored.
 • Account deletion: Profile → Privacy → Delete my account. It deletes on-device data, the cloud backup, the sign-in account and server records.

@@ -6,7 +6,7 @@ import {
   reasonText, trialReminderAt, usageRows, visibleModules, type Gate,
 } from '/home/user/CalApp/src/lib/plan-gates.ts';
 import { FeatureLockedError, aiFailureAction, lockReason } from '/home/user/CalApp/src/lib/api-errors.ts';
-import { freeTrialDays, groupPackages, tierOf } from '/home/user/CalApp/src/lib/store-plans.ts';
+import { freeTrialDays, groupPackages, replacementFor, tierOf } from '/home/user/CalApp/src/lib/store-plans.ts';
 import { PLANS, featureCheck, isTrialSource, kindCap } from '/home/user/CalApp/server/src/billing.ts';
 import { coachScopeNote, scopeCoachTools } from '/home/user/CalApp/server/src/coach-actions.ts';
 import { decide, planFor, planFromSubscriber } from '/home/user/CalApp/server/src/revenuecat.ts';
@@ -51,6 +51,10 @@ eq('Essentials without a module: asked to choose', visibleModules(unchosen).choo
 const pro = { plan: 'pro' as const, locks: true, features: { programs: 1, programsUsed: 0 } };
 check('Pro: food, training, health, coach memory', ['food', 'training', 'health', 'coachDocs'].every((g) => gateOpen(g as Gate, pro)));
 check('Pro: one program a month', gateOpen('program', pro) && !gateOpen('program', { ...pro, features: { programs: 1, programsUsed: 1 } }));
+const essTrialState = { plan: 'essentials' as const, locks: true, module: 'food' as const, trial: true, features: { programs: 1, programsUsed: 0 } };
+check('Essentials trial: every gate open, as Pro', ALL.every((g) => gateOpen(g, essTrialState)));
+eq('Essentials trial: Overview shows both areas', visibleModules(essTrialState), { food: true, training: true, chooseModule: false });
+check('Essentials trial without a module: nothing to choose yet', !visibleModules({ plan: 'essentials', locks: true, module: null, trial: true }).chooseModule);
 check('Pro+: everything, programs unlimited', ALL.every((g) => gateOpen(g, { plan: 'proPlus', locks: true, features: { programs: null, programsUsed: 9 } })));
 
 // ── app: which plan the sheet opens on ──
@@ -177,8 +181,14 @@ for (const [lang, dict] of [['en', en], ['ar', ar]] as const) {
   eq(`${lang}: every plan string exists`, KEYS.filter((k) => t(k).startsWith('MISSING')), []);
   const reasons = ['subscribe', 'food', 'training', 'program', 'coachDocs', 'quota', 'coach', 'equipment'];
   eq(`${lang}: every lock reason has text`, reasons.map((r) => reasonText(t, r, 7, 20)).filter((x) => x.startsWith('MISSING')), []);
-  check(`${lang}: trial terms state length, price after and how to cancel`, ['{{days}}', '{{price}}', '{{store}}'].every((p) => t('upgrade.trialTerms').includes(p)));
+  check(`${lang}: trial terms state length, price after and how to cancel`, ['{{days}}', '{{plan}}', '{{price}}', '{{store}}'].every((p) => t('upgrade.trialTerms').includes(p)));
 }
+
+// ── Google Play replacements behave like the App Store ──
+eq('Play: Essentials → Pro (same length) is now, charging the difference', replacementFor('calgym_essentials_monthly', 'calgym_pro_monthly'), 'CHARGE_PRORATED_PRICE');
+eq('Play: Pro → Essentials waits for the period (or trial) to end', replacementFor('calgym_pro_yearly', 'calgym_essentials_yearly'), 'DEFERRED');
+eq('Play: Essentials monthly → Pro yearly credits the unused time', replacementFor('calgym_essentials_monthly', 'calgym_pro_yearly'), 'WITH_TIME_PRORATION');
+eq('Play: Pro+ → Pro is a downgrade', replacementFor('calgym_proplus_monthly', 'calgym_pro_monthly'), 'DEFERRED');
 
 // ── the server's own checks ──
 if (process.env.DATABASE_URL) {
@@ -197,11 +207,11 @@ if (process.env.DATABASE_URL) {
   eq('the refusal says subscribe', billing.featureLocked(a).need, 'subscribe');
 
   const ess = `${ref}-ess`;
-  await db.setUserPlan(ess, 'essentials', 'revenuecat:initial_purchase:trial', new Date(Date.now() + 14 * 864e5).toISOString());
+  await db.setUserPlan(ess, 'essentials', 'revenuecat:renewal', new Date(Date.now() + 30 * 864e5).toISOString());
   check('Essentials without module: meal refused until chosen', !(await billing.checkAccess(ess, 'meal')).featureAllowed);
   eq('first choice of module is allowed', await db.setUserModule(ess, 'food'), { ok: true });
   a = await billing.checkAccess(ess, 'meal');
-  check('Essentials Food: meal scan allowed, trial allowance 20', a.featureAllowed && a.limit === 20 && a.trial && a.module === 'food');
+  check('Essentials Food: meal scan allowed, allowance 20', a.featureAllowed && a.limit === 20 && !a.trial && a.module === 'food');
   a = await billing.checkAccess(ess, 'equipment', 'exercise');
   check('Essentials Food: exercise lookup refused as training', !a.featureAllowed && a.need === 'training');
   const early = await db.setUserModule(ess, 'training');
@@ -216,13 +226,29 @@ if (process.env.DATABASE_URL) {
   check('a reservation counts', r.ok);
   eq('usage by kind shows it', await db.getUsageByKind(ess), { equipment: 1 });
 
+  // A free trial is everything, whichever plan follows it.
+  const essTrial = `${ref}-esstrial`;
+  await db.setUserPlan(essTrial, 'essentials', 'revenuecat:initial_purchase:trial', new Date(Date.now() + 14 * 864e5).toISOString());
+  await db.setUserModule(essTrial, 'food');
+  a = await billing.checkAccess(essTrial, 'equipment', 'exercise');
+  check('Essentials Food trial: training AI allowed too', a.featureAllowed && a.trial && a.plan === 'essentials');
+  check('Essentials trial: the trial allowance (50)', a.limit === 50, String(a.limit));
+  check('Essentials trial: coach memory and the program builder open',
+    (await billing.checkAccess(essTrial, 'coachDocs', 'coach')).featureAllowed && (await billing.checkAccess(essTrial, 'program')).featureAllowed);
+  check('Essentials trial: the coach may log and plan for both areas', (await billing.checkAccess(essTrial, 'coach')).spec.scope === 'all');
+  await db.setUserPlan(essTrial, 'essentials', 'revenuecat:renewal', new Date(Date.now() + 30 * 864e5).toISOString());
+  a = await billing.checkAccess(essTrial, 'equipment', 'exercise');
+  check('after the first charge: Essentials Food only, training refused', !a.featureAllowed && a.need === 'training' && a.limit === 20);
+  await db.setUserPlan(essTrial, 'essentials', 'revenuecat:product_change:trial', new Date(Date.now() + 7 * 864e5).toISOString());
+  check('a trial marked by a product-change resync is still a trial', (await billing.checkAccess(essTrial, 'equipment')).featureAllowed);
+
   const proRef = `${ref}-pro`;
   await db.setUserPlan(proRef, 'pro', 'admin', null);
   a = await billing.checkAccess(proRef, 'coachDocs', 'coach');
   check('Pro: coach memory allowed, allowance 50', a.featureAllowed && a.limit === 50);
 
   await db.setSetting('plan_locks', { on: false });
-  for (const x of [ref, ess, proRef]) await db.deleteUser(x).catch(() => {});
+  for (const x of [ref, ess, essTrial, proRef]) await db.deleteUser(x).catch(() => {});
 } else {
   console.log('SKIP  database checks (no DATABASE_URL)');
 }

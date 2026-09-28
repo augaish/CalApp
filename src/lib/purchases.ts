@@ -2,7 +2,7 @@ import { Linking, NativeModules, Platform } from 'react-native';
 import type { PurchasesPackage } from 'react-native-purchases';
 
 import { currentRef, onIdentityChange, syncBilling } from './api';
-import { findOfferOption, groupPackages, offerCodeUrl, type StorePlans } from './store-plans';
+import { findOfferOption, groupPackages, offerCodeUrl, replacementFor, type StorePlans } from './store-plans';
 
 /**
  * In-app subscriptions, through RevenueCat's SDK.
@@ -163,13 +163,15 @@ export async function purchase(pkg: PurchasesPackage): Promise<PurchaseOutcome> 
   if (!Purchases || !configured) return { kind: 'failed', message: 'unavailable' };
   try {
     // Play treats a second tier as a second subscription unless told it
-    // replaces the first; the App Store does that itself within a group.
-    let change: { oldProductIdentifier: string } | null = null;
+    // replaces the first; the App Store does that itself within a group, and
+    // the replacement mode matches Apple's: an upgrade now, paying only the
+    // difference; a downgrade when the current period (or trial) ends.
+    let change: Parameters<Sdk['purchasePackage']>[2] = null;
     if (Platform.OS === 'android') {
       const info = await Purchases.getCustomerInfo().catch(() => null);
       const want = pkg.product.identifier.split(':')[0];
       const old = info?.activeSubscriptions.map((id) => id.split(':')[0]).find((id) => id !== want);
-      if (old) change = { oldProductIdentifier: old };
+      if (old) change = { oldProductIdentifier: old, replacementMode: Purchases.STORE_REPLACEMENT_MODE?.[replacementFor(old, want)] };
     }
     await Purchases.purchasePackage(pkg, null, change);
     return settled();

@@ -143,3 +143,21 @@ export function freeTrialDays(pkg: StorePackageLike | null | undefined): number 
       return null;
   }
 }
+
+/**
+ * How Google Play should replace one subscription with another, to behave as
+ * the App Store does: a higher tier at once, charging only the prorated
+ * difference for the rest of the period (same billing length only; Play
+ * refuses it otherwise, so a length change credits the unused time instead);
+ * a lower tier when the current period ends.
+ */
+export function replacementFor(oldId: string, newId: string): 'CHARGE_PRORATED_PRICE' | 'WITH_TIME_PRORATION' | 'DEFERRED' {
+  const rank = (id: string) => {
+    const tier = tierOf({ identifier: id, product: { identifier: id } } as never);
+    return tier === 'proPlus' ? 3 : tier === 'pro' ? 2 : 1;
+  };
+  const yearly = (id: string) => /year|annual/i.test(id);
+  if (rank(newId) < rank(oldId)) return 'DEFERRED';
+  if (rank(newId) > rank(oldId) && yearly(newId) === yearly(oldId)) return 'CHARGE_PRORATED_PRICE';
+  return 'WITH_TIME_PRORATION';
+}

@@ -8,7 +8,7 @@ import { notifications, TRIAL_REMINDER_ID } from './reminders';
  * refund request. Rescheduled on every plan refresh; cancelled when there is
  * no trial. Never asks for permission itself: without it, nothing is sent.
  */
-export async function syncTrialReminder(until: string | null): Promise<void> {
+export async function syncTrialReminder(until: string | null, nextPlan = ''): Promise<void> {
   const mod = notifications();
   if (!mod) return;
   try {
@@ -20,7 +20,7 @@ export async function syncTrialReminder(until: string | null): Promise<void> {
     const date = new Date(until).toLocaleDateString(i18n.language === 'ar' ? 'ar' : 'en', { day: 'numeric', month: 'long' });
     await mod.scheduleNotificationAsync({
       identifier: TRIAL_REMINDER_ID,
-      content: { title: i18n.t('plans.trialReminderTitle'), body: i18n.t('plans.trialReminderBody', { date }), data: { kind: 'trial' } },
+      content: { title: i18n.t('plans.trialReminderTitle'), body: i18n.t('plans.trialReminderBody', { date, plan: nextPlan }), data: { kind: 'trial' } },
       trigger: { type: mod.SchedulableTriggerInputTypes.DATE, date: at },
     });
   } catch (err) {

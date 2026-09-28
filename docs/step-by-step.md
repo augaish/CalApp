@@ -59,7 +59,8 @@ Type the IDs exactly as shown. They can never be changed or reused. You already 
 - **Family Sharing:** off. It can't be turned off once on.
 - **Free trial, 2 weeks, on all four sold products** (Essentials and Pro, monthly and yearly): each product → **Subscription Prices → Introductory Offers → +** → countries: all → start date: today, no end date → type **Free** → duration **2 weeks**.
   - Apple allows one trial per Apple ID per group, and the app shows "14 days free, then … , cancel at least 24 hours before" only to people Apple says are still eligible.
-  - A trial gets the plan's features and its allowance (at most 50 AI actions; admin → Membership → Free trial), and becomes a normal paid plan at its first renewal.
+  - **Every trial is Pro:** whichever plan someone starts, the two weeks include everything (Food, Training, Health, the program builder, coach memory), with the trial allowance (at most 50 AI actions; admin → Membership → Free trial). At the first charge it becomes the plan they chose.
+  - Someone on the Pro trial who wants the cheaper plan picks Essentials in Profile → Membership: the store switches them when the trial ends, with no charge before then. An upgrade after paying is immediate, and the store credits the unused part (Google Play is set to charge only the difference).
   - The app reminds the member two days before the first charge.
   - Partners earn nothing on the trial itself, only from the first paid renewal.
 - **Availability:** all countries and regions.

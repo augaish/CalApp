@@ -9,6 +9,7 @@ import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { useEntitlement } from '@/lib/entitlement';
 import { periodResetsOn, planLabelKey, usageRows } from '@/lib/plan-gates';
+import { useAppStore } from '@/lib/store';
 
 function useDate() {
   const { i18n } = useTranslation();
@@ -88,11 +89,20 @@ export function MembershipCard() {
   const limit = useEntitlement((s) => s.limit) ?? 0;
   const period = useEntitlement((s) => s.period);
 
-  const status = trial && planUntil
-    ? t('plans.trialEnds', { date: date(planUntil) })
-    : promo
-      ? t('plans.codeUntil', { date: date(promo.until) })
-      : null;
+  const pending = useAppStore((s) => s.planSwitch);
+  // A trial is everything; what follows is the plan chosen (or the switch to
+  // Essentials made during it).
+  const next = pending ? t(`plans.name.essentials_${pending.module}`) : t(planLabelKey(plan, locks, module));
+  const title = trial ? t('plans.trialTitle') : t(planLabelKey(plan, locks, module));
+  const status = trial
+    ? planUntil
+      ? t('plans.trialThen', { date: date(planUntil), plan: next })
+      : t('plans.trialThenNoDate', { plan: next })
+    : pending && planUntil
+      ? t('plans.switchOn', { plan: next, date: date(planUntil) })
+      : promo
+        ? t('plans.codeUntil', { date: date(promo.until) })
+        : null;
   const left = Math.max(0, limit - used);
   const resets = period ? periodResetsOn(period) : null;
 
@@ -101,7 +111,7 @@ export function MembershipCard() {
       <Pressable onPress={() => router.push('/upgrade')} accessibilityRole="button" style={({ pressed }) => [styles.head, pressed && { opacity: 0.7 }]}>
         <Icon name="sparkles" size={20} color={theme.primary} />
         <View style={{ flex: 1 }}>
-          <Text style={{ color: theme.text, fontWeight: '800', fontSize: 17 }}>{t(planLabelKey(plan, locks, module))}</Text>
+          <Text style={{ color: theme.text, fontWeight: '800', fontSize: 17 }}>{title}</Text>
           {status ? <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }}>{status}</Text> : null}
         </View>
         <Icon name="chevron-forward" size={16} color={theme.textTertiary} />

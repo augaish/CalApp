@@ -32,12 +32,24 @@ export interface GateState {
   locks?: boolean;
   /** Essentials' chosen module; null until chosen. */
   module?: Module | null;
+  /** In a store free trial, which opens everything whatever plan follows. */
+  trial?: boolean;
   features?: { programs?: number | null; programsUsed?: number };
+}
+
+/**
+ * The plan whose features apply now: a free trial is a taste of everything,
+ * so an Essentials trial works as Pro until its first charge. What is billed
+ * afterwards is still the plan itself.
+ */
+export function featurePlan(s: Pick<GateState, 'plan' | 'trial'>): Plan {
+  const plan: Plan = s.plan ?? 'free';
+  return s.trial && plan === 'essentials' ? 'pro' : plan;
 }
 
 export function gateOpen(gate: Gate, s: GateState): boolean {
   if (!s.locks) return true;
-  const plan: Plan = s.plan ?? 'free';
+  const plan = featurePlan(s);
   if (plan === 'free') return false;
   switch (gate) {
     case 'health':
@@ -69,7 +81,7 @@ export function lockReasonFor(gate: Gate, s: GateState): LockReason {
  * `chooseModule` is an Essentials member who hasn't picked one yet.
  */
 export function visibleModules(s: GateState): { food: boolean; training: boolean; chooseModule: boolean } {
-  if (!s.locks || s.plan !== 'essentials') return { food: true, training: true, chooseModule: false };
+  if (!s.locks || featurePlan(s) !== 'essentials') return { food: true, training: true, chooseModule: false };
   if (!s.module) return { food: false, training: false, chooseModule: true };
   return { food: s.module === 'food', training: s.module === 'training', chooseModule: false };
 }

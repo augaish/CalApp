@@ -157,6 +157,39 @@ try {
   }
 
   // ── Pro passes ──
+  // ── A free trial is everything, whichever plan follows ──
+  const TRIAL = `u_lk${run}trial`;
+  await admin('/admin/api/plan', { ref: TRIAL, plan: 'essentials', module: 'food', days: 30 });
+  {
+    const hook = await fetch(`${API}/api/billing/revenuecat`, {
+      method: 'POST',
+      headers: { authorization: 'e2e-hook', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: { id: `ev-${run}-trial`, type: 'INITIAL_PURCHASE', app_user_id: TRIAL, product_id: 'calgym_essentials_monthly', entitlement_ids: ['essentials'], period_type: 'TRIAL', expiration_at_ms: Date.now() + 14 * 864e5, event_timestamp_ms: Date.now() } }),
+    }).then((r) => r.json());
+    const m = await me(TRIAL);
+    check('server: an Essentials Food trial opens Pro features', hook.result === 'grant' && m.plan === 'essentials' && m.trial === true && m.scope === 'all' && m.features.coachDocs === true, JSON.stringify({ hook, plan: m.plan, trial: m.trial, scope: m.scope }));
+    const { ctx, page } = await openApp('/', TRIAL);
+    const b = await body(page);
+    check('trial: Overview shows Food and Training', /Nutrition today/.test(b) && /Your next steps/.test(b));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openApp('/training', TRIAL);
+    check('trial: Training has no "not in your plan" banner', !/Training isn't in your plan/.test(await body(page)));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openApp('/profile', TRIAL);
+    const b = await body(page);
+    check('trial: Profile says everything is included, then Essentials · Food', /Free trial · everything included/.test(b) && /then Essentials · Food/.test(b), b.match(/Free trial[^.]{0,80}/)?.[0]);
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openApp('/profile', TRIAL, {}, 'ar');
+    check('ar: the trial line in Arabic', /تجربة مجانية · كل المزايا/.test(await body(page)));
+    await ctx.close();
+  }
+
   const PRO = `u_lk${run}pro`;
   await admin('/admin/api/plan', { ref: PRO, plan: 'pro', days: 30 });
   {

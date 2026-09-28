@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { create } from 'zustand';
 
 import { fetchEntitlement, type Entitlement } from './api';
+import i18n from './i18n';
 import { gateOpen, lockReasonFor } from './plan-gates';
 import { configurePurchases, setPlanChangedHandler } from './purchases';
 import { setNotifyGateSource, syncReminders } from './reminders';
@@ -25,8 +26,16 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
     const data = await fetchEntitlement();
     if (data) set({ ...data, loaded: true });
     else set({ loaded: true });
-    // A reminder two days before a store trial turns into the first charge.
-    if (data) void syncTrialReminder(data.trial ? (data.planUntil ?? null) : null);
+    if (data) {
+      // A switch to Essentials chosen during Pro has happened (or the
+      // person went back to Pro): the note about it is done.
+      const pending = useAppStore.getState().planSwitch;
+      const over = pending?.at ? Date.parse(pending.at) + 3 * 86400000 < Date.now() : false;
+      if (pending && (over || (data.plan !== 'pro' && data.plan !== 'proPlus'))) useAppStore.getState().setPlanSwitch(null);
+      // A reminder two days before a store trial turns into the first charge,
+      // naming the plan that follows it.
+      void syncTrialReminder(data.trial ? (data.planUntil ?? null) : null, nextPlanName(data.plan, data.module));
+    }
     // What the plan covers decides which notifications make sense (Essentials
     // Food: none about training). Only once reminders have been set up, so
     // this never asks for permission before onboarding does.
@@ -53,6 +62,14 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
 // A purchase, restore or App Store redemption re-reads the plan from here.
 setPlanChangedHandler(() => useEntitlement.getState().refresh());
 
+/** The plan a trial turns into, named ("Essentials · Food", "Pro"). */
+function nextPlanName(plan: Entitlement['plan'] | undefined, module: Entitlement['module'] | undefined): string {
+  const pending = useAppStore.getState().planSwitch;
+  if (pending) return i18n.t(`plans.name.essentials_${pending.module}`);
+  if (plan === 'essentials') return i18n.t(module ? `plans.name.essentials_${module}` : 'plans.name.essentials');
+  return i18n.t(`plans.name.${plan === 'proPlus' ? 'proPlus' : 'pro'}`);
+}
+
 /** True on any paying tier. */
 export function isPro(): boolean {
   const plan = useEntitlement.getState().plan;
@@ -62,7 +79,7 @@ export function isPro(): boolean {
 // Notifications follow what the plan covers.
 setNotifyGateSource(() => {
   const s = useEntitlement.getState();
-  return { plan: s.plan, locks: s.locks, module: s.module, features: s.features };
+  return { plan: s.plan, locks: s.locks, module: s.module, trial: s.trial, features: s.features };
 });
 
 // With plan locks on, a write the plan doesn't cover does nothing and the

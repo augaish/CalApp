@@ -1,4 +1,4 @@
-import type { StorePlans } from './store-plans';
+import { groupPackages, type StorePackageLike, type StorePlans } from './store-plans';
 
 /**
  * The web build sells nothing: subscriptions go through the App Store and
@@ -16,16 +16,44 @@ export function purchasesStatus(): PurchasesStatus {
 export function configurePurchases(_keys: unknown): void {}
 export function setPlanChangedHandler(_fn: () => Promise<void> | void): void {}
 
-export interface LoadedPlans {
-  plans: StorePlans;
-  packages: never[];
-}
-export async function loadStorePlans(): Promise<LoadedPlans | null> {
-  return null;
+/**
+ * Store screenshots (App Store review asks for one per subscription) are
+ * taken from the web preview, which has no store. `?storePreview=1` shows the
+ * paywall as a new customer sees it on a phone: the launch prices in SAR and
+ * the 2-week free trial. Nothing can be bought; it only draws.
+ */
+function storePreview(): boolean {
+  try {
+    return typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('storePreview');
+  } catch {
+    return false;
+  }
 }
 
-export async function trialEligibility(_productIds: string[]): Promise<Record<string, boolean>> {
-  return {};
+const TRIAL = { price: 0, periodUnit: 'WEEK', periodNumberOfUnits: 2, cycles: 1 };
+const sample = (id: string, packageType: string, price: number, period: string): StorePackageLike => ({
+  identifier: packageType === 'CUSTOM' ? id.replace('calgym_', '').replace('yearly', 'annual') : packageType === 'ANNUAL' ? '$rc_annual' : '$rc_monthly',
+  packageType,
+  product: { identifier: id, priceString: `SAR ${price.toFixed(2)}`, price, currencyCode: 'SAR', subscriptionPeriod: period, introPrice: TRIAL },
+});
+const PREVIEW_PACKAGES = [
+  sample('calgym_essentials_monthly', 'CUSTOM', 19.99, 'P1M'),
+  sample('calgym_essentials_yearly', 'CUSTOM', 149.99, 'P1Y'),
+  sample('calgym_pro_monthly', 'MONTHLY', 24.99, 'P1M'),
+  sample('calgym_pro_yearly', 'ANNUAL', 199.99, 'P1Y'),
+];
+
+export interface LoadedPlans {
+  plans: StorePlans;
+  packages: StorePackageLike[];
+}
+export async function loadStorePlans(): Promise<LoadedPlans | null> {
+  if (!storePreview()) return null;
+  return { plans: groupPackages(PREVIEW_PACKAGES), packages: PREVIEW_PACKAGES };
+}
+
+export async function trialEligibility(productIds: string[]): Promise<Record<string, boolean>> {
+  return storePreview() ? Object.fromEntries(productIds.map((id) => [id, true])) : {};
 }
 
 export type PurchaseOutcome =

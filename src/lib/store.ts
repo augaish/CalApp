@@ -191,6 +191,8 @@ export interface AppState {
    * the daily maximum. Absent = the defaults in notify/planner.ts.
    */
   notifyPrefs?: { enabled?: boolean; quietStart?: number; quietEnd?: number; maxPerDay?: number };
+  /** A move from Pro to Essentials chosen in the app, which the store applies when the current period (or trial) ends. */
+  planSwitch?: { module: 'food' | 'training'; at: string | null } | null;
   /** Messages put off with a notification's "Later" button: note id → ISO time to come back. */
   notifySnooze?: Record<string, string>;
   /** Notification button presses already carried out, so none is done twice. */
@@ -395,6 +397,7 @@ export interface AppState {
   setRemindMeals: (on: boolean) => void;
   setNotifyPrefs: (prefs: Partial<NonNullable<AppState['notifyPrefs']>>) => void;
   setNotifySnooze: (snooze: Record<string, string>) => void;
+  setPlanSwitch: (next: AppState['planSwitch']) => void;
   markNotifyHandled: (key: string) => void;
   setRemindWater: (on: boolean) => void;
   setRemindWorkouts: (on: boolean) => void;
@@ -1241,6 +1244,7 @@ export const useAppStore = create<AppState>()(
       setRemindMeals: (on) => set({ remindMeals: on }),
       setNotifyPrefs: (prefs) => set((st) => ({ notifyPrefs: { ...(st.notifyPrefs ?? {}), ...prefs } })),
       setNotifySnooze: (snooze) => set({ notifySnooze: snooze }),
+      setPlanSwitch: (next) => set({ planSwitch: next }),
       markNotifyHandled: (key) => set((st) => ({ notifyHandled: [...(st.notifyHandled ?? []).filter((k) => k !== key), key].slice(-30) })),
       setRemindWater: (on) => set({ remindWater: on }),
       setRemindWorkouts: (on) => set({ remindWorkouts: on }),
@@ -1399,6 +1403,7 @@ export const useAppStore = create<AppState>()(
         notifyPrefs,
         notifySnooze,
         notifyHandled,
+        planSwitch,
         remindersInitialized,
         tutorialSeen,
         checklistDismissed,
@@ -1450,6 +1455,7 @@ export const useAppStore = create<AppState>()(
         notifyPrefs,
         notifySnooze,
         notifyHandled,
+        planSwitch,
         remindersInitialized,
         tutorialSeen,
         checklistDismissed,

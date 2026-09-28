@@ -238,7 +238,7 @@ export interface Access {
   withinQuota: boolean;
   /** Plan locks are on, so the spec's feature flags are enforced. */
   locks: boolean;
-  /** The plan comes from a store free trial, with the trial's allowance. */
+  /** The plan comes from a store free trial: Pro's features, the trial's allowance. */
   trial: boolean;
   /** The feature this access was checked for, so a refusal can name it. */
   feature: Feature;
@@ -317,18 +317,21 @@ export async function checkAccess(
   const [limits, locks, trialCap] = await Promise.all([planLimits(), planLocksOn(), trialLimit()]);
   const user = ref ? await getOrCreateUser(ref) : null;
   const plan: Plan = (user?.plan as Plan) ?? 'free';
-  const base = PLANS[plan] ?? PLANS.free;
-  const spec = locks ? base : unlocked(base);
   const module: Module | null = plan === 'essentials' ? (user?.module ?? null) : null;
   const trial = plan !== 'free' && isTrialSource(user?.planSource);
-  // No plan with locks on: records stay, the AI does not. A trial gets the
-  // plan's features but a bounded allowance, so a trial that never converts
-  // costs little.
-  const planLimit = locks && plan === 'free' ? 0 : (limits[plan] ?? spec.limit);
+  // A free trial is a taste of everything: whichever plan it turns into, it
+  // opens Pro's features for its two weeks, so people choose having seen it
+  // all. The plan itself (what gets charged) is unchanged.
+  const featurePlan: Plan = trial && plan === 'essentials' ? 'pro' : plan;
+  const base = PLANS[featurePlan] ?? PLANS.free;
+  const spec = locks ? base : unlocked(base);
+  // No plan with locks on: records stay, the AI does not. A trial has a
+  // bounded allowance, so a trial that never converts costs little.
+  const planLimit = locks && plan === 'free' ? 0 : (limits[featurePlan] ?? spec.limit);
   const limit = trial ? Math.min(planLimit, trialCap) : planLimit;
   const used = ref ? await getUsage(ref, period) : 0;
   const weight = await weightFor(kind);
-  const check = featureCheck(plan, spec, feature, module, locks);
+  const check = featureCheck(featurePlan, spec, feature, featurePlan === 'essentials' ? module : null, locks);
   let featureAllowed = check.ok;
   let need: Need | undefined = check.ok ? undefined : check.need;
   // A plan may allow a feature but ration it inside the shared allowance.

@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Platform } from 'react-native';
 
 import { alertProblem } from '@/lib/alerts';
+import i18n from '@/lib/i18n';
 import { setModule } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { choiceForReason, type Choice } from '@/lib/plan-gates';
@@ -20,6 +21,10 @@ import { freeTrialDays, type BillingPeriod, type PaidTier } from '@/lib/store-pl
 
 export { reasonText } from '@/lib/plan-gates';
 
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(i18n.language === 'ar' ? 'ar' : 'en', { day: 'numeric', month: 'long' });
+}
+
 /**
  * Everything a screen needs to sell a plan from the store: the store's plans
  * and prices, the chosen tier and period, and buy / restore with their
@@ -32,6 +37,7 @@ export function useStoreOffer(reason?: string) {
   const locks = useEntitlement((s) => s.locks);
   const module = useEntitlement((s) => s.module);
   const billing = useEntitlement((s) => s.billing);
+  const planUntil = useEntitlement((s) => s.planUntil);
   // Food / Training / Both: one area is Essentials for it, both is Pro. It
   // starts from what the person told onboarding, or from what opened the sheet.
   const [choice, setChoice] = useState<Choice>(() =>
@@ -99,9 +105,20 @@ export function useStoreOffer(reason?: string) {
     // on the right one. A failure here doesn't stop the purchase: the member
     // is asked to choose afterwards.
     if (choice !== 'both') await setModule(choice);
+    // From Pro to Essentials is a downgrade: both stores apply it when the
+    // current period (or free trial) ends, and keep everything until then.
+    const downgrade = choice !== 'both' && (plan === 'pro' || plan === 'proPlus');
     const out = await purchase(selectedPkg);
     setBusy(null);
-    if (out.kind === 'purchased') {
+    if (out.kind === 'purchased' && downgrade) {
+      useAppStore.getState().setPlanSwitch({ module: choice, at: planUntil ?? null });
+      const name = t(`plans.name.essentials_${choice}`);
+      Alert.alert(
+        t('plans.switchDoneTitle'),
+        planUntil ? t('plans.switchDone', { plan: name, date: shortDate(planUntil) }) : t('plans.switchDoneNoDate', { plan: name }),
+        [{ text: t('common.done'), onPress: onDone }],
+      );
+    } else if (out.kind === 'purchased') {
       const name = choice === 'both' ? t('plans.name.pro') : t(`plans.name.essentials_${choice}`);
       Alert.alert(t('upgrade.purchaseDoneTitle'), t('upgrade.purchaseDone', { plan: name }), [
         { text: t('common.done'), onPress: onDone },
