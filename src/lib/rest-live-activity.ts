@@ -5,8 +5,10 @@ import i18n from './i18n';
 import { useAppStore } from './store';
 
 /**
- * The rest countdown on the lock screen and in the Dynamic Island (iPhone,
- * iOS 16.2+), alongside the end-of-rest alert in rest-alert.ts.
+ * The rest countdown on the lock screen: in the Dynamic Island and a Live
+ * Activity on iPhone (iOS 16.2+), and an ongoing notification with a large
+ * countdown on Android (modules/rest-countdown). Alongside the end-of-rest
+ * alert in rest-alert.ts.
  *
  * It follows the same stored value, `activeSession.restEndsAt`: a rest that
  * starts shows a live countdown to that moment, a changed rest updates it,
@@ -26,7 +28,15 @@ const LA: LiveActivityModule | null =
       (require('expo-live-activity') as LiveActivityModule)
     : null;
 
-export const liveActivitiesAvailable = LA != null;
+/** Android: the app's own module, present from the build that added it. */
+interface RestCountdownModule {
+  show(endsAtMs: number, title: string, subtitle: string): void;
+  hide(): void;
+}
+const RC: RestCountdownModule | null =
+  Platform.OS === 'android' ? requireOptionalNativeModule<RestCountdownModule>('RestCountdown') : null;
+
+export const liveActivitiesAvailable = LA != null || RC != null;
 
 const CONFIG = {
   backgroundColor: '#1E1832',
@@ -49,6 +59,14 @@ function remember(id: string | undefined) {
 }
 
 function end() {
+  if (RC) {
+    try {
+      RC.hide();
+    } catch {
+      // Nothing showing.
+    }
+    return;
+  }
   const id = current ?? useAppStore.getState().activeSession?.restActivityId;
   if (!LA || !id) return;
   try {
@@ -60,12 +78,20 @@ function end() {
 }
 
 function apply(endsAt: string | null, next: string | undefined) {
-  if (!LA) return;
   const ends = endsAt ? Date.parse(endsAt) : NaN;
   if (!Number.isFinite(ends) || ends <= Date.now() + 1000) {
     end();
     return;
   }
+  if (RC) {
+    try {
+      RC.show(ends, i18n.t('session.restLiveTitle'), next || i18n.t('session.restOverBody'));
+    } catch (err) {
+      console.warn('rest countdown failed:', err);
+    }
+    return;
+  }
+  if (!LA) return;
   const state = {
     title: i18n.t('session.restLiveTitle'),
     subtitle: next || i18n.t('session.restOverBody'),
@@ -93,7 +119,7 @@ let started = false;
 
 /** Follow the session's rest from now on. Safe to call more than once. */
 export function startRestLiveActivity(): void {
-  if (started || !LA) return;
+  if (started || (!LA && !RC)) return;
   started = true;
   const s = useAppStore.getState().activeSession;
   last = s?.restEndsAt ?? null;

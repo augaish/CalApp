@@ -1,0 +1,6 @@
+{
+  "name": "rest-countdown",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rest countdown on the Android lock screen: an ongoing, silent notification with a large system-drawn countdown."
+}
