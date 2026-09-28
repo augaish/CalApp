@@ -73,12 +73,12 @@ export function WhoopConnectionRow() {
   const theme = useTheme();
   const [status, refresh] = useWhoopStatus();
   const [busy, setBusy] = useState(false);
-  // A new connection is Pro once plan locks are on; one already made keeps syncing.
+  // A new connection needs a plan once locks are on; one already made keeps syncing.
   const gate = usePlanGate();
 
   const connect = async () => {
     if (busy) return;
-    if (!gate.guard('whoop')) return;
+    if (!gate.guard('health')) return;
     setBusy(true);
     try {
       const result = await WebBrowser.openAuthSessionAsync(whoopAuthorizeUrl(), 'calapp://whoop-callback');
@@ -140,7 +140,7 @@ export function WhoopConnectionRow() {
               ? t('profile.whoopConnected')
               : t('profile.connect')}
         </Text>
-        {status !== 'connected' && status !== 'loading' && !gate.isOpen('whoop') ? (
+        {status !== 'connected' && status !== 'loading' && !gate.isOpen('health') ? (
           <Icon name="lock-closed" size={12} color={theme.primary} />
         ) : null}
       </View>

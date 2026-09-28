@@ -202,7 +202,7 @@ export const TERMS_HTML = page(
 </ul>
 
 <h2>Plans and payment</h2>
-<p>Calgym offers a free tier with a monthly allowance of AI actions, and paid subscriptions with larger allowances. Paid subscriptions are billed through the Apple App Store or Google Play. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel your subscription in your App Store or Google Play account settings. Refunds are handled by Apple or Google under their policies.</p>
+<p>Calgym is offered as subscriptions: Essentials (Food or Training, plus Health) and Pro (Food, Training and Health), each with a monthly allowance of AI actions. New subscribers may start with a free trial; unless cancelled at least 24 hours before the trial ends, the subscription then begins and is charged. The trial's length and the price that follows are shown before you start it. Without a subscription you can still view and export what you recorded. Subscriptions are billed through the Apple App Store or Google Play. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel your subscription in your App Store or Google Play account settings. Refunds are handled by Apple or Google under their policies.</p>
 
 <h2>Promotion codes</h2>
 <p>A code can be used once per account, only while it is active and within its dates and limits, and may be withdrawn at any time. A free-access code gives the stated plan for the stated period at no charge. A discount code applies the store's own offer at checkout; the price and its terms are the ones the App Store or Google Play shows you. Codes have no cash value.</p>
@@ -230,7 +230,7 @@ export const TERMS_HTML = page(
 <p>أرقام السعرات والعناصر الغذائية تقديرات قد تكون خاطئة. لا يقدّم كالجيم تشخيصاً أو علاجاً أو نصيحة طبية أو غذائية. استشر مختصاً قبل اتخاذ قرارات صحية.</p>
 
 <h2>الباقات والدفع</h2>
-<p>تتوفر باقة مجانية بحد شهري من عمليات الذكاء الاصطناعي، وباقات مدفوعة بحدود أعلى. تتم الفوترة عبر App Store أو Google Play، وتتجدد الاشتراكات تلقائياً ما لم تُلغَ قبل ٢٤ ساعة من نهاية الفترة. يمكنك الإدارة أو الإلغاء من إعدادات حسابك في المتجر.</p>
+<p>يُقدَّم كالجيم باشتراكات: الأساسيات (التغذية أو التمارين، مع الصحة) وبرو (التغذية والتمارين والصحة)، ولكل منهما حد شهري من عمليات الذكاء الاصطناعي. قد يبدأ المشتركون الجدد بتجربة مجانية؛ وما لم تُلغَ قبل ٢٤ ساعة على الأقل من نهايتها يبدأ الاشتراك ويُحتسب. تُعرض مدة التجربة والسعر الذي يليها قبل أن تبدأها. وبدون اشتراك يمكنك الاطلاع على ما سجّلته وتصديره. تتم الفوترة عبر App Store أو Google Play، وتتجدد الاشتراكات تلقائياً ما لم تُلغَ قبل ٢٤ ساعة من نهاية الفترة. يمكنك الإدارة أو الإلغاء من إعدادات حسابك في المتجر.</p>
 
 <h2>أكواد العروض</h2>
 <p>يُستخدم الكود مرة واحدة لكل حساب، ما دام فعّالاً وضمن تواريخه وحدوده، ويجوز سحبه في أي وقت. كود الوصول المجاني يمنح الباقة المذكورة للمدة المذكورة دون مقابل، وكود الخصم يطبّق عرض المتجر نفسه عند الدفع بالسعر والشروط التي يعرضها App Store أو Google Play. لا قيمة نقدية للأكواد.</p>

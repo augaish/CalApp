@@ -78,11 +78,11 @@ export default function Recipes() {
   const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
-  // Browsing, cooking and logging stay open on every plan; writing a new
-  // recipe, by hand or with AI, is a Pro feature once plan locks are on.
+  // Browsing stays open to everyone; writing a recipe, by hand or with AI,
+  // is part of Food (Essentials Food or Pro) once plan locks are on.
   const gate = usePlanGate();
-  const canCreate = gate.isOpen('recipes');
-  const addMine = () => gate.guard('recipes') && router.push('/recipe-edit');
+  const canCreate = gate.isOpen('food');
+  const addMine = () => gate.guard('food') && router.push('/recipe-edit');
 
   const library = [...recipes].sort(libraryOrder);
   const needsReview = library.filter((r) => r.reviewStatus === 'needs_review').length;
@@ -167,7 +167,7 @@ export default function Recipes() {
       footer={
         <View>
           <View style={styles.footerRow}>
-            <Button label={t('recipes.createWithAi')} icon={canCreate ? 'sparkles' : 'lock-closed'} onPress={() => gate.guard('recipes') && setCreating((v) => !v)} style={{ flex: 1 }} />
+            <Button label={t('recipes.createWithAi')} icon={canCreate ? 'sparkles' : 'lock-closed'} onPress={() => gate.guard('food') && setCreating((v) => !v)} style={{ flex: 1 }} />
             <Button label={t('recipes.addMineShort')} icon={canCreate ? 'add' : 'lock-closed'} variant="secondary" onPress={addMine} style={{ flex: 1 }} />
           </View>
           <Text style={{ color: theme.textTertiary, fontSize: 12, textAlign: 'center', marginTop: 6 }}>{t('recipes.savedNote')}</Text>

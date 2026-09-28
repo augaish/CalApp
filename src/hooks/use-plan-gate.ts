@@ -2,34 +2,48 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 
 import { useEntitlement } from '@/lib/entitlement';
-import { gateOpen, type Gate, type GateContext } from '@/lib/plan-gates';
+import { gateOpen, lockReasonFor, readOnly, visibleModules, type Gate } from '@/lib/plan-gates';
+
+/** The plan fields the gates read, from the entitlement store. */
+function useGateState() {
+  const plan = useEntitlement((s) => s.plan);
+  const locks = useEntitlement((s) => s.locks);
+  const module = useEntitlement((s) => s.module);
+  const features = useEntitlement((s) => s.features);
+  return { plan, locks, module, features };
+}
 
 /**
- * The plan's feature locks, for a screen: `isOpen` to decide what to draw,
- * `guard` to run before starting something — it opens the membership sheet
- * with the reason and returns false when the plan doesn't include it.
+ * The plan's locks, for a screen: `isOpen` to decide what to draw, `guard`
+ * to run before starting something — it opens the membership sheet with the
+ * reason and returns false when the plan doesn't include it.
  */
 export function usePlanGate() {
   const router = useRouter();
-  const plan = useEntitlement((s) => s.plan);
-  const locks = useEntitlement((s) => s.locks);
-  const features = useEntitlement((s) => s.features);
+  const state = useGateState();
+  const { plan, locks, module, features } = state;
 
   const isOpen = useCallback(
-    (gate: Gate, ctx?: GateContext) => gateOpen(gate, { plan, locks, features }, ctx),
-    [plan, locks, features],
+    (gate: Gate) => gateOpen(gate, { plan, locks, module, features }),
+    [plan, locks, module, features],
   );
 
   const guard = useCallback(
-    (gate: Gate, ctx?: GateContext) => {
-      if (isOpen(gate, ctx)) return true;
-      router.push(`/membership?reason=${gate}`);
+    (gate: Gate) => {
+      if (isOpen(gate)) return true;
+      router.push(`/membership?reason=${lockReasonFor(gate, { plan, locks, module, features })}`);
       return false;
     },
-    [isOpen, router],
+    [isOpen, router, plan, locks, module, features],
   );
 
-  return { isOpen, guard, locks: !!locks };
+  return {
+    isOpen,
+    guard,
+    locks: !!locks,
+    readOnly: readOnly({ plan, locks }),
+    visible: visibleModules({ plan, locks, module }),
+  };
 }
 
 /**
@@ -40,13 +54,13 @@ export function usePlanGate() {
 export function useGatedScreen(gate: Gate, active = true): boolean {
   const router = useRouter();
   const loaded = useEntitlement((s) => s.loaded);
-  const { isOpen } = usePlanGate();
-  const open = !active || isOpen(gate);
+  const state = useGateState();
+  const open = !active || gateOpen(gate, state);
   const decided = useRef(false);
   useEffect(() => {
     if (!loaded || decided.current) return;
     decided.current = true;
-    if (!open) router.replace(`/membership?reason=${gate}`);
-  }, [loaded, open, gate, router]);
+    if (!open) router.replace(`/membership?reason=${lockReasonFor(gate, state)}`);
+  }, [loaded, open, gate, router, state]);
   return open;
 }

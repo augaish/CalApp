@@ -62,13 +62,13 @@ export default function Schedules() {
   const [renameDraft, setRenameDraft] = useState('');
 
   const current = weekSize(schedule);
-  // Free keeps one saved week once plan locks are on; more is Pro. Saved
-  // weeks beyond that stay, to switch between, rename or delete.
+  // Saving a week is part of Training (Essentials Training or Pro) once
+  // plan locks are on; saved weeks always stay, to switch, rename or delete.
   const gate = usePlanGate();
-  const canSaveNew = gate.isOpen('schedules', { savedSchedules: saved.length });
+  const canSaveNew = gate.isOpen('training');
   // A first save gets a name to start from, so one tap keeps the week.
   const startNaming = () => {
-    if (!gate.guard('schedules', { savedSchedules: saved.length })) return;
+    if (!gate.guard('training')) return;
     if (!newName.trim() && saved.length === 0) setNewName(t('schedules.defaultName'));
     setNaming(true);
   };

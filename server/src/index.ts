@@ -40,6 +40,8 @@ import {
   getOrCreateUser,
   getSetting,
   getUsageKind,
+  getUsageByKind,
+  MODULE_CHANGE_DAYS,
   getWhoopConnection,
   initDb,
   linkRefs,
@@ -63,6 +65,7 @@ import {
   setUserDevice,
   setUserEmail,
   setUserPlan,
+  setUserModule,
   setWhoopConnection,
   getPromo,
   listPromos,
@@ -106,7 +109,7 @@ import {
 } from './parse.js';
 import { classifyAiError, describeAiError } from './ai-failure.js';
 import { withProviderFallback } from './provider-fallback.js';
-import { ACTION_TOOLS, sanitizeCoachActions } from './coach-actions.js';
+import { ACTION_TOOLS, coachScopeNote, scopeCoachTools, sanitizeCoachActions } from './coach-actions.js';
 import {
   buildAuthorizeUrl,
   exchangeCodeForToken,
@@ -1458,7 +1461,8 @@ app.post('/api/coach', async (c) => {
       : c.json(quotaError(access), 402);
   }
   try {
-    const system = coachSystemPrompt(language, contextText(body.context));
+    const system = coachSystemPrompt(language, contextText(body.context)) + coachScopeNote(access);
+    const tools = coachToolsFor(access);
     if ((await providerFor(access)) === 'deepseek') {
       // OpenAI-shaped: the system prompt is the first message rather than a
       // separate field, and the schedule tool stays optional (tool_choice
@@ -1466,7 +1470,7 @@ app.post('/api/coach', async (c) => {
       const ds = await withOneRetry(() =>
         deepseekToolCall(
           [{ role: 'system', content: system }, ...messages],
-          [toDeepseekTool(SCHEDULE_TOOL), toDeepseekTool(RECIPE_TOOL), ...ACTION_TOOLS.map(toDeepseekTool)],
+          tools.map(toDeepseekTool),
           6000,
         ),
       );
@@ -1492,7 +1496,7 @@ app.post('/api/coach', async (c) => {
       max_tokens: 2000,
       system,
       messages,
-      tools: [SCHEDULE_TOOL, RECIPE_TOOL, ...ACTION_TOOLS],
+      tools,
     });
     await trackUsage({ ref, kind: 'coach' }, MODEL, response.usage);
     const reply = replyText(response);
@@ -1519,6 +1523,11 @@ app.post('/api/coach', async (c) => {
     return aiFailure(c, err, 'coach_failed');
   }
 });
+
+/** The coach's tools for this member (see scopeCoachTools). */
+function coachToolsFor(access: Access): Anthropic.Tool[] {
+  return scopeCoachTools([SCHEDULE_TOOL, RECIPE_TOOL, ...ACTION_TOOLS], access);
+}
 
 interface CoachAttachmentBody {
   image?: string;
@@ -1750,6 +1759,12 @@ app.get('/api/me', async (c) => {
       ])
     : [0, 0];
   const programWeight = weights.program ?? 1;
+  const usage = ref ? await getUsageByKind(ref, access.period) : {};
+  // When an Essentials member may next switch module (null = any time).
+  const nextChange =
+    access.plan === 'essentials' && user?.module && user.moduleSetAt
+      ? new Date(new Date(user.moduleSetAt).getTime() + MODULE_CHANGE_DAYS * 86400000)
+      : null;
   // The app sends this on every launch — guest or signed-in — so it is the
   // one place a device gets recorded for every account the admin table shows,
   // not only the ones that reach a sign-in screen. Best-effort: a failed
@@ -1769,8 +1784,6 @@ app.get('/api/me', async (c) => {
       highAccuracy: access.spec.highAccuracy,
       coachCap: access.spec.coachCap ?? null,
       coachUsed,
-      recipes: access.spec.recipes,
-      bodyReading: access.spec.bodyReading,
       coachDocs: access.spec.coachDocs,
       // Programme designs a month (null = no separate cap) and how many are used.
       programs: access.spec.programs,
@@ -1780,6 +1793,15 @@ app.get('/api/me', async (c) => {
     // feature stays open, as before plans had features of their own.
     locks: access.locks,
     trial: access.trial,
+    // Essentials' module ('food' | 'training'; null until chosen), whether the
+    // plan covers everything, and when the module may next change.
+    module: access.module,
+    scope: access.spec.scope,
+    moduleNextChange: nextChange && nextChange.getTime() > Date.now() ? nextChange.toISOString() : null,
+    // When the current store period (or trial) ends, for "Trial ends 12 Oct".
+    planUntil: user?.storePlan?.plan === access.plan ? (user.storePlan.until ?? null) : null,
+    // This month's AI use by kind, in actions, for the usage breakdown.
+    usage,
     // What the upgrade screen should show. Editable from the admin page so
     // a price change doesn't need an app release — but note it only changes
     // the DISPLAY: the amount actually charged comes from the store product.
@@ -1804,6 +1826,21 @@ app.get('/api/me', async (c) => {
     // How long a promo gift has left, so the app can say so.
     promo: user?.promo ?? null,
   });
+});
+
+/**
+ * Choose the Essentials module (Food or Training). Sent before an Essentials
+ * purchase so the plan knows its module the moment it arrives, and from
+ * Profile to switch — which an Essentials member may do once every 30 days.
+ */
+app.post('/api/module', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ error: 'identify_required' }, 400);
+  const body = await c.req.json<{ module?: string }>().catch(() => ({}) as { module?: string });
+  if (body.module !== 'food' && body.module !== 'training') return c.json({ error: 'invalid_request' }, 400);
+  const out = await setUserModule(ref, body.module);
+  if (!out.ok) return c.json({ error: 'module_locked', nextChange: out.nextChange }, 409);
+  return c.json({ ok: true, module: body.module });
 });
 
 /**
@@ -2370,16 +2407,19 @@ app.post('/admin/api/providers', async (c) => {
 app.post('/admin/api/prices', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req
-    .json<{ pro?: number; proPlus?: number; proYearly?: number; currency?: string }>()
+    .json<{ pro?: number; proPlus?: number; proYearly?: number; essentials?: number; essentialsYearly?: number; currency?: string }>()
     .catch(() => ({}) as Record<string, never>);
   const valid = (v: unknown) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v < 100000;
   if (!valid(body.pro) || !valid(body.proPlus) || !valid(body.proYearly)) {
     return c.json({ error: 'invalid_request' }, 400);
   }
+  const cur = await planPrices();
   await setSetting('plan_prices', {
     pro: body.pro,
     proPlus: body.proPlus,
     proYearly: body.proYearly,
+    essentials: valid(body.essentials) ? body.essentials : cur.essentials,
+    essentialsYearly: valid(body.essentialsYearly) ? body.essentialsYearly : cur.essentialsYearly,
     currency: (body.currency ?? 'SAR').trim().slice(0, 8) || 'SAR',
   });
   return c.json({ ok: true, prices: await planPrices() });
@@ -2499,10 +2539,14 @@ app.post('/admin/api/test-deepseek-text', async (c) => {
 
 app.post('/admin/api/plan', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json<{ ref?: string; plan?: string; days?: number; note?: string }>().catch(() => ({}) as never);
+  const body = await c.req.json<{ ref?: string; plan?: string; days?: number; note?: string; module?: string }>().catch(() => ({}) as never);
   const ref = (body.ref ?? '').trim();
   if (!ref) return c.json({ error: 'invalid_request' }, 400);
-  const plan = body.plan === 'pro' || body.plan === 'proPlus' ? body.plan : 'free';
+  const plan: Plan = body.plan === 'essentials' || body.plan === 'pro' || body.plan === 'proPlus' ? body.plan : 'free';
+  // An admin grant of Essentials sets its module outright (no 30-day wait).
+  if (plan === 'essentials' && (body.module === 'food' || body.module === 'training')) {
+    await setUserModule(ref, body.module, new Date(), true);
+  }
   const until =
     plan !== 'free' && body.days && body.days > 0
       ? new Date(Date.now() + body.days * 86400000).toISOString()
@@ -2517,13 +2561,14 @@ app.post('/admin/api/plan', async (c) => {
 app.post('/admin/api/limits', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req
-    .json<{ free?: number; pro?: number; proPlus?: number; trial?: number }>()
+    .json<{ free?: number; essentials?: number; pro?: number; proPlus?: number; trial?: number }>()
     .catch(() => ({}) as never);
   const [cur, curTrial] = await Promise.all([planLimits(), trialLimit()]);
   const pick = (v: unknown, fallback: number) =>
     Number.isFinite(v) ? Math.max(0, Number(v)) : fallback;
   await setSetting('plan_limits', {
     free: pick(body.free, cur.free),
+    essentials: pick(body.essentials, cur.essentials),
     pro: pick(body.pro, cur.pro),
     proPlus: pick(body.proPlus, cur.proPlus),
     trial: pick(body.trial, curTrial),

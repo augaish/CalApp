@@ -130,7 +130,7 @@ console.log('\n=== App: free code ===');
   await page.goto(`${APP}/upgrade`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
   b = await body(page);
-  check('upgrade: now says Pro, from a code, with the end date', /You're on Pro/.test(b) && /Calgym Pro from a code, until/.test(b), b.match(/You're on Pro.{0,80}/)?.[0]);
+  check('upgrade: now says Pro, from a code, with the end date', /\bPro\s*From a code · until/.test(b), b.match(/Membership.{0,120}/)?.[0]);
   await page.screenshot({ path: `${OUT}/upgrade-after.png` });
 
   // Same person, same code.

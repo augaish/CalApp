@@ -28,6 +28,8 @@ export class FeatureLockedError extends Error {
     public plan: string,
     /** The server's name for what was refused ('coach', 'program', …). */
     public what: string = 'coach',
+    /** What would unlock it: 'subscribe', 'food', 'training' or 'pro'. */
+    public need: string | null = null,
   ) {
     super('feature_locked');
     this.name = 'FeatureLockedError';
@@ -39,27 +41,21 @@ export type LockReason =
   | 'quota'
   | 'coach'
   | 'equipment'
-  | 'recipes'
+  | 'subscribe'
+  | 'food'
+  | 'training'
   | 'program'
-  | 'bodyReading'
-  | 'coachDocs'
-  | 'mealPlans'
-  | 'shopping'
-  | 'schedules'
-  | 'whoop'
-  | 'trends';
+  | 'coachDocs';
 
 /** The membership sheet's reason for a feature the server refused. */
 export function lockReason(err: FeatureLockedError): LockReason {
+  if (err.need === 'subscribe' || err.need === 'food' || err.need === 'training') return err.need;
+  if (err.need === 'pro') return err.what === 'coachDocs' ? 'coachDocs' : 'program';
   switch (err.what) {
     case 'equipment':
       return 'equipment';
-    case 'recipe':
-      return 'recipes';
     case 'program':
       return 'program';
-    case 'bodyReading':
-      return 'bodyReading';
     case 'coachDocs':
       return 'coachDocs';
     default:

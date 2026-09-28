@@ -8,9 +8,11 @@ import { Icon } from '@/components/icon';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { WeekBars } from '@/components/charts';
 import { SponsorCard } from '@/components/sponsor-card';
+import { PlanStatusCard } from '@/components/plan-status';
 import { ActionButton, DayStrip, IconTile, IllustrationTile, MacroRow, StatTile, ProgressTrack, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { estimateMinutes } from '@/lib/session-flow';
 import { resolvePlan } from '@/lib/occurrences';
@@ -68,6 +70,9 @@ export default function Overview() {
   const router = useRouter();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
 
+  // Essentials shows its own module (plus Health); everyone else sees both.
+  const gate = usePlanGate();
+  const { food: showFood, training: showTraining } = gate.visible;
   const units = useAppStore((s) => s.units);
   const profile = useAppStore((s) => s.profile);
   const targets = useAppStore((s) => s.targets);
@@ -295,13 +300,16 @@ export default function Overview() {
           </Pressable>
         )}
 
+        <PlanStatusCard />
+
         {/* Your next steps — train and eat, as equal cards with one action
             each. Only for today: a past day is for reading, not acting. */}
-        {selectedIsToday && (
+        {selectedIsToday && (showFood || showTraining) && (
           <>
             <SectionTitle style={{ marginTop: Spacing.sm }}>{t('today.nextSteps')}</SectionTitle>
 
             {/* Each Overview card is a door to its own screen; the button inside stays the shortcut. */}
+            {showTraining && (
             <Pressable
               {...stepsTarget.bind}
               onPress={() => router.push('/training')}
@@ -361,7 +369,9 @@ export default function Overview() {
                 <StatTile icon="time-outline" value={String(estimateMinutes(todayIds.length, 0))} label={t('today.tileMinutes')} />
               )}
             </Pressable>
+            )}
 
+            {showFood && (
             <Pressable
               onPress={() => router.push('/food')}
               accessibilityRole="button"
@@ -428,6 +438,7 @@ export default function Overview() {
                 color={theme.protein}
               />
             </Pressable>
+            )}
           </>
         )}
 
@@ -460,6 +471,7 @@ export default function Overview() {
         )}
 
         {/* Nutrition today — actual diary entries only; planned food is not here. */}
+        {showFood && (
         <Pressable
           {...nutritionTarget.bind}
           onPress={() => router.push('/food')}
@@ -495,6 +507,7 @@ export default function Overview() {
             </View>
           )}
         </Pressable>
+        )}
 
         {/* Latest weight — read-only. A reading shown today is not a reading
             taken today, so it carries its own date and source (S01). */}
@@ -551,7 +564,9 @@ export default function Overview() {
           <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
         </Pressable>
 
-        {/* AI program — a row, not a hero: drafts are reviewed in their own screen. */}
+        {/* AI program — a row, not a hero: drafts are reviewed in their own screen.
+            It designs training and meals together, so it belongs with both. */}
+        {showFood && showTraining && (
         <View style={[styles.groupCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <SettingsRow
             icon="sparkles-outline"
@@ -565,7 +580,9 @@ export default function Overview() {
             last
           />
         </View>
+        )}
 
+        {showFood && (
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           {/* The bars keep their tap-to-filter; the title is the door to the weekly review. */}
           <Pressable
@@ -588,6 +605,7 @@ export default function Overview() {
             selectedIndex={days.findIndex((d) => isSameDay(d.toISOString(), selected))}
           />
         </View>
+        )}
 
         <SponsorCard />
       </CollapsingScreen>

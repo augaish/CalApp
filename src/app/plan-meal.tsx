@@ -58,7 +58,7 @@ export default function PlanMeal() {
   const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
   const setPlannedRecipe = useAppStore((s) => s.setPlannedRecipe);
-  const allowed = useGatedScreen('mealPlans');
+  const allowed = useGatedScreen('food');
 
   const [days] = useState(upcomingDays);
   const recipe = recipes.find((r) => r.id === params.recipeId);

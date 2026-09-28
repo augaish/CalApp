@@ -97,8 +97,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       used?: number;
       limit?: number;
       what?: string;
+      need?: string | null;
     };
-    if (res.status === 403) throw new FeatureLockedError(q.plan ?? 'free', q.what);
+    if (res.status === 403) throw new FeatureLockedError(q.plan ?? 'free', q.what, q.need ?? null);
     throw new QuotaError(q.plan ?? 'free', q.used ?? 0, q.limit ?? 0);
   }
   if (!res.ok) {
@@ -109,7 +110,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 }
 
 export interface Entitlement {
-  plan: 'free' | 'pro' | 'proPlus';
+  plan: 'free' | 'essentials' | 'pro' | 'proPlus';
   used: number;
   limit: number;
   remaining: number;
@@ -121,8 +122,6 @@ export interface Entitlement {
     /** Cap on coach messages inside the allowance (null = no sub-cap). */
     coachCap?: number | null;
     coachUsed?: number;
-    recipes?: boolean;
-    bodyReading?: boolean;
     coachDocs?: boolean;
     /** Programme designs a month (null = no separate cap), and how many are used. */
     programs?: number | null;
@@ -132,6 +131,18 @@ export interface Entitlement {
   locks?: boolean;
   /** The plan is a store free trial, on the trial's allowance. */
   trial?: boolean;
+  /** Essentials' module ('food' | 'training'), null until chosen or on other plans. */
+  module?: 'food' | 'training' | null;
+  /** 'all' covers Food and Training; 'module' covers the chosen one. */
+  scope?: 'all' | 'module';
+  /** When an Essentials member may next change module; null = now. */
+  moduleNextChange?: string | null;
+  /** When the current store period or trial ends. */
+  planUntil?: string | null;
+  /** This month's AI actions by kind. */
+  usage?: Record<string, number>;
+  /** What each kind costs in actions. */
+  weights?: Record<string, number>;
   /**
    * What the upgrade screen should display, set from the admin dashboard so
    * a price or allowance change doesn't need an app release. Display only —
@@ -143,8 +154,10 @@ export interface Entitlement {
     pro?: number;
     proPlus?: number;
     proYearly?: number;
+    essentials?: number;
+    essentialsYearly?: number;
     currency?: string;
-    limits?: { free?: number; pro?: number; proPlus?: number };
+    limits?: { free?: number; essentials?: number; pro?: number; proPlus?: number };
     coachCap?: number | null;
     trialLimit?: number;
   };
@@ -310,6 +323,29 @@ export async function syncBilling(): Promise<boolean> {
     return data.result === 'granted';
   } catch {
     return false;
+  }
+}
+
+export type SetModuleResult = { kind: 'ok' } | { kind: 'locked'; nextChange: string } | { kind: 'failed' };
+
+/**
+ * Choose the Essentials module. Sent before an Essentials purchase and from
+ * Profile; an Essentials member can change it once every 30 days, and the
+ * server says when the next change is allowed.
+ */
+export async function setModule(module: 'food' | 'training'): Promise<SetModuleResult> {
+  try {
+    const res = await fetch(`${API_URL}/api/module`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ module }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; nextChange?: string };
+    if (res.ok && data.ok) return { kind: 'ok' };
+    if (data.error === 'module_locked' && data.nextChange) return { kind: 'locked', nextChange: data.nextChange };
+    return { kind: 'failed' };
+  } catch {
+    return { kind: 'failed' };
   }
 }
 

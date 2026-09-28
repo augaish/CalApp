@@ -207,13 +207,15 @@ export const ADMIN_HTML = `<!doctype html>
     </div>
 
     <div class="card">
-      <h2>Grant or revoke Pro</h2>
+      <h2>Grant or revoke a plan</h2>
       <div class="row">
         <div><label>User ref</label><input id="g_ref" placeholder="paste from the table" /></div>
         <div><label>Days (blank = forever)</label><input id="g_days" type="number" min="1" /></div>
         <div><label>Note</label><input id="g_note" placeholder="e.g. beta tester" /></div>
       </div>
       <div class="row" style="margin-top:10px">
+        <button onclick="setPlan('essentials', 'food')">Grant Essentials · Food</button>
+        <button onclick="setPlan('essentials', 'training')">Grant Essentials · Training</button>
         <button onclick="setPlan('pro')">Grant Pro</button>
         <button onclick="setPlan('proPlus')">Grant Pro+</button>
         <button class="ghost" onclick="setPlan('free')">Revoke</button>
@@ -226,8 +228,10 @@ export const ADMIN_HTML = `<!doctype html>
       <h2>Membership prices</h2>
       <details class="how"><summary>How this works</summary><div>Used for the revenue estimate above, and shown on the upgrade screen only until the store products are live. <b>Once subscriptions are on, the app shows the store's own price</b> — set in App Store Connect / Google Play, in each person's currency with VAT included — so there is one price to manage, and it is there. These numbers never change what anyone is charged.</div></details>
       <div class="row">
+        <div><label>Essentials / month</label><input id="pr_ess" type="number" step="0.01" /></div>
+        <div><label>Essentials / year</label><input id="pr_essyear" type="number" step="0.01" /></div>
         <div><label>Pro / month</label><input id="pr_pro" type="number" step="0.01" /></div>
-        <div><label>Pro+ / month</label><input id="pr_proplus" type="number" step="0.01" /></div>
+        <div><label>Pro+ / month (not sold yet)</label><input id="pr_proplus" type="number" step="0.01" /></div>
         <div><label>Pro / year</label><input id="pr_proyear" type="number" step="0.01" /></div>
         <div><label>Currency</label><input id="pr_cur" maxlength="8" /></div>
         <button onclick="savePrices()">Save prices</button>
@@ -237,21 +241,21 @@ export const ADMIN_HTML = `<!doctype html>
 
     <div class="card">
       <h2>Plan locks</h2>
-      <div class="sub" style="margin:0 0 10px">When on, each plan gets only its own features. Turn this on once the store can sell, after testers have the FOUNDERS code. Anything people already made stays usable either way.</div>
+      <div class="sub" style="margin:0 0 10px">When on, the launch offer applies: no permanent free plan, a 14-day store trial of Essentials or Pro, and people without a plan can view and export their records but not log anything new or use AI. Turn this on once the store can sell and testers have the FOUNDERS code. Nothing anyone recorded is ever deleted.</div>
       <table>
-        <thead><tr><th>Feature</th><th>Free</th><th>Pro</th><th>Pro+</th></tr></thead>
+        <thead><tr><th>What</th><th>No plan</th><th>Essentials (Food or Training)</th><th>Pro</th></tr></thead>
         <tbody>
-          <tr><td>Logging, workouts, rest timer, body map, backup</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td>Saved schedules</td><td>1</td><td>Unlimited</td><td>Unlimited</td></tr>
-          <tr><td>Health trend history</td><td>30 days</td><td>All</td><td>All</td></tr>
-          <tr><td>AI coach messages</td><td>3</td><td>Allowance</td><td>Allowance</td></tr>
-          <tr><td>Writing recipes, meal plans, shopping list</td><td>No</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td>InBody reading with AI, new WHOOP connection</td><td>No</td><td>Yes</td><td>Yes</td></tr>
-          <tr><td>AI program builder</td><td>No</td><td>1 a month</td><td>Unlimited</td></tr>
-          <tr><td>Coach memory (photos and files)</td><td>No</td><td>No</td><td>Yes</td></tr>
-          <tr><td>More accurate meal analysis</td><td>No</td><td>No</td><td>Yes</td></tr>
+          <tr><td>View and export records</td><td>Yes</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>Food: diary, barcode, photo, recipes, meal plans, shopping, fasting</td><td>No</td><td>If Food</td><td>Yes</td></tr>
+          <tr><td>Training: workouts, schedules, history, records, body map</td><td>No</td><td>If Training</td><td>Yes</td></tr>
+          <tr><td>Health: weight, measurements, readings, water, WHOOP, trends</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>AI actions a month (the other module's AI is refused)</td><td>0</td><td>20</td><td>50</td></tr>
+          <tr><td>Coach (general questions; tools only for their module)</td><td>No</td><td>Yes</td><td>Yes</td></tr>
+          <tr><td>AI program builder (training and meals together)</td><td>No</td><td>No</td><td>1 a month</td></tr>
+          <tr><td>Coach memory (files and photos)</td><td>No</td><td>No</td><td>Yes</td></tr>
         </tbody>
       </table>
+      <div class="sub" style="margin:8px 0 0">Essentials members may switch module once every 30 days. Pro+ exists in the store but is not offered; people who have it get everything.</div>
       <div class="row" style="margin-top:12px">
         <label style="margin:0"><input id="locks_on" type="checkbox" style="width:auto" /> Plan locks on</label>
         <button onclick="saveLocks()">Save</button>
@@ -262,7 +266,8 @@ export const ADMIN_HTML = `<!doctype html>
     <div class="card">
       <h2>Monthly AI allowance</h2>
       <div class="row">
-        <div><label>Free</label><input id="lim_free" type="number" min="0" /></div>
+        <div><label>Free (locks off)</label><input id="lim_free" type="number" min="0" /></div>
+        <div><label>Essentials</label><input id="lim_ess" type="number" min="0" /></div>
         <div><label>Pro</label><input id="lim_pro" type="number" min="0" /></div>
         <div><label>Pro+</label><input id="lim_proplus" type="number" min="0" /></div>
         <div><label>Free trial (whole trial)</label><input id="lim_trial" type="number" min="0" /></div>
@@ -501,13 +506,14 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('s_cost').textContent =
       (s.costUsdThisMonth * USD_TO_SAR).toFixed(2);
     document.getElementById('lim_free').value = data.limits.free;
+    document.getElementById('lim_ess').value = data.limits.essentials != null ? data.limits.essentials : '';
     document.getElementById('lim_pro').value = data.limits.pro;
     document.getElementById('lim_proplus').value = data.limits.proPlus;
     document.getElementById('lim_trial').value = data.trialLimit != null ? data.trialLimit : '';
     document.getElementById('locks_on').checked = !!data.planLocks;
     document.getElementById('locks_msg').textContent = data.planLocks
-      ? 'On: plans are locked to their own features.'
-      : 'Off: every plan can use every feature; only the AI allowance differs.';
+      ? 'On: the launch offer applies (no free plan; Essentials covers one module).'
+      : 'Off: everyone can use everything; Free keeps its small AI allowance.';
     loadQueue();
     loadAiFailures();
     loadPartners();
@@ -594,12 +600,14 @@ export const ADMIN_HTML = `<!doctype html>
     });
     document.getElementById('u_count').textContent = q ? list.length + ' of ' + data.users.length : data.users.length + ' users';
     var html = '';
-    list.forEach(function (u) {      var isPro = u.plan === 'pro' || u.plan === 'proPlus';
+    list.forEach(function (u) {
+      var isPro = u.plan !== 'free';
+      var planLabel = u.plan === 'essentials' ? 'essentials' + (u.module ? ' · ' + u.module : ' · no module') : u.plan;
       html += '<tr>' +
         '<td style="font-family:monospace">' + esc(u.ref) + '</td>' +
         '<td>' + (u.email ? esc(u.email) : '<span class="muted">guest</span>') + '</td>' +
         '<td class="muted">' + (u.device ? esc(u.device) : '—') + '</td>' +
-        '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + u.plan + '</span></td>' +
+        '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + esc(planLabel) + '</span></td>' +
         '<td class="muted">' + esc(u.planSource) + '</td>' +
         '<td>' + u.used + '</td>' +
         '<td class="muted">' + fmtTokens(u.tokens) + '</td>' +
@@ -648,6 +656,8 @@ export const ADMIN_HTML = `<!doctype html>
   }
   function renderPrices() {
     var p = data.prices || {};
+    document.getElementById('pr_ess').value = p.essentials != null ? p.essentials : '';
+    document.getElementById('pr_essyear').value = p.essentialsYearly != null ? p.essentialsYearly : '';
     document.getElementById('pr_pro').value = p.pro != null ? p.pro : '';
     document.getElementById('pr_proplus').value = p.proPlus != null ? p.proPlus : '';
     document.getElementById('pr_proyear').value = p.proYearly != null ? p.proYearly : '';
@@ -658,6 +668,8 @@ export const ADMIN_HTML = `<!doctype html>
     box.classList.remove('hide');
     box.textContent = 'Saving…';
     api('/admin/api/prices', {
+      essentials: Number(document.getElementById('pr_ess').value),
+      essentialsYearly: Number(document.getElementById('pr_essyear').value),
       pro: Number(document.getElementById('pr_pro').value),
       proPlus: Number(document.getElementById('pr_proplus').value),
       proYearly: Number(document.getElementById('pr_proyear').value),
@@ -798,11 +810,12 @@ export const ADMIN_HTML = `<!doctype html>
     box.scrollIntoView({ behavior: 'smooth', block: 'center' });
     box.focus();
   }
-  function setPlan(plan) {
+  function setPlan(plan, module) {
     var days = parseInt(document.getElementById('g_days').value, 10);
     api('/admin/api/plan', {
       ref: document.getElementById('g_ref').value,
       plan: plan,
+      module: module,
       days: isNaN(days) ? undefined : days,
       note: document.getElementById('g_note').value || undefined,
     }).then(load);
@@ -964,6 +977,7 @@ export const ADMIN_HTML = `<!doctype html>
   function saveLimits() {
     api('/admin/api/limits', {
       free: parseInt(document.getElementById('lim_free').value, 10),
+      essentials: parseInt(document.getElementById('lim_ess').value, 10),
       pro: parseInt(document.getElementById('lim_pro').value, 10),
       proPlus: parseInt(document.getElementById('lim_proplus').value, 10),
       trial: parseInt(document.getElementById('lim_trial').value, 10),
@@ -971,7 +985,7 @@ export const ADMIN_HTML = `<!doctype html>
   }
   function saveLocks() {
     var on = document.getElementById('locks_on').checked;
-    if (on && !confirm('Turn plan locks on? Free users lose recipes, meal plans, extra schedules and the other paid features straight away.')) return;
+    if (on && !confirm('Turn plan locks on? People without a plan can then only view and export their records, and Essentials members only use their own module.')) return;
     api('/admin/api/plan-locks', { on: on }).then(load);
   }
   function saveSponsor() {

@@ -66,7 +66,7 @@ export default function Shopping() {
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
   const theme = useTheme();
   const router = useRouter();
-  const allowed = useGatedScreen('shopping');
+  const allowed = useGatedScreen('food');
 
   const recipes = useAllRecipes();
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);

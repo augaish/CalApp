@@ -7,6 +7,7 @@ import Sortable from 'react-native-sortables';
 
 import { TodayPill } from '@/components/brand-header';
 import { Icon } from '@/components/icon';
+import { ModuleBanner } from '@/components/plan-status';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
@@ -366,6 +367,7 @@ export default function Training() {
 
   return (
     <CollapsingScreen title={t('tabs.training')} header={header} scrollRef={pageRef}>
+      <ModuleBanner area="training" />
       {lastOp && (
         <View style={[styles.undoBar, { backgroundColor: theme.surfaceTint }]}>
           <Icon name="swap-horizontal" size={16} color={theme.primaryDark} />

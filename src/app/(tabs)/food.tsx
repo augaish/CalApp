@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { ModuleBanner } from '@/components/plan-status';
 import { alertDestructive } from '@/lib/alerts';
 import { HeaderPill } from '@/components/brand-header';
 import { CollapsingScreen } from '@/components/collapsing-screen';
@@ -254,6 +255,7 @@ export default function Food() {
         ) : undefined
       }
     >
+      <ModuleBanner area="food" />
       {tab === 'plan' ? (
         <>
           <View style={styles.planHead}>

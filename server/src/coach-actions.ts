@@ -258,3 +258,38 @@ export function sanitizeCoachActions(calls: { name: string; args: unknown }[]): 
   }
   return { actions: actions.slice(0, 6), suggestions };
 }
+
+/** Coach tools that act on food, and on training. Water, weight and follow-ups are for everyone. */
+const FOOD_TOOLS = new Set(['write_recipe', 'propose_food_log', 'propose_food_update', 'propose_targets']);
+const TRAINING_TOOLS = new Set(['propose_weekly_schedule', 'propose_workout_log']);
+
+/** What the coach's scope depends on: whether locks are on, and what the plan covers. */
+export interface CoachScope {
+  locks: boolean;
+  spec: { scope: 'all' | 'module' };
+  module: 'food' | 'training' | null;
+}
+
+/**
+ * The coach's tools for this member. Essentials keeps the coach for its own
+ * module and for general questions, but not the tools that log or plan the
+ * other module — so no AI is spent building what the plan doesn't include.
+ */
+export function scopeCoachTools<T extends { name: string }>(tools: T[], scope: CoachScope): T[] {
+  if (!scope.locks || scope.spec.scope === 'all') return tools;
+  return tools.filter((tool) => {
+    if (FOOD_TOOLS.has(tool.name)) return scope.module === 'food';
+    if (TRAINING_TOOLS.has(tool.name)) return scope.module === 'training';
+    return true;
+  });
+}
+
+/** What the coach is told about an Essentials member's scope. */
+export function coachScopeNote(scope: CoachScope): string {
+  if (!scope.locks || scope.spec.scope === 'all') return '';
+  const mine = scope.module === 'food' ? 'food and nutrition' : scope.module === 'training' ? 'training' : null;
+  const other = scope.module === 'food' ? 'training' : scope.module === 'training' ? 'food and nutrition' : 'food or training';
+  return mine
+    ? `\n\nThis member's plan covers ${mine} (plus health). Answer general questions about ${other} briefly, but do not design ${other} plans, schedules, recipes or logs for them; if they want that, say it comes with Calgym Pro.`
+    : `\n\nThis member has not chosen Food or Training yet. Answer general questions only, without designing plans or logs, and suggest choosing their focus in Profile.`;
+}

@@ -225,7 +225,7 @@ export function cleanDraft(input: PromoDraft): { ok: true; value: CleanPromo } |
   };
 }
 
-export const PLAN_RANK: Record<Plan, number> = { free: 0, pro: 1, proPlus: 2 };
+export const PLAN_RANK: Record<Plan, number> = { free: 0, essentials: 1, pro: 2, proPlus: 3 };
 
 export interface EffectivePlan {
   plan: Plan;

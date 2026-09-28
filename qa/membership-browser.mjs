@@ -33,10 +33,16 @@ const body = (page) => page.evaluate(() => document.body.innerText);
 {
   const { ctx, page } = await open('/membership');
   const b = await body(page);
-  check('title and promise', /Get more from Calgym/.test(b) && /More AI every month/.test(b));
-  check('all six benefits listed, Pro+ ones tagged', ['More AI every month', 'Recipes, meal plans, shopping', 'Every schedule, all your history', 'AI program builder', 'A coach that remembers', 'Highest accuracy'].every((x) => b.includes(x)) && /Pro\+/.test(b), '');
+  check('title and the question', /Choose how Calgym helps you/.test(b) && /What do you want help with\?/.test(b));
+  check('Food, Training and Both offered; both-focus opens on Pro, recommended', ['Food', 'Training', 'Both'].every((x) => b.includes(x)) && /Pro\s*Recommended/.test(b) && /Everything in Food and in Training/.test(b), '');
+  check('Pro shows its display price and 50 AI actions', /24\.99/.test(b) && /50 AI actions a month/.test(b));
+  await page.getByRole('radio', { name: /Food$/ }).first().click();
+  await page.waitForTimeout(400);
+  const f = await body(page);
+  check('choosing Food shows Essentials · Food with its own inclusions', /Essentials · Food/.test(f) && /Recipes, portions and meal planning/.test(f) && /19\.99/.test(f) && /20 AI actions a month/.test(f));
+  check('Essentials offers Pro for the real difference', /Add Training too with Pro, for 5\.00 SAR more a month/.test(f));
   check('web: says subscriptions are coming, no buy button that cannot work', /Subscriptions coming soon/.test(b));
-  check('"Have a code?" and "Compare plans" are offered', /Have a code\?/.test(b) && /Compare plans/.test(b));
+  check('"Have a code?" and "Compare plans" are offered', /Have a code\?/.test(b) && /Membership and usage/.test(b));
   await page.screenshot({ path: `${OUT}/sheet.png` });
   await page.getByRole('button', { name: 'Not now' }).click();
   await page.waitForTimeout(600);
@@ -60,9 +66,9 @@ const body = (page) => page.evaluate(() => document.body.innerText);
 {
   const { ctx, page } = await open('/membership?reason=coach');
   check('a limit opens it with its reason', /used your free coach messages/.test(await body(page)));
-  await page.getByText('Compare plans').click();
+  await page.getByText('Membership and usage').click();
   await page.waitForTimeout(900);
-  check('"Compare plans" leads to the full plans page', /\/upgrade/.test(page.url()), page.url());
+  check('"Membership and usage" leads to the full page', /\/upgrade/.test(page.url()), page.url());
   await ctx.close();
 }
 {
@@ -75,7 +81,7 @@ const body = (page) => page.evaluate(() => document.body.innerText);
 {
   const { ctx, page } = await open('/membership', 'ar');
   const b = await body(page);
-  check('Arabic: title and Not now', /احصل على المزيد/.test(b) && /ليس الآن/.test(b));
+  check('Arabic: title, the question and Not now', /اختر كيف يساعدك كالجيم/.test(b) && /في ماذا تريد المساعدة/.test(b) && /ليس الآن/.test(b));
   await page.screenshot({ path: `${OUT}/sheet-ar.png` });
   await ctx.close();
 }

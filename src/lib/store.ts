@@ -471,9 +471,90 @@ export const FASTING_PROTOCOL_HOURS: Record<Exclude<FastingProtocol, 'custom'>, 
   omad: 23,
 };
 
+/** The three areas a plan can cover. */
+export type WriteArea = 'food' | 'training' | 'health';
+
+/**
+ * Store actions that record or plan something new, by the area they belong
+ * to. With plan locks on, one the plan doesn't cover does nothing and the
+ * membership sheet explains why (see setWriteGuard). Deleting, settings,
+ * finishing something already started and syncing are never listed: a person
+ * can always tidy up, export and leave.
+ */
+const WRITE_AREAS: Partial<Record<keyof AppState, WriteArea | ((...args: unknown[]) => WriteArea | null)>> = {
+  logMeal: 'food',
+  updateMeal: 'food',
+  duplicateMeal: 'food',
+  startShopping: 'food',
+  setShoppingChecked: 'food',
+  setShoppingHave: 'food',
+  setShoppingOneBatch: 'food',
+  addRecipe: 'food',
+  updateRecipe: 'food',
+  // Clearing a planned slot is tidying up; filling one is planning.
+  setPlannedRecipe: (...args) => (args[2] == null ? null : 'food'),
+  swapPlannedMeal: 'food',
+  startFast: 'food',
+  logSet: 'training',
+  updateSet: 'training',
+  setWorkoutTrained: 'training',
+  copyDayTo: 'training',
+  setDayOrder: 'training',
+  reorderSchedule: 'training',
+  saveDayToSchedule: 'training',
+  addToSchedule: 'training',
+  setScheduleTitle: 'training',
+  setPlannedSets: 'training',
+  skipPlanToday: 'training',
+  restorePlanToday: 'training',
+  importSchedule: 'training',
+  applyCoachSchedule: 'training',
+  markExerciseDone: 'training',
+  saveScheduleAs: 'training',
+  updateSavedSchedule: 'training',
+  activateSchedule: 'training',
+  startSession: 'training',
+  applyOccurrenceMoves: 'training',
+  addExercise: 'training',
+  updateExercise: 'training',
+  mergeExercise: 'training',
+  logWater: 'health',
+  logWeight: 'health',
+  logBodyReading: 'health',
+};
+
+let writeGuard: ((area: WriteArea) => boolean) | null = null;
+
+/**
+ * Registered once by the app root: returns whether the plan covers an area,
+ * and opens the membership sheet when it doesn't. Unset (tests, web preview
+ * before launch) means everything is allowed.
+ */
+export function setWriteGuard(fn: ((area: WriteArea) => boolean) | null): void {
+  writeGuard = fn;
+}
+
+/** Wrap the listed actions so a write the plan doesn't cover does nothing. */
+function guardWrites<A extends unknown[]>(creator: (...args: A) => AppState): (...args: A) => AppState {
+  return (...args: A) => {
+    const state = creator(...args);
+    const out = { ...state } as Record<string, unknown>;
+    for (const [name, rule] of Object.entries(WRITE_AREAS)) {
+      const action = out[name];
+      if (typeof action !== 'function' || !rule) continue;
+      out[name] = (...params: unknown[]) => {
+        const area = typeof rule === 'function' ? rule(...params) : rule;
+        if (area && writeGuard && !writeGuard(area)) return undefined;
+        return (action as (...p: unknown[]) => unknown)(...params);
+      };
+    }
+    return out as unknown as AppState;
+  };
+}
+
 export const useAppStore = create<AppState>()(
   persist(
-    (set, get) => ({
+    guardWrites((set, get) => ({
       account: null,
       language: null,
       units: 'metric',
@@ -1258,7 +1339,7 @@ export const useAppStore = create<AppState>()(
           activeFast: null,
           fastingHistory: [],
         }),
-    }),
+    })),
     {
       name: 'calapp-store',
       version: 15,

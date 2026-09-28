@@ -43,6 +43,8 @@ export function notifications(): NotificationsModule | null {
 
 /** The rest timer's end-of-rest alert; reminders never cancel it. */
 export const REST_ALERT_ID = 'calgym-rest';
+/** The reminder before a store trial's first charge (trial-reminder.ts); reminders never cancel it. */
+export const TRIAL_REMINDER_ID = 'calgym-trial';
 
 const WATER_HOURS = [10, 15, 20];
 const MEAL_PROMPT: Record<'breakfast' | 'lunch' | 'dinner', { hour: number; minute: number }> = {
@@ -112,7 +114,7 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
   const scheduled = await mod.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled
-      .filter((n) => n.identifier !== REST_ALERT_ID)
+      .filter((n) => n.identifier !== REST_ALERT_ID && n.identifier !== TRIAL_REMINDER_ID)
       .map((n) => mod.cancelScheduledNotificationAsync(n.identifier)),
   );
   if (!anyOn) return { granted: true };

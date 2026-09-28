@@ -11,7 +11,7 @@
  * lives, and it is the store.
  */
 
-export type PaidTier = 'pro' | 'proPlus';
+export type PaidTier = 'essentials' | 'pro' | 'proPlus';
 export type BillingPeriod = 'monthly' | 'annual';
 
 /** The parts of an SDK package this module reads. */
@@ -38,7 +38,9 @@ export type StorePlans<P extends StorePackageLike = StorePackageLike> = Record<
 /** Which tier a package sells. Pro+ first: "pro" is inside every Pro+ id. */
 export function tierOf(pkg: StorePackageLike): PaidTier {
   const ids = `${pkg.product.identifier} ${pkg.identifier}`.toLowerCase();
-  return /plus|pro_?\+/.test(ids) ? 'proPlus' : 'pro';
+  if (/plus|pro_?\+/.test(ids)) return 'proPlus';
+  if (/essential/.test(ids)) return 'essentials';
+  return 'pro';
 }
 
 /** How often a package bills, or null for anything that is not a plain subscription. */
@@ -58,7 +60,7 @@ export function periodOf(pkg: StorePackageLike): BillingPeriod | null {
 
 /** Sort an offering's packages into tier × period. First match wins. */
 export function groupPackages<P extends StorePackageLike>(packages: P[]): StorePlans<P> {
-  const out: StorePlans<P> = { pro: {}, proPlus: {} };
+  const out: StorePlans<P> = { essentials: {}, pro: {}, proPlus: {} };
   for (const pkg of packages) {
     const period = periodOf(pkg);
     if (!period) continue;

@@ -117,6 +117,7 @@ export default function RootLayout() {
             options={{ presentation: 'transparentModal', animation: 'fade', contentStyle: { backgroundColor: 'transparent' } }}
           />
           <Stack.Screen name="redeem" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="focus" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-library" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-edit" options={{ presentation: 'modal' }} />
           <Stack.Screen name="exercise-detail" options={{ presentation: 'modal' }} />

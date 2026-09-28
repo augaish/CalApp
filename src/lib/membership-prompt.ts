@@ -6,6 +6,10 @@
  * - only to someone on the free plan, only when the store actually has a plan
  *   to sell, and never over a workout or while they are elsewhere than a tab.
  *
+ * With the launch offer (plan locks on, no free plan), someone without a plan
+ * can only look back at their records, so the offer comes daily instead and
+ * without the three-day wait — still never over a workout.
+ *
  * Hitting a limit opens the sheet directly and is not counted here.
  */
 
@@ -20,6 +24,7 @@ export interface MembershipPromptState {
 const DAY = 86_400_000;
 export const FIRST_WEEKLY_AFTER_DAYS = 3;
 export const WEEKLY_GAP_DAYS = 7;
+export const LAUNCH_GAP_DAYS = 1;
 
 /**
  * The state to start from. Someone still before the tour is new, and is owed
@@ -32,14 +37,15 @@ export function initialPromptState(tourSeen: boolean, now: Date = new Date()): M
 
 export function promptDue(
   state: MembershipPromptState,
-  ctx: { free: boolean; tourDone: boolean; busy: boolean },
+  ctx: { free: boolean; tourDone: boolean; busy: boolean; launchOffer?: boolean },
   now: Date = new Date(),
 ): 'intro' | 'weekly' | null {
   if (!ctx.free || !ctx.tourDone || ctx.busy) return null;
   if (!state.introShown) return 'intro';
   const since = (iso: string) => (now.getTime() - new Date(iso).getTime()) / DAY;
-  if (since(state.firstSeenAt) < FIRST_WEEKLY_AFTER_DAYS) return null;
-  if (state.lastShownAt && since(state.lastShownAt) < WEEKLY_GAP_DAYS) return null;
+  if (!ctx.launchOffer && since(state.firstSeenAt) < FIRST_WEEKLY_AFTER_DAYS) return null;
+  const gap = ctx.launchOffer ? LAUNCH_GAP_DAYS : WEEKLY_GAP_DAYS;
+  if (state.lastShownAt && since(state.lastShownAt) < gap) return null;
   return 'weekly';
 }
 

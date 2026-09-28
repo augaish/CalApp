@@ -204,6 +204,10 @@ export async function initDb(): Promise<void> {
   // What the row was last seen on — set from the launch ping, so it covers
   // guests too, not only signed-in accounts.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS device TEXT`);
+  // Essentials covers one module, Food or Training, chosen by the member and
+  // changeable once every 30 days (see setUserModule).
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS module TEXT`);
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS module_set_at TIMESTAMPTZ`);
   // A user's WHOOP connection, one row per account. Kept separate from
   // app_users (rather than more ALTER-ADD columns) since disconnecting is a
   // single DELETE and the row simply doesn't exist for anyone who hasn't
@@ -536,7 +540,7 @@ export async function clearPromo(ref: string): Promise<void> {
 }
 
 function rankSql(col: string): string {
-  return `(CASE ${col} WHEN 'proPlus' THEN 2 WHEN 'pro' THEN 1 ELSE 0 END)`;
+  return `(CASE ${col} WHEN 'proPlus' THEN 3 WHEN 'pro' THEN 2 WHEN 'essentials' THEN 1 ELSE 0 END)`;
 }
 
 /**
@@ -717,7 +721,7 @@ export async function markBillingEventApplied(ref: string, eventMs: number): Pro
 
 // ── Accounts & entitlement ────────────────────────────────────────────────
 
-export type Plan = 'free' | 'pro' | 'proPlus';
+export type Plan = 'free' | 'essentials' | 'pro' | 'proPlus';
 
 export interface AppUser {
   ref: string;
@@ -730,6 +734,9 @@ export interface AppUser {
   storePlan?: { plan: Plan; source: string; until: string | null };
   /** A running promo gift, if any. */
   promo?: { plan: Plan; until: string; code: string | null } | null;
+  /** The Essentials module, when one has been chosen. */
+  module?: 'food' | 'training' | null;
+  moduleSetAt?: string | null;
 }
 
 /**
@@ -750,6 +757,8 @@ function appUserFrom(r: Record<string, unknown>): AppUser {
     note: (r.note as string) ?? null,
     storePlan: e.store,
     promo: e.promo,
+    module: r.module === 'food' || r.module === 'training' ? r.module : null,
+    moduleSetAt: iso(r.module_set_at),
   };
 }
 
@@ -764,7 +773,7 @@ export async function getOrCreateUser(ref: string): Promise<AppUser | null> {
     const res = await pool.query(
       `INSERT INTO app_users (ref) VALUES ($1)
        ON CONFLICT (ref) DO UPDATE SET last_seen_at = now()
-       RETURNING ref, plan, plan_source, plan_until, note, promo_plan, promo_until, promo_code`,
+       RETURNING ref, plan, plan_source, plan_until, note, promo_plan, promo_until, promo_code, module, module_set_at`,
       [ref],
     );
     // Who used the app today, for the overview's daily-active line.
@@ -823,6 +832,53 @@ export async function setUserPlan(
            note = COALESCE(EXCLUDED.note, app_users.note)`,
     [ref, plan, source, until, note ?? null],
   );
+}
+
+/** Days an Essentials member waits between changes of module. */
+export const MODULE_CHANGE_DAYS = 30;
+
+/**
+ * Choose the Essentials module. The first choice, re-choosing the same one,
+ * and any change while not on Essentials are always allowed; a member on
+ * Essentials may switch once every MODULE_CHANGE_DAYS, so a single module
+ * cannot quietly become both. History is never touched.
+ */
+export async function setUserModule(
+  ref: string,
+  module: 'food' | 'training',
+  now: Date = new Date(),
+  force = false,
+): Promise<{ ok: true } | { ok: false; nextChange: string }> {
+  if (!pool) return { ok: true };
+  const user = await getOrCreateUser(ref);
+  if (!force && user?.plan === 'essentials' && user.module && user.module !== module && user.moduleSetAt) {
+    const next = new Date(new Date(user.moduleSetAt).getTime() + MODULE_CHANGE_DAYS * 86400000);
+    if (next.getTime() > now.getTime()) return { ok: false, nextChange: next.toISOString() };
+  }
+  if (user?.module === module) return { ok: true };
+  await pool.query(
+    `INSERT INTO app_users (ref, module, module_set_at) VALUES ($1, $2, $3)
+     ON CONFLICT (ref) DO UPDATE SET module = EXCLUDED.module, module_set_at = EXCLUDED.module_set_at`,
+    [ref, module, now.toISOString()],
+  );
+  return { ok: true };
+}
+
+/** This period's AI use by kind, in weighted actions. */
+export async function getUsageByKind(ref: string, period = currentPeriod()): Promise<Record<string, number>> {
+  if (!pool) return {};
+  try {
+    const res = await pool.query(
+      'SELECT kind, count FROM usage_counters WHERE ref = $1 AND period = $2 AND count > 0',
+      [ref, period],
+    );
+    const out: Record<string, number> = {};
+    for (const r of res.rows) out[r.kind as string] = Number(r.count);
+    return out;
+  } catch (err) {
+    console.error('getUsageByKind failed:', err);
+    return {};
+  }
 }
 
 // ── Usage metering ────────────────────────────────────────────────────────
@@ -1246,6 +1302,8 @@ export interface AdminRow {
   plan: string;
   planSource: string;
   planUntil: string | null;
+  /** Essentials' module, when chosen. */
+  module?: 'food' | 'training' | null;
   note: string | null;
   used: number;
   /** Real input+output tokens across every AI call this period. */
@@ -1290,7 +1348,7 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
   const period = currentPeriod();
   const res = await pool.query(
     `SELECT u.ref, u.email, u.device, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
-            u.promo_plan, u.promo_until, u.promo_code,
+            u.promo_plan, u.promo_until, u.promo_code, u.module, u.module_set_at,
             COALESCE((SELECT SUM(c.count) FROM usage_counters c
                       WHERE c.ref = u.ref AND c.period = $1), 0)::int AS used,
             COALESCE((SELECT SUM(c.input_tokens + c.output_tokens) FROM usage_counters c
@@ -1312,7 +1370,7 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
       // Show what the person actually has, gift included, so a code's
       // recipients do not read as free users in the table.
       const u = appUserFrom(r);
-      return { plan: u.plan, planSource: u.planSource, planUntil: u.planUntil };
+      return { plan: u.plan, planSource: u.planSource, planUntil: u.planUntil, module: u.module ?? null };
     })(),
     note: r.note,
     used: r.used,

@@ -40,53 +40,76 @@ App Store Connect → **Business** → **Add Bank Account**. A personal account 
 - Reference name: `Calgym Membership`
 - Localization → display name: English `Calgym Membership` · Arabic `عضوية كالجيم`
 
-### 2.2 The four products
-Type the IDs exactly as shown. They can never be changed or reused.
+### 2.2 The products
+Type the IDs exactly as shown. They can never be changed or reused. You already created the four Pro and Pro+ products; **add the two Essentials ones**.
 
-| Reference name | Product ID | Duration | Level | Price (Saudi Arabia, VAT incl.) |
-|---|---|---|---|---|
-| Pro+ Monthly | `calgym_proplus_monthly` | 1 month | 1 | **SAR 49.99** |
-| Pro+ Yearly | `calgym_proplus_yearly` | 1 year | 1 | **SAR 399.99** |
-| Pro Monthly | `calgym_pro_monthly` | 1 month | 2 | **SAR 24.99** |
-| Pro Yearly | `calgym_pro_yearly` | 1 year | 2 | **SAR 199.99** |
+| Reference name | Product ID | Duration | Level | Price (Saudi Arabia, VAT incl.) | Sold at launch |
+|---|---|---|---|---|---|
+| Pro+ Monthly | `calgym_proplus_monthly` | 1 month | 1 | SAR 49.99 | No, kept for later |
+| Pro+ Yearly | `calgym_proplus_yearly` | 1 year | 1 | SAR 399.99 | No, kept for later |
+| Pro Monthly | `calgym_pro_monthly` | 1 month | 2 | **SAR 24.99** | Yes |
+| Pro Yearly | `calgym_pro_yearly` | 1 year | 2 | **SAR 199.99** | Yes |
+| Essentials Monthly | `calgym_essentials_monthly` | 1 month | 3 | **SAR 19.99** | Yes |
+| Essentials Yearly | `calgym_essentials_yearly` | 1 year | 3 | **SAR 149.99** | Yes |
 
-- **Level 1 is the higher tier.** A switch from Pro to Pro+ is then an immediate upgrade, and Pro+ to Pro a downgrade at renewal.
+- **All six in the one group.** Level 1 is the highest: Essentials → Pro is an immediate upgrade, Pro → Essentials a downgrade at renewal.
+- **Pro+ stays unsold.** Leave its two products as they are (not attached to the app version, not in RevenueCat's offering). They're ready when Pro+ has its own reason to exist.
+- **Essentials is one product for both focuses.** The member picks Food or Training in the app; the store only sells "Essentials".
 - **Prices:** choose them with **Saudi Arabia** as the base country and let Apple fill in the others. The price is what the customer pays, VAT included.
 - **Family Sharing:** off. It can't be turned off once on.
-- **Free trial (yearly plans only):** on `calgym_pro_yearly` and `calgym_proplus_yearly` → **Subscription Prices → Introductory Offers → +** → countries: all → start date: today, no end date → type **Free** → duration **1 week**. Add **no** trial to the monthly plans: monthly trials mostly bring people who try and cancel. The app shows "7 days free, then … /year, cancel at least 24 hours before" only to people Apple says are still eligible (one trial per Apple ID per group). A trial gets the plan's features with at most 50 AI actions for the whole week (admin → Membership → Free trial), and becomes a normal paid plan at its first renewal. Partners earn nothing on the trial itself, only from the first paid renewal.
+- **Free trial, 2 weeks, on all four sold products** (Essentials and Pro, monthly and yearly): each product → **Subscription Prices → Introductory Offers → +** → countries: all → start date: today, no end date → type **Free** → duration **2 weeks**.
+  - Apple allows one trial per Apple ID per group, and the app shows "14 days free, then … , cancel at least 24 hours before" only to people Apple says are still eligible.
+  - A trial gets the plan's features and its allowance (at most 50 AI actions; admin → Membership → Free trial), and becomes a normal paid plan at its first renewal.
+  - The app reminds the member two days before the first charge.
+  - Partners earn nothing on the trial itself, only from the first paid renewal.
 - **Availability:** all countries and regions.
 
 **Why these prices.** For every 100 SAR a customer pays, you keep about 63 SAR: VAT 15% is taken off first, then Apple's 15% (with the Small Business Program), then a partner's 15% on sales through their code.
 
-| Plan | Price | You keep | AI cost, typical user (40%) | AI cost, full allowance | Result, typical | Result, full allowance |
+| Plan | Price | You keep | AI cost, typical | AI cost, full allowance | Result, typical | Result, full allowance |
 |---|---|---|---|---|---|---|
-| Pro monthly (50) | 24.99 | 15.70 | ~2.9 | ~4.3 | +12.8 | +11.5 |
-| Pro yearly | 199.99 / yr | 10.47 / mo | ~2.9 | ~4.3 | +7.6 | +6.2 |
-| Pro+ monthly (400) | 49.99 | 31.41 | ~11.6 | ~26.0 | +19.8 | +5.4 |
-| Pro+ yearly | 399.99 / yr | 20.94 / mo | ~11.6 | ~26.0 | +9.3 | −5.1 |
+| Essentials monthly (20) | 19.99 | 12.56 | ~0.4 | ~0.9 | +12.2 | +11.7 |
+| Essentials yearly | 149.99 / yr | 7.85 / mo | ~0.4 | ~0.9 | +7.5 | +7.0 |
+| Pro monthly (50) | 24.99 | 15.70 | ~0.9 | ~2.3 | +14.8 | +13.4 |
+| Pro yearly | 199.99 / yr | 10.47 / mo | ~0.9 | ~2.3 | +9.6 | +8.2 |
 
-All figures are in SAR per month. AI costs include about 2 SAR of fixed costs per subscriber (server, database, builds). The full-allowance cost assumes the most expensive actions, and Pro+'s more accurate model.
+All figures are in SAR per member per month. AI costs about 0.045 SAR an action. Fixed costs are counted separately below.
 
-**Break-even per month**, which is what a month of use costs you divided by 0.63:
-- **Pro:** 4.6 SAR at typical use, 6.8 SAR at full use.
-- **Pro+:** 18.5 SAR at typical use, 41 SAR at full use.
+**How many subscribers you need.** Fixed costs are roughly **430 SAR a month**:
 
-Only a Pro+ yearly member who uses all 400 actions every month costs more than they pay. Watch **admin → Overview → AI** and the per-user cost in **Users**. Sales without a partner code keep another 15%. If you don't join the Small Business Program, you keep about 52% instead of 63% in the first year, and these prices would need to be about 20% higher.
+| Cost | SAR / month |
+|---|---|
+| Apple Developer ($99 a year) | 31 |
+| Railway server and database | ~75 |
+| Supabase paid plan (free until you grow) | ~94 |
+| Expo builds and updates, paid plan (free until about 1,000 active users) | ~71 |
+| Your own Claude / ChatGPT subscriptions (assumed) | ~150 |
+| Domain and email | ~5 |
+
+Divided by what an average subscriber leaves after costs (about 13.7 SAR with the Small Business Program and half the sales through partners; about 9.1 SAR in the worst case, with Apple at 30%, every sale through a partner and full AI use):
+
+| Advertising a month | Subscribers to break even (realistic) | (worst case) |
+|---|---|---|
+| None | ~32 | ~48 |
+| 1,000 SAR | ~105 | ~158 |
+| 3,000 SAR | ~251 | ~379 |
+
+Watch **admin → Overview** for the real mix. If you advertise, what matters is the payback: what one subscriber costs to win divided by the ~13.7 SAR they leave each month.
 
 ### 2.3 Localizations (name up to 30 characters, description up to 45)
 
 | Product | English name | English description | Arabic name | Arabic description |
 |---|---|---|---|---|
-| Pro Monthly | Calgym Pro | 50 AI actions a month and meal planning | كالجيم برو | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
-| Pro Yearly | Calgym Pro (Yearly) | 50 AI actions a month and meal planning | كالجيم برو (سنوي) | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
-| Pro+ Monthly | Calgym Pro+ | 400 AI actions a month and the AI coach | كالجيم برو+ | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
-| Pro+ Yearly | Calgym Pro+ (Yearly) | 400 AI actions a month and the AI coach | كالجيم برو+ (سنوي) | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Essentials Monthly | Calgym Essentials | Food or Training plus Health, 20 AI a month | كالجيم الأساسيات | التغذية أو التمارين مع الصحة، ٢٠ عملية شهرياً |
+| Essentials Yearly | Calgym Essentials (Yearly) | Food or Training plus Health, 20 AI a month | كالجيم الأساسيات (سنوي) | التغذية أو التمارين مع الصحة، ٢٠ عملية شهرياً |
+| Pro Monthly | Calgym Pro | Food, Training and Health, 50 AI a month | كالجيم برو | التغذية والتمارين والصحة، ٥٠ عملية شهرياً |
+| Pro Yearly | Calgym Pro (Yearly) | Food, Training and Health, 50 AI a month | كالجيم برو (سنوي) | التغذية والتمارين والصحة، ٥٠ عملية شهرياً |
 
-If Pro and Pro+ get their own features (under discussion), these descriptions change with them.
+Pro+ keeps what you already entered; it isn't reviewed until it's sold.
 
 ### 2.4 Review information (each product)
 - **Screenshot:** Profile → Membership. Until the store is live it shows the built-in prices; that's fine.
-- **Notes:** "Subscriptions are offered in Profile → Membership and in the membership sheet that opens when a free limit is reached. Restore purchases and the Terms/Privacy links are on the same screens."
+- **Notes:** "Calgym is a subscription app with a 14-day free trial. Plans are offered in the membership sheet after onboarding and in Profile → Membership: Essentials (Food or Training) and Pro (both). Without a plan, a person can still view and export everything they recorded. Restore purchases and the Terms/Privacy links are on the same screens."
 
 The products stay in "Missing Metadata" / "Ready to Submit" until the agreement is active, and go to review together with the first app version that sells them.
 
@@ -110,20 +133,21 @@ The products stay in "Missing Metadata" / "Ready to Submit" until the agreement 
    - Name `Calgym iOS`, bundle ID `com.augaish.calapp`.
    - Upload the `.p8` with its Key ID and Issuer ID; add the shared secret if you made one.
    - Copy the **Apple Server Notification URL** shown there (you need it in section 5).
-3. **Product catalog → Products → + New:** the four product IDs.
+3. **Product catalog → Products → + New:** the six product IDs (the Pro+ ones too, so a Pro+ purchase would still be recognised later).
 4. **Entitlements:**
+   - `essentials` → `calgym_essentials_monthly`, `calgym_essentials_yearly`
    - `pro` → `calgym_pro_monthly`, `calgym_pro_yearly`
    - `pro_plus` → `calgym_proplus_monthly`, `calgym_proplus_yearly`
-5. **Offerings → + New:** identifier `default`, then add four packages and set the offering as **Current**:
+5. **Offerings → + New:** identifier `default`, then add these four packages and set the offering as **Current**:
 
    | Package | Identifier | Product |
    |---|---|---|
    | Monthly | `$rc_monthly` | `calgym_pro_monthly` |
    | Annual | `$rc_annual` | `calgym_pro_yearly` |
-   | Custom | `proplus_monthly` | `calgym_proplus_monthly` |
-   | Custom | `proplus_annual` | `calgym_proplus_yearly` |
+   | Custom | `essentials_monthly` | `calgym_essentials_monthly` |
+   | Custom | `essentials_annual` | `calgym_essentials_yearly` |
 
-   RevenueCat allows only one standard Monthly and one Annual per offering, which is why Pro+ uses custom names. The app reads them from the product IDs.
+   RevenueCat allows only one standard Monthly and one Annual per offering, which is why Essentials uses custom names; the app reads the plan from the product IDs. **Don't add the Pro+ packages** — that's what keeps Pro+ off the paywall. If you already added them, remove them from the offering (the products and entitlement stay).
 6. **Project settings → API keys:**
    - Copy the **App Store public key** (`appl_…`).
    - **+ New secret API key**, version **V1**, named `Calgym server` (`sk_…`).
@@ -153,10 +177,15 @@ App Store Connect → your app → **App Information** → **App Store Server No
 Then check **admin → Overview → Launch checklist**. Everything except "First store event received" should be ticked.
 
 ## 7. ⬜ Admin page (…/admin)
-- **Membership → Membership prices:** Pro `24.99`, Pro+ `49.99`, Pro yearly `199.99`, currency `SAR`. These are only shown until the store is live; after that, the store's own price shows.
-- **Membership → Monthly AI allowance:** Free `7`, Pro `50`, Pro+ `400`, Free trial `50`. A value saved here earlier overrides the new default, so check it.
-- **Codes & partners → Promotion codes:** a thank-you code for your testers: `FOUNDERS`, free access, **Pro+**, 90 days, max uses = number of testers. Send it to them before you turn plan locks on.
-- **Membership → Plan locks:** leave **off** until the store can sell (section 10). While off, every plan can use every feature and only the AI allowance differs. Turn it on once purchases work and testers have `FOUNDERS`. What each plan includes is in the table on that card. Anything someone already made (recipes, saved schedules, a program, readings, a WHOOP connection, coach documents) stays usable on every plan; only starting something new is locked.
+- **Membership → Membership prices:** Essentials `19.99` / year `149.99`, Pro `24.99` / year `199.99`, currency `SAR` (Pro+ `49.99` stays for later). These are only shown until the store is live; after that, the store's own price shows.
+- **Membership → Monthly AI allowance:** Free (locks off) `7`, Essentials `20`, Pro `50`, Pro+ `400`, Free trial `50`. A value saved here earlier overrides the new default, so check it.
+- **Codes & partners → Promotion codes:** a thank-you code for your testers: `FOUNDERS`, free access, **Pro**, 90 days, max uses = number of testers. Send it to them before you turn plan locks on.
+- **Users → Grant a plan:** you can also give someone Essentials · Food, Essentials · Training or Pro directly (for example a tester who wants to try Essentials).
+- **Membership → Plan locks:** this switches the launch offer on. Leave it **off** until the store can sell (section 10); while off, everyone can use everything as today. Once on:
+  - **No plan:** view and export only; no new logging and no AI.
+  - **Essentials:** the chosen module (Food or Training) plus Health, 20 AI actions. The other module's tab stays visible, read-only, with an upgrade banner; its AI is refused by the server, and the coach still answers general questions but won't log or plan for it. Focus can change once every 30 days.
+  - **Pro:** everything, 50 AI actions, the program builder (1 a month) and coach memory.
+  - Nothing anyone recorded is ever deleted, whatever the plan.
 - **Codes & partners → Partners:** add partners and their codes when ready. The shares are explained in `billing-setup.md`.
 
 ## 8. ⬜ TestFlight external testing
@@ -222,8 +251,8 @@ No app build is needed.
 4. Organization accounts don't need the 12-tester, 14-day closed test.
 
 ### 12.3 ⬜ Subscriptions (Monetize → Subscriptions)
-Same product IDs, each with a base plan: `calgym_pro_monthly` (base plan `monthly`, 1 month), `calgym_pro_yearly` (`yearly`, 1 year), and the same for Pro+. Prices are set per country; the Saudi prices are as above.
-For the free trial, on each **yearly** base plan: **Add offer** → offer ID `trial7` → eligibility **New customer acquisition** → phase **Free trial, 7 days** → activate. Google only shows it to people who can take it.
+Same product IDs, each with a base plan: `calgym_essentials_monthly` (base plan `monthly`, 1 month), `calgym_essentials_yearly` (`yearly`, 1 year), and the same for Pro (and Pro+, created but not sold). Prices are set per country; the Saudi prices are as above.
+For the free trial, on each **Essentials and Pro** base plan: **Add offer** → offer ID `trial14` → eligibility **New customer acquisition** → phase **Free trial, 14 days** → activate. Google only shows it to people who can take it. In RevenueCat's Android app, add the same entitlements and put the Essentials and Pro base plans in the `default` offering like on iPhone.
 
 ### 12.4 ⬜ RevenueCat, Android
 1. RevenueCat → **+ Play Store app** → package `com.augaish.calapp`.
@@ -243,5 +272,6 @@ Production → create a release with the newest `.aab` → roll out.
 - ⬜ One real purchase on each platform (refund it via Apple / Google if you like).
 - ⬜ Partners have their codes and private links.
 - ⬜ Send testers the `FOUNDERS` code, then turn **Plan locks** on in the admin page.
+- ⬜ With a Sandbox Apple ID that has never subscribed, check the paywall: Food / Training / Both, "14 days free", the terms above the button, and that choosing Essentials · Training shows only Training on Overview.
 - ⬜ Check the free trial appears on the yearly plans (use a Sandbox Apple ID that has never subscribed).
 - ⬜ Watch **admin → Overview** for the first days: purchases, AI failures and AI cost.

@@ -10,6 +10,7 @@ import { alertProblem } from '@/lib/alerts';
 import { RowGroup, SettingsRow } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';
+import type { Gate } from '@/lib/plan-gates';
 import { useTheme } from '@/hooks/use-theme';
 import { photoPickerAvailable, pickPhoto } from '@/lib/photo';
 
@@ -49,6 +50,16 @@ export default function AddMenu() {
     router.back();
     router.push(href);
   };
+  // Each area's rows open their screen when the plan covers it, and the
+  // membership sheet (with the reason) when it doesn't.
+  const to = (area: Gate, href: Href) => {
+    if (gate.isOpen(area)) return go(href);
+    router.back();
+    gate.guard(area);
+  };
+  const icon = (area: Gate, name: keyof typeof Ionicons.glyphMap) => (gate.isOpen(area) ? name : 'lock-closed-outline');
+  const showFood = gate.visible.food;
+  const showTraining = gate.visible.training;
 
   /** Straight to the photo library — no viewfinder flash or camera prompt for a flow that needs neither. */
   const uploadPhoto = async () => {
@@ -67,6 +78,7 @@ export default function AddMenu() {
     setPicking(false);
     if (uri) go(`/photo-analyze?mode=meal&uri=${encodeURIComponent(uri)}`);
   };
+  const upload = () => (gate.isOpen('food') ? void uploadPhoto() : to('food', '/'));
 
   return (
     <View style={styles.backdrop}>
@@ -97,44 +109,69 @@ export default function AddMenu() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + Spacing.md }}>
-          <GroupHead icon="restaurant" color="#F59E0B" title={t('addMenu.food')} subtitle={t('addMenu.foodSubtitle')} />
-          <RowGroup>
-            <SettingsRow icon="scan-outline" title={t('addMenu.scanMealRow')} onPress={() => go('/scan?mode=meal')} />
-            <SettingsRow icon="barcode-outline" title={t('addMenu.scanBarcode')} onPress={() => go('/scan?mode=barcode')} />
-            <SettingsRow icon="search-outline" title={t('addMenu.searchFood')} onPress={() => go('/food-search')} />
-            <SettingsRow icon="document-text-outline" title={t('addMenu.manualRow')} onPress={() => go('/food-edit')} />
-            {/* Two working routes the board does not list, kept in the same row style. */}
-            <SettingsRow icon="images-outline" title={t('addMenu.uploadPhoto')} onPress={uploadPhoto} />
-            <SettingsRow icon="create-outline" title={t('addMenu.describe')} onPress={() => go('/describe')} last />
-          </RowGroup>
+          {gate.readOnly ? (
+            // No plan: the records are safe; adding needs a plan.
+            <Pressable
+              onPress={() => to('health', '/')}
+              accessibilityRole="button"
+              style={[styles.hint, { backgroundColor: theme.surfaceTint, marginTop: 0, marginBottom: Spacing.sm }]}
+            >
+              <Icon name="lock-closed-outline" size={16} color={theme.primaryDark} />
+              <Text style={{ color: theme.primaryDark, fontSize: 13, flex: 1, fontWeight: '600' }}>{t('plans.readOnlyBody')}</Text>
+            </Pressable>
+          ) : null}
+          {gate.visible.chooseModule ? (
+            <SettingsRow icon="options-outline" title={t('plans.chooseFocusTitle')} subtitle={t('plans.chooseFocusBody')} onPress={() => go('/focus')} last />
+          ) : null}
 
-          {!foodOnly && (
+          {showFood && (
             <>
-              <GroupHead icon="barbell" color={theme.primary} title={t('addMenu.training')} subtitle={t('addMenu.trainingSubtitle')} />
+              <GroupHead icon="restaurant" color="#F59E0B" title={t('addMenu.food')} subtitle={t('addMenu.foodSubtitle')} />
               <RowGroup>
-                <SettingsRow icon="walk-outline" title={t('addMenu.logExercise')} onPress={() => go('/exercise-library')} />
-                <SettingsRow icon="qr-code-outline" title={t('addMenu.scanEquipment')} onPress={() => go('/scan?mode=gym')} last />
-              </RowGroup>
-
-              <GroupHead icon="heart" color={theme.primary} title={t('addMenu.health')} subtitle={t('addMenu.healthSubtitle')} />
-              <RowGroup>
-                <SettingsRow icon="add-circle-outline" title={t('addMenu.addReading')} onPress={() => go('/body-reading')} />
-                <SettingsRow icon={gate.isOpen('bodyReading') ? 'image-outline' : 'lock-closed-outline'} title={t('addMenu.readMeasurementPhoto')} onPress={() => go(gate.isOpen('bodyReading') ? '/scan?mode=body' : '/membership?reason=bodyReading')} last />
-              </RowGroup>
-
-              <GroupHead icon="water" color="#3B82F6" title={t('addMenu.daily')} subtitle={t('addMenu.dailySubtitle')} />
-              <RowGroup>
-                <SettingsRow icon="water-outline" title={t('addMenu.water')} onPress={() => go('/water')} last />
+                <SettingsRow icon={icon('food', 'scan-outline')} title={t('addMenu.scanMealRow')} onPress={() => to('food', '/scan?mode=meal')} />
+                <SettingsRow icon={icon('food', 'barcode-outline')} title={t('addMenu.scanBarcode')} onPress={() => to('food', '/scan?mode=barcode')} />
+                <SettingsRow icon={icon('food', 'search-outline')} title={t('addMenu.searchFood')} onPress={() => to('food', '/food-search')} />
+                <SettingsRow icon={icon('food', 'document-text-outline')} title={t('addMenu.manualRow')} onPress={() => to('food', '/food-edit')} />
+                {/* Two working routes the board does not list, kept in the same row style. */}
+                <SettingsRow icon={icon('food', 'images-outline')} title={t('addMenu.uploadPhoto')} onPress={upload} />
+                <SettingsRow icon={icon('food', 'create-outline')} title={t('addMenu.describe')} onPress={() => to('food', '/describe')} last />
               </RowGroup>
             </>
           )}
 
+          {!foodOnly && (
+            <>
+              {showTraining && (
+                <>
+                  <GroupHead icon="barbell" color={theme.primary} title={t('addMenu.training')} subtitle={t('addMenu.trainingSubtitle')} />
+                  <RowGroup>
+                    <SettingsRow icon={icon('training', 'walk-outline')} title={t('addMenu.logExercise')} onPress={() => to('training', '/exercise-library')} />
+                    <SettingsRow icon={icon('training', 'qr-code-outline')} title={t('addMenu.scanEquipment')} onPress={() => to('training', '/scan?mode=gym')} last />
+                  </RowGroup>
+                </>
+              )}
+
+              <GroupHead icon="heart" color={theme.primary} title={t('addMenu.health')} subtitle={t('addMenu.healthSubtitle')} />
+              <RowGroup>
+                <SettingsRow icon={icon('health', 'add-circle-outline')} title={t('addMenu.addReading')} onPress={() => to('health', '/body-reading')} />
+                <SettingsRow icon={icon('health', 'image-outline')} title={t('addMenu.readMeasurementPhoto')} onPress={() => to('health', '/scan?mode=body')} last />
+              </RowGroup>
+
+              <GroupHead icon="water" color="#3B82F6" title={t('addMenu.daily')} subtitle={t('addMenu.dailySubtitle')} />
+              <RowGroup>
+                <SettingsRow icon={icon('health', 'water-outline')} title={t('addMenu.water')} onPress={() => to('health', '/water')} last />
+              </RowGroup>
+            </>
+          )}
+
+          {showFood ? (
           <View style={[styles.hint, { backgroundColor: theme.surfaceTint }]}>
             <Icon name="bulb-outline" size={16} color={theme.primaryDark} />
             <Text style={{ color: theme.primaryDark, fontSize: 13, flex: 1 }}>
               {t('addMenu.foodPlanningHintLead')} <Text style={{ fontWeight: '800' }}>{t('tabs.food')}</Text>.
             </Text>
           </View>
+          ) : null}
         </ScrollView>
       </View>
     </View>

@@ -83,9 +83,9 @@ export default function BodyReading() {
   const theme = useTheme();
   const router = useRouter();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
-  // Typing a reading in stays free; reading a report with AI is Pro.
+  // Health comes with every plan; without one, readings are view-only.
   const gate = usePlanGate();
-  const canScan = gate.isOpen('bodyReading');
+  const canScan = gate.isOpen('health');
 
   const language = useAppStore((s) => s.language) ?? 'en';
   const profile = useAppStore((s) => s.profile);
@@ -390,7 +390,7 @@ export default function BodyReading() {
         ]}
         value={mode}
         onChange={(m) => {
-          if (m === 'photo' && !gate.guard('bodyReading')) return;
+          if (m === 'photo' && !gate.guard('health')) return;
           setMode(m);
         }}
         style={{ marginBottom: Spacing.md }}
@@ -421,7 +421,7 @@ export default function BodyReading() {
             label={source === 'scan' ? t('bodyReading.rescan') : t('bodyReading.photographReport')}
             variant="secondary"
             icon={canScan ? 'camera-outline' : 'lock-closed'}
-            onPress={() => gate.guard('bodyReading') && router.push('/scan?mode=body')}
+            onPress={() => gate.guard('health') && router.push('/scan?mode=body')}
           />
           {documentPickerAvailable && (
             <>
@@ -430,7 +430,7 @@ export default function BodyReading() {
                 variant="ghost"
                 icon={canScan ? 'document-attach-outline' : 'lock-closed'}
                 loading={uploadStage === 'picking' || uploadStage === 'analyzing'}
-                onPress={() => gate.guard('bodyReading') && uploadPdf()}
+                onPress={() => gate.guard('health') && uploadPdf()}
                 style={{ marginTop: Spacing.xs }}
               />
               {uploadStage !== 'idle' && <UploadProgress stage={uploadStage} error={uploadError} />}

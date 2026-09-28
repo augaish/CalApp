@@ -72,7 +72,7 @@ export default function RecipeEdit() {
   const addRecipe = useAppStore((s) => s.addRecipe);
   const updateRecipe = useAppStore((s) => s.updateRecipe);
   const existing = id ? recipes.find((r) => r.id === id) : undefined;
-  const allowed = useGatedScreen('recipes', !existing);
+  const allowed = useGatedScreen('food', !existing);
 
   const [name, setName] = useState(existing?.name ?? '');
   const [servings, setServings] = useState(String(existing?.servings ?? 2));

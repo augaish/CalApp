@@ -55,14 +55,19 @@ export type BillingAction =
 
 /** Product / entitlement identifiers that map onto each paid tier. */
 export interface PlanMapping {
+  essentials: string[];
   pro: string[];
   proPlus: string[];
 }
 
 export const DEFAULT_MAPPING: PlanMapping = {
   proPlus: ['proplus', 'pro_plus', 'pro-plus', 'plus'],
+  essentials: ['essential'],
   pro: ['pro', 'premium'],
 };
+
+/** Higher wins when a subscriber somehow holds two tiers at once. */
+const RANK: Record<Plan, number> = { free: 0, essentials: 1, pro: 2, proPlus: 3 };
 
 /**
  * Which tier an event refers to. Pro+ is checked first because "pro" is a
@@ -79,6 +84,7 @@ export function planFor(event: RevenueCatEvent, mapping = DEFAULT_MAPPING): Plan
   if (ids.length === 0) return null;
   const hits = (needles: string[]) => ids.some((id) => needles.some((n) => id.includes(n)));
   if (hits(mapping.proPlus)) return 'proPlus';
+  if (hits(mapping.essentials)) return 'essentials';
   if (hits(mapping.pro)) return 'pro';
   return null;
 }
@@ -168,7 +174,7 @@ function msToIso(ms: number | null | undefined): string | null {
  * plan changes the moment the store sheet closes, instead of waiting for the
  * webhook — which remains the source of truth for everything after.
  *
- * Returns null when nothing is active. Pro+ beats Pro when both are.
+ * Returns null when nothing is active. The higher tier wins when two are.
  */
 export interface SubscriberRecord {
   subscriber?: {
@@ -193,7 +199,7 @@ export function planFromSubscriber(
     if (expires && (Number.isNaN(expires.getTime()) || expires.getTime() <= now.getTime())) continue;
     const plan = planFor({ entitlement_ids: [id], product_id: ent.product_identifier ?? '' }, mapping);
     if (!plan) continue;
-    if (!best || (plan === 'proPlus' && best.plan !== 'proPlus')) {
+    if (!best || RANK[plan] > RANK[best.plan]) {
       const productId = ent.product_identifier ?? null;
       const period = productId ? record.subscriber?.subscriptions?.[productId]?.period_type : null;
       best = { plan, until: expires ? expires.toISOString() : null, productId, trial: (period ?? '').toLowerCase() === 'trial' };

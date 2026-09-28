@@ -1,10 +1,11 @@
-import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Platform } from 'react-native';
 
 import { alertProblem } from '@/lib/alerts';
+import { setModule } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
+import { choiceForReason, type Choice } from '@/lib/plan-gates';
 import {
   configurePurchases,
   loadStorePlans,
@@ -14,22 +15,10 @@ import {
   trialEligibility,
   type LoadedPlans,
 } from '@/lib/purchases';
+import { useAppStore } from '@/lib/store';
 import { freeTrialDays, type BillingPeriod, type PaidTier } from '@/lib/store-plans';
 
-/**
- * What membership adds, in the order both the sheet and the full page list
- * it. `tier` marks the ones only Pro+ includes.
- */
-export const MEMBERSHIP_FEATURES: { icon: keyof typeof Ionicons.glyphMap; key: string; tier?: 'proPlus' }[] = [
-  { icon: 'camera', key: 'scan' },
-  { icon: 'restaurant', key: 'planning' },
-  { icon: 'calendar', key: 'schedules' },
-  { icon: 'sparkles', key: 'program' },
-  { icon: 'chatbubbles', key: 'memory', tier: 'proPlus' },
-  { icon: 'ribbon', key: 'accuracy', tier: 'proPlus' },
-];
-
-export { reasonText, reasonWantsProPlus } from '@/lib/plan-gates';
+export { reasonText } from '@/lib/plan-gates';
 
 /**
  * Everything a screen needs to sell a plan from the store: the store's plans
@@ -37,15 +26,22 @@ export { reasonText, reasonWantsProPlus } from '@/lib/plan-gates';
  * outcomes told to the person. The membership sheet and the full Upgrade page
  * share it, so the two can never disagree about a price or a purchase.
  */
-export function useStoreOffer() {
+export function useStoreOffer(reason?: string) {
   const { t } = useTranslation();
   const plan = useEntitlement((s) => s.plan);
+  const locks = useEntitlement((s) => s.locks);
+  const module = useEntitlement((s) => s.module);
   const billing = useEntitlement((s) => s.billing);
+  // Food / Training / Both: one area is Essentials for it, both is Pro. It
+  // starts from what the person told onboarding, or from what opened the sheet.
+  const [choice, setChoice] = useState<Choice>(() =>
+    choiceForReason(reason, { plan, locks, module }, useAppStore.getState().focusAreas),
+  );
 
   const [store, setStore] = useState<LoadedPlans | null>(null);
   const [storeChecked, setStoreChecked] = useState(false);
   const [period, setPeriod] = useState<BillingPeriod>('monthly');
-  const [tier, setTier] = useState<PaidTier>(plan === 'pro' ? 'proPlus' : 'pro');
+  const tier: PaidTier = choice === 'both' ? 'pro' : 'essentials';
   const [busy, setBusy] = useState<'buy' | 'restore' | null>(null);
   const [eligible, setEligible] = useState<Record<string, boolean>>({});
 
@@ -99,10 +95,15 @@ export function useStoreOffer() {
   const buy = async (onDone: () => void) => {
     if (!selectedPkg) return;
     setBusy('buy');
+    // Essentials needs its module before the plan arrives, so the app opens
+    // on the right one. A failure here doesn't stop the purchase: the member
+    // is asked to choose afterwards.
+    if (choice !== 'both') await setModule(choice);
     const out = await purchase(selectedPkg);
     setBusy(null);
     if (out.kind === 'purchased') {
-      Alert.alert(t('upgrade.purchaseDoneTitle'), t('upgrade.purchaseDone', { plan: tier === 'proPlus' ? t('upgrade.planProPlus') : t('upgrade.planPro') }), [
+      const name = choice === 'both' ? t('plans.name.pro') : t(`plans.name.essentials_${choice}`);
+      Alert.alert(t('upgrade.purchaseDoneTitle'), t('upgrade.purchaseDone', { plan: name }), [
         { text: t('common.done'), onPress: onDone },
       ]);
     } else if (out.kind === 'pending') {
@@ -131,7 +132,8 @@ export function useStoreOffer() {
     period: shownPeriod,
     setPeriod,
     tier,
-    setTier,
+    choice,
+    setChoice,
     selectedPkg,
     priceFor,
     trialDaysFor,

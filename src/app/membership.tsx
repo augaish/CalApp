@@ -1,25 +1,23 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
-import { Segmented } from '@/components/system';
+import { PlanPicker, usePlanAction } from '@/components/plan-picker';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { SERVER_URL } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
-import { annualSaving, type PaidTier } from '@/lib/store-plans';
-import { MEMBERSHIP_FEATURES, reasonText, reasonWantsProPlus, useStoreOffer } from '@/lib/use-store-offer';
+import { reasonText, useStoreOffer } from '@/lib/use-store-offer';
 
 /**
- * The membership sheet: what membership adds, the store's price and a way to
- * subscribe without leaving the sheet — and always a way out (X, "Not now",
- * or a tap outside). It offers itself gently (see membership-prompt.ts) and
- * opens when a free limit is reached; "Compare plans" leads to the full page.
+ * The membership sheet: "What do you want help with?" and the plan that
+ * answers it — Essentials for Food or Training, Pro for both — with the
+ * store's price, the free trial and a way to start it without leaving the
+ * sheet; and always a way out (X, "Not now", or a tap outside). It opens after
+ * onboarding, when a plan doesn't cover something, and from Profile.
  */
 export default function Membership() {
   const { t, i18n } = useTranslation();
@@ -29,35 +27,13 @@ export default function Membership() {
   const { reason } = useLocalSearchParams<{ reason?: string }>();
   const used = useEntitlement((s) => s.used);
   const limit = useEntitlement((s) => s.limit);
-  const plan = useEntitlement((s) => s.plan);
-  const offer = useStoreOffer();
-  const { plans, storeChecked, serverSells, needsUpdate, hasAnnual, period, setPeriod, tier, setTier, selectedPkg, priceFor, trialDaysFor, storeName, busy } = offer;
-
-  // Something only Pro+ includes opens the sheet on Pro+.
-  const wantsProPlus = reasonWantsProPlus(reason, plan);
-  useEffect(() => {
-    if (wantsProPlus) setTier('proPlus');
-  }, [wantsProPlus, setTier]);
+  const offer = useStoreOffer(reason);
+  const { plans, storeName, busy } = offer;
 
   // Opened by a link with nothing behind it, closing lands on Overview.
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
-  const tiers = (['pro', 'proPlus'] as PaidTier[]).filter((id) => !plans || plans[id].monthly || plans[id].annual);
-  const price = selectedPkg ? priceFor(tier) : null;
-  const trialDays = selectedPkg ? trialDaysFor(tier) : null;
+  const action = usePlanAction(offer, close);
   const forward = i18n.dir?.() === 'rtl' ? 'chevron-back' : 'chevron-forward';
-
-  const primary = plans && selectedPkg ? (
-    <Button
-      label={trialDays ? t('upgrade.startTrial', { days: trialDays }) : t('upgrade.subscribe', { price: price ? `${price.main} ${price.unit}` : '' })}
-      loading={busy === 'buy'}
-      disabled={busy !== null}
-      onPress={() => offer.buy(close)}
-    />
-  ) : needsUpdate ? (
-    <Button label={t('upgrade.updateNeeded')} disabled onPress={() => {}} />
-  ) : (
-    <Button label={storeChecked || !serverSells ? t('upgrade.soon') : t('common.loading')} disabled onPress={() => {}} />
-  );
 
   return (
     <View style={styles.backdrop}>
@@ -80,9 +56,6 @@ export default function Membership() {
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Spacing.sm }}>
           <View style={styles.hero}>
-            <LinearGradient colors={[theme.gradientStart, theme.gradientEnd]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.badge}>
-              <Icon name="sparkles" size={28} color="#fff" />
-            </LinearGradient>
             <Text style={[Type.title, styles.center, { color: theme.text }]} accessibilityRole="header">
               {t('membership.title')}
             </Text>
@@ -95,76 +68,7 @@ export default function Membership() {
             </View>
           ) : null}
 
-          <View style={{ gap: Spacing.ms, marginBottom: Spacing.md }}>
-            {MEMBERSHIP_FEATURES.map((f) => (
-              <View key={f.key} style={styles.feature}>
-                <View style={[styles.featureIcon, { backgroundColor: theme.cardSubtle }]}>
-                  <Icon name={f.icon} size={18} color={theme.primary} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.featureTitle}>
-                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flexShrink: 1 }}>{t(`upgrade.features.${f.key}.title`)}</Text>
-                    {f.tier === 'proPlus' ? (
-                      <View style={[styles.tierTag, { backgroundColor: theme.cardSubtle }]}>
-                        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800' }}>{t('upgrade.tierProPlus')}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                  <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18 }}>{t(`upgrade.features.${f.key}.body`)}</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-
-          {plans ? (
-            <>
-              {hasAnnual ? (
-                <Segmented
-                  options={[
-                    { key: 'monthly', label: t('upgrade.monthly') },
-                    {
-                      key: 'annual',
-                      label: (() => {
-                        const save = annualSaving(plans, tier);
-                        return save ? t('upgrade.yearlySave', { percent: save }) : t('upgrade.yearlyTab');
-                      })(),
-                    },
-                  ]}
-                  value={period}
-                  onChange={setPeriod}
-                  style={{ marginBottom: Spacing.sm }}
-                />
-              ) : null}
-              <View style={styles.tiers} accessibilityRole="radiogroup">
-                {tiers.map((id) => {
-                  const selected = tier === id;
-                  const p = priceFor(id);
-                  return (
-                    <Pressable
-                      key={id}
-                      onPress={() => setTier(id)}
-                      accessibilityRole="radio"
-                      accessibilityState={{ selected }}
-                      style={[
-                        styles.tier,
-                        { backgroundColor: theme.card, borderColor: selected ? theme.primary : theme.border, borderWidth: selected ? 2 : 1 },
-                      ]}
-                    >
-                      <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{id === 'proPlus' ? t('upgrade.tierProPlus') : t('upgrade.tierPro')}</Text>
-                      {p ? (
-                        <Text style={{ color: theme.text, fontWeight: '700', marginTop: 2 }}>
-                          {p.main} <Text style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}>{p.unit}</Text>
-                        </Text>
-                      ) : null}
-                      {trialDaysFor(id) ? (
-                        <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12, marginTop: 2 }}>{t('upgrade.trialBadge', { days: trialDaysFor(id) })}</Text>
-                      ) : null}
-                    </Pressable>
-                  );
-                })}
-              </View>
-            </>
-          ) : null}
+          <PlanPicker offer={offer} />
 
           <View style={styles.links}>
             {plans ? (
@@ -196,14 +100,10 @@ export default function Membership() {
         </ScrollView>
 
         <View style={{ paddingTop: Spacing.sm, paddingBottom: insets.bottom + Spacing.sm }}>
-          {trialDays && price ? (
-            // Apple requires the trial's length, what follows and how to
-            // cancel to be stated right where the trial is started.
-            <Text style={[styles.center, { color: theme.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: Spacing.xs }]}>
-              {t('upgrade.trialTerms', { days: trialDays, price: price.main, unit: price.unit, store: storeName })}
-            </Text>
+          {action.terms ? (
+            <Text style={[styles.center, { color: theme.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: Spacing.xs }]}>{action.terms}</Text>
           ) : null}
-          {primary}
+          <Button label={action.label} loading={action.loading} disabled={action.disabled} onPress={action.onPress} />
           <Button label={t('membership.notNow')} variant="ghost" onPress={close} style={{ marginTop: Spacing.xs }} />
         </View>
       </View>
@@ -221,8 +121,7 @@ const styles = StyleSheet.create({
   },
   grabber: { width: 60, height: 5, borderRadius: 3, alignSelf: 'center', marginBottom: Spacing.xs },
   close: { position: 'absolute', top: Spacing.sm, end: Spacing.sm, width: TOUCH, height: TOUCH, alignItems: 'center', justifyContent: 'center', zIndex: 1 },
-  hero: { alignItems: 'center', gap: 6, marginTop: Spacing.md, marginBottom: Spacing.md, paddingHorizontal: Spacing.lg },
-  badge: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  hero: { alignItems: 'center', gap: 6, marginTop: Spacing.lg, marginBottom: Spacing.md, paddingHorizontal: Spacing.lg },
   center: { textAlign: 'center' },
   reason: { borderWidth: 1, borderRadius: Radius.control, padding: Spacing.ms, marginBottom: Spacing.md },
   feature: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms },

@@ -12,7 +12,10 @@ import {
 
 export type { Reservation };
 
-export type Plan = 'free' | 'pro' | 'proPlus';
+export type Plan = 'free' | 'essentials' | 'pro' | 'proPlus';
+
+/** What Essentials covers: one of these, chosen by the member. */
+export type Module = 'food' | 'training';
 
 /** Capabilities and monthly AI allowance for each tier. */
 export interface PlanSpec {
@@ -30,28 +33,29 @@ export interface PlanSpec {
    * meal scan — the feature that actually sells the app.
    */
   coachCap?: number;
-  /** The AI recipe writer. */
-  recipes: boolean;
-  /** Reading an InBody / body-composition printout. */
-  bodyReading: boolean;
   /** Programmes the AI may design each month; null = only the allowance limits it. */
   programs: number | null;
   /** Photos and PDFs the coach reads and keeps as memory. */
   coachDocs: boolean;
+  /** 'all': Food and Training. 'module': the one the member chose. */
+  scope: 'all' | 'module';
 }
 
 /**
- * Free keeps the whole daily habit — logging, workouts, the body map — plus a
- * small taste of the AI. Pro buys the AI doing the logging and the planning
- * features; Pro+ buys the coach: programme design, the coach's memory and the
- * accurate model. The feature locks only apply once the admin switches plan
- * locks on (see planLocksOn), so nothing is locked before the store can sell.
- * Limits are editable from the admin page without a redeploy.
+ * The launch offer, once the admin switches plan locks on (planLocksOn):
+ * no permanent free tier — a two-week store trial of Essentials (Food or
+ * Training, plus Health) or Pro (everything). Without a plan, records stay
+ * viewable and exportable but nothing new is logged and no AI is used.
+ * Pro+ is kept for later and not offered; it is Pro with more.
+ *
+ * With locks off, every plan behaves as before plans had features: all of it
+ * open, Free with a small allowance. Limits are editable from the admin page.
  */
 export const PLANS: Record<Plan, PlanSpec> = {
-  free: { limit: 7, coach: true, equipment: true, highAccuracy: false, coachCap: 3, recipes: false, bodyReading: false, programs: 0, coachDocs: false },
-  pro: { limit: 50, coach: true, equipment: true, highAccuracy: false, recipes: true, bodyReading: true, programs: 1, coachDocs: false },
-  proPlus: { limit: 400, coach: true, equipment: true, highAccuracy: true, recipes: true, bodyReading: true, programs: null, coachDocs: true },
+  free: { limit: 7, coach: true, equipment: true, highAccuracy: false, coachCap: 3, programs: 0, coachDocs: false, scope: 'all' },
+  essentials: { limit: 20, coach: true, equipment: true, highAccuracy: false, programs: 0, coachDocs: false, scope: 'module' },
+  pro: { limit: 50, coach: true, equipment: true, highAccuracy: false, programs: 1, coachDocs: true, scope: 'all' },
+  proPlus: { limit: 400, coach: true, equipment: true, highAccuracy: true, programs: null, coachDocs: true, scope: 'all' },
 };
 
 /**
@@ -59,7 +63,7 @@ export const PLANS: Record<Plan, PlanSpec> = {
  * had features of their own. Used until the store is live.
  */
 function unlocked(spec: PlanSpec): PlanSpec {
-  return { ...spec, recipes: true, bodyReading: true, programs: null, coachDocs: true };
+  return { ...spec, programs: null, coachDocs: true, scope: 'all' };
 }
 
 /** Whether per-plan feature locks are enforced. Off until the admin turns it on. */
@@ -142,11 +146,8 @@ export async function weightFor(kind: string): Promise<number> {
 /** Admin-overridable per-plan limits. */
 export async function planLimits(): Promise<Record<Plan, number>> {
   const stored = await getSetting<Partial<Record<Plan, number>>>('plan_limits', {});
-  return {
-    free: typeof stored.free === 'number' ? stored.free : PLANS.free.limit,
-    pro: typeof stored.pro === 'number' ? stored.pro : PLANS.pro.limit,
-    proPlus: typeof stored.proPlus === 'number' ? stored.proPlus : PLANS.proPlus.limit,
-  };
+  const pick = (p: Plan) => (typeof stored[p] === 'number' ? (stored[p] as number) : PLANS[p].limit);
+  return { free: pick('free'), essentials: pick('essentials'), pro: pick('pro'), proPlus: pick('proPlus') };
 }
 
 // ── Which AI answers, per membership tier ──────────────────────────────────
@@ -160,9 +161,18 @@ export interface PlanPrices {
   currency: string;
   /** Optional yearly price for Pro, shown as the "or NNN/year" line. */
   proYearly: number;
+  essentials: number;
+  essentialsYearly: number;
 }
 
-const DEFAULT_PRICES: PlanPrices = { pro: 24.99, proPlus: 49.99, proYearly: 199.99, currency: 'SAR' };
+const DEFAULT_PRICES: PlanPrices = {
+  essentials: 19.99,
+  essentialsYearly: 149.99,
+  pro: 24.99,
+  proYearly: 199.99,
+  proPlus: 49.99,
+  currency: 'SAR',
+};
 
 /**
  * Admin-editable prices. These drive what the app SHOWS on its upgrade
@@ -179,6 +189,8 @@ export async function planPrices(): Promise<PlanPrices> {
     pro: num(stored.pro, DEFAULT_PRICES.pro),
     proPlus: num(stored.proPlus, DEFAULT_PRICES.proPlus),
     proYearly: num(stored.proYearly, DEFAULT_PRICES.proYearly),
+    essentials: num(stored.essentials, DEFAULT_PRICES.essentials),
+    essentialsYearly: num(stored.essentialsYearly, DEFAULT_PRICES.essentialsYearly),
     currency: typeof stored.currency === 'string' && stored.currency.trim() ? stored.currency.trim().slice(0, 8) : DEFAULT_PRICES.currency,
   };
 }
@@ -197,11 +209,20 @@ export async function planPrices(): Promise<PlanPrices> {
  * same report follows the tier. See AI_PROVIDER_FIXED_ROUTES in index.ts.
  */
 export async function aiProviders(deepseekAvailable: boolean): Promise<Record<Plan, AiProvider>> {
-  if (!deepseekAvailable) return { free: 'claude', pro: 'claude', proPlus: 'claude' };
+  if (!deepseekAvailable) return { free: 'claude', essentials: 'claude', pro: 'claude', proPlus: 'claude' };
   const stored = await getSetting<Partial<Record<Plan, string>>>('ai_providers', {});
   const pick = (v: unknown): AiProvider => (v === 'claude' ? 'claude' : 'deepseek');
-  return { free: pick(stored.free), pro: pick(stored.pro), proPlus: pick(stored.proPlus) };
+  // Essentials follows Pro until it is given a setting of its own.
+  return {
+    free: pick(stored.free),
+    essentials: pick(stored.essentials ?? stored.pro),
+    pro: pick(stored.pro),
+    proPlus: pick(stored.proPlus),
+  };
 }
+
+/** Why a feature is refused: no plan at all, the other module, or a Pro feature. */
+export type Need = 'subscribe' | Module | 'pro';
 
 export interface Access {
   plan: Plan;
@@ -221,26 +242,51 @@ export interface Access {
   trial: boolean;
   /** The feature this access was checked for, so a refusal can name it. */
   feature: Feature;
+  /** Essentials' chosen module (null until chosen, or on other plans). */
+  module: Module | null;
+  /** What would unlock a refused feature. */
+  need?: Need;
 }
 
-/** Whether a plan includes a feature, before any monthly ration. */
-export function featureInPlan(spec: PlanSpec, feature: Feature): boolean {
-  switch (feature) {
-    case 'coach':
-      return spec.coach;
-    case 'equipment':
-      return spec.equipment;
-    case 'recipe':
-      return spec.recipes;
-    case 'bodyReading':
-      return spec.bodyReading;
-    case 'program':
-      return spec.programs === null || spec.programs > 0;
-    case 'coachDocs':
-      return spec.coach && spec.coachDocs;
-    default:
-      return true;
+/** Which part of the app each AI feature belongs to. */
+export const FEATURE_AREA: Record<Feature, Module | 'health' | 'general' | 'pro'> = {
+  meal: 'food',
+  describe: 'food',
+  recipe: 'food',
+  equipment: 'training',
+  bodyReading: 'health',
+  coach: 'general',
+  program: 'pro',
+  coachDocs: 'pro',
+};
+
+/**
+ * Whether a plan includes a feature, before any monthly ration, and if not,
+ * what would. With locks off everything is included, as before plans had
+ * features. Essentials covers its own module plus Health and the coach —
+ * never the other module's AI, which is what keeps one module from quietly
+ * becoming both.
+ */
+export function featureCheck(
+  plan: Plan,
+  spec: PlanSpec,
+  feature: Feature,
+  module: Module | null,
+  locks: boolean,
+): { ok: true } | { ok: false; need: Need } {
+  if (!locks) return { ok: true };
+  if (plan === 'free') return { ok: false, need: 'subscribe' };
+  const area = FEATURE_AREA[feature];
+  if (area === 'pro') {
+    const ok = feature === 'program' ? spec.programs === null || spec.programs > 0 : spec.coachDocs;
+    return ok ? { ok: true } : { ok: false, need: 'pro' };
   }
+  if (area === 'food' || area === 'training') {
+    if (spec.scope === 'all' || module === area) return { ok: true };
+    return { ok: false, need: area };
+  }
+  if (feature === 'coach' && !spec.coach) return { ok: false, need: 'pro' };
+  return { ok: true };
 }
 
 /**
@@ -273,18 +319,26 @@ export async function checkAccess(
   const plan: Plan = (user?.plan as Plan) ?? 'free';
   const base = PLANS[plan] ?? PLANS.free;
   const spec = locks ? base : unlocked(base);
+  const module: Module | null = plan === 'essentials' ? (user?.module ?? null) : null;
   const trial = plan !== 'free' && isTrialSource(user?.planSource);
-  // A trial gets the paid features but a bounded allowance, so a trial that
-  // never converts costs little.
-  const limit = trial ? Math.min(limits[plan] ?? spec.limit, trialCap) : (limits[plan] ?? spec.limit);
+  // No plan with locks on: records stay, the AI does not. A trial gets the
+  // plan's features but a bounded allowance, so a trial that never converts
+  // costs little.
+  const planLimit = locks && plan === 'free' ? 0 : (limits[plan] ?? spec.limit);
+  const limit = trial ? Math.min(planLimit, trialCap) : planLimit;
   const used = ref ? await getUsage(ref, period) : 0;
   const weight = await weightFor(kind);
-  let featureAllowed = featureInPlan(spec, feature);
+  const check = featureCheck(plan, spec, feature, module, locks);
+  let featureAllowed = check.ok;
+  let need: Need | undefined = check.ok ? undefined : check.need;
   // A plan may allow a feature but ration it inside the shared allowance.
   const cap = kindCap(spec, kind, weight);
   if (featureAllowed && ref && typeof cap === 'number') {
     const kindUsed = await getUsageKind(ref, kind, period);
-    if (kindUsed + weight > cap) featureAllowed = false;
+    if (kindUsed + weight > cap) {
+      featureAllowed = false;
+      need = feature === 'program' ? 'pro' : undefined;
+    }
   }
   return {
     plan,
@@ -301,6 +355,8 @@ export async function checkAccess(
     locks,
     trial,
     feature,
+    module,
+    need,
   };
 }
 
@@ -325,7 +381,7 @@ export async function release(ref: string, kind: string): Promise<void> {
 
 /** 403 body: the plan does not include this feature. */
 export function featureLocked(a: Access) {
-  return { error: 'feature_locked', feature: true, what: a.feature, plan: a.plan, used: a.used, limit: a.limit };
+  return { error: 'feature_locked', feature: true, what: a.feature, need: a.need ?? null, plan: a.plan, used: a.used, limit: a.limit };
 }
 
 /** 402 body: allowance for the month is spent — or too thin for this action,

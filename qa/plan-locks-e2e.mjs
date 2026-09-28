@@ -1,7 +1,7 @@
-// Plan locks end to end: the admin switch turns them on, and a free account
-// in the app (web build pointed at a local server) meets the membership sheet
-// with the right reason at each paid feature — while what is free, and what
-// it already made, stays open. A Pro account passes the same doors.
+// The launch offer end to end: the admin switches plan locks on, and the app
+// (web build pointed at a local server) behaves per plan — no plan is
+// view-only, Essentials shows and allows only its module (plus Health), an
+// Essentials member without a focus is asked to choose, and Pro passes.
 //
 // Needs: the server on :8787 with ADMIN_TOKEN=e2e-admin and a database; a
 // web export built with EXPO_PUBLIC_API_URL=http://127.0.0.1:8787 served on
@@ -17,6 +17,7 @@ const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : '
 const squash = (s) => s.replace(/\s+/g, ' ');
 const admin = (path, body) =>
   fetch(`${API}${path}`, { method: 'POST', headers: { 'x-admin-token': 'e2e-admin', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
+const me = (ref) => fetch(`${API}/api/me`, { headers: { 'x-calgym-user': ref } }).then((r) => r.json());
 
 const WEEK = { 1: { title: 'Push', exerciseIds: ['bench-press'] } };
 const base = (lang, installId, extra = {}) => ({
@@ -25,6 +26,8 @@ const base = (lang, installId, extra = {}) => ({
   targets: { calories: 1900, proteinG: 120, carbsG: 210, fatG: 63 },
   schedule: WEEK, savedSchedules: [], activeScheduleId: null, workouts: [], exercises: [], meals: [], weights: [],
   recipes: [], mealPlanRecipes: {}, mealPlanSwaps: {}, shopping: null, water: [], coachMessages: [], fastingHistory: [], skips: {}, dayOrder: {}, whoopBurnByDay: {}, whoopWorkoutsByDay: {}, occurrences: {},
+  // Seen the after-onboarding offer already, so it doesn't open on its own mid-test.
+  membershipPrompt: { firstSeenAt: new Date().toISOString(), introShown: true, lastShownAt: new Date().toISOString() },
   ...extra,
 });
 
@@ -47,83 +50,130 @@ try {
   {
     const { ctx, page } = await openApp('/recipes', `u_lk${run}off`);
     await clickText(page, 'Add my recipe');
-    check('locks off: a free account can add a recipe', !page.url().includes('/membership'), page.url());
+    check('locks off: anyone can add a recipe', page.url().includes('/recipe-edit'), page.url());
     await ctx.close();
   }
 
-  // ── Locks on: a free account ──
   await admin('/admin/api/plan-locks', { on: true });
-  const FREE_ID = `u_lk${run}free`;
+
+  // ── No plan: view-only ──
+  const NONE = `u_lk${run}none`;
   {
-    const { ctx, page } = await openApp('/recipes', FREE_ID);
-    check('free: the recipe library still opens', /Recipes/.test(await body(page)));
+    const m = await me(NONE);
+    check('server: no plan has no AI allowance', m.plan === 'free' && m.limit === 0 && m.locks === true, JSON.stringify({ plan: m.plan, limit: m.limit }));
+    const { ctx, page } = await openApp('/', NONE);
+    const b = await body(page);
+    check('no plan: Overview says records are safe', /Your records are safe/.test(b));
+    check('no plan: both modules still there to look back on', /Nutrition today/.test(b));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openApp('/recipes', NONE);
     await clickText(page, 'Add my recipe');
-    check('free: adding a recipe opens the membership sheet', page.url().includes('/membership') && page.url().includes('reason=recipes'), page.url());
-    check('free: it says recipes come with Pro', /Writing your own recipes comes with Pro/.test(await body(page)));
+    check('no plan: adding a recipe opens the sheet', page.url().includes('reason=subscribe'), page.url());
+    check('no plan: the sheet says start the trial', /Start your free trial to keep logging/.test(await body(page)));
     await ctx.close();
   }
   {
-    const saved = [{ id: 'sch1', name: 'My week', days: WEEK, createdAt: new Date().toISOString() }];
-    const { ctx, page } = await openApp('/schedules', FREE_ID, { savedSchedules: saved, activeScheduleId: 'sch1' });
-    check('free: the saved schedule is still there', /My week/.test(await body(page)));
-    await clickText(page, 'New schedule');
-    check('free: a second saved schedule opens the sheet', page.url().includes('reason=schedules'), page.url());
-    check('free: it says Free keeps one', /Free keeps one saved schedule/.test(await body(page)));
+    // The store-level guard: logging water from its own screen does nothing
+    // and brings the sheet, even though the screen itself opened.
+    const { ctx, page } = await openApp('/water', NONE);
+    const add = page.getByText(/^\+?\s*250/).first();
+    if (await add.count()) {
+      await add.click();
+      await page.waitForTimeout(900);
+      check('no plan: a write from any screen is refused with the sheet', page.url().includes('reason=subscribe'), page.url());
+    } else {
+      check('no plan: water screen has a quick-add button to try', false, 'no 250 button found');
+    }
+    await ctx.close();
+  }
+
+  // ── Essentials · Training ──
+  const TRAIN = `u_lk${run}train`;
+  await admin('/admin/api/plan', { ref: TRAIN, plan: 'essentials', module: 'training', days: 30 });
+  {
+    const m = await me(TRAIN);
+    check('server: Essentials Training, 20 actions', m.plan === 'essentials' && m.module === 'training' && m.limit === 20, JSON.stringify({ plan: m.plan, module: m.module, limit: m.limit }));
+    const { ctx, page } = await openApp('/', TRAIN);
+    const b = await body(page);
+    check('Essentials Training: Overview has no nutrition card', !/Nutrition today/.test(b));
+    check('Essentials Training: Overview keeps training, weight and water', /Your next steps/.test(b) && /Latest weight/i.test(b) && /Water/.test(b));
     await ctx.close();
   }
   {
-    const { ctx, page } = await openApp('/schedules', FREE_ID);
+    const { ctx, page } = await openApp('/food', TRAIN);
+    check('Essentials Training: Food tab shows the banner, history still there', /Food isn't in your plan/.test(await body(page)));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openApp('/recipes', TRAIN);
+    await clickText(page, 'Add my recipe');
+    check('Essentials Training: adding a recipe opens the sheet for food', page.url().includes('reason=food'), page.url());
+    const b = await body(page);
+    check('the sheet explains and opens on Pro', /Food isn't part of your plan/.test(b) && /Pro\s*Recommended/.test(b));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openApp('/schedules', TRAIN);
     await clickText(page, 'Save this week');
     const naming = await page.locator('input[placeholder^="Name it"]').count();
-    check('free: the first saved schedule is allowed', !page.url().includes('/membership') && naming > 0, page.url());
+    check('Essentials Training: saving a schedule is allowed', !page.url().includes('/membership') && naming > 0, page.url());
     await ctx.close();
   }
   {
-    const { ctx, page } = await openApp('/shopping', FREE_ID);
-    check('free: the shopping list gives way to the sheet', page.url().includes('reason=shopping') && /shopping list comes with Pro/.test(await body(page)), page.url());
-    await ctx.close();
-  }
-  {
-    const { ctx, page } = await openApp('/program', FREE_ID);
+    const { ctx, page } = await openApp('/program', TRAIN);
     await clickText(page, 'Build my program');
-    check('free: building a program opens the sheet', page.url().includes('reason=program'), page.url());
-    check('free: it names Pro and Pro+', /program builder comes with Pro \(one a month\) and Pro\+/.test(await body(page)));
+    check('Essentials: the program builder is Pro', page.url().includes('reason=program'), page.url());
     await ctx.close();
   }
   {
-    const { ctx, page } = await openApp('/body-reading', FREE_ID);
-    check('free: typing a reading in stays open', /Weight/.test(await body(page)) && !page.url().includes('/membership'));
-    await clickText(page, 'Read from photo');
-    check('free: reading a report with AI opens the sheet', page.url().includes('reason=bodyReading'), page.url());
+    const { ctx, page } = await openApp('/profile', TRAIN);
+    const b = await body(page);
+    check('Profile: plan, focus and usage in plain words', /Essentials · Training/.test(b) && /0 of 20 used/.test(b) && /resets/.test(b), b.match(/Membership.{0,160}/)?.[0]);
+    check('Profile: change focus offered', /Change focus/.test(b));
     await ctx.close();
   }
+
+  // ── Essentials without a focus ──
+  const NOFOCUS = `u_lk${run}nofocus`;
+  await admin('/admin/api/plan', { ref: NOFOCUS, plan: 'essentials', days: 30 });
   {
-    const { ctx, page } = await openApp('/health', FREE_ID);
-    await page.getByText('Last 30 days', { exact: true }).first().click();
-    await page.waitForTimeout(600);
-    await clickText(page, 'Last 90 days');
-    check('free: 90 days of history opens the sheet', page.url().includes('reason=trends'), page.url());
-    await ctx.close();
-  }
-  {
-    const { ctx, page } = await openApp('/membership?reason=coachDocs', FREE_ID, {}, 'ar');
-    check('ar: the coach-memory reason is in Arabic', /متاح في برو بلس/.test(await body(page)));
+    const { ctx, page } = await openApp('/', NOFOCUS);
+    check('Essentials without focus: asked to choose', /Choose Food or Training/.test(await body(page)));
+    await clickText(page, 'Choose Food or Training');
+    check('the card opens the focus screen', page.url().includes('/focus'), page.url());
+    await page.getByRole('radio', { name: /Food/ }).first().click();
+    await page.getByText('Save', { exact: true }).last().click();
+    await page.waitForTimeout(1500);
+    const m = await me(NOFOCUS);
+    check('choosing Food saves it on the server', m.module === 'food', String(m.module));
+    await page.goto(`${APP}/`, { waitUntil: 'networkidle' });
+    await page.waitForTimeout(1500);
+    const b = await body(page);
+    check('Overview now shows food, not training', /Nutrition today/.test(b) && !/Choose Food or Training/.test(b));
     check('no page errors', page.errors.length === 0, page.errors.join(' | '));
     await ctx.close();
   }
 
-  // ── Locks on: a Pro account passes ──
-  const PRO_ID = `u_lk${run}pro`;
-  await admin('/admin/api/plan', { ref: PRO_ID, plan: 'pro', days: 30 });
+  // ── Pro passes ──
+  const PRO = `u_lk${run}pro`;
+  await admin('/admin/api/plan', { ref: PRO, plan: 'pro', days: 30 });
   {
-    const { ctx, page } = await openApp('/recipes', PRO_ID);
+    const { ctx, page } = await openApp('/recipes', PRO);
     await clickText(page, 'Add my recipe');
-    check('pro: adding a recipe goes straight to the editor', page.url().includes('/recipe-edit'), page.url());
+    check('Pro: adding a recipe goes to the editor', page.url().includes('/recipe-edit'), page.url());
     await ctx.close();
   }
   {
-    const { ctx, page } = await openApp('/shopping', PRO_ID);
-    check('pro: the shopping list opens', !page.url().includes('/membership'), page.url());
+    const { ctx, page } = await openApp('/', PRO);
+    const b = await body(page);
+    check('Pro: Overview shows both', /Nutrition today/.test(b) && /Your next steps/.test(b));
+    await ctx.close();
+  }
+  {
+    const { ctx, page } = await openApp('/membership?reason=coachDocs', PRO, {}, 'ar');
+    check('ar: the coach-memory reason is in Arabic', /إرسال ملفات وصور يتذكرها المدرب/.test(await body(page)));
     await ctx.close();
   }
 } finally {

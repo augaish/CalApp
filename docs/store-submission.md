@@ -55,7 +55,7 @@ EN:
 >
 > Works as a guest — no account needed. English and Arabic.
 >
-> Calgym Pro and Pro+ are optional auto-renewing subscriptions. Pro adds a larger monthly AI allowance, recipes, meal plans, the shopping list, unlimited saved schedules and full history; Pro+ adds more AI, unlimited AI programs, a coach that remembers your documents and the most accurate meal analysis. The yearly plans may start with a 7-day free trial for new subscribers. Payment is charged to your Apple ID at confirmation. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period; manage them in Settings → Apple ID → Subscriptions.
+> Calgym Essentials and Calgym Pro are auto-renewing subscriptions, each starting with a 14-day free trial for new subscribers. Essentials covers Food or Training, plus Health, with 20 AI actions a month. Pro covers Food, Training and Health together, with 50 AI actions a month, the AI program builder and a coach that remembers your documents. Without a subscription you can still view and export everything you recorded. Payment is charged to your Apple ID at confirmation. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period; manage them in Settings → Apple ID → Subscriptions.
 > Terms: https://calapp-production-ab20.up.railway.app/terms · Privacy: https://calapp-production-ab20.up.railway.app/privacy
 >
 > Calorie and nutrition figures are AI estimates and may be inaccurate. Not medical advice.
@@ -173,36 +173,11 @@ Do these in order. Only the sandbox purchase test at the end waits for the bank 
   - English: `Calgym Membership`
   - Arabic: `عضوية كالجيم`
 
-**Four products, all in that one group**
-
-| Reference name | Product ID | Duration | Level | Suggested price (Saudi Arabia) |
-|---|---|---|---|---|
-| Pro+ Monthly | `calgym_proplus_monthly` | 1 month | 1 | SAR 49.99 |
-| Pro+ Yearly | `calgym_proplus_yearly` | 1 year | 1 | SAR 399.99 |
-| Pro Monthly | `calgym_pro_monthly` | 1 month | 2 | SAR 24.99 |
-| Pro Yearly | `calgym_pro_yearly` | 1 year | 2 | SAR 199.99 |
-
-- **Product IDs:** type them exactly as shown. They can never be changed or reused once created, and the app and server rely on these names.
-- **Levels:** Pro+ is level 1 (the higher tier) and Pro is level 2. This is what makes a switch from Pro to Pro+ an immediate upgrade, and Pro+ to Pro a downgrade at renewal.
-- **Prices:** pick the price with **Saudi Arabia** as the base country and let Apple fill in the other countries. The price you choose is what the customer pays, VAT included; Apple deducts the VAT. These prices cover Apple's 15% (Small Business Program), a 15% partner commission, VAT and AI costs; the break-even math is in [step-by-step.md](step-by-step.md). Set the same numbers in the admin page → Membership so the paywall shows them before the store prices load.
-- **Family Sharing:** leave it **off**. Once turned on, it can't be turned off.
-- **Introductory offers / free trials:** a 1-week **Free** introductory offer on the two **yearly** products only, none on the monthly ones. The paywall states the trial length, the price after it and how to cancel, and shows it only to eligible people. Steps are in [step-by-step.md](step-by-step.md).
-- **Availability:** all countries and regions.
-
-**Localizations** (display name up to 30 characters, description up to 45)
-
-| Product | English name | English description | Arabic name | Arabic description |
-|---|---|---|---|---|
-| Pro Monthly | Calgym Pro | 50 AI actions a month and meal planning | كالجيم برو | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
-| Pro Yearly | Calgym Pro (Yearly) | 50 AI actions a month and meal planning | كالجيم برو (سنوي) | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
-| Pro+ Monthly | Calgym Pro+ | 400 AI actions a month and the AI coach | كالجيم برو+ | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
-| Pro+ Yearly | Calgym Pro+ (Yearly) | 400 AI actions a month and the AI coach | كالجيم برو+ (سنوي) | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
-
-If you change the allowances in the admin page, update these descriptions to match.
+**The products, the trial and their localizations** are in [step-by-step.md](step-by-step.md), section 2 — the single up-to-date list: Essentials (19.99 / 149.99) and Pro (24.99 / 199.99) with a 2-week free trial on all four, and Pro+ created but not sold yet.
 
 **Review information (each product)**
 - **Screenshot:** the membership sheet or Profile → Membership. Until the store is live, it shows the built-in prices; that's fine for review.
-- **Review notes:** "Subscriptions are offered in Profile → Membership and in the membership sheet that opens when a free limit is reached. Restore purchases and the Terms/Privacy links are on the same screens."
+- **Review notes:** "Calgym is a subscription app with a 14-day free trial. Plans are offered in the membership sheet after onboarding and in Profile → Membership: Essentials (Food or Training) and Pro (both). Without a plan, a person can still view and export everything they recorded. Restore purchases and the Terms/Privacy links are on the same screens."
 
 The products stay in "Missing Metadata" or "Ready to Submit" until the Paid Apps agreement is active. That's expected. They're submitted for review together with the first app version that sells them.
 

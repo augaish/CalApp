@@ -21,6 +21,7 @@ export function useMembershipPrompt() {
   const pathname = usePathname();
   const loaded = useEntitlement((s) => s.loaded);
   const plan = useEntitlement((s) => s.plan);
+  const locks = useEntitlement((s) => s.locks);
   const billing = useEntitlement((s) => s.billing);
   const tourSeen = useAppStore((s) => s.tourSeen);
   const tourActive = useTour((s) => s.active);
@@ -42,6 +43,7 @@ export function useMembershipPrompt() {
       free: plan === 'free',
       tourDone: tourSeen && !tourActive,
       busy: !!app.activeSession || !TAB_ROUTES.includes(pathname),
+      launchOffer: !!locks,
     });
     if (!due) return;
     let live = true;
@@ -57,5 +59,5 @@ export function useMembershipPrompt() {
       live = false;
       clearTimeout(timer);
     };
-  }, [loaded, plan, billing, tourSeen, tourActive, pathname, wake, router]);
+  }, [loaded, plan, locks, billing, tourSeen, tourActive, pathname, wake, router]);
 }

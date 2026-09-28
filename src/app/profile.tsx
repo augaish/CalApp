@@ -4,13 +4,13 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { MembershipCard } from '@/components/plan-status';
 import { PageHeader } from '@/components/brand-header';
 import { RowGroup, SettingsRow, StatusPill } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { buildExport } from '@/lib/account';
-import { useEntitlement } from '@/lib/entitlement';
 import { lightHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
@@ -33,9 +33,6 @@ export default function Profile() {
   const targets = useAppStore((s) => s.targets);
   const account = useAppStore((s) => s.account);
   const signOut = useAppStore((s) => s.signOut);
-  const plan = useEntitlement((s) => s.plan);
-  const remaining = useEntitlement((s) => s.remaining);
-  const limit = useEntitlement((s) => s.limit);
   const isGuest = !account?.email && account?.provider === 'guest';
 
   const switchLanguage = (lang: Language) => {
@@ -97,7 +94,6 @@ export default function Profile() {
     }
   };
 
-  const planLabel = plan === 'proPlus' ? t('upgrade.planProPlus') : plan === 'pro' ? t('upgrade.planPro') : t('upgrade.planFree');
   const unitsLabel = units === 'imperial' ? `${t('units.lb')} / ${t('units.in')}` : `${t('progress.kg')} / ${t('units.cm')}`;
 
   return (
@@ -138,6 +134,9 @@ export default function Profile() {
         <SettingsRow icon="notifications-outline" title={t('notifications.title')} onPress={() => router.push('/notifications')} last />
       </RowGroup>
 
+      <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: Spacing.sm }}>{t('profile.membership')}</Text>
+      <MembershipCard />
+
       <RowGroup title={t('profile.goals')}>
         <SettingsRow
           icon="restaurant-outline"
@@ -149,13 +148,6 @@ export default function Profile() {
       </RowGroup>
 
       <RowGroup title={t('profile.account')}>
-        <SettingsRow
-          icon="star-outline"
-          title={t('profile.membership')}
-          value={planLabel}
-          subtitle={typeof remaining === 'number' && typeof limit === 'number' ? t('upgrade.remaining', { remaining, limit }) : undefined}
-          onPress={() => router.push('/upgrade')}
-        />
         <SettingsRow icon="pricetag-outline" title={t('redeem.title')} onPress={() => router.push('/redeem')} />
         <SettingsRow icon="document-text-outline" title={t('legal.exportData')} onPress={exportData} />
         <SettingsRow icon="sparkles-outline" title={t('tabs.ai')} onPress={() => router.push('/coach')} />
