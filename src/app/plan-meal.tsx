@@ -10,6 +10,7 @@ import { weekdayLabel } from '@/components/schedule-plan-card';
 import { Chip, DeltaRows, IconTile } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { useGatedScreen } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import {
@@ -57,6 +58,7 @@ export default function PlanMeal() {
   const mealPlanSwaps = useAppStore((s) => s.mealPlanSwaps);
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
   const setPlannedRecipe = useAppStore((s) => s.setPlannedRecipe);
+  const allowed = useGatedScreen('mealPlans');
 
   const [days] = useState(upcomingDays);
   const recipe = recipes.find((r) => r.id === params.recipeId);
@@ -128,6 +130,8 @@ export default function PlanMeal() {
   };
 
   const dateLabel = `${t(`home.mealTypes.${slot}`)} · ${day.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`;
+
+  if (!allowed) return null;
 
   return (
     <Screen

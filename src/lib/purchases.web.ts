@@ -24,6 +24,10 @@ export async function loadStorePlans(): Promise<LoadedPlans | null> {
   return null;
 }
 
+export async function trialEligibility(_productIds: string[]): Promise<Record<string, boolean>> {
+  return {};
+}
+
 export type PurchaseOutcome =
   | { kind: 'purchased' }
   | { kind: 'cancelled' }

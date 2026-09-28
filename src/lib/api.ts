@@ -67,7 +67,7 @@ function authHeaders(): Record<string, string> {
 // Defined in a leaf module so the rule for what to say about each failure
 // can be tested without dragging React Native in. Re-exported here because
 // every screen already imports them from '@/lib/api'.
-export { AiConsentDeclinedError, ApiError, FeatureLockedError, QuotaError } from './api-errors';
+export { AiConsentDeclinedError, ApiError, FeatureLockedError, lockReason, QuotaError } from './api-errors';
 
 /** Routes that send the person's photos, reports or words to an AI provider. */
 const AI_PATHS = new Set([
@@ -96,8 +96,9 @@ async function post<T>(path: string, body: unknown): Promise<T> {
       plan?: string;
       used?: number;
       limit?: number;
+      what?: string;
     };
-    if (res.status === 403) throw new FeatureLockedError(q.plan ?? 'free');
+    if (res.status === 403) throw new FeatureLockedError(q.plan ?? 'free', q.what);
     throw new QuotaError(q.plan ?? 'free', q.used ?? 0, q.limit ?? 0);
   }
   if (!res.ok) {
@@ -120,7 +121,17 @@ export interface Entitlement {
     /** Cap on coach messages inside the allowance (null = no sub-cap). */
     coachCap?: number | null;
     coachUsed?: number;
+    recipes?: boolean;
+    bodyReading?: boolean;
+    coachDocs?: boolean;
+    /** Programme designs a month (null = no separate cap), and how many are used. */
+    programs?: number | null;
+    programsUsed?: number;
   };
+  /** Plan locks are on: lock what this plan doesn't include. Absent/false: all open. */
+  locks?: boolean;
+  /** The plan is a store free trial, on the trial's allowance. */
+  trial?: boolean;
   /**
    * What the upgrade screen should display, set from the admin dashboard so
    * a price or allowance change doesn't need an app release. Display only —
@@ -135,6 +146,7 @@ export interface Entitlement {
     currency?: string;
     limits?: { free?: number; pro?: number; proPlus?: number };
     coachCap?: number | null;
+    trialLimit?: number;
   };
   /** RevenueCat public SDK keys; null until subscriptions are switched on. */
   billing?: { iosKey?: string | null; androidKey?: string | null } | null;

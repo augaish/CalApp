@@ -20,7 +20,8 @@ import { PhotoProgress } from '@/components/photo-progress';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { AiConsentDeclinedError, analyzeBodyReading, analyzeEquipment, analyzeMeal, ApiError, FeatureLockedError, isMockMode, lookupBarcode, QuotaError, reportBarcode } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeBodyReading, analyzeEquipment, analyzeMeal, ApiError, FeatureLockedError, isMockMode, lockReason, lookupBarcode, QuotaError, reportBarcode } from '@/lib/api';
+import type { LockReason } from '@/lib/api-errors';
 import { useEntitlement } from '@/lib/entitlement';
 import { usePending } from '@/lib/pending';
 import { webviewAvailable } from '@/lib/native-modules';
@@ -129,7 +130,7 @@ export default function Scan() {
   };
 
   /** Out of allowance, or the plan doesn't include this — go to upgrade. */
-  const onLocked = (reason: 'quota' | 'equipment') => {
+  const onLocked = (reason: LockReason) => {
     useEntitlement.getState().refresh();
     router.replace(`/membership?reason=${reason}`);
   };
@@ -163,7 +164,7 @@ export default function Scan() {
         return;
       }
       if (err instanceof QuotaError) return onLocked('quota');
-      if (err instanceof FeatureLockedError) return onLocked('equipment');
+      if (err instanceof FeatureLockedError) return onLocked(lockReason(err));
       if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
         Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
         reset();
@@ -194,7 +195,7 @@ export default function Scan() {
       await processImage(uri);
     } catch (err) {
       if (err instanceof QuotaError) return onLocked('quota');
-      if (err instanceof FeatureLockedError) return onLocked('equipment');
+      if (err instanceof FeatureLockedError) return onLocked(lockReason(err));
       if (err instanceof ApiError && err.code === 'ai_credits_exhausted') {
         Alert.alert(t('common.aiCreditsExhaustedTitle'), t('common.aiCreditsExhausted'));
         reset();

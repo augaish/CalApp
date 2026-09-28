@@ -53,22 +53,22 @@ Type the IDs exactly as shown. They can never be changed or reused.
 - **Level 1 is the higher tier.** A switch from Pro to Pro+ is then an immediate upgrade, and Pro+ to Pro a downgrade at renewal.
 - **Prices:** choose them with **Saudi Arabia** as the base country and let Apple fill in the others. The price is what the customer pays, VAT included.
 - **Family Sharing:** off. It can't be turned off once on.
-- **Free trials / introductory offers:** none for now. The paywall doesn't explain trial terms yet, and Apple rejects a trial that isn't explained on screen.
+- **Free trial (yearly plans only):** on `calgym_pro_yearly` and `calgym_proplus_yearly` → **Subscription Prices → Introductory Offers → +** → countries: all → start date: today, no end date → type **Free** → duration **1 week**. Add **no** trial to the monthly plans: monthly trials mostly bring people who try and cancel. The app shows "7 days free, then … /year, cancel at least 24 hours before" only to people Apple says are still eligible (one trial per Apple ID per group). A trial gets the plan's features with at most 50 AI actions for the whole week (admin → Membership → Free trial), and becomes a normal paid plan at its first renewal. Partners earn nothing on the trial itself, only from the first paid renewal.
 - **Availability:** all countries and regions.
 
 **Why these prices.** For every 100 SAR a customer pays, you keep about 63 SAR: VAT 15% is taken off first, then Apple's 15% (with the Small Business Program), then a partner's 15% on sales through their code.
 
 | Plan | Price | You keep | AI cost, typical user (40%) | AI cost, full allowance | Result, typical | Result, full allowance |
 |---|---|---|---|---|---|---|
-| Pro monthly (150) | 24.99 | 15.70 | ~4.7 | ~8.8 | +11.0 | +6.9 |
-| Pro yearly | 199.99 / yr | 10.47 / mo | ~4.7 | ~8.8 | +5.8 | +1.7 |
+| Pro monthly (50) | 24.99 | 15.70 | ~2.9 | ~4.3 | +12.8 | +11.5 |
+| Pro yearly | 199.99 / yr | 10.47 / mo | ~2.9 | ~4.3 | +7.6 | +6.2 |
 | Pro+ monthly (400) | 49.99 | 31.41 | ~11.6 | ~26.0 | +19.8 | +5.4 |
 | Pro+ yearly | 399.99 / yr | 20.94 / mo | ~11.6 | ~26.0 | +9.3 | −5.1 |
 
 All figures are in SAR per month. AI costs include about 2 SAR of fixed costs per subscriber (server, database, builds). The full-allowance cost assumes the most expensive actions, and Pro+'s more accurate model.
 
 **Break-even per month**, which is what a month of use costs you divided by 0.63:
-- **Pro:** 7.5 SAR at typical use, 14 SAR at full use.
+- **Pro:** 4.6 SAR at typical use, 6.8 SAR at full use.
 - **Pro+:** 18.5 SAR at typical use, 41 SAR at full use.
 
 Only a Pro+ yearly member who uses all 400 actions every month costs more than they pay. Watch **admin → Overview → AI** and the per-user cost in **Users**. Sales without a partner code keep another 15%. If you don't join the Small Business Program, you keep about 52% instead of 63% in the first year, and these prices would need to be about 20% higher.
@@ -77,8 +77,8 @@ Only a Pro+ yearly member who uses all 400 actions every month costs more than t
 
 | Product | English name | English description | Arabic name | Arabic description |
 |---|---|---|---|---|
-| Pro Monthly | Calgym Pro | 150 AI actions a month and the AI coach | كالجيم برو | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
-| Pro Yearly | Calgym Pro (Yearly) | 150 AI actions a month and the AI coach | كالجيم برو (سنوي) | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Pro Monthly | Calgym Pro | 50 AI actions a month and meal planning | كالجيم برو | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
+| Pro Yearly | Calgym Pro (Yearly) | 50 AI actions a month and meal planning | كالجيم برو (سنوي) | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
 | Pro+ Monthly | Calgym Pro+ | 400 AI actions a month and the AI coach | كالجيم برو+ | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
 | Pro+ Yearly | Calgym Pro+ (Yearly) | 400 AI actions a month and the AI coach | كالجيم برو+ (سنوي) | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
 
@@ -154,8 +154,9 @@ Then check **admin → Overview → Launch checklist**. Everything except "First
 
 ## 7. ⬜ Admin page (…/admin)
 - **Membership → Membership prices:** Pro `24.99`, Pro+ `49.99`, Pro yearly `199.99`, currency `SAR`. These are only shown until the store is live; after that, the store's own price shows.
-- **Membership → Monthly AI allowance:** Free `15`, Pro `150`, Pro+ `400`. A value saved here earlier overrides the new default, so check it.
-- **Codes & partners → Promotion codes:** a thank-you code for your testers. For example `FOUNDERS`: free access, Pro, 90 days, max uses = number of testers.
+- **Membership → Monthly AI allowance:** Free `7`, Pro `50`, Pro+ `400`, Free trial `50`. A value saved here earlier overrides the new default, so check it.
+- **Codes & partners → Promotion codes:** a thank-you code for your testers: `FOUNDERS`, free access, **Pro+**, 90 days, max uses = number of testers. Send it to them before you turn plan locks on.
+- **Membership → Plan locks:** leave **off** until the store can sell (section 10). While off, every plan can use every feature and only the AI allowance differs. Turn it on once purchases work and testers have `FOUNDERS`. What each plan includes is in the table on that card. Anything someone already made (recipes, saved schedules, a program, readings, a WHOOP connection, coach documents) stays usable on every plan; only starting something new is locked.
 - **Codes & partners → Partners:** add partners and their codes when ready. The shares are explained in `billing-setup.md`.
 
 ## 8. ⬜ TestFlight external testing
@@ -222,6 +223,7 @@ No app build is needed.
 
 ### 12.3 ⬜ Subscriptions (Monetize → Subscriptions)
 Same product IDs, each with a base plan: `calgym_pro_monthly` (base plan `monthly`, 1 month), `calgym_pro_yearly` (`yearly`, 1 year), and the same for Pro+. Prices are set per country; the Saudi prices are as above.
+For the free trial, on each **yearly** base plan: **Add offer** → offer ID `trial7` → eligibility **New customer acquisition** → phase **Free trial, 7 days** → activate. Google only shows it to people who can take it.
 
 ### 12.4 ⬜ RevenueCat, Android
 1. RevenueCat → **+ Play Store app** → package `com.augaish.calapp`.
@@ -240,5 +242,6 @@ Production → create a release with the newest `.aab` → roll out.
 - ⬜ Admin checklist is all ticked; the membership pop-up appears for free users once the store sells.
 - ⬜ One real purchase on each platform (refund it via Apple / Google if you like).
 - ⬜ Partners have their codes and private links.
-- ⬜ Send testers the thank-you code.
+- ⬜ Send testers the `FOUNDERS` code, then turn **Plan locks** on in the admin page.
+- ⬜ Check the free trial appears on the yearly plans (use a Sandbox Apple ID that has never subscribed).
 - ⬜ Watch **admin → Overview** for the first days: purchases, AI failures and AI cost.

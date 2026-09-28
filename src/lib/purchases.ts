@@ -111,6 +111,33 @@ export async function loadStorePlans(): Promise<LoadedPlans | null> {
   }
 }
 
+/**
+ * Which products this person may still take a free trial on. Apple allows one
+ * introductory offer per subscription group, so iOS asks the store; Google
+ * Play only hands the app offers the person is eligible for, so a trial that
+ * reached us there is theirs to take. Unknown counts as not eligible: the
+ * paywall must never promise a trial the store then won't give.
+ */
+export async function trialEligibility(productIds: string[]): Promise<Record<string, boolean>> {
+  const out: Record<string, boolean> = {};
+  if (productIds.length === 0) return out;
+  if (Platform.OS === 'android') {
+    for (const id of productIds) out[id] = true;
+    return out;
+  }
+  const Purchases = configured ? load() : null;
+  if (!Purchases || Platform.OS !== 'ios') return out;
+  try {
+    const found = await Purchases.checkTrialOrIntroductoryPriceEligibility(productIds);
+    for (const id of productIds) {
+      out[id] = found[id]?.status === Purchases.INTRO_ELIGIBILITY_STATUS.INTRO_ELIGIBILITY_STATUS_ELIGIBLE;
+    }
+  } catch (err) {
+    console.warn('trial eligibility failed:', err);
+  }
+  return out;
+}
+
 export type PurchaseOutcome =
   | { kind: 'purchased' }
   | { kind: 'cancelled' }

@@ -9,6 +9,7 @@ import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { RowGroup, SettingsRow } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { photoPickerAvailable, pickPhoto } from '@/lib/photo';
 
@@ -43,6 +44,7 @@ export default function AddMenu() {
 
   const [picking, setPicking] = useState(false);
 
+  const gate = usePlanGate();
   const go = (href: Href) => {
     router.back();
     router.push(href);
@@ -117,7 +119,7 @@ export default function AddMenu() {
               <GroupHead icon="heart" color={theme.primary} title={t('addMenu.health')} subtitle={t('addMenu.healthSubtitle')} />
               <RowGroup>
                 <SettingsRow icon="add-circle-outline" title={t('addMenu.addReading')} onPress={() => go('/body-reading')} />
-                <SettingsRow icon="image-outline" title={t('addMenu.readMeasurementPhoto')} onPress={() => go('/scan?mode=body')} last />
+                <SettingsRow icon={gate.isOpen('bodyReading') ? 'image-outline' : 'lock-closed-outline'} title={t('addMenu.readMeasurementPhoto')} onPress={() => go(gate.isOpen('bodyReading') ? '/scan?mode=body' : '/membership?reason=bodyReading')} last />
               </RowGroup>
 
               <GroupHead icon="water" color="#3B82F6" title={t('addMenu.daily')} subtitle={t('addMenu.dailySubtitle')} />

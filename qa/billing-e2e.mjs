@@ -125,7 +125,7 @@ console.log('\n=== App: free code ===');
   check('server: the account is Pro now, from the code', m.plan === 'pro' && m.promo?.code === FREE, JSON.stringify({ plan: m.plan, promo: m.promo }));
   const days = (new Date(m.promo.until).getTime() - Date.now()) / 86400000;
   check('server: for 90 days', days > 89.9 && days < 90.1, days.toFixed(2));
-  check('server: with the Pro allowance', m.limit === 150, String(m.limit));
+  check('server: with the Pro allowance', m.limit === 50, String(m.limit));
 
   await page.goto(`${APP}/upgrade`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);

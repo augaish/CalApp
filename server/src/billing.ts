@@ -30,19 +30,57 @@ export interface PlanSpec {
    * meal scan — the feature that actually sells the app.
    */
   coachCap?: number;
+  /** The AI recipe writer. */
+  recipes: boolean;
+  /** Reading an InBody / body-composition printout. */
+  bodyReading: boolean;
+  /** Programmes the AI may design each month; null = only the allowance limits it. */
+  programs: number | null;
+  /** Photos and PDFs the coach reads and keeps as memory. */
+  coachDocs: boolean;
 }
 
 /**
- * Free can try EVERY feature, just a little of it: experiencing the coach and
- * the equipment scan is what converts, and the monthly action cap already
- * bounds the cost. Paid tiers buy volume (and higher accuracy), not access.
+ * Free keeps the whole daily habit — logging, workouts, the body map — plus a
+ * small taste of the AI. Pro buys the AI doing the logging and the planning
+ * features; Pro+ buys the coach: programme design, the coach's memory and the
+ * accurate model. The feature locks only apply once the admin switches plan
+ * locks on (see planLocksOn), so nothing is locked before the store can sell.
  * Limits are editable from the admin page without a redeploy.
  */
 export const PLANS: Record<Plan, PlanSpec> = {
-  free: { limit: 15, coach: true, equipment: true, highAccuracy: false, coachCap: 5 },
-  pro: { limit: 150, coach: true, equipment: true, highAccuracy: false },
-  proPlus: { limit: 400, coach: true, equipment: true, highAccuracy: true },
+  free: { limit: 7, coach: true, equipment: true, highAccuracy: false, coachCap: 3, recipes: false, bodyReading: false, programs: 0, coachDocs: false },
+  pro: { limit: 50, coach: true, equipment: true, highAccuracy: false, recipes: true, bodyReading: true, programs: 1, coachDocs: false },
+  proPlus: { limit: 400, coach: true, equipment: true, highAccuracy: true, recipes: true, bodyReading: true, programs: null, coachDocs: true },
 };
+
+/**
+ * The whole plan as if locks were off: every feature open, as before tiers
+ * had features of their own. Used until the store is live.
+ */
+function unlocked(spec: PlanSpec): PlanSpec {
+  return { ...spec, recipes: true, bodyReading: true, programs: null, coachDocs: true };
+}
+
+/** Whether per-plan feature locks are enforced. Off until the admin turns it on. */
+export async function planLocksOn(): Promise<boolean> {
+  const stored = await getSetting<{ on?: unknown }>('plan_locks', {});
+  return stored.on === true;
+}
+
+/** AI actions a free-trial subscriber gets for the whole trial. */
+export const DEFAULT_TRIAL_LIMIT = 50;
+
+export async function trialLimit(): Promise<number> {
+  const stored = await getSetting<{ trial?: unknown }>('plan_limits', {});
+  const v = stored.trial;
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : DEFAULT_TRIAL_LIMIT;
+}
+
+/** A plan granted from a store free trial rather than a paid period. */
+export function isTrialSource(source: string | null | undefined): boolean {
+  return !!source && /:trial$/.test(source);
+}
 
 export type Feature =
   | 'meal'
@@ -51,7 +89,8 @@ export type Feature =
   | 'coach'
   | 'bodyReading'
   | 'program'
-  | 'recipe';
+  | 'recipe'
+  | 'coachDocs';
 
 /**
  * What each metered route costs against the monthly allowance. Keyed by the
@@ -176,6 +215,42 @@ export interface Access {
   featureAllowed: boolean;
   /** false when the monthly allowance is spent. */
   withinQuota: boolean;
+  /** Plan locks are on, so the spec's feature flags are enforced. */
+  locks: boolean;
+  /** The plan comes from a store free trial, with the trial's allowance. */
+  trial: boolean;
+  /** The feature this access was checked for, so a refusal can name it. */
+  feature: Feature;
+}
+
+/** Whether a plan includes a feature, before any monthly ration. */
+export function featureInPlan(spec: PlanSpec, feature: Feature): boolean {
+  switch (feature) {
+    case 'coach':
+      return spec.coach;
+    case 'equipment':
+      return spec.equipment;
+    case 'recipe':
+      return spec.recipes;
+    case 'bodyReading':
+      return spec.bodyReading;
+    case 'program':
+      return spec.programs === null || spec.programs > 0;
+    case 'coachDocs':
+      return spec.coach && spec.coachDocs;
+    default:
+      return true;
+  }
+}
+
+/**
+ * The per-kind ration a reservation must respect, in weighted units: the
+ * coach's message cap, or the month's programme designs times what one costs.
+ */
+export function kindCap(spec: PlanSpec, kind: string, weight: number): number | undefined {
+  if (kind === 'coach') return spec.coachCap;
+  if (kind === 'program' && spec.programs !== null) return spec.programs * weight;
+  return undefined;
 }
 
 /**
@@ -193,20 +268,24 @@ export async function checkAccess(
   kind: string = feature,
 ): Promise<Access> {
   const period = currentPeriod();
-  const limits = await planLimits();
+  const [limits, locks, trialCap] = await Promise.all([planLimits(), planLocksOn(), trialLimit()]);
   const user = ref ? await getOrCreateUser(ref) : null;
   const plan: Plan = (user?.plan as Plan) ?? 'free';
-  const spec = PLANS[plan] ?? PLANS.free;
-  const limit = limits[plan] ?? spec.limit;
+  const base = PLANS[plan] ?? PLANS.free;
+  const spec = locks ? base : unlocked(base);
+  const trial = plan !== 'free' && isTrialSource(user?.planSource);
+  // A trial gets the paid features but a bounded allowance, so a trial that
+  // never converts costs little.
+  const limit = trial ? Math.min(limits[plan] ?? spec.limit, trialCap) : (limits[plan] ?? spec.limit);
   const used = ref ? await getUsage(ref, period) : 0;
-  let featureAllowed =
-    feature === 'coach' ? spec.coach : feature === 'equipment' ? spec.equipment : true;
-  // A plan may allow the coach but ration it inside the shared allowance.
-  if (featureAllowed && feature === 'coach' && ref && typeof spec.coachCap === 'number') {
-    const coachUsed = await getUsageKind(ref, 'coach', period);
-    if (coachUsed >= spec.coachCap) featureAllowed = false;
-  }
   const weight = await weightFor(kind);
+  let featureAllowed = featureInPlan(spec, feature);
+  // A plan may allow a feature but ration it inside the shared allowance.
+  const cap = kindCap(spec, kind, weight);
+  if (featureAllowed && ref && typeof cap === 'number') {
+    const kindUsed = await getUsageKind(ref, kind, period);
+    if (kindUsed + weight > cap) featureAllowed = false;
+  }
   return {
     plan,
     spec,
@@ -219,6 +298,9 @@ export async function checkAccess(
     // callers outright; failing closed here too keeps a route that forgets the
     // check from handing out unlimited AI.
     withinQuota: !!ref && used + weight <= limit,
+    locks,
+    trial,
+    feature,
   };
 }
 
@@ -233,8 +315,8 @@ export async function consume(ref: string | null, kind: string): Promise<void> {
  * model call then fails — the user should not pay for our error.
  */
 export async function reserve(ref: string, access: Access, kind: string): Promise<Reservation> {
-  const cap = kind === 'coach' ? access.spec.coachCap : undefined;
-  return reserveUsage(ref, kind, access.limit, cap, await weightFor(kind));
+  const weight = await weightFor(kind);
+  return reserveUsage(ref, kind, access.limit, kindCap(access.spec, kind, weight), weight);
 }
 
 export async function release(ref: string, kind: string): Promise<void> {
@@ -243,7 +325,7 @@ export async function release(ref: string, kind: string): Promise<void> {
 
 /** 403 body: the plan does not include this feature. */
 export function featureLocked(a: Access) {
-  return { error: 'feature_locked', feature: true, plan: a.plan, used: a.used, limit: a.limit };
+  return { error: 'feature_locked', feature: true, what: a.feature, plan: a.plan, used: a.used, limit: a.limit };
 }
 
 /** 402 body: allowance for the month is spent — or too thin for this action,

@@ -24,9 +24,46 @@ export class QuotaError extends Error {
 
 /** Raised when the caller's plan does not include the feature at all. */
 export class FeatureLockedError extends Error {
-  constructor(public plan: string) {
+  constructor(
+    public plan: string,
+    /** The server's name for what was refused ('coach', 'program', …). */
+    public what: string = 'coach',
+  ) {
     super('feature_locked');
     this.name = 'FeatureLockedError';
+  }
+}
+
+/** Why the membership sheet opened, which decides the line it leads with. */
+export type LockReason =
+  | 'quota'
+  | 'coach'
+  | 'equipment'
+  | 'recipes'
+  | 'program'
+  | 'bodyReading'
+  | 'coachDocs'
+  | 'mealPlans'
+  | 'shopping'
+  | 'schedules'
+  | 'whoop'
+  | 'trends';
+
+/** The membership sheet's reason for a feature the server refused. */
+export function lockReason(err: FeatureLockedError): LockReason {
+  switch (err.what) {
+    case 'equipment':
+      return 'equipment';
+    case 'recipe':
+      return 'recipes';
+    case 'program':
+      return 'program';
+    case 'bodyReading':
+      return 'bodyReading';
+    case 'coachDocs':
+      return 'coachDocs';
+    default:
+      return 'coach';
   }
 }
 
@@ -65,7 +102,7 @@ const RETRYABLE_CODES = ['ai_rate_limited', 'ai_overloaded', 'ai_timeout'];
 
 export type AiFailureAction =
   /** Nothing to explain in a dialog: the upgrade screen states the case. */
-  | { kind: 'upgrade'; reason: 'quota' | 'coach' }
+  | { kind: 'upgrade'; reason: LockReason }
   /** The person chose not to send it: nothing to report. */
   | { kind: 'none' }
   | { kind: 'alert'; titleKey: string; bodyKey: string; values?: Record<string, string> };
@@ -89,7 +126,7 @@ export function aiFailureAction(
   unusable: { titleKey: string; bodyKey: string },
 ): AiFailureAction {
   if (err instanceof QuotaError) return { kind: 'upgrade', reason: 'quota' };
-  if (err instanceof FeatureLockedError) return { kind: 'upgrade', reason: 'coach' };
+  if (err instanceof FeatureLockedError) return { kind: 'upgrade', reason: lockReason(err) };
   // They just chose "Not now" on the permission question: nothing was sent
   // and nothing went wrong, so there is nothing to tell them.
   if (err instanceof AiConsentDeclinedError) return { kind: 'none' };

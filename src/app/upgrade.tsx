@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -12,7 +13,7 @@ import { SERVER_URL } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { manageSubscription } from '@/lib/purchases';
 import { annualSaving } from '@/lib/store-plans';
-import { MEMBERSHIP_FEATURES, useStoreOffer } from '@/lib/use-store-offer';
+import { MEMBERSHIP_FEATURES, reasonText, reasonWantsProPlus, useStoreOffer } from '@/lib/use-store-offer';
 
 /** Used until `/api/me` answers (and on a server that predates `pricing`) —
  * the same numbers this screen shipped with, so nothing ever renders blank.
@@ -23,8 +24,8 @@ const FALLBACK = {
   proPlus: 49.99,
   proYearly: 199.99,
   currency: 'SAR',
-  limits: { free: 15, pro: 150, proPlus: 400 },
-  coachCap: 5,
+  limits: { free: 7, pro: 50, proPlus: 400 },
+  coachCap: 3,
 };
 
 export default function Upgrade() {
@@ -41,7 +42,11 @@ export default function Upgrade() {
   const pro = plan === 'pro' || plan === 'proPlus';
 
   const offer = useStoreOffer();
-  const { plans, storeChecked, status, serverSells, needsUpdate, hasAnnual, tier, setTier, selectedPkg, priceFor, storeName, busy } = offer;
+  const { plans, storeChecked, status, serverSells, needsUpdate, hasAnnual, tier, setTier, selectedPkg, priceFor, trialDaysFor, storeName, busy } = offer;
+  const wantsProPlus = reasonWantsProPlus(reason, plan);
+  useEffect(() => {
+    if (wantsProPlus) setTier('proPlus');
+  }, [wantsProPlus, setTier]);
   const shownPeriod = offer.period;
   const setPeriod = offer.setPeriod;
 
@@ -86,12 +91,21 @@ export default function Upgrade() {
 
   const currentTierSelected = plan === tier && !promo;
 
+  const selectedPrice = plans && selectedPkg ? priceFor(tier) : null;
+  const trialDays = plans && selectedPkg && !currentTierSelected ? trialDaysFor(tier) : null;
+
   const primary = (() => {
     if (plans && selectedPkg) {
-      const p = priceFor(tier);
+      const p = selectedPrice;
       return (
         <Button
-          label={currentTierSelected ? t('upgrade.currentPlan') : t('upgrade.subscribe', { price: p ? `${p.main} ${p.unit}` : '' })}
+          label={
+            currentTierSelected
+              ? t('upgrade.currentPlan')
+              : trialDays
+                ? t('upgrade.startTrial', { days: trialDays })
+                : t('upgrade.subscribe', { price: p ? `${p.main} ${p.unit}` : '' })
+          }
           disabled={currentTierSelected || busy !== null}
           loading={busy === 'buy'}
           onPress={buy}
@@ -106,6 +120,11 @@ export default function Upgrade() {
     <Screen
       footer={
         <View>
+          {trialDays && selectedPrice ? (
+            <Text style={{ color: theme.textSecondary, fontSize: 12, lineHeight: 17, textAlign: 'center', marginBottom: Spacing.xs }}>
+              {t('upgrade.trialTerms', { days: trialDays, price: selectedPrice.main, unit: selectedPrice.unit, store: storeName })}
+            </Text>
+          ) : null}
           {primary}
           {plans ? (
             <Button
@@ -148,11 +167,7 @@ export default function Upgrade() {
       {reason ? (
         <Card style={{ borderColor: theme.warning, borderWidth: 1 }}>
           <Text style={{ color: theme.warningText, fontWeight: '600' }}>
-            {reason === 'coach'
-              ? t('upgrade.coachLocked')
-              : reason === 'equipment'
-                ? t('upgrade.equipmentLocked')
-                : t('upgrade.quotaHit', { used: used ?? 0, limit: limit ?? 0 })}
+            {reasonText(t, reason, used ?? 0, limit ?? 0)}
           </Text>
         </Card>
       ) : null}
@@ -196,6 +211,7 @@ export default function Upgrade() {
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '600' }}>
                 {t(`upgrade.features.${f.key}.title`)}
+                {f.tier === 'proPlus' ? <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800' }}>{`  ${t('upgrade.tierProPlus')}`}</Text> : null}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
                 {t(`upgrade.features.${f.key}.body`)}
@@ -279,6 +295,11 @@ export default function Upgrade() {
                 )}
               </View>
               <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }}>{row.desc}</Text>
+              {row.id !== 'free' && trialDaysFor(row.id) ? (
+                <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700', marginTop: 6 }}>
+                  {t('upgrade.trialBadge', { days: trialDaysFor(row.id) })}
+                </Text>
+              ) : null}
               {!plans && row.id === 'pro' && yearly > 0 && (
                 <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '700', marginTop: 6 }}>
                   {savePct > 0

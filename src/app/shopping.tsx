@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/brand-header';
 import { ActionButton, Chip, EmptyState, IconTile, Segmented, SettingsRow } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { useGatedScreen } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { servingCountLabel, servingPluralCount } from '@/lib/recipes';
@@ -65,6 +66,7 @@ export default function Shopping() {
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
   const theme = useTheme();
   const router = useRouter();
+  const allowed = useGatedScreen('shopping');
 
   const recipes = useAllRecipes();
   const mealPlanRecipes = useAppStore((s) => s.mealPlanRecipes);
@@ -119,6 +121,8 @@ export default function Shopping() {
   const started = !!shopping;
   const missing = plannedTotal - meals.length;
   const rangeLabel = t('shopping.rangeLabel', { from: readableDate(range.fromKey, locale), to: readableDate(range.toKey, locale) });
+
+  if (!allowed) return null;
 
   return (
     <Screen

@@ -24,8 +24,9 @@ import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card'
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
-import { analyzeCoachAttachment, coachChat, FeatureLockedError, isMockMode, QuotaError } from '@/lib/api';
+import { analyzeCoachAttachment, coachChat, FeatureLockedError, isMockMode, lockReason, QuotaError } from '@/lib/api';
 import { aiFailureAction } from '@/lib/api-errors';
 import { applyCoachAction } from '@/lib/coach-actions';
 import { resolveCoachSchedule } from '@/lib/coach-schedule';
@@ -90,6 +91,7 @@ export default function Coach() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [attachStage, setAttachStage] = useState<'idle' | 'picking' | 'reading'>('idle');
+  const gate = usePlanGate();
   const [openDrafts, setOpenDrafts] = useState<number[]>([]);
   const scrollRef = useRef<ScrollView>(null);
   // Undo closures for actions applied in this visit, keyed message-action;
@@ -286,6 +288,9 @@ export default function Coach() {
   // coach keeps for future conversations — a "teach" action, not a reply.
   const attachDocument = async () => {
     if (attachStage === 'picking' || attachStage === 'reading') return;
+    // Documents the coach remembers are Pro+ once plan locks are on; the
+    // ones already kept stay in its memory on any plan.
+    if (!gate.guard('coachDocs')) return;
     if (referenceDocs.length >= MAX_COACH_REFERENCE_DOCS) {
       Alert.alert(t('coach.attachLimitTitle'), t('coach.attachLimitBody', { count: MAX_COACH_REFERENCE_DOCS }));
       return;
@@ -313,7 +318,7 @@ export default function Coach() {
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         setAttachStage('idle');
-        router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : lockReason(err)}`);
         return;
       }
       const action = aiFailureAction(err, { titleKey: 'coach.attachErrorInvalidFile', bodyKey: 'coach.attachErrorFailed' });
@@ -525,7 +530,7 @@ export default function Coach() {
               accessibilityLabel={t('coach.attach')}
               style={styles.attachBtn}
             >
-              <Icon name="attach" size={22} color={theme.textSecondary} />
+              <Icon name={gate.isOpen('coachDocs') ? 'attach' : 'lock-closed'} size={22} color={theme.textSecondary} />
             </Pressable>
           )}
           <TextInput

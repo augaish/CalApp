@@ -13,9 +13,10 @@ import { IconTile, InfoLine, Segmented } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
 import { Button, Field, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { displayToKg, formatWeight, kgToDisplay, weightUnit } from '@/lib/units';
-import { AiConsentDeclinedError, analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeBodyReading, ApiError, FeatureLockedError, lockReason, QuotaError } from '@/lib/api';
 import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { useEntitlement } from '@/lib/entitlement';
 import { successHaptic } from '@/lib/feedback';
@@ -82,6 +83,9 @@ export default function BodyReading() {
   const theme = useTheme();
   const router = useRouter();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
+  // Typing a reading in stays free; reading a report with AI is Pro.
+  const gate = usePlanGate();
+  const canScan = gate.isOpen('bodyReading');
 
   const language = useAppStore((s) => s.language) ?? 'en';
   const profile = useAppStore((s) => s.profile);
@@ -239,7 +243,7 @@ export default function BodyReading() {
       if (err instanceof QuotaError || err instanceof FeatureLockedError) {
         useEntitlement.getState().refresh();
         setUploadStage('idle');
-        router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : 'coach'}`);
+        router.push(`/membership?reason=${err instanceof QuotaError ? 'quota' : lockReason(err)}`);
         return;
       }
       setUploadStage('error');
@@ -385,7 +389,10 @@ export default function BodyReading() {
           { key: 'photo', label: t('bodyReading.readFromPhoto') },
         ]}
         value={mode}
-        onChange={setMode}
+        onChange={(m) => {
+          if (m === 'photo' && !gate.guard('bodyReading')) return;
+          setMode(m);
+        }}
         style={{ marginBottom: Spacing.md }}
       />
 
@@ -413,17 +420,17 @@ export default function BodyReading() {
           <Button
             label={source === 'scan' ? t('bodyReading.rescan') : t('bodyReading.photographReport')}
             variant="secondary"
-            icon="camera-outline"
-            onPress={() => router.push('/scan?mode=body')}
+            icon={canScan ? 'camera-outline' : 'lock-closed'}
+            onPress={() => gate.guard('bodyReading') && router.push('/scan?mode=body')}
           />
           {documentPickerAvailable && (
             <>
               <Button
                 label={t('bodyReading.uploadPdf')}
                 variant="ghost"
-                icon="document-attach-outline"
+                icon={canScan ? 'document-attach-outline' : 'lock-closed'}
                 loading={uploadStage === 'picking' || uploadStage === 'analyzing'}
-                onPress={uploadPdf}
+                onPress={() => gate.guard('bodyReading') && uploadPdf()}
                 style={{ marginTop: Spacing.xs }}
               />
               {uploadStage !== 'idle' && <UploadProgress stage={uploadStage} error={uploadError} />}

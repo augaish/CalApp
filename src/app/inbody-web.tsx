@@ -9,7 +9,8 @@ import { alertProblem } from '@/lib/alerts';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { AiConsentDeclinedError, analyzeBodyReading, ApiError, FeatureLockedError, QuotaError } from '@/lib/api';
+import { AiConsentDeclinedError, analyzeBodyReading, ApiError, FeatureLockedError, lockReason, QuotaError } from '@/lib/api';
+import type { LockReason } from '@/lib/api-errors';
 import { useEntitlement } from '@/lib/entitlement';
 import { webviewAvailable, viewShotAvailable } from '@/lib/native-modules';
 import { usePending } from '@/lib/pending';
@@ -56,7 +57,7 @@ export default function InBodyWeb() {
     );
   }, []);
 
-  const onLocked = (reason: 'quota' | 'coach') => {
+  const onLocked = (reason: LockReason) => {
     useEntitlement.getState().refresh();
     router.replace(`/membership?reason=${reason}`);
   };
@@ -77,7 +78,7 @@ export default function InBodyWeb() {
         return;
       }
       if (err instanceof QuotaError) return onLocked('quota');
-      if (err instanceof FeatureLockedError) return onLocked('coach');
+      if (err instanceof FeatureLockedError) return onLocked(lockReason(err));
       alertProblem(
         err instanceof ApiError
           ? t(

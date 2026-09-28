@@ -33,8 +33,8 @@ const body = (page) => page.evaluate(() => document.body.innerText);
 {
   const { ctx, page } = await open('/membership');
   const b = await body(page);
-  check('title and promise', /Get more from Calgym/.test(b) && /Scan without limits/.test(b));
-  check('all five benefits listed', ['scan', 'describe', 'equipment', 'coach', 'limits'].length === 5 && /AI Coach|coach/i.test(b), '');
+  check('title and promise', /Get more from Calgym/.test(b) && /More AI every month/.test(b));
+  check('all six benefits listed, Pro+ ones tagged', ['More AI every month', 'Recipes, meal plans, shopping', 'Every schedule, all your history', 'AI program builder', 'A coach that remembers', 'Highest accuracy'].every((x) => b.includes(x)) && /Pro\+/.test(b), '');
   check('web: says subscriptions are coming, no buy button that cannot work', /Subscriptions coming soon/.test(b));
   check('"Have a code?" and "Compare plans" are offered', /Have a code\?/.test(b) && /Compare plans/.test(b));
   await page.screenshot({ path: `${OUT}/sheet.png` });

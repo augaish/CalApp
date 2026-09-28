@@ -8,6 +8,7 @@ import {Pressable, StyleSheet, Text, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { Spacing } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { disconnectWhoop, fetchWhoopStatus, whoopAuthorizeUrl } from '@/lib/api';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
@@ -72,9 +73,12 @@ export function WhoopConnectionRow() {
   const theme = useTheme();
   const [status, refresh] = useWhoopStatus();
   const [busy, setBusy] = useState(false);
+  // A new connection is Pro once plan locks are on; one already made keeps syncing.
+  const gate = usePlanGate();
 
   const connect = async () => {
     if (busy) return;
+    if (!gate.guard('whoop')) return;
     setBusy(true);
     try {
       const result = await WebBrowser.openAuthSessionAsync(whoopAuthorizeUrl(), 'calapp://whoop-callback');
@@ -136,6 +140,9 @@ export function WhoopConnectionRow() {
               ? t('profile.whoopConnected')
               : t('profile.connect')}
         </Text>
+        {status !== 'connected' && status !== 'loading' && !gate.isOpen('whoop') ? (
+          <Icon name="lock-closed" size={12} color={theme.primary} />
+        ) : null}
       </View>
     </Pressable>
   );
@@ -147,5 +154,5 @@ export const connectionStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   connRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, paddingVertical: 8 },
-  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, flexDirection: 'row', alignItems: 'center', gap: 4 },
 });

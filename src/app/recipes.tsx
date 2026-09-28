@@ -10,6 +10,7 @@ import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, EmptyState, SearchField, StatusPill } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { generateRecipe } from '@/lib/api';
 import { aiFailureAction } from '@/lib/api-errors';
@@ -77,6 +78,11 @@ export default function Recipes() {
   const [filter, setFilter] = useState<Filter>('all');
   const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
+  // Browsing, cooking and logging stay open on every plan; writing a new
+  // recipe, by hand or with AI, is a Pro feature once plan locks are on.
+  const gate = usePlanGate();
+  const canCreate = gate.isOpen('recipes');
+  const addMine = () => gate.guard('recipes') && router.push('/recipe-edit');
 
   const library = [...recipes].sort(libraryOrder);
   const needsReview = library.filter((r) => r.reviewStatus === 'needs_review').length;
@@ -161,8 +167,8 @@ export default function Recipes() {
       footer={
         <View>
           <View style={styles.footerRow}>
-            <Button label={t('recipes.createWithAi')} icon="sparkles" onPress={() => setCreating((v) => !v)} style={{ flex: 1 }} />
-            <Button label={t('recipes.addMineShort')} icon="add" variant="secondary" onPress={() => router.push('/recipe-edit')} style={{ flex: 1 }} />
+            <Button label={t('recipes.createWithAi')} icon={canCreate ? 'sparkles' : 'lock-closed'} onPress={() => gate.guard('recipes') && setCreating((v) => !v)} style={{ flex: 1 }} />
+            <Button label={t('recipes.addMineShort')} icon={canCreate ? 'add' : 'lock-closed'} variant="secondary" onPress={addMine} style={{ flex: 1 }} />
           </View>
           <Text style={{ color: theme.textTertiary, fontSize: 12, textAlign: 'center', marginTop: 6 }}>{t('recipes.savedNote')}</Text>
         </View>
@@ -257,7 +263,7 @@ export default function Recipes() {
           icon="restaurant-outline"
           title={query.trim() ? t('recipes.noMatches', { query: query.trim() }) : filter === 'mine' ? t('recipes.mineEmptyTitle') : t('recipes.noneInFilter')}
           body={filter === 'mine' && !query.trim() ? t('recipes.mineEmpty') : undefined}
-          action={filter === 'mine' && !query.trim() ? { label: t('recipes.addMine'), icon: 'add', onPress: () => router.push('/recipe-edit') } : undefined}
+          action={filter === 'mine' && !query.trim() ? { label: t('recipes.addMine'), icon: canCreate ? 'add' : 'lock-closed', onPress: addMine } : undefined}
           secondary={filter === 'mine' && !query.trim() ? { label: t('recipes.createWithAi'), icon: 'sparkles', onPress: () => setCreating(true) } : undefined}
           compact
         />

@@ -11,6 +11,8 @@ import { useWhoopStatus } from '@/components/connections';
 import { Chip, IconTile, RowGroup, SettingsRow } from '@/components/system';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
+import { FREE_TREND_DAYS } from '@/lib/plan-gates';
 import { useTheme } from '@/hooks/use-theme';
 import { formatWeight, formatWeightDelta, kgToDisplay, weightUnit } from '@/lib/units';
 import { buildExport } from '@/lib/account';
@@ -57,6 +59,9 @@ export default function Health() {
   const profile = useAppStore((s) => s.profile);
   const [range, setRange] = useState<(typeof RANGES)[number]>(30);
   const [pickingRange, setPickingRange] = useState(false);
+  // Free sees the last 30 days once plan locks are on; longer history is Pro.
+  const gate = usePlanGate();
+  const longHistory = gate.isOpen('trends');
   const [whoop] = useWhoopStatus();
   const heroTarget = useTourTarget('health.hero');
 
@@ -156,8 +161,10 @@ export default function Health() {
             <Chip
               key={d}
               label={t('health.lastDays', { days: d })}
+              icon={d > FREE_TREND_DAYS && !longHistory ? 'lock-closed' : undefined}
               selected={range === d}
               onPress={() => {
+                if (d > FREE_TREND_DAYS && !gate.guard('trends')) return;
                 setRange(d);
                 setPickingRange(false);
               }}

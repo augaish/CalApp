@@ -141,12 +141,15 @@ export function decide(event: RevenueCatEvent, mapping = DEFAULT_MAPPING): Billi
   if (ENTITLING.has(type)) {
     const plan = planFor(event, mapping);
     if (!plan) return { kind: 'ignore', reason: 'unmapped_product' };
+    // A free-trial period keeps a ':trial' mark on the plan's source, which
+    // gives it the trial's smaller allowance until the first paid renewal.
+    const trial = (event.period_type ?? '').toUpperCase() === 'TRIAL';
     return {
       kind: 'grant',
       ref,
       plan,
       until: msToIso(event.expiration_at_ms),
-      note: `revenuecat:${type.toLowerCase()}`,
+      note: `revenuecat:${type.toLowerCase()}${trial ? ':trial' : ''}`,
     };
   }
 
@@ -173,6 +176,8 @@ export interface SubscriberRecord {
       string,
       { expires_date?: string | null; product_identifier?: string | null } | undefined
     >;
+    /** Per product: whether the current period is a free trial ('trial'). */
+    subscriptions?: Record<string, { period_type?: string | null } | undefined>;
   };
 }
 
@@ -180,8 +185,8 @@ export function planFromSubscriber(
   record: SubscriberRecord,
   now: Date = new Date(),
   mapping = DEFAULT_MAPPING,
-): { plan: Plan; until: string | null; productId: string | null } | null {
-  let best: { plan: Plan; until: string | null; productId: string | null } | null = null;
+): { plan: Plan; until: string | null; productId: string | null; trial: boolean } | null {
+  let best: { plan: Plan; until: string | null; productId: string | null; trial: boolean } | null = null;
   for (const [id, ent] of Object.entries(record.subscriber?.entitlements ?? {})) {
     if (!ent) continue;
     const expires = ent.expires_date ? new Date(ent.expires_date) : null;
@@ -189,7 +194,9 @@ export function planFromSubscriber(
     const plan = planFor({ entitlement_ids: [id], product_id: ent.product_identifier ?? '' }, mapping);
     if (!plan) continue;
     if (!best || (plan === 'proPlus' && best.plan !== 'proPlus')) {
-      best = { plan, until: expires ? expires.toISOString() : null, productId: ent.product_identifier ?? null };
+      const productId = ent.product_identifier ?? null;
+      const period = productId ? record.subscriber?.subscriptions?.[productId]?.period_type : null;
+      best = { plan, until: expires ? expires.toISOString() : null, productId, trial: (period ?? '').toLowerCase() === 'trial' };
     }
   }
   return best;

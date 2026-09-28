@@ -25,6 +25,8 @@ export interface StorePackageLike {
     currencyCode: string;
     subscriptionPeriod?: string | null;
     subscriptionOptions?: { id: string; storeProductId?: string; isBasePlan?: boolean }[] | null;
+    /** The store's introductory offer, if the product has one. */
+    introPrice?: { price: number; periodUnit: string; periodNumberOfUnits: number; cycles?: number } | null;
   };
 }
 
@@ -114,4 +116,28 @@ export const APP_STORE_ID = '6793969631';
  */
 export function offerCodeUrl(code: string): string {
   return `https://apps.apple.com/redeem?ctx=offercodes&id=${APP_STORE_ID}&code=${encodeURIComponent(code.trim())}`;
+}
+
+/**
+ * Days of free trial a product's introductory offer gives, or null when it has
+ * none (or its intro is a discount rather than free). Whether this person may
+ * still take it is a separate question — see trialEligibility.
+ */
+export function freeTrialDays(pkg: StorePackageLike | null | undefined): number | null {
+  const intro = pkg?.product.introPrice;
+  if (!intro || intro.price !== 0) return null;
+  const n = intro.periodNumberOfUnits * Math.max(1, intro.cycles ?? 1);
+  if (!(n > 0)) return null;
+  switch (intro.periodUnit.toUpperCase()) {
+    case 'DAY':
+      return n;
+    case 'WEEK':
+      return n * 7;
+    case 'MONTH':
+      return n * 30;
+    case 'YEAR':
+      return n * 365;
+    default:
+      return null;
+  }
 }

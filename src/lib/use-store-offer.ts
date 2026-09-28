@@ -11,18 +11,25 @@ import {
   purchase,
   purchasesStatus,
   restorePurchases,
+  trialEligibility,
   type LoadedPlans,
 } from '@/lib/purchases';
-import type { BillingPeriod, PaidTier } from '@/lib/store-plans';
+import { freeTrialDays, type BillingPeriod, type PaidTier } from '@/lib/store-plans';
 
-/** What membership adds, in the order both the sheet and the full page list it. */
-export const MEMBERSHIP_FEATURES: { icon: keyof typeof Ionicons.glyphMap; key: string }[] = [
+/**
+ * What membership adds, in the order both the sheet and the full page list
+ * it. `tier` marks the ones only Pro+ includes.
+ */
+export const MEMBERSHIP_FEATURES: { icon: keyof typeof Ionicons.glyphMap; key: string; tier?: 'proPlus' }[] = [
   { icon: 'camera', key: 'scan' },
-  { icon: 'sparkles', key: 'describe' },
-  { icon: 'barbell', key: 'equipment' },
-  { icon: 'chatbubbles', key: 'coach' },
-  { icon: 'infinite', key: 'limits' },
+  { icon: 'restaurant', key: 'planning' },
+  { icon: 'calendar', key: 'schedules' },
+  { icon: 'sparkles', key: 'program' },
+  { icon: 'chatbubbles', key: 'memory', tier: 'proPlus' },
+  { icon: 'ribbon', key: 'accuracy', tier: 'proPlus' },
 ];
+
+export { reasonText, reasonWantsProPlus } from '@/lib/plan-gates';
 
 /**
  * Everything a screen needs to sell a plan from the store: the store's plans
@@ -40,6 +47,7 @@ export function useStoreOffer() {
   const [period, setPeriod] = useState<BillingPeriod>('monthly');
   const [tier, setTier] = useState<PaidTier>(plan === 'pro' ? 'proPlus' : 'pro');
   const [busy, setBusy] = useState<'buy' | 'restore' | null>(null);
+  const [eligible, setEligible] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let live = true;
@@ -50,6 +58,10 @@ export function useStoreOffer() {
       if (!live) return;
       setStore(loaded);
       setStoreChecked(true);
+      // Only products that offer a free trial need asking about.
+      const withTrial = (loaded?.packages ?? []).filter((p) => freeTrialDays(p) != null).map((p) => p.product.identifier);
+      const found = await trialEligibility(withTrial);
+      if (live) setEligible(found);
     })();
     return () => {
       live = false;
@@ -73,6 +85,14 @@ export function useStoreOffer() {
     if (!pkg) return null;
     const annual = pkg === plans[id].annual;
     return { main: pkg.product.priceString, unit: annual ? t('upgrade.perYearStore') : t('upgrade.perMonthStore') };
+  };
+
+  /** Days of free trial the selected period's package gives this person, or null. */
+  const trialDaysFor = (id: PaidTier): number | null => {
+    if (!plans) return null;
+    const pkg = plans[id][shownPeriod] ?? plans[id].monthly;
+    if (!pkg || !eligible[pkg.product.identifier]) return null;
+    return freeTrialDays(pkg);
   };
 
   /** Buys the selected plan; `onDone` runs after the person dismisses the thank-you. */
@@ -114,6 +134,7 @@ export function useStoreOffer() {
     setTier,
     selectedPkg,
     priceFor,
+    trialDaysFor,
     storeName,
     busy,
     buy,

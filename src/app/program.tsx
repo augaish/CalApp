@@ -9,6 +9,7 @@ import { MealPlanCard } from '@/components/meal-plan-card';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { Button, Card, MacroTile, Screen, Title } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { generateProgram, isMockMode } from '@/lib/api';
 import { aiFailureAction } from '@/lib/api-errors';
@@ -48,8 +49,13 @@ export default function ProgramScreen() {
 
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState<GeneratedProgram | null>(null);
+  // A program already accepted stays on every plan; designing a new one is
+  // Pro (one a month) or Pro+ once plan locks are on.
+  const gate = usePlanGate();
+  const canBuild = gate.isOpen('program');
 
   const build = async () => {
+    if (!gate.guard('program')) return;
     setBusy(true);
     try {
       const context = await buildCoachContext(language);
@@ -255,7 +261,7 @@ export default function ProgramScreen() {
         <Button
           label={busy ? t('program.building') : t('program.regenerate')}
           variant="secondary"
-          icon="refresh"
+          icon={canBuild ? 'refresh' : 'lock-closed'}
           loading={busy}
           onPress={build}
           style={{ marginTop: Spacing.md }}
@@ -271,7 +277,7 @@ export default function ProgramScreen() {
       footer={
         <Button
           label={busy ? t('program.building') : t('program.build')}
-          icon="sparkles"
+          icon={canBuild ? 'sparkles' : 'lock-closed'}
           loading={busy}
           onPress={build}
         />

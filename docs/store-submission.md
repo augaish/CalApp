@@ -55,7 +55,7 @@ EN:
 >
 > Works as a guest — no account needed. English and Arabic.
 >
-> Calgym Pro and Pro+ are optional auto-renewing subscriptions with larger monthly AI allowances. Payment is charged to your Apple ID at confirmation. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period; manage them in Settings → Apple ID → Subscriptions.
+> Calgym Pro and Pro+ are optional auto-renewing subscriptions. Pro adds a larger monthly AI allowance, recipes, meal plans, the shopping list, unlimited saved schedules and full history; Pro+ adds more AI, unlimited AI programs, a coach that remembers your documents and the most accurate meal analysis. The yearly plans may start with a 7-day free trial for new subscribers. Payment is charged to your Apple ID at confirmation. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period; manage them in Settings → Apple ID → Subscriptions.
 > Terms: https://calapp-production-ab20.up.railway.app/terms · Privacy: https://calapp-production-ab20.up.railway.app/privacy
 >
 > Calorie and nutrition figures are AI estimates and may be inaccurate. Not medical advice.
@@ -186,15 +186,15 @@ Do these in order. Only the sandbox purchase test at the end waits for the bank 
 - **Levels:** Pro+ is level 1 (the higher tier) and Pro is level 2. This is what makes a switch from Pro to Pro+ an immediate upgrade, and Pro+ to Pro a downgrade at renewal.
 - **Prices:** pick the price with **Saudi Arabia** as the base country and let Apple fill in the other countries. The price you choose is what the customer pays, VAT included; Apple deducts the VAT. These prices cover Apple's 15% (Small Business Program), a 15% partner commission, VAT and AI costs; the break-even math is in [step-by-step.md](step-by-step.md). Set the same numbers in the admin page → Membership so the paywall shows them before the store prices load.
 - **Family Sharing:** leave it **off**. Once turned on, it can't be turned off.
-- **Introductory offers / free trials:** add **none** for now. The paywall doesn't describe trial terms yet, and Apple rejects a trial that isn't explained on the purchase screen. If you want trials later, tell me first and I'll add the wording.
+- **Introductory offers / free trials:** a 1-week **Free** introductory offer on the two **yearly** products only, none on the monthly ones. The paywall states the trial length, the price after it and how to cancel, and shows it only to eligible people. Steps are in [step-by-step.md](step-by-step.md).
 - **Availability:** all countries and regions.
 
 **Localizations** (display name up to 30 characters, description up to 45)
 
 | Product | English name | English description | Arabic name | Arabic description |
 |---|---|---|---|---|
-| Pro Monthly | Calgym Pro | 150 AI actions a month and the AI coach | كالجيم برو | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
-| Pro Yearly | Calgym Pro (Yearly) | 150 AI actions a month and the AI coach | كالجيم برو (سنوي) | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Pro Monthly | Calgym Pro | 50 AI actions a month and meal planning | كالجيم برو | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
+| Pro Yearly | Calgym Pro (Yearly) | 50 AI actions a month and meal planning | كالجيم برو (سنوي) | ٥٠ عملية ذكاء اصطناعي شهرياً وتخطيط الوجبات |
 | Pro+ Monthly | Calgym Pro+ | 400 AI actions a month and the AI coach | كالجيم برو+ | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
 | Pro+ Yearly | Calgym Pro+ (Yearly) | 400 AI actions a month and the AI coach | كالجيم برو+ (سنوي) | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
 

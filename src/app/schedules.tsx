@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/brand-header';
 import { ActionButton, EmptyState, IconTile, InfoLine, StatusPill } from '@/components/system';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
 import { useAppStore } from '@/lib/store';
@@ -61,8 +62,13 @@ export default function Schedules() {
   const [renameDraft, setRenameDraft] = useState('');
 
   const current = weekSize(schedule);
+  // Free keeps one saved week once plan locks are on; more is Pro. Saved
+  // weeks beyond that stay, to switch between, rename or delete.
+  const gate = usePlanGate();
+  const canSaveNew = gate.isOpen('schedules', { savedSchedules: saved.length });
   // A first save gets a name to start from, so one tap keeps the week.
   const startNaming = () => {
+    if (!gate.guard('schedules', { savedSchedules: saved.length })) return;
     if (!newName.trim() && saved.length === 0) setNewName(t('schedules.defaultName'));
     setNaming(true);
   };
@@ -127,7 +133,7 @@ export default function Schedules() {
           // being trained — so it says that.
           <Button
             label={saved.length === 0 && current.exercises > 0 ? t('schedules.saveThisWeek') : t('schedules.newSchedule')}
-            icon={saved.length === 0 && current.exercises > 0 ? 'bookmark-outline' : 'add'}
+            icon={!canSaveNew ? 'lock-closed' : saved.length === 0 && current.exercises > 0 ? 'bookmark-outline' : 'add'}
             onPress={startNaming}
           />
         )

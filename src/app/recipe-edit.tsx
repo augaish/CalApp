@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
+import { useGatedScreen } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
 import { resolveIngredientKey } from '@/lib/ingredients';
@@ -71,6 +72,7 @@ export default function RecipeEdit() {
   const addRecipe = useAppStore((s) => s.addRecipe);
   const updateRecipe = useAppStore((s) => s.updateRecipe);
   const existing = id ? recipes.find((r) => r.id === id) : undefined;
+  const allowed = useGatedScreen('recipes', !existing);
 
   const [name, setName] = useState(existing?.name ?? '');
   const [servings, setServings] = useState(String(existing?.servings ?? 2));
@@ -188,6 +190,8 @@ export default function RecipeEdit() {
   const unknownRows = rows.filter(
     (r) => (r.name.trim() || num(r.amount)) && ![r.calories, r.proteinG, r.carbsG, r.fatG].every((v) => num(v) != null),
   ).length;
+
+  if (!allowed) return null;
 
   return (
     <Screen

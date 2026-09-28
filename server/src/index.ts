@@ -13,10 +13,12 @@ import {
   featureLocked,
   PLANS,
   planLimits,
+  planLocksOn,
   planPrices,
   quotaError,
   release,
   reserve,
+  trialLimit,
   type Access,
   type AiProvider,
   type Plan,
@@ -1533,8 +1535,9 @@ app.post('/api/coach-attachment', async (c) => {
   const parsed = parseBodyReadingBody(await c.req.json<CoachAttachmentBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
   const ref = (await callerRef(c))!;
-  const access = await checkAccess(ref, 'coach');
-  if (!access.spec.coach) return c.json(featureLocked(access), 403);
+  // Documents the coach keeps as memory are a Pro+ feature once locks are on.
+  const access = await checkAccess(ref, 'coachDocs', 'coach');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   const claim = await reserve(ref, access, 'coach');
   if (!claim.ok) {
     return claim.reason === 'cap'
@@ -1664,7 +1667,8 @@ app.post('/api/generate-program', async (c) => {
   const access = await checkAccess(ref, 'program');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   const claim = await reserve(ref, access, 'program');
-  if (!claim.ok) return c.json(quotaError(access), 402);
+  // 'cap' is the month's programme designs used up, not the allowance.
+  if (!claim.ok) return claim.reason === 'cap' ? c.json(featureLocked(access), 403) : c.json(quotaError(access), 402);
   const system = programPrompt(language, contextText(body.context));
   try {
     const program = await withProviderFallback('/api/generate-program', await providerFor(access), {
@@ -1739,10 +1743,13 @@ app.get('/api/me', async (c) => {
     planLimits(),
     actionWeights(),
   ]);
-  const coachUsed =
-    ref && typeof access.spec.coachCap === 'number'
-      ? await getUsageKind(ref, 'coach', access.period)
-      : 0;
+  const [coachUsed, programUsed] = ref
+    ? await Promise.all([
+        typeof access.spec.coachCap === 'number' ? getUsageKind(ref, 'coach', access.period) : 0,
+        access.spec.programs !== null ? getUsageKind(ref, 'program', access.period) : 0,
+      ])
+    : [0, 0];
+  const programWeight = weights.program ?? 1;
   // The app sends this on every launch — guest or signed-in — so it is the
   // one place a device gets recorded for every account the admin table shows,
   // not only the ones that reach a sign-in screen. Best-effort: a failed
@@ -1762,7 +1769,17 @@ app.get('/api/me', async (c) => {
       highAccuracy: access.spec.highAccuracy,
       coachCap: access.spec.coachCap ?? null,
       coachUsed,
+      recipes: access.spec.recipes,
+      bodyReading: access.spec.bodyReading,
+      coachDocs: access.spec.coachDocs,
+      // Programme designs a month (null = no separate cap) and how many are used.
+      programs: access.spec.programs,
+      programsUsed: Math.floor(programUsed / Math.max(1, programWeight)),
     },
+    // Plan locks on: the app locks what the plan doesn't include. Off: every
+    // feature stays open, as before plans had features of their own.
+    locks: access.locks,
+    trial: access.trial,
     // What the upgrade screen should show. Editable from the admin page so
     // a price change doesn't need an app release — but note it only changes
     // the DISPLAY: the amount actually charged comes from the store product.
@@ -1770,6 +1787,7 @@ app.get('/api/me', async (c) => {
       ...prices,
       limits,
       coachCap: PLANS.free.coachCap ?? null,
+      trialLimit: await trialLimit(),
     },
     // What each action costs against the allowance, so the app can say "this
     // uses 5 of your credits" before spending them rather than after.
@@ -1946,7 +1964,7 @@ app.post('/api/billing/sync', async (c) => {
     });
     if (!res.ok) return c.json({ ok: false, result: `revenuecat_${res.status}` });
     const found = planFromSubscriber((await res.json()) as SubscriberRecord);
-    if (found) await setUserPlan(ref, found.plan, 'revenuecat:sync', found.until);
+    if (found) await setUserPlan(ref, found.plan, found.trial ? 'revenuecat:sync:trial' : 'revenuecat:sync', found.until);
     const access = await checkAccess(ref, 'coach');
     return c.json({
       ok: true,
@@ -2298,7 +2316,7 @@ function adminOk(c: { req: { header: (n: string) => string | undefined; query: (
 
 app.get('/admin/api/data', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const [stats, users, limits, sponsor, shadowTests, providers, prices, weights] =
+  const [stats, users, limits, sponsor, shadowTests, providers, prices, weights, locks, trial] =
     await Promise.all([
       adminStats(),
       listUsers(),
@@ -2308,11 +2326,15 @@ app.get('/admin/api/data', async (c) => {
       aiProviders(deepseekConfigured()),
       planPrices(),
       actionWeights(),
+      planLocksOn(),
+      trialLimit(),
     ]);
   return c.json({
     stats,
     users,
     limits,
+    planLocks: locks,
+    trialLimit: trial,
     sponsor,
     plans: PLANS,
     cache: cacheEnabled,
@@ -2495,17 +2517,26 @@ app.post('/admin/api/plan', async (c) => {
 app.post('/admin/api/limits', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req
-    .json<{ free?: number; pro?: number; proPlus?: number }>()
+    .json<{ free?: number; pro?: number; proPlus?: number; trial?: number }>()
     .catch(() => ({}) as never);
-  const cur = await planLimits();
+  const [cur, curTrial] = await Promise.all([planLimits(), trialLimit()]);
   const pick = (v: unknown, fallback: number) =>
     Number.isFinite(v) ? Math.max(0, Number(v)) : fallback;
   await setSetting('plan_limits', {
     free: pick(body.free, cur.free),
     pro: pick(body.pro, cur.pro),
     proPlus: pick(body.proPlus, cur.proPlus),
+    trial: pick(body.trial, curTrial),
   });
-  return c.json({ ok: true, limits: await planLimits() });
+  return c.json({ ok: true, limits: await planLimits(), trialLimit: await trialLimit() });
+});
+
+/** Turn per-plan feature locks on or off. Off until the store can sell. */
+app.post('/admin/api/plan-locks', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ on?: boolean }>().catch(() => ({}) as { on?: boolean });
+  await setSetting('plan_locks', { on: body.on === true });
+  return c.json({ ok: true, on: await planLocksOn() });
 });
 
 /** Every code with its counters, newest first. */

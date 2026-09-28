@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +13,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { SERVER_URL } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
 import { annualSaving, type PaidTier } from '@/lib/store-plans';
-import { MEMBERSHIP_FEATURES, useStoreOffer } from '@/lib/use-store-offer';
+import { MEMBERSHIP_FEATURES, reasonText, reasonWantsProPlus, useStoreOffer } from '@/lib/use-store-offer';
 
 /**
  * The membership sheet: what membership adds, the store's price and a way to
@@ -28,18 +29,26 @@ export default function Membership() {
   const { reason } = useLocalSearchParams<{ reason?: string }>();
   const used = useEntitlement((s) => s.used);
   const limit = useEntitlement((s) => s.limit);
+  const plan = useEntitlement((s) => s.plan);
   const offer = useStoreOffer();
-  const { plans, storeChecked, serverSells, needsUpdate, hasAnnual, period, setPeriod, tier, setTier, selectedPkg, priceFor, storeName, busy } = offer;
+  const { plans, storeChecked, serverSells, needsUpdate, hasAnnual, period, setPeriod, tier, setTier, selectedPkg, priceFor, trialDaysFor, storeName, busy } = offer;
+
+  // Something only Pro+ includes opens the sheet on Pro+.
+  const wantsProPlus = reasonWantsProPlus(reason, plan);
+  useEffect(() => {
+    if (wantsProPlus) setTier('proPlus');
+  }, [wantsProPlus, setTier]);
 
   // Opened by a link with nothing behind it, closing lands on Overview.
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const tiers = (['pro', 'proPlus'] as PaidTier[]).filter((id) => !plans || plans[id].monthly || plans[id].annual);
   const price = selectedPkg ? priceFor(tier) : null;
+  const trialDays = selectedPkg ? trialDaysFor(tier) : null;
   const forward = i18n.dir?.() === 'rtl' ? 'chevron-back' : 'chevron-forward';
 
   const primary = plans && selectedPkg ? (
     <Button
-      label={t('upgrade.subscribe', { price: price ? `${price.main} ${price.unit}` : '' })}
+      label={trialDays ? t('upgrade.startTrial', { days: trialDays }) : t('upgrade.subscribe', { price: price ? `${price.main} ${price.unit}` : '' })}
       loading={busy === 'buy'}
       disabled={busy !== null}
       onPress={() => offer.buy(close)}
@@ -82,13 +91,7 @@ export default function Membership() {
 
           {reason ? (
             <View style={[styles.reason, { backgroundColor: theme.cardSubtle, borderColor: theme.warning }]}>
-              <Text style={{ color: theme.warningText, fontWeight: '600' }}>
-                {reason === 'coach'
-                  ? t('upgrade.coachLocked')
-                  : reason === 'equipment'
-                    ? t('upgrade.equipmentLocked')
-                    : t('upgrade.quotaHit', { used: used ?? 0, limit: limit ?? 0 })}
-              </Text>
+              <Text style={{ color: theme.warningText, fontWeight: '600' }}>{reasonText(t, reason, used ?? 0, limit ?? 0)}</Text>
             </View>
           ) : null}
 
@@ -99,7 +102,14 @@ export default function Membership() {
                   <Icon name={f.icon} size={18} color={theme.primary} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{t(`upgrade.features.${f.key}.title`)}</Text>
+                  <View style={styles.featureTitle}>
+                    <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15, flexShrink: 1 }}>{t(`upgrade.features.${f.key}.title`)}</Text>
+                    {f.tier === 'proPlus' ? (
+                      <View style={[styles.tierTag, { backgroundColor: theme.cardSubtle }]}>
+                        <Text style={{ color: theme.primary, fontSize: 11, fontWeight: '800' }}>{t('upgrade.tierProPlus')}</Text>
+                      </View>
+                    ) : null}
+                  </View>
                   <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18 }}>{t(`upgrade.features.${f.key}.body`)}</Text>
                 </View>
               </View>
@@ -146,6 +156,9 @@ export default function Membership() {
                           {p.main} <Text style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}>{p.unit}</Text>
                         </Text>
                       ) : null}
+                      {trialDaysFor(id) ? (
+                        <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 12, marginTop: 2 }}>{t('upgrade.trialBadge', { days: trialDaysFor(id) })}</Text>
+                      ) : null}
                     </Pressable>
                   );
                 })}
@@ -183,6 +196,13 @@ export default function Membership() {
         </ScrollView>
 
         <View style={{ paddingTop: Spacing.sm, paddingBottom: insets.bottom + Spacing.sm }}>
+          {trialDays && price ? (
+            // Apple requires the trial's length, what follows and how to
+            // cancel to be stated right where the trial is started.
+            <Text style={[styles.center, { color: theme.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: Spacing.xs }]}>
+              {t('upgrade.trialTerms', { days: trialDays, price: price.main, unit: price.unit, store: storeName })}
+            </Text>
+          ) : null}
           {primary}
           <Button label={t('membership.notNow')} variant="ghost" onPress={close} style={{ marginTop: Spacing.xs }} />
         </View>
@@ -206,6 +226,8 @@ const styles = StyleSheet.create({
   center: { textAlign: 'center' },
   reason: { borderWidth: 1, borderRadius: Radius.control, padding: Spacing.ms, marginBottom: Spacing.md },
   feature: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms },
+  featureTitle: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  tierTag: { borderRadius: 99, paddingHorizontal: 7, paddingVertical: 2 },
   featureIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   tiers: { flexDirection: 'row', gap: Spacing.sm },
   tier: { flex: 1, borderRadius: Radius.md, padding: Spacing.ms, minHeight: 64, justifyContent: 'center' },
