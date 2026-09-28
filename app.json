@@ -59,6 +59,7 @@
       "expo-apple-authentication",
       "expo-notifications",
       "expo-live-activity",
+      "expo-background-task",
       [
         "expo-camera",
         {

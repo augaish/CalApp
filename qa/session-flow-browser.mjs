@@ -47,6 +47,17 @@ check('after set 1 it says "Complete set 2 of 3"', /Complete set 2 of 3/.test(b)
 let st = await store(page);
 check('  rest is running', !!st.activeSession.restEndsAt);
 check('  with the next step named for the lock-screen alert', /Next: set 2 of 3 · Barbell Bench Press/.test(st.activeSession.restNext ?? ''), st.activeSession.restNext);
+{
+  const before = Date.parse(st.activeSession.restEndsAt);
+  await page.getByRole('button', { name: 'Rest 15 seconds more' }).click(); await page.waitForTimeout(300);
+  const plus = Date.parse((await store(page)).activeSession.restEndsAt);
+  check('  +15 s moves the end 15 seconds later', Math.abs(plus - before - 15000) < 1500, `${plus - before} ms`);
+  await page.getByRole('button', { name: 'Rest 15 seconds less' }).click(); await page.waitForTimeout(300);
+  const minus = Date.parse((await store(page)).activeSession.restEndsAt);
+  check('  −15 s moves it back', Math.abs(minus - before) < 1500, `${minus - before} ms`);
+  await page.getByRole('button', { name: 'Rest 15 seconds more' }).screenshot({ path: `${OUT}/rest-step.png` }).catch(() => {});
+  await page.screenshot({ path: `${OUT}/rest-card.png` });
+}
 await page.getByText('Complete set 2 of 3', { exact: true }).click(); await page.waitForTimeout(600);
 b = await body(page);
 check('the third is "Complete last set (3 of 3)"', /Complete last set \(3 of 3\)/.test(b));

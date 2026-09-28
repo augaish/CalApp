@@ -23,7 +23,9 @@ export function variant(seed: string, n: number): number {
 
 export function formatNumber(n: number, lang: string, digits = 0): string {
   try {
-    return n.toLocaleString(lang === 'ar' ? 'ar' : 'en', { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+    // Arabic-Indic digits asked for by name: newer ICU data formats plain
+    // 'ar' with Western digits, which would mix with the Arabic wording.
+    return n.toLocaleString(lang === 'ar' ? 'ar-u-nu-arab' : 'en', { maximumFractionDigits: digits, minimumFractionDigits: 0 });
   } catch {
     return digits ? n.toFixed(digits) : String(Math.round(n));
   }

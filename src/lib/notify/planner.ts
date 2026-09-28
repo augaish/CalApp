@@ -124,6 +124,8 @@ export interface NotifyFacts {
   days: [DayFacts, DayFacts];
   /** The seven days before the next Saturday recap within the plan, if any. */
   week: WeekFacts | null;
+  /** Messages put off with "Later": id → when to come back (epoch ms). */
+  snoozed?: Record<string, number>;
 }
 
 export interface PlannedNote {
@@ -364,13 +366,19 @@ export function candidates(f: NotifyFacts): PlannedNote[] {
 }
 
 /**
- * The plan: candidates that are still in the future and outside quiet hours,
+ * The plan: candidates (moved where the person said "Later") that are still
+ * in the future and outside quiet hours,
  * then per day the most useful ones first, within the daily maximum and never
  * two within SPACING_MIN of each other.
  */
 export function planNotes(f: NotifyFacts): PlannedNote[] {
   const soon = f.now.getTime() + 60_000;
-  const pool = candidates(f).filter((n) => n.at.getTime() > soon && !inQuietHours(n.at, f.prefs));
+  const snoozed = f.snoozed ?? {};
+  const pool = candidates(f)
+    // "Later": the same message, moved — and only while its reason still
+    // holds (a meal logged meanwhile has no candidate left to move).
+    .map((n) => (snoozed[n.id] > f.now.getTime() ? { ...n, at: new Date(snoozed[n.id]), priority: 99 } : n))
+    .filter((n) => n.at.getTime() > soon && !inQuietHours(n.at, f.prefs));
   const byDay = new Map<string, PlannedNote[]>();
   for (const n of pool) {
     const k = key(n.at);

@@ -245,6 +245,55 @@ function lookup(dict: unknown) {
   eq('gaining is not a win when the goal is to lose… but fat and muscle still are', bodyWinsOn(readings, TODAY, 'gain').map((b) => b.kind), ['fat', 'muscle']);
 }
 
+// ── "Later" and the notification buttons ──
+{
+  const { categoryFor, categories, responseStep, routeFor, withSnooze } = await import('/home/user/CalApp/src/lib/notify/actions.ts');
+  // Lunch reminder at 14:15 (13:30 + 45); it's 14:20 and they pressed "In 30 min".
+  const at1420 = new Date(2026, 9, 6, 14, 20);
+  const lunchId = 'n-meal-lunch-2026-10-06';
+  const snoozed = planNotes(facts({ now: at1420, snoozed: { [lunchId]: new Date(2026, 9, 6, 14, 50).getTime() } }));
+  const lunch = snoozed.find((n) => n.id === lunchId);
+  check('Later: the lunch reminder comes back 30 minutes on', lunch != null && hm(lunch.at) === '14:50', lunch ? hm(lunch.at) : 'missing');
+  const logged = planNotes(facts({ now: at1420, snoozed: { [lunchId]: new Date(2026, 9, 6, 14, 50).getTime() } }, { mealsLogged: ['lunch'], mealMinutes: [14 * 60 + 30] }));
+  check('Later, then lunch logged: it never comes back', !logged.some((n) => n.id === lunchId));
+  const stale = planNotes(facts({ now: at1420, snoozed: { [lunchId]: new Date(2026, 9, 6, 14, 0).getTime() } }));
+  check('a snooze already past moves nothing', !stale.some((n) => n.id === lunchId));
+  const quiet = planNotes(facts({ now: new Date(2026, 9, 6, 22, 50), snoozed: { 'n-meal-dinner-2026-10-06': new Date(2026, 9, 6, 23, 20).getTime() } }));
+  check('Later never lands in quiet hours', !quiet.some((n) => n.id === 'n-meal-dinner-2026-10-06'));
+
+  eq('water messages carry the water button', [categoryFor('water'), categoryFor('waterAfterWorkout')], ['calgym-water', 'calgym-water']);
+  eq('meal, protein, training, missed have buttons; recaps do not', [categoryFor('meal'), categoryFor('protein'), categoryFor('training'), categoryFor('missed'), categoryFor('dayRecap'), categoryFor('comeback')], ['calgym-meal', 'calgym-protein', 'calgym-training', 'calgym-missed', null, null]);
+  const tEn = (k: string, v?: Record<string, unknown>) => {
+    let x: unknown = en;
+    for (const part of k.split('.')) x = (x as Record<string, unknown>)?.[part];
+    return typeof x === 'string' ? x.replace(/\{\{(\w+)\}\}/g, (_, n) => String(v?.[n] ?? '')) : `MISSING:${k}`;
+  };
+  const tAr = (k: string, v?: Record<string, unknown>) => {
+    let x: unknown = ar;
+    for (const part of k.split('.')) x = (x as Record<string, unknown>)?.[part];
+    return typeof x === 'string' ? x.replace(/\{\{(\w+)\}\}/g, (_, n) => String(v?.[n] ?? '')) : `MISSING:${k}`;
+  };
+  const cats = categories(tEn, 330, 'en');
+  eq('the water button is their usual glass', cats.find((c) => c.id === 'calgym-water')?.actions[0].buttonTitle, '+330 ml');
+  check('background buttons stay in the background, screen buttons open the app',
+    cats.every((c) => c.actions.every((a) => a.opensAppToForeground === (a.identifier === 'log-food' || a.identifier === 'start-workout'))));
+  const arTitles = categories(tAr, 250, 'ar').flatMap((c) => c.actions.map((a) => a.buttonTitle));
+  check('every button worded in Arabic', arTitles.every((x) => !x.includes('MISSING') && x.length > 0), arTitles.join(' | '));
+  check('every button worded in English', cats.flatMap((c) => c.actions).every((a) => !a.buttonTitle.includes('MISSING')));
+
+  eq('+ml logs their glass', responseStep('water', 'water-add', 330), { type: 'water', ml: 330 });
+  eq('In 30 min snoozes 30', responseStep('meal', 'snooze-30', 250), { type: 'snooze', minutes: 30 });
+  eq('Log meal opens logging', responseStep('meal', 'log-food', 250), { type: 'route', path: '/add-menu' });
+  eq('Start workout starts it', responseStep('training', 'start-workout', 250), { type: 'startWorkout' });
+  const TAP = 'expo.modules.notifications.actions.DEFAULT';
+  eq('a tap goes where the message is about', ['meal', 'water', 'training', 'rest', 'dayRecap', 'trial'].map((k) => (responseStep(k, TAP, 250) as { path?: string }).path), ['/food', '/water', '/training', '/session', '/', '/upgrade']);
+  eq('an unknown notification does nothing', responseStep(undefined, TAP, 250), { type: 'none' });
+  check('every kind the planner sends has a place to go', ['meal', 'protein', 'fastEnd', 'water', 'waterAfterWorkout', 'training', 'restDay', 'missed', 'dayRecap', 'weekRecap', 'program', 'comeback'].every((k) => routeFor(k) != null));
+  const now = new Date(2026, 9, 6, 12, 0);
+  const kept = withSnooze({ old: new Date(2026, 9, 6, 11, 0).toISOString(), live: new Date(2026, 9, 6, 13, 0).toISOString() }, 'new', new Date(2026, 9, 6, 12, 30), now);
+  eq('snoozes: past ones dropped, live ones kept', Object.keys(kept).sort(), ['live', 'new']);
+}
+
 // ── from stored data to a plan, as the app does it ──
 {
   const { buildFacts } = await import('/home/user/CalApp/src/lib/notify/facts.ts');

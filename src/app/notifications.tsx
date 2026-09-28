@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
 import { Icon } from '@/components/icon';
@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { DEFAULT_PREFS } from '@/lib/notify/planner';
 import { notificationsGranted, plannedPreview, syncReminders } from '@/lib/reminders';
+import { exactRestAlerts, openExactAlarmSettings } from '@/lib/rest-live-activity';
 import { useAppStore } from '@/lib/store';
 
 type Kind = 'food' | 'water' | 'training';
@@ -91,6 +92,16 @@ export default function Notifications() {
     };
   }, []);
 
+  // Android 14+: whether the rest timer's alert may be exact. Read again on
+  // return from system settings, where the person allows it.
+  const [exact, setExact] = useState(exactRestAlerts);
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') setExact(exactRestAlerts());
+    });
+    return () => sub.remove();
+  }, []);
+
   // Which areas the plan covers: Essentials Food has no Training, and so on.
   const covered: Record<Kind, boolean> = {
     food: !gate.readOnly && gate.isOpen('food'),
@@ -149,6 +160,18 @@ export default function Notifications() {
           }
           compact
         />
+      )}
+
+      {exact === false && (
+        <RowGroup style={styles.group}>
+          <SettingsRow
+            icon="alarm-outline"
+            title={t('notifications.exactTitle')}
+            subtitle={t('notifications.exactHint')}
+            onPress={openExactAlarmSettings}
+            last
+          />
+        </RowGroup>
       )}
 
       <RowGroup style={styles.group}>
@@ -230,6 +253,7 @@ export default function Notifications() {
             )}
           </RowGroup>
           <InfoLine>{t('notifications.planNote')}</InfoLine>
+          {Platform.OS !== 'web' && <InfoLine icon="hand-left-outline">{t('notifications.buttonsNote')}</InfoLine>}
         </>
       )}
     </Screen>

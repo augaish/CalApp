@@ -1,5 +1,6 @@
 import { AppState, Platform } from 'react-native';
 
+import { categories, categoryFor } from './notify/actions';
 import { renderNote } from './notify/copy';
 import { buildFacts } from './notify/facts';
 import { planNotes, type Channel, type PlannedNote } from './notify/planner';
@@ -106,6 +107,25 @@ async function ensureChannels(mod: NotificationsModule): Promise<void> {
   channelsLang = i18n.language;
 }
 
+/**
+ * The buttons each kind of message carries (notify/actions.ts). Re-registered
+ * when the language or the person's usual glass changes, since the water
+ * button says "+330 ml" for someone who drinks from a 330 ml bottle.
+ */
+let categoriesKey: string | null = null;
+
+async function ensureCategories(mod: NotificationsModule, glassMl: number): Promise<void> {
+  const key = `${i18n.language}|${glassMl}`;
+  if (categoriesKey === key) return;
+  for (const c of categories(i18n.t.bind(i18n), glassMl, i18n.language)) {
+    await mod.setNotificationCategoryAsync(
+      c.id,
+      c.actions.map((a) => ({ identifier: a.identifier, buttonTitle: a.buttonTitle, options: { opensAppToForeground: a.opensAppToForeground } })),
+    );
+  }
+  categoriesKey = key;
+}
+
 async function schedule(mod: NotificationsModule, note: PlannedNote): Promise<void> {
   const { title, body } = renderNote(note, i18n.t.bind(i18n), i18n.language);
   const quiet = note.kind === 'weekRecap' || note.kind === 'comeback' || note.kind === 'restDay';
@@ -115,6 +135,7 @@ async function schedule(mod: NotificationsModule, note: PlannedNote): Promise<vo
       title,
       body,
       data: { kind: note.kind, channel: note.channel },
+      categoryIdentifier: categoryFor(note.kind) ?? undefined,
       // iPhone: recaps and gentle notes arrive without lighting the screen;
       // a fast ending is worth breaking through Focus for.
       interruptionLevel: quiet ? 'passive' : note.kind === 'fastEnd' ? 'timeSensitive' : 'active',
@@ -148,7 +169,14 @@ async function runSync(): Promise<{ granted: boolean }> {
   if (!(await requestPermission(mod))) return { granted: false };
 
   await ensureChannels(mod);
-  const notes = planNotes(buildFacts(s, gateSource(), new Date()));
+  const facts = buildFacts(s, gateSource(), new Date());
+  try {
+    await ensureCategories(mod, facts.glassMl);
+  } catch (err) {
+    // Without buttons the messages still arrive.
+    console.warn('notification categories failed:', err);
+  }
+  const notes = planNotes(facts);
   for (const note of notes) {
     try {
       await schedule(mod, note);

@@ -1,128 +1,96 @@
 package expo.modules.restcountdown
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
-import android.os.SystemClock
-import android.widget.RemoteViews
+import android.provider.Settings
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 /**
  * The rest countdown on the Android lock screen and in the notification
- * shade: an ongoing, silent notification whose large time is a system
- * Chronometer counting down to the end of the rest. The system keeps it
- * ticking with the app asleep, and it removes itself when the rest is over
- * (the separate end-of-rest alert still sounds).
+ * shade — one notification for the whole rest (see RestNotifier):
  *
- * The Android counterpart of the iPhone Live Activity; JavaScript drives both
- * from the same value (see src/lib/rest-live-activity.ts).
+ *  - while resting, a large system Chronometer counting down, with −15 s,
+ *    +15 s and Skip buttons that work without opening the app;
+ *  - when the rest ends, the same notification becomes the "Rest over" alert
+ *    (with sound), fired by an alarm, so nothing depends on the app being
+ *    awake.
+ *
+ * JavaScript drives it from the session's stored rest end
+ * (src/lib/rest-live-activity.ts). A change made from the notification is
+ * sent back as an `onRestChange` event, and kept until `takePending()` reads
+ * it, so a change made while the app was closed is not lost either.
  */
 class RestCountdownModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("RestCountdown")
 
-    Function("show") { endsAtMs: Double, title: String, subtitle: String ->
-      appContext.reactContext?.let { show(it, endsAtMs.toLong(), title, subtitle) }
+    // 2: the notification carries the alert and the buttons itself.
+    Constants("version" to 2)
+
+    Events("onRestChange")
+
+    OnCreate { instance = this@RestCountdownModule }
+    OnDestroy { if (instance === this@RestCountdownModule) instance = null }
+
+    Function("setLabels") { minus: String, plus: String, skip: String, countdownChannel: String, alertChannel: String ->
+      appContext.reactContext?.let { RestNotifier.setLabels(it, minus, plus, skip, countdownChannel, alertChannel) }
+      Unit
+    }
+
+    Function("show") { endsAtMs: Double, title: String, subtitle: String, overTitle: String, overBody: String ->
+      appContext.reactContext?.let { RestNotifier.start(it, endsAtMs.toLong(), title, subtitle, overTitle, overBody) }
       Unit
     }
 
     Function("hide") {
-      appContext.reactContext?.let { manager(it).cancel(NOTIFICATION_ID) }
+      appContext.reactContext?.let { RestNotifier.stop(it) }
+      Unit
+    }
+
+    // A change made from the notification that the app hasn't applied yet:
+    // the new end in epoch ms, 0 for skipped, or null for none. Read once.
+    Function("takePending") {
+      appContext.reactContext?.let { RestNotifier.takePending(it)?.toDouble() }
+    }
+
+    // Android 14+ asks the person before an app may set exact alarms; until
+    // then the alert can arrive a little after the rest ends.
+    Function("canExact") {
+      val context = appContext.reactContext ?: return@Function true
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return@Function true
+      (context.getSystemService(Context.ALARM_SERVICE) as AlarmManager).canScheduleExactAlarms()
+    }
+
+    Function("openExactSettings") {
+      val context = appContext.reactContext
+      if (context != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        try {
+          context.startActivity(
+            Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:" + context.packageName))
+              .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+          )
+        } catch (e: Exception) {
+          // No such screen on this device.
+        }
+      }
       Unit
     }
   }
 
-  private fun manager(context: Context) =
-    context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-  private fun show(context: Context, endsAtMs: Long, title: String, subtitle: String) {
-    val nm = manager(context)
-    val remaining = endsAtMs - System.currentTimeMillis()
-    if (remaining <= 0) {
-      nm.cancel(NOTIFICATION_ID)
-      return
-    }
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL_ID) == null) {
-      // Low importance: shown on the lock screen and in the shade, but no
-      // sound, vibration or heads-up for something the person just started.
-      val channel = NotificationChannel(
-        CHANNEL_ID,
-        context.getString(R.string.rest_countdown_channel),
-        NotificationManager.IMPORTANCE_LOW,
-      ).apply {
-        setShowBadge(false)
-        setSound(null, null)
-        enableVibration(false)
-        lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-      }
-      nm.createNotificationChannel(channel)
-    }
-
-    // Chronometer counts against elapsedRealtime, which a clock change on the
-    // phone cannot disturb.
-    val base = SystemClock.elapsedRealtime() + remaining
-    fun views(layout: Int) = RemoteViews(context.packageName, layout).apply {
-      setChronometer(R.id.rest_countdown_time, base, null, true)
-      setChronometerCountDown(R.id.rest_countdown_time, true)
-      setTextViewText(R.id.rest_countdown_title, title)
-      setTextViewText(R.id.rest_countdown_subtitle, subtitle)
-    }
-
-    // A tap opens the workout.
-    val open = Intent(Intent.ACTION_VIEW, Uri.parse("calapp://session"))
-      .setPackage(context.packageName)
-      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-    val tap = PendingIntent.getActivity(
-      context,
-      0,
-      open,
-      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-    )
-
-    val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-      Notification.Builder(context, CHANNEL_ID)
-        // Gone on its own when the rest ends, even with the app asleep.
-        .setTimeoutAfter(remaining + 1000)
-    } else {
-      @Suppress("DEPRECATION")
-      Notification.Builder(context)
-        .setPriority(Notification.PRIORITY_LOW)
-        .setSound(null)
-    }
-
-    val notification = builder
-      .setSmallIcon(R.drawable.rest_countdown_icon)
-      .setColor(ACCENT)
-      .setContentTitle(title)
-      .setContentText(subtitle)
-      .setCustomContentView(views(R.layout.rest_countdown))
-      .setCustomBigContentView(views(R.layout.rest_countdown_big))
-      .setStyle(Notification.DecoratedCustomViewStyle())
-      .setOngoing(true)
-      .setOnlyAlertOnce(true)
-      .setShowWhen(false)
-      .setCategory(Notification.CATEGORY_STOPWATCH)
-      .setVisibility(Notification.VISIBILITY_PUBLIC)
-      .setContentIntent(tap)
-      .build()
-
+  fun emitChange(endsAtMs: Long) {
     try {
-      nm.notify(NOTIFICATION_ID, notification)
-    } catch (e: SecurityException) {
-      // Notifications not allowed: the countdown simply doesn't show.
+      sendEvent("onRestChange", mapOf("endsAtMs" to endsAtMs.toDouble()))
+    } catch (e: Exception) {
+      // JavaScript not running: takePending() picks it up on the next open.
     }
   }
 
   companion object {
-    private const val CHANNEL_ID = "rest-countdown"
-    private const val NOTIFICATION_ID = 7201
-    private const val ACCENT = 0xFF6D5AAB.toInt()
+    @Volatile
+    var instance: RestCountdownModule? = null
   }
 }

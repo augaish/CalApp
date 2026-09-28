@@ -173,7 +173,7 @@ type State = Pick<
   AppState,
   | 'meals' | 'water' | 'workouts' | 'weights' | 'schedule' | 'occurrences' | 'skips' | 'exercises' | 'targets' | 'profile'
   | 'activeFast' | 'activeProgram' | 'whoopBurnByDay' | 'whoopWorkoutsByDay' | 'remindMeals' | 'remindWater' | 'remindWorkouts'
-> & { notifyPrefs?: Partial<NotifyPrefs> };
+> & { notifyPrefs?: Partial<NotifyPrefs>; notifySnooze?: Record<string, string> };
 
 function dayFacts(s: State, date: Date, now: Date): DayFacts {
   const meals = Array.isArray(s.meals) ? s.meals : [];
@@ -320,5 +320,6 @@ export function buildFacts(s: State, gate: GateState, now: Date = new Date()): N
     workoutStreak: workoutStreakDays(workouts),
     days,
     week: saturday ? weekFacts(s, saturday) : null,
+    snoozed: Object.fromEntries(Object.entries(s.notifySnooze ?? {}).map(([k, v]) => [k, Date.parse(v)])),
   };
 }

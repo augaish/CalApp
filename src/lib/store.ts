@@ -191,6 +191,10 @@ export interface AppState {
    * the daily maximum. Absent = the defaults in notify/planner.ts.
    */
   notifyPrefs?: { enabled?: boolean; quietStart?: number; quietEnd?: number; maxPerDay?: number };
+  /** Messages put off with a notification's "Later" button: note id → ISO time to come back. */
+  notifySnooze?: Record<string, string>;
+  /** Notification button presses already carried out, so none is done twice. */
+  notifyHandled?: string[];
   remindWater: boolean;
   remindWorkouts: boolean;
   /** Reminders have been auto-scheduled once (permission requested on first run). */
@@ -390,6 +394,8 @@ export interface AppState {
   endSession: () => void;
   setRemindMeals: (on: boolean) => void;
   setNotifyPrefs: (prefs: Partial<NonNullable<AppState['notifyPrefs']>>) => void;
+  setNotifySnooze: (snooze: Record<string, string>) => void;
+  markNotifyHandled: (key: string) => void;
   setRemindWater: (on: boolean) => void;
   setRemindWorkouts: (on: boolean) => void;
   setRemindersInitialized: () => void;
@@ -1234,6 +1240,8 @@ export const useAppStore = create<AppState>()(
       endSession: () => set({ activeSession: null }),
       setRemindMeals: (on) => set({ remindMeals: on }),
       setNotifyPrefs: (prefs) => set((st) => ({ notifyPrefs: { ...(st.notifyPrefs ?? {}), ...prefs } })),
+      setNotifySnooze: (snooze) => set({ notifySnooze: snooze }),
+      markNotifyHandled: (key) => set((st) => ({ notifyHandled: [...(st.notifyHandled ?? []).filter((k) => k !== key), key].slice(-30) })),
       setRemindWater: (on) => set({ remindWater: on }),
       setRemindWorkouts: (on) => set({ remindWorkouts: on }),
       setRemindersInitialized: () => set({ remindersInitialized: true }),
@@ -1389,6 +1397,8 @@ export const useAppStore = create<AppState>()(
         remindWater,
         remindWorkouts,
         notifyPrefs,
+        notifySnooze,
+        notifyHandled,
         remindersInitialized,
         tutorialSeen,
         checklistDismissed,
@@ -1438,6 +1448,8 @@ export const useAppStore = create<AppState>()(
         remindWater,
         remindWorkouts,
         notifyPrefs,
+        notifySnooze,
+        notifyHandled,
         remindersInitialized,
         tutorialSeen,
         checklistDismissed,

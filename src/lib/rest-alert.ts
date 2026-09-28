@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 
 import i18n from './i18n';
 import { notifications, REST_ALERT_ID, requestPermission } from './reminders';
+import { nativeRestAlerts } from './rest-live-activity';
 import { useAppStore } from './store';
 
 /**
@@ -42,6 +43,8 @@ async function apply(endsAt: string | null, next: string | undefined): Promise<v
       askedThisLaunch = true;
       if (!(await requestPermission(mod))) return;
     }
+    // The Android countdown turns into the alert itself (rest-live-activity.ts).
+    if (nativeRestAlerts) return;
     if (Platform.OS === 'android' && !channelReady) {
       await mod.setNotificationChannelAsync(CHANNEL, {
         name: i18n.t('session.restChannel'),

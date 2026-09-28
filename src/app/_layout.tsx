@@ -9,9 +9,11 @@ import { Celebration } from '@/components/celebration';
 import { useSchemeName, useTheme } from '@/hooks/use-theme';
 import { setInstallId } from '@/lib/api';
 import { syncAuthIdentity } from '@/lib/auth';
+import { registerBackgroundWork } from '@/lib/background';
 import { useEntitlement } from '@/lib/entitlement';
 import { deviceLanguage, setI18nLanguage, applyRTL } from '@/lib/i18n';
 import { startMilestones } from '@/lib/milestones';
+import { startNotificationResponses } from '@/lib/notify/responses';
 import { startRestAlerts } from '@/lib/rest-alert';
 import { startRestLiveActivity } from '@/lib/rest-live-activity';
 import { useAppStore } from '@/lib/store';
@@ -60,6 +62,10 @@ export default function RootLayout() {
     startRestAlerts();
     startRestLiveActivity();
     startMilestones();
+    // A tap on a notification opens what it is about; its buttons log water,
+    // put a reminder off or start the workout.
+    startNotificationResponses();
+    void registerBackgroundWork();
     // If a Supabase session exists, meter against the account instead so the
     // plan follows the person across devices.
     syncAuthIdentity().finally(() => useEntitlement.getState().refresh());

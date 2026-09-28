@@ -16,7 +16,7 @@ import { resolvePlan } from '@/lib/occurrences';
 import { useCelebrate } from '@/lib/celebrate';
 import { calendarDaysBetween, timestampFor } from '@/lib/day';
 import { exerciseName, findExercise, logStyleFor } from '@/lib/exercises';
-import { lightHaptic, recordHaptic, successHaptic } from '@/lib/feedback';
+import { lightHaptic, recordHaptic, selectionHaptic, successHaptic } from '@/lib/feedback';
 import { afterSet, completeLabel, setGoal } from '@/lib/session-flow';
 import {
   bestSetEver,
@@ -47,6 +47,11 @@ type SetShape = Pick<WorkoutSet, 'weightKg' | 'reps' | 'seconds' | 'distanceM'>;
  * React Compiler's purity rule forbids reading the clock inside a component. */
 function restEndsAtFrom(seconds: number): string {
   return new Date(Date.now() + seconds * 1000).toISOString();
+}
+
+/** The rest moved by `deltaMs`, never to less than a second from now (same reason as above). */
+function shiftRest(endsAt: string, deltaMs: number): string {
+  return new Date(Math.max(Date.now() + 1000, new Date(endsAt).getTime() + deltaMs)).toISOString();
 }
 
 /** Epoch ms `ms` from now (same reason as above). */
@@ -545,6 +550,24 @@ export default function SessionScreen() {
                   {Math.floor(restRemaining / 60)}:{String(restRemaining % 60).padStart(2, '0')}
                 </Text>
               </View>
+              {([
+                [-15_000, 'session.restMinus', 'session.restMinusA11y'],
+                [15_000, 'session.restPlus', 'session.restPlusA11y'],
+              ] as const).map(([delta, label, a11y]) => (
+                <Pressable
+                  key={label}
+                  onPress={() => {
+                    selectionHaptic();
+                    if (session.restEndsAt) updateSession({ restEndsAt: shiftRest(session.restEndsAt, delta) });
+                  }}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel={t(a11y)}
+                  style={({ pressed }) => [styles.restStep, { backgroundColor: theme.card }, pressed && { opacity: 0.7 }]}
+                >
+                  <Text style={{ color: theme.primaryDark, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{t(label)}</Text>
+                </Pressable>
+              ))}
               <ActionButton label={t('session.skipRest')} variant="secondary" onPress={() => updateSession({ restEndsAt: null })} />
             </View>
             <View style={[styles.restTrack, { backgroundColor: theme.border }]}>
@@ -706,6 +729,7 @@ const styles = StyleSheet.create({
   },
   restCard: { borderRadius: Radius.control, padding: Spacing.ms, marginTop: Spacing.md, gap: Spacing.sm },
   restRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  restStep: { minWidth: 48, height: 36, paddingHorizontal: 8, borderRadius: Radius.control, alignItems: 'center', justifyContent: 'center' },
   restTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   restFill: { height: 6, borderRadius: 3 },
   restTime: { fontSize: 30, fontWeight: '800', fontVariant: ['tabular-nums'] },

@@ -20,7 +20,7 @@ export async function syncTrialReminder(until: string | null): Promise<void> {
     const date = new Date(until).toLocaleDateString(i18n.language === 'ar' ? 'ar' : 'en', { day: 'numeric', month: 'long' });
     await mod.scheduleNotificationAsync({
       identifier: TRIAL_REMINDER_ID,
-      content: { title: i18n.t('plans.trialReminderTitle'), body: i18n.t('plans.trialReminderBody', { date }) },
+      content: { title: i18n.t('plans.trialReminderTitle'), body: i18n.t('plans.trialReminderBody', { date }), data: { kind: 'trial' } },
       trigger: { type: mod.SchedulableTriggerInputTypes.DATE, date: at },
     });
   } catch (err) {
