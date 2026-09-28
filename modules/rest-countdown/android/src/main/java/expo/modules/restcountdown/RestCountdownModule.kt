@@ -28,13 +28,13 @@ class RestCountdownModule : Module() {
     Name("RestCountdown")
 
     Function("show") { endsAtMs: Double, title: String, subtitle: String ->
-      val context = appContext.reactContext ?: return@Function
-      show(context, endsAtMs.toLong(), title, subtitle)
+      appContext.reactContext?.let { show(it, endsAtMs.toLong(), title, subtitle) }
+      Unit
     }
 
     Function("hide") {
-      val context = appContext.reactContext ?: return@Function
-      manager(context).cancel(NOTIFICATION_ID)
+      appContext.reactContext?.let { manager(it).cancel(NOTIFICATION_ID) }
+      Unit
     }
   }
 
