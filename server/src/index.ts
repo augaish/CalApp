@@ -882,6 +882,58 @@ async function withOneRetry<T>(call: (attempt: 0 | 1) => Promise<T>): Promise<T>
  */
 const dsBudget = (attempt: 0 | 1, base: number) => (attempt ? base * 3 : base);
 
+/**
+ * A text meal estimate from Claude with web search (restaurant menus), used
+ * by describe and refine. A search turn paused mid-way is continued; a
+ * disabled web search falls back to a plain call; and a reply with no usable
+ * JSON (a search turn that ended in prose, a cut-off or malformed answer)
+ * gets one retry without tools and with a JSON-only reminder — with the head
+ * of what came back logged, because that failure is invisible otherwise.
+ */
+async function mealWithSearch(
+  request: { model: string; max_tokens: number; messages: { role: 'user'; content: string }[] },
+  ref: string,
+  label: string,
+  prompt: string,
+): Promise<MealAnalysis> {
+  let response;
+  try {
+    response = await anthropic.messages.create({ ...request, tools: [WEB_SEARCH_TOOL] });
+    for (let turns = 0; response.stop_reason === 'pause_turn' && turns < 2; turns++) {
+      await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
+      response = await anthropic.messages.create({
+        ...request,
+        tools: [WEB_SEARCH_TOOL],
+        messages: [...request.messages, { role: 'assistant' as const, content: response.content as Anthropic.MessageParam['content'] }],
+      });
+    }
+  } catch (err) {
+    // Web search is an org-level Console setting; a disabled account must
+    // still get its estimate, just without a restaurant lookup.
+    if (!isWebSearchDisabled(err)) throw err;
+    console.warn(`web search unavailable, retrying ${label} without it`);
+    response = await anthropic.messages.create(request);
+  }
+  await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
+  try {
+    return toMealAnalysis(replyText(response), citationDomains(response));
+  } catch (parseErr) {
+    const head = response.content
+      .map((b) => (b.type === 'text' ? b.text.slice(0, 160) : `<${b.type}>`))
+      .join(' | ')
+      .slice(0, 400);
+    console.warn(
+      `${label} reply unparseable (${parseErr instanceof Error ? parseErr.message.slice(0, 120) : parseErr}); stop=${response.stop_reason}; head: ${head}. Retrying without web search.`,
+    );
+    const retry = await anthropic.messages.create({
+      ...request,
+      messages: [{ role: 'user' as const, content: prompt + JSON_ONLY_REMINDER }],
+    });
+    await trackUsage({ ref, kind: 'describe' }, request.model, retry.usage);
+    return toMealAnalysis(replyText(retry));
+  }
+}
+
 app.post('/api/analyze-meal', async (c) => {
   const parsed = parseBody(await c.req.json<AnalyzeBody>().catch(() => ({})));
   if (!parsed) return c.json({ error: 'invalid_request' }, 400);
@@ -893,9 +945,13 @@ app.post('/api/analyze-meal', async (c) => {
     if ((await providerFor(access)) === 'deepseek') {
       // Same generous budget as the shadow test, for the same reason (a
       // reasoning model's thinking shares max_tokens with the JSON answer).
-      const ds = await withOneRetry((attempt) => deepseekVisionCall(parsed.image, mealPrompt(parsed.language), dsBudget(attempt, 8000)));
-      await trackUsage({ ref, kind: 'meal' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
-      return c.json(toMealAnalysis(ds.text));
+      // Parsed inside the retry, so a malformed answer gets the second try too.
+      const result = await withOneRetry(async (attempt) => {
+        const ds = await deepseekVisionCall(parsed.image, mealPrompt(parsed.language), dsBudget(attempt, 8000));
+        await trackUsage({ ref, kind: 'meal' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+        return toMealAnalysis(ds.text);
+      });
+      return c.json(result);
     }
     const model = access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL;
     const claudeStart = Date.now();
@@ -1253,9 +1309,13 @@ app.post('/api/analyze-text', async (c) => {
     if ((await providerFor(access)) === 'deepseek') {
       // No web search on this path — a branded/restaurant item gets
       // DeepSeek's own knowledge of it rather than a live menu lookup.
-      const ds = await withOneRetry((attempt) => deepseekTextCall(textMealPrompt(language, text, { canSearch: false }) + (attempt ? JSON_ONLY_REMINDER : ''), dsBudget(attempt, 4000)));
-      await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
-      return c.json(toMealAnalysis(ds.text));
+      // Parsed inside the retry, so a malformed answer gets the second try too.
+      const result = await withOneRetry(async (attempt) => {
+        const ds = await deepseekTextCall(textMealPrompt(language, text, { canSearch: false }) + (attempt ? JSON_ONLY_REMINDER : ''), dsBudget(attempt, 4000));
+        await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+        return toMealAnalysis(ds.text);
+      });
+      return c.json(result);
     }
     const request = {
       model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
@@ -1267,49 +1327,7 @@ app.post('/api/analyze-text', async (c) => {
       max_tokens: 3000,
       messages: [{ role: 'user' as const, content: textMealPrompt(language, text) }],
     };
-    let response;
-    try {
-      response = await anthropic.messages.create({ ...request, tools: [WEB_SEARCH_TOOL] });
-      // A server-tool turn can come back paused mid-search; continue it (a
-      // couple of times at most) rather than treating the half-turn as the
-      // answer, which had no JSON in it and surfaced as "could not read".
-      for (let turns = 0; response.stop_reason === 'pause_turn' && turns < 2; turns++) {
-        await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
-        response = await anthropic.messages.create({
-          ...request,
-          tools: [WEB_SEARCH_TOOL],
-          messages: [...request.messages, { role: 'assistant' as const, content: response.content as Anthropic.MessageParam['content'] }],
-        });
-      }
-    } catch (err) {
-      // Web search is an org-level Console setting; a disabled account must
-      // still get its meal estimated, just without a restaurant lookup.
-      if (!isWebSearchDisabled(err)) throw err;
-      console.warn('web search unavailable, retrying analyze-text without it');
-      response = await anthropic.messages.create(request);
-    }
-    await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
-    try {
-      return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
-    } catch (parseErr) {
-      // No usable JSON (a search turn that ended in prose, or a cut-off
-      // answer). One retry without tools and with a JSON-only reminder before
-      // giving up — and the head of what came back is logged, because until
-      // now this failure was invisible on the server too.
-      const head = response.content
-        .map((b) => (b.type === 'text' ? b.text.slice(0, 160) : `<${b.type}>`))
-        .join(' | ')
-        .slice(0, 400);
-      console.warn(
-        `analyze-text reply unparseable (${parseErr instanceof Error ? parseErr.message.slice(0, 120) : parseErr}); stop=${response.stop_reason}; head: ${head}. Retrying without web search.`,
-      );
-      const retry = await anthropic.messages.create({
-        ...request,
-        messages: [{ role: 'user' as const, content: textMealPrompt(language, text) + JSON_ONLY_REMINDER }],
-      });
-      await trackUsage({ ref, kind: 'describe' }, request.model, retry.usage);
-      return c.json(toMealAnalysis(replyText(retry)));
-    }
+    return c.json(await mealWithSearch(request, ref, 'analyze-text', textMealPrompt(language, text)));
   } catch (err) {
     // The text is logged (trimmed) because the failures worth fixing here are
     // all about what the user wrote, and they are invisible otherwise.
@@ -1354,27 +1372,20 @@ app.post('/api/refine-meal', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   try {
     if ((await providerFor(access)) === 'deepseek') {
-      const ds = await withOneRetry((attempt) => deepseekTextCall(refineMealPrompt(language, items, message, { canSearch: false }) + (attempt ? JSON_ONLY_REMINDER : ''), dsBudget(attempt, 4000)));
-      await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
-      return c.json(toMealAnalysis(ds.text));
+      // Parsed inside the retry, so a malformed answer gets the second try too.
+      const result = await withOneRetry(async (attempt) => {
+        const ds = await deepseekTextCall(refineMealPrompt(language, items, message, { canSearch: false }) + (attempt ? JSON_ONLY_REMINDER : ''), dsBudget(attempt, 4000));
+        await trackUsage({ ref, kind: 'describe' }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+        return toMealAnalysis(ds.text);
+      });
+      return c.json(result);
     }
     const request = {
       model: access.spec.highAccuracy ? PREMIUM_MODEL : MEAL_MODEL,
       max_tokens: 3000,
       messages: [{ role: 'user' as const, content: refineMealPrompt(language, items, message) }],
     };
-    let response;
-    try {
-      response = await anthropic.messages.create({ ...request, tools: [WEB_SEARCH_TOOL] });
-    } catch (err) {
-      // Web search is an org-level Console setting; a disabled account must
-      // still get a corrected estimate, just without a restaurant lookup.
-      if (!isWebSearchDisabled(err)) throw err;
-      console.warn('web search unavailable, retrying refine-meal without it');
-      response = await anthropic.messages.create(request);
-    }
-    await trackUsage({ ref, kind: 'describe' }, request.model, response.usage);
-    return c.json(toMealAnalysis(replyText(response), citationDomains(response)));
+    return c.json(await mealWithSearch(request, ref, 'refine-meal', refineMealPrompt(language, items, message)));
   } catch (err) {
     console.error(`refine-meal failed for "${message.slice(0, 120)}":`, err);
     await release(ref, 'describe');

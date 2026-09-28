@@ -81,8 +81,78 @@ export function asciiDigits(text: string): string {
 }
 
 /**
+ * Mend the slips a model makes when writing JSON by hand, outside strings
+ * only: a missing comma between two values (`}\n{`, `"a"\n"b"`, `12\n"fat"`
+ * — the most common, and the one behind "Expected ',' or ']' after array
+ * element"), a trailing comma before `}` or `]`, and // or /* *\/ comments.
+ * Anything inside a string is copied untouched.
+ */
+export function repairJson(text: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  // The last significant character written outside a string.
+  let last = '';
+  const endsValue = (ch: string) => ch === '}' || ch === ']' || ch === '"' || /[0-9a-z]/i.test(ch);
+  const startsValue = (ch: string) => ch === '{' || ch === '[' || ch === '"' || ch === '-' || /[0-9tfn]/.test(ch);
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inString) {
+      out += ch;
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') {
+        inString = false;
+        last = '"';
+      }
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i++;
+      out += '\n';
+      continue;
+    }
+    if (ch === '/' && text[i + 1] === '*') {
+      const close = text.indexOf('*/', i + 2);
+      i = close === -1 ? text.length : close + 1;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      out += ch;
+      continue;
+    }
+    if ((ch === '}' || ch === ']') && last === ',') {
+      // Drop the trailing comma already written (and the space after it).
+      const at = out.lastIndexOf(',');
+      out = out.slice(0, at) + out.slice(at + 1);
+    } else if (startsValue(ch) && last && endsValue(last) && /\s/.test(text[i - 1] ?? '')) {
+      // Two values side by side with only whitespace between: a lost comma.
+      // (Inside a bare word — `true`, `null`, a number — there is no gap.)
+      out += ',';
+    }
+    out += ch;
+    if (ch === '"') inString = true;
+    else last = ch;
+  }
+  return out;
+}
+
+function parseLenient(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (err) {
+    try {
+      return JSON.parse(repairJson(text));
+    } catch {
+      throw err;
+    }
+  }
+}
+
+/**
  * Pull the JSON value out of a reply that may be fenced, prefixed with prose,
- * or written with non-ASCII digits. Throws when there is nothing parseable.
+ * written with non-ASCII digits, or carry a small syntax slip (see
+ * repairJson). Throws when there is nothing parseable.
  */
 export function extractJson(raw: string): unknown {
   const cleaned = asciiDigits(
@@ -92,7 +162,7 @@ export function extractJson(raw: string): unknown {
       .replace(/\s*```$/, ''),
   );
   try {
-    return JSON.parse(cleaned);
+    return parseLenient(cleaned);
   } catch {
     // Fall back to the outermost braces, which survives a wrapping sentence.
     const start = cleaned.indexOf('{');
@@ -100,7 +170,7 @@ export function extractJson(raw: string): unknown {
     if (start === -1 || end <= start) {
       throw new Error(`no JSON object in model reply: ${cleaned.slice(0, 200)}`);
     }
-    return JSON.parse(cleaned.slice(start, end + 1));
+    return parseLenient(cleaned.slice(start, end + 1));
   }
 }
 
