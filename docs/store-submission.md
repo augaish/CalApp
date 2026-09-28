@@ -82,7 +82,8 @@ AR:
 >
 > يعمل دون حساب، بالعربية والإنجليزية.
 >
-> اشتراكات Pro وPro+ اختيارية تتجدد تلقائياً مع حدود أعلى للذكاء الاصطناعي. يُخصم المبلغ من حساب Apple عند التأكيد، ويتجدد الاشتراك ما لم يُلغَ قبل ٢٤ ساعة من نهاية الفترة، ويُدار من الإعدادات ← Apple ID ← الاشتراكات.
+> كالجيم الأساسيات وكالجيم برو اشتراكات تتجدد تلقائياً، ويبدأ كل منهما بتجربة مجانية لمدة ١٤ يوماً للمشتركين الجدد. الأساسيات تشمل التغذية أو التمارين مع الصحة و٢٠ عملية ذكاء اصطناعي شهرياً. برو يشمل التغذية والتمارين والصحة معاً، مع ٥٠ عملية شهرياً ومصمم البرامج الذكي ومدرب يتذكر ملفاتك. وبدون اشتراك يمكنك الاطلاع على كل ما سجّلته وتصديره. يُخصم المبلغ من حساب Apple عند التأكيد، ويتجدد الاشتراك ما لم يُلغَ قبل ٢٤ ساعة على الأقل من نهاية الفترة، ويُدار من الإعدادات ← Apple ID ← الاشتراكات.
+> الشروط: https://calapp-production-ab20.up.railway.app/terms · الخصوصية: https://calapp-production-ab20.up.railway.app/privacy
 >
 > أرقام السعرات تقديرات بالذكاء الاصطناعي وقد تكون غير دقيقة، وليست نصيحة طبية.
 
@@ -117,7 +118,7 @@ Photos, report files and coach messages are sent for AI processing and not kept 
 > • No sign-in needed: tap "Continue as guest" on the first screen. Sign in with Apple, Google and email are also offered.
 > • AI features (meal photo, describe a meal, body report scan, AI coach, recipe/program generation) ask permission before anything is sent to our AI providers (Anthropic, DeepSeek). This can be changed in Profile → Privacy → AI processing. Photos and messages are processed in real time and not stored.
 > • Account deletion: Profile → Privacy → Delete my account. It deletes on-device data, the cloud backup, the sign-in account and server records. Web: /account-deletion.
-> • Subscriptions (Pro, Pro+): Profile → Membership, or the membership sheet. Restore purchases is on that screen. Terms and privacy links are on the paywall.
+> • Subscriptions: Calgym Essentials (Food or Training, plus Health) and Calgym Pro (both), each with a 14-day free trial. They are offered in the membership sheet after onboarding and in Profile → Membership, where Restore purchases, the trial terms and the Terms/Privacy links are shown. Please start the free trial with the sandbox account to reach every feature; without a plan the app shows recorded data read-only.
 > • Promo codes: Profile → Redeem a code. Test code: (create one in the admin console, e.g. a 7-day free code, and put it here).
 > • Health figures are estimates with a disclaimer; the app gives no medical advice.
 
@@ -137,7 +138,8 @@ Suggested order: Overview (today), meal scan result, Training with the schedule,
 
 - **App category:** Health & Fitness · **Contact email:** the support address · **Privacy policy:** `/privacy`
 - **Ads:** answer **Yes** only while the Sponsor slot (admin → Content) is switched on. It is an in-app promotion. Otherwise No.
-- **App access:** all functionality is available without special access (guest mode).
+- **App access:** no login is needed (guest mode). Features beyond viewing need a subscription, which starts with a 14-day free trial; say so in the access instructions, and add a free-access promo code for the reviewer (admin → Codes, e.g. `PLAYREVIEW`, Pro, 30 days) with "Profile → Redeem a code".
+- **Subscriptions (Monetize → Subscriptions):** the same product IDs as Apple, each with a base plan (`monthly` / `yearly`) and a `trial14` offer (New customer acquisition, Free trial, 14 days) on the Essentials and Pro base plans. Pro+ is created but not activated.
 - **Content rating (IARC):** a reference/utility app with no violence or other flagged content; mention the AI chat when asked.
 - **Target audience:** 13+ (not designed for children).
 - **Health apps declaration:** select "Nutrition and weight management" and "Activity and fitness". The app is not a medical device.
@@ -173,7 +175,35 @@ Do these in order. Only the sandbox purchase test at the end waits for the bank 
   - English: `Calgym Membership`
   - Arabic: `عضوية كالجيم`
 
-**The products, the trial and their localizations** are in [step-by-step.md](step-by-step.md), section 2 — the single up-to-date list: Essentials (19.99 / 149.99) and Pro (24.99 / 199.99) with a 2-week free trial on all four, and Pro+ created but not sold yet.
+**Products** — all six in the one group. Type the IDs exactly; they can never be changed or reused. You already made the Pro and Pro+ ones; add the two Essentials ones.
+
+| Reference name | Product ID | Duration | Level | Price (Saudi Arabia, VAT incl.) | Sold now |
+|---|---|---|---|---|---|
+| Pro+ Monthly | `calgym_proplus_monthly` | 1 month | 1 | SAR 49.99 | No, kept for later |
+| Pro+ Yearly | `calgym_proplus_yearly` | 1 year | 1 | SAR 399.99 | No, kept for later |
+| Pro Monthly | `calgym_pro_monthly` | 1 month | 2 | SAR 24.99 | Yes |
+| Pro Yearly | `calgym_pro_yearly` | 1 year | 2 | SAR 199.99 | Yes |
+| Essentials Monthly | `calgym_essentials_monthly` | 1 month | 3 | SAR 19.99 | Yes |
+| Essentials Yearly | `calgym_essentials_yearly` | 1 year | 3 | SAR 149.99 | Yes |
+
+- **Levels:** 1 is the highest. Essentials → Pro is an immediate upgrade; Pro → Essentials a downgrade at renewal.
+- **Essentials is one product for both focuses.** The member picks Food or Training in the app.
+- **Pro+:** leave its products as they are, not attached to the app version. They're ready for later.
+- **Prices:** set with **Saudi Arabia** as the base country; let Apple fill in the others. The price is what the customer pays, VAT included.
+- **Family Sharing:** off (it can't be turned off once on).
+- **Free trial, 2 weeks, on the four sold products:** each product → **Subscription Prices → Introductory Offers → +** → countries: all → start: today, no end date → type **Free** → **2 weeks**. The app shows the trial and its terms only to people Apple says are still eligible, and reminds them two days before the first charge.
+- **Availability:** all countries and regions.
+
+**Localizations** (display name up to 30 characters, description up to 45)
+
+| Product | English name | English description | Arabic name | Arabic description |
+|---|---|---|---|---|
+| Essentials Monthly | Calgym Essentials | Food or Training plus Health, 20 AI a month | كالجيم الأساسيات | التغذية أو التمارين مع الصحة، ٢٠ عملية شهرياً |
+| Essentials Yearly | Calgym Essentials (Yearly) | Food or Training plus Health, 20 AI a month | كالجيم الأساسيات (سنوي) | التغذية أو التمارين مع الصحة، ٢٠ عملية شهرياً |
+| Pro Monthly | Calgym Pro | Food, Training and Health, 50 AI a month | كالجيم برو | التغذية والتمارين والصحة، ٥٠ عملية شهرياً |
+| Pro Yearly | Calgym Pro (Yearly) | Food, Training and Health, 50 AI a month | كالجيم برو (سنوي) | التغذية والتمارين والصحة، ٥٠ عملية شهرياً |
+
+Pro+ keeps what you already entered; it isn't reviewed until it's sold. Pricing and break-even math are in [step-by-step.md](step-by-step.md), section 2.
 
 **Review information (each product)**
 - **Screenshot:** the membership sheet or Profile → Membership. Until the store is live, it shows the built-in prices; that's fine for review.
@@ -199,8 +229,9 @@ The products stay in "Missing Metadata" or "Ready to Submit" until the Paid Apps
    - Upload the In-App Purchase key `.p8`, with its Key ID and Issuer ID.
    - Paste the App-Specific Shared Secret if you made one. Save.
    - Copy the **Apple Server Notification URL** shown on this page; you need it in step 4.
-3. **Product catalog → Products → + New:** add the four product IDs from the table, one at a time, under the App Store app.
+3. **Product catalog → Products → + New:** add all six product IDs from the table, one at a time, under the App Store app (the Pro+ ones too, so a Pro+ purchase would still be recognised later).
 4. **Product catalog → Entitlements:**
+   - `essentials` (description "Essentials"): attach `calgym_essentials_monthly` and `calgym_essentials_yearly`.
    - `pro` (description "Pro"): attach `calgym_pro_monthly` and `calgym_pro_yearly`.
    - `pro_plus` (description "Pro+"): attach `calgym_proplus_monthly` and `calgym_proplus_yearly`.
 5. **Product catalog → Offerings → + New:** identifier `default`, description "Standard". Add four packages:
@@ -209,10 +240,10 @@ The products stay in "Missing Metadata" or "Ready to Submit" until the Paid Apps
    |---|---|---|
    | Monthly | `$rc_monthly` | `calgym_pro_monthly` |
    | Annual | `$rc_annual` | `calgym_pro_yearly` |
-   | Custom | `proplus_monthly` | `calgym_proplus_monthly` |
-   | Custom | `proplus_annual` | `calgym_proplus_yearly` |
+   | Custom | `essentials_monthly` | `calgym_essentials_monthly` |
+   | Custom | `essentials_annual` | `calgym_essentials_yearly` |
 
-   Then make `default` the **Current** offering. The app sorts packages by product ID, so the custom names work; RevenueCat allows only one standard Monthly and one Annual per offering.
+   Then make `default` the **Current** offering. The app sorts packages by product ID, so the custom names work; RevenueCat allows only one standard Monthly and one Annual per offering. **Don't add Pro+ packages** — leaving them out is what keeps Pro+ off the paywall. If you already added them, remove them from the offering (the products and entitlement stay).
 6. **Project settings → API keys:**
    - Copy the **App Store public key**, which starts with `appl_`.
    - **+ New secret API key**, version **V1**, named `Calgym server`. Copy it; it starts with `sk_`.
@@ -257,11 +288,15 @@ After it redeploys, open **admin → Overview → Launch checklist**. The three 
 1. App Store Connect → **Business** → add the bank account. Wait for **Paid Apps Agreement: Active** (up to a day or two).
 2. **Users and Access → Sandbox → Test Accounts** → add a tester with an email not used for any Apple ID.
 3. On your iPhone: **Settings → Developer → Sandbox Apple Account** → sign in with it. Enable Developer Mode if it isn't showing.
-4. Buy Pro in the TestFlight build → Profile shows Pro → the admin shows the purchase.
-5. Submit the app version with the four subscriptions attached for App Review.
+4. In the TestFlight build, choose **Training** on the paywall and start the Essentials trial → Profile shows "Essentials · Training" and "Free trial · ends …" → the admin shows the purchase. Then upgrade to Pro from Profile → Membership.
+5. Admin → Membership → turn **Plan locks** on (after testers have the `FOUNDERS` code).
+6. Submit the app version with the four Essentials and Pro subscriptions attached for App Review.
 
 ### Native changes in builds since 11
 - Build 15: the lock-screen and Dynamic Island rest countdown (the LiveActivity extension), and dark mode "System".
+- Build 16 (check it reached TestFlight): the larger lock-screen countdown layout, with the time first, big and clear.
+- Android APK of 28 September (build `28587322`): the rest countdown on the Android lock screen, as a silent notification with a large countdown.
+- Everything else since (plans, Essentials, trial, usage card) arrives over the air on these builds.
 
 ---
 
