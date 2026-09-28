@@ -559,6 +559,7 @@ export const ar: TranslationSchema = {
     },
   },
   schedules: {
+    saveThisWeek: 'حفظ هذا الأسبوع',
     title: 'الجداول المحفوظة',
     subtitle: 'احتفظ بأسبوع للنادي وآخر للبيت وآخر للسفر، وحمّل ما يناسبك.',
     current: 'أسبوعك الحالي',

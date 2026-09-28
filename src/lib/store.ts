@@ -428,6 +428,16 @@ interface AppState {
     water: WaterEntry[];
     weights: WeightEntry[];
     activeProgram: Program | null;
+    /** Present only in backups that carry them; absent ones leave the phone's copy. */
+    savedSchedules?: AppState['savedSchedules'];
+    activeScheduleId?: AppState['activeScheduleId'];
+    occurrences?: AppState['occurrences'];
+    recipes?: AppState['recipes'];
+    mealPlanRecipes?: AppState['mealPlanRecipes'];
+    mealPlanSwaps?: AppState['mealPlanSwaps'];
+    shopping?: AppState['shopping'];
+    fastingHistory?: AppState['fastingHistory'];
+    favoriteIds?: AppState['favoriteIds'];
   }) => void;
   /** Wipes all local data and returns to the login/onboarding flow. */
   resetAll: () => void;
@@ -1186,7 +1196,17 @@ export const useAppStore = create<AppState>()(
       },
       setLinkedRef: (ref) => set({ linkedRef: ref }),
       setSyncedAt: (iso) => set({ syncedAt: iso }),
-      applySnapshot: (snap) =>
+      applySnapshot: (snap) => {
+        const {
+          savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
+          mealPlanSwaps, shopping, fastingHistory, favoriteIds,
+        } = snap;
+        const plans = Object.fromEntries(
+          Object.entries({
+            savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
+            mealPlanSwaps, shopping, fastingHistory, favoriteIds,
+          }).filter(([, v]) => v !== undefined),
+        ) as Partial<AppState>;
         set({
           profile: snap.profile,
           targets: snap.targets,
@@ -1199,7 +1219,9 @@ export const useAppStore = create<AppState>()(
           water: snap.water,
           weights: snap.weights,
           activeProgram: snap.activeProgram,
-        }),
+          ...plans,
+        });
+      },
       resetAll: () =>
         set({
           account: null,

@@ -61,6 +61,11 @@ export default function Schedules() {
   const [renameDraft, setRenameDraft] = useState('');
 
   const current = weekSize(schedule);
+  // A first save gets a name to start from, so one tap keeps the week.
+  const startNaming = () => {
+    if (!newName.trim() && saved.length === 0) setNewName(t('schedules.defaultName'));
+    setNaming(true);
+  };
   const nameOf = (s: { name: string }) => s.name || t('schedules.defaultName');
   const activeSaved = saved.find((s) => s.id === activeId);
   // The working week differs from its saved copy once it has been edited.
@@ -118,7 +123,13 @@ export default function Schedules() {
             <Button label={t('common.cancel')} variant="ghost" onPress={() => setNaming(false)} />
           </View>
         ) : (
-          <Button label={t('schedules.newSchedule')} icon="add" onPress={() => setNaming(true)} />
+          // With nothing saved yet, what this button does is keep the week
+          // being trained — so it says that.
+          <Button
+            label={saved.length === 0 && current.exercises > 0 ? t('schedules.saveThisWeek') : t('schedules.newSchedule')}
+            icon={saved.length === 0 && current.exercises > 0 ? 'bookmark-outline' : 'add'}
+            onPress={startNaming}
+          />
         )
       }
     >
@@ -129,8 +140,8 @@ export default function Schedules() {
         <EmptyState
           icon="calendar-outline"
           title={t('schedules.emptyTitle')}
-          body={current.exercises === 0 ? t('schedules.emptyWeek') : t('schedules.empty')}
-          action={current.exercises === 0 ? { label: t('schedules.editWeek'), icon: 'create-outline', onPress: () => router.push('/schedule') } : { label: t('schedules.newSchedule'), icon: 'add', onPress: () => setNaming(true) }}
+          body={current.exercises === 0 ? t('schedules.emptyWeek') : t('schedules.unsavedWeek', { days: current.trainingDays, exercises: current.exercises })}
+          action={current.exercises === 0 ? { label: t('schedules.editWeek'), icon: 'create-outline', onPress: () => router.push('/schedule') } : { label: t('schedules.saveThisWeek'), icon: 'bookmark-outline', onPress: startNaming }}
         />
       )}
 

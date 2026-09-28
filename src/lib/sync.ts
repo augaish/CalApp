@@ -41,9 +41,23 @@ export interface Snapshot {
   water: WaterEntry[];
   weights: WeightEntry[];
   activeProgram: Program | null;
+  // Plans the person made, not only what they logged. Added later: a backup
+  // written before them simply lacks these, and restoring it then leaves the
+  // phone's own copies alone rather than emptying them.
+  savedSchedules?: State['savedSchedules'];
+  activeScheduleId?: State['activeScheduleId'];
+  occurrences?: State['occurrences'];
+  recipes?: State['recipes'];
+  mealPlanRecipes?: State['mealPlanRecipes'];
+  mealPlanSwaps?: State['mealPlanSwaps'];
+  shopping?: State['shopping'];
+  fastingHistory?: State['fastingHistory'];
+  favoriteIds?: State['favoriteIds'];
 }
 
-/** The syncable slice: logs and profile, never device-local preferences. */
+type State = ReturnType<typeof useAppStore.getState>;
+
+/** The syncable slice: logs, plans and profile, never device-local preferences. */
 export function snapshot(): Snapshot {
   const s = useAppStore.getState();
   return {
@@ -59,6 +73,15 @@ export function snapshot(): Snapshot {
     water: s.water,
     weights: s.weights,
     activeProgram: s.activeProgram,
+    savedSchedules: s.savedSchedules,
+    activeScheduleId: s.activeScheduleId,
+    occurrences: s.occurrences,
+    recipes: s.recipes,
+    mealPlanRecipes: s.mealPlanRecipes,
+    mealPlanSwaps: s.mealPlanSwaps,
+    shopping: s.shopping,
+    fastingHistory: s.fastingHistory,
+    favoriteIds: s.favoriteIds,
   };
 }
 
@@ -70,7 +93,9 @@ function isEmpty(snap: Snapshot): boolean {
     snap.workouts.length === 0 &&
     snap.weights.length === 0 &&
     snap.water.length === 0 &&
-    snap.exercises.length === 0
+    snap.exercises.length === 0 &&
+    !(snap.savedSchedules?.length) &&
+    !(snap.recipes?.length)
   );
 }
 
@@ -125,6 +150,15 @@ function apply(snap: Snapshot, updatedAt: string) {
       water: snap.water ?? [],
       weights: snap.weights ?? [],
       activeProgram: snap.activeProgram ?? null,
+      savedSchedules: snap.savedSchedules,
+      activeScheduleId: snap.activeScheduleId,
+      occurrences: snap.occurrences,
+      recipes: snap.recipes,
+      mealPlanRecipes: snap.mealPlanRecipes,
+      mealPlanSwaps: snap.mealPlanSwaps,
+      shopping: snap.shopping,
+      fastingHistory: snap.fastingHistory,
+      favoriteIds: snap.favoriteIds,
     });
     useAppStore.getState().setSyncedAt(updatedAt);
   } finally {

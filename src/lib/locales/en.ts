@@ -559,6 +559,7 @@ export const en = {
     },
   },
   schedules: {
+    saveThisWeek: 'Save this week',
     title: 'Saved schedules',
     subtitle: 'Keep a week for the gym, one for home, one for travelling — and load whichever applies.',
     current: 'Your week right now',
