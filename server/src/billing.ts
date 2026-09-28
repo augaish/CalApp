@@ -41,7 +41,7 @@ export interface PlanSpec {
 export const PLANS: Record<Plan, PlanSpec> = {
   free: { limit: 15, coach: true, equipment: true, highAccuracy: false, coachCap: 5 },
   pro: { limit: 150, coach: true, equipment: true, highAccuracy: false },
-  proPlus: { limit: 500, coach: true, equipment: true, highAccuracy: true },
+  proPlus: { limit: 400, coach: true, equipment: true, highAccuracy: true },
 };
 
 export type Feature =
@@ -123,7 +123,7 @@ export interface PlanPrices {
   proYearly: number;
 }
 
-const DEFAULT_PRICES: PlanPrices = { pro: 13, proPlus: 25, proYearly: 129, currency: 'SAR' };
+const DEFAULT_PRICES: PlanPrices = { pro: 24.99, proPlus: 49.99, proYearly: 199.99, currency: 'SAR' };
 
 /**
  * Admin-editable prices. These drive what the app SHOWS on its upgrade

@@ -177,14 +177,14 @@ Do these in order. Only the sandbox purchase test at the end waits for the bank 
 
 | Reference name | Product ID | Duration | Level | Suggested price (Saudi Arabia) |
 |---|---|---|---|---|
-| Pro+ Monthly | `calgym_proplus_monthly` | 1 month | 1 | SAR 24.99 |
-| Pro+ Yearly | `calgym_proplus_yearly` | 1 year | 1 | SAR 249.99 |
-| Pro Monthly | `calgym_pro_monthly` | 1 month | 2 | SAR 12.99 |
-| Pro Yearly | `calgym_pro_yearly` | 1 year | 2 | SAR 129.99 |
+| Pro+ Monthly | `calgym_proplus_monthly` | 1 month | 1 | SAR 49.99 |
+| Pro+ Yearly | `calgym_proplus_yearly` | 1 year | 1 | SAR 399.99 |
+| Pro Monthly | `calgym_pro_monthly` | 1 month | 2 | SAR 24.99 |
+| Pro Yearly | `calgym_pro_yearly` | 1 year | 2 | SAR 199.99 |
 
 - **Product IDs:** type them exactly as shown. They can never be changed or reused once created, and the app and server rely on these names.
 - **Levels:** Pro+ is level 1 (the higher tier) and Pro is level 2. This is what makes a switch from Pro to Pro+ an immediate upgrade, and Pro+ to Pro a downgrade at renewal.
-- **Prices:** pick the price with **Saudi Arabia** as the base country and let Apple fill in the other countries. The price you choose is what the customer pays, VAT included; Apple deducts the VAT. The suggestions match the admin page's current display prices (13 / 25 / 129) at the nearest Apple price, with yearly about two months cheaper than monthly.
+- **Prices:** pick the price with **Saudi Arabia** as the base country and let Apple fill in the other countries. The price you choose is what the customer pays, VAT included; Apple deducts the VAT. These prices cover Apple's 15% (Small Business Program), a 15% partner commission, VAT and AI costs; the break-even math is in [step-by-step.md](step-by-step.md). Set the same numbers in the admin page → Membership so the paywall shows them before the store prices load.
 - **Family Sharing:** leave it **off**. Once turned on, it can't be turned off.
 - **Introductory offers / free trials:** add **none** for now. The paywall doesn't describe trial terms yet, and Apple rejects a trial that isn't explained on the purchase screen. If you want trials later, tell me first and I'll add the wording.
 - **Availability:** all countries and regions.
@@ -195,8 +195,8 @@ Do these in order. Only the sandbox purchase test at the end waits for the bank 
 |---|---|---|---|---|
 | Pro Monthly | Calgym Pro | 150 AI actions a month and the AI coach | كالجيم برو | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
 | Pro Yearly | Calgym Pro (Yearly) | 150 AI actions a month and the AI coach | كالجيم برو (سنوي) | ١٥٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
-| Pro+ Monthly | Calgym Pro+ | 500 AI actions a month and the AI coach | كالجيم برو+ | ٥٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
-| Pro+ Yearly | Calgym Pro+ (Yearly) | 500 AI actions a month and the AI coach | كالجيم برو+ (سنوي) | ٥٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Pro+ Monthly | Calgym Pro+ | 400 AI actions a month and the AI coach | كالجيم برو+ | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
+| Pro+ Yearly | Calgym Pro+ (Yearly) | 400 AI actions a month and the AI coach | كالجيم برو+ (سنوي) | ٤٠٠ عملية ذكاء اصطناعي شهرياً والمدرب الذكي |
 
 If you change the allowances in the admin page, update these descriptions to match.
 

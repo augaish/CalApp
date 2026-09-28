@@ -19,11 +19,11 @@ import { MEMBERSHIP_FEATURES, useStoreOffer } from '@/lib/use-store-offer';
  * Shown only while the store has nothing to sell: once it does, every price
  * on this screen is the store's own. */
 const FALLBACK = {
-  pro: 13,
-  proPlus: 25,
-  proYearly: 129,
+  pro: 24.99,
+  proPlus: 49.99,
+  proYearly: 199.99,
   currency: 'SAR',
-  limits: { free: 15, pro: 150, proPlus: 500 },
+  limits: { free: 15, pro: 150, proPlus: 400 },
   coachCap: 5,
 };
 
