@@ -13,6 +13,7 @@ import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { sendEmailCode, syncAuthIdentity, verifyEmailCode } from '@/lib/auth';
 import { appleSignInAvailable, signInWithApple } from '@/lib/auth-apple';
+import { GoogleCancelled, GoogleUnavailable, signInWithGoogle } from '@/lib/auth-google';
 import { lightHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { normalizeDigits } from '@/lib/numbers';
@@ -90,6 +91,20 @@ export default function Login() {
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
       if (!/canceled|cancelled|ERR_REQUEST_CANCELED/i.test(msg)) alertProblem(t('auth.signInFailed'), reason(err));
+      setBusy(false);
+    }
+  };
+
+  const withGoogle = async () => {
+    setBusy(true);
+    try {
+      const account = await signInWithGoogle();
+      const outcome = await syncAuthIdentity();
+      setAccount(account);
+      if (outcome === 'restored') Alert.alert(t('auth.restored'));
+    } catch (err) {
+      if (err instanceof GoogleUnavailable) Alert.alert(t('auth.googleUnavailableTitle'), t('auth.googleUnavailable'));
+      else if (!(err instanceof GoogleCancelled)) alertProblem(t('auth.signInFailed'), reason(err));
       setBusy(false);
     }
   };
@@ -196,6 +211,17 @@ export default function Login() {
                   <Text style={styles.appleLabel}>{t('auth.continueApple')}</Text>
                 </Pressable>
               )}
+              {Platform.OS !== 'web' && (
+                <Pressable
+                  onPress={withGoogle}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  style={({ pressed }) => [styles.googleBtn, { borderColor: theme.border }, pressed && { opacity: 0.85 }]}
+                >
+                  <Icon name="logo-google" size={18} color="#1F1F1F" />
+                  <Text style={styles.googleLabel}>{t('auth.continueGoogle')}</Text>
+                </Pressable>
+              )}
               <Button label={t('welcome.signIn')} variant="secondary" onPress={() => setStep('email')} style={{ marginTop: Spacing.sm }} />
               <Text style={{ color: theme.textSecondary, fontSize: 13, textAlign: 'center', marginTop: Spacing.ms }}>{t('welcome.note')}</Text>
             </>
@@ -263,6 +289,9 @@ const styles = StyleSheet.create({
   check: { position: 'absolute', top: 10, end: 10, width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   appleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, backgroundColor: '#000000', borderRadius: Radius.control, minHeight: 52, marginTop: Spacing.sm },
   appleLabel: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
+  // Google's own button style: white, with a hairline border, in either theme.
+  googleBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, backgroundColor: '#FFFFFF', borderWidth: 1, borderRadius: Radius.control, minHeight: 52, marginTop: Spacing.sm },
+  googleLabel: { color: '#1F1F1F', fontSize: 17, fontWeight: '600' },
   input: { borderWidth: 1, borderRadius: Radius.control, paddingHorizontal: Spacing.md, paddingVertical: 14, fontSize: 16, marginBottom: Spacing.sm },
   codeInput: { textAlign: 'center', fontSize: 24, fontWeight: '800', letterSpacing: 6 },
 });

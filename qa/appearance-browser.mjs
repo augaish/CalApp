@@ -1,4 +1,4 @@
-// Appearance: System / Light / Dark from Profile, and the palette follows.
+// Appearance: Light by default; System / Light / Dark from Profile, and the palette follows.
 import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
 const BASE = 'http://127.0.0.1:8099';
 const state = (appearance) => ({
@@ -32,8 +32,20 @@ let { ctx, page } = await open(undefined, 'light');
 check('an existing store (no setting) on a light phone stays light', (await pageBg(page)) === LIGHT, await pageBg(page));
 await ctx.close();
 ({ ctx, page } = await open(undefined, 'dark'));
+check('no choice made: light, even on a dark phone', (await pageBg(page)) === LIGHT, await pageBg(page));
+await ctx.close();
+({ ctx, page } = await open('system', 'dark'));
 check('on System, a dark phone gets the dark palette', (await pageBg(page)) === DARK, await pageBg(page));
 await ctx.close();
+{
+  // Signed out, first launch, on a dark phone: the login screen is light.
+  const c = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: 'dark' });
+  const p = await c.newPage();
+  await p.goto(`${BASE}/`, { waitUntil: 'load' }); await p.waitForTimeout(1800);
+  const bg = await p.evaluate(() => { let el = document.elementFromPoint(6, 780); while (el && getComputedStyle(el).backgroundColor === 'rgba(0, 0, 0, 0)') el = el.parentElement; return el ? getComputedStyle(el).backgroundColor : null; });
+  check('the login screen is light on a dark phone', bg === LIGHT, String(bg));
+  await c.close();
+}
 ({ ctx, page } = await open('light', 'dark'));
 check('Light pinned stays light on a dark phone', (await pageBg(page)) === LIGHT, await pageBg(page));
 await ctx.close();

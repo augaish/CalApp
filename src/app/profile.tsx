@@ -65,7 +65,7 @@ export default function Profile() {
       { text: t('common.cancel'), style: 'cancel' },
     ]);
 
-  const appearance = useAppStore((s) => s.appearance) ?? 'system';
+  const appearance = useAppStore((s) => s.appearance) ?? 'light';
   const setAppearance = useAppStore((s) => s.setAppearance);
   const chooseAppearance = () =>
     Alert.alert(t('appearance.title'), t('appearance.note'), [

@@ -165,3 +165,24 @@ On Google's form, sending data to a service provider that processes it on your b
 ### Build 12 carries (native changes since build 11)
 - The lock-screen and Dynamic Island rest countdown (`expo-live-activity`, a new widget extension). EAS will create the extension's bundle ID `com.augaish.calapp.LiveActivity` and its profile on the first build.
 - Dark mode "System" for the app chrome (`userInterfaceStyle: automatic`).
+
+---
+
+## Google sign-in (one-time setup)
+The app's "Continue with Google" button goes through Supabase Auth. Until the steps below are done, tapping it says Google sign-in isn't ready yet.
+
+1. **Google Cloud Console** (console.cloud.google.com) → create a project named **Calgym**.
+2. **APIs & Services → OAuth consent screen:**
+   - User type **External**, app name **Calgym**, support email, and the app logo if you want it.
+   - Authorized domain: `supabase.co`.
+   - Scopes: `email`, `profile`, `openid`.
+   - Then **Publish app**. While it's in "Testing", only listed test users can sign in.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID:**
+   - Type **Web application**, name "Calgym Supabase".
+   - Authorized redirect URI: `https://uvhvxcvwpwkqvnvqdtyf.supabase.co/auth/v1/callback`
+   - Copy the **Client ID** and **Client secret**.
+4. **Supabase → Authentication → Sign In / Providers → Google:** enable it, paste the Client ID and Client secret, and save.
+5. **Supabase → Authentication → URL Configuration → Redirect URLs:** add `calapp://**`.
+
+No app build is needed: the button works on build 15 as soon as step 5 is saved.
+Google's page will say "to continue to uvhvxcvwpwkqvnvqdtyf.supabase.co". Showing "Calgym" there instead needs a Supabase custom domain, which is a paid add-on.

@@ -12,7 +12,7 @@ import { useAppStore } from '@/lib/store';
  * there while an explicit Dark still works.
  */
 export function useTheme(): ThemeColors {
-  const pref = useAppStore((s) => s.appearance) ?? 'system';
+  const pref = useAppStore((s) => s.appearance) ?? 'light';
   const system = useColorScheme();
   const scheme = pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref;
   return Colors[scheme];
@@ -20,7 +20,7 @@ export function useTheme(): ThemeColors {
 
 /** 'light' or 'dark', resolved the same way, for the few places that need the name. */
 export function useSchemeName(): 'light' | 'dark' {
-  const pref = useAppStore((s) => s.appearance) ?? 'system';
+  const pref = useAppStore((s) => s.appearance) ?? 'light';
   const system = useColorScheme();
   return pref === 'system' ? (system === 'dark' ? 'dark' : 'light') : pref;
 }

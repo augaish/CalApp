@@ -966,6 +966,8 @@ export const en = {
     deleteSet: 'Delete set',
   },
   auth: {
+    googleUnavailableTitle: 'Google sign-in is not ready yet',
+    googleUnavailable: 'Please continue with Apple or email for now — Google sign-in is being switched on.',
     welcomeTitle: 'Calgym',
     welcomeSubtitle: 'Your AI food & gym coach. Snap, scan, and hit your goals.',
     continueGoogle: 'Continue with Google',

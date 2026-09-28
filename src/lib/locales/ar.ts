@@ -966,6 +966,8 @@ export const ar: TranslationSchema = {
     deleteSet: 'حذف المجموعة',
   },
   auth: {
+    googleUnavailableTitle: 'الدخول عبر Google غير متاح بعد',
+    googleUnavailable: 'تابع عبر Apple أو البريد الإلكتروني الآن — نعمل على تفعيل الدخول عبر Google.',
     continueEmail: 'المتابعة بالبريد الإلكتروني',
     continueApple: 'المتابعة عبر Apple',
     emailPlaceholder: 'you@example.com',

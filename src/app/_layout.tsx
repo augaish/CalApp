@@ -24,7 +24,7 @@ export default function RootLayout() {
   const profile = useAppStore((s) => s.profile);
   const account = useAppStore((s) => s.account);
   const tutorialSeen = useAppStore((s) => s.tutorialSeen);
-  const appearance = useAppStore((s) => s.appearance) ?? 'system';
+  const appearance = useAppStore((s) => s.appearance) ?? 'light';
   const theme = useTheme();
   const scheme = useSchemeName();
   // The navigator's own surfaces (behind screens, during transitions) in the
