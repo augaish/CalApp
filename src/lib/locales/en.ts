@@ -966,6 +966,10 @@ export const en = {
     deleteSet: 'Delete set',
   },
   auth: {
+    networkTitle: 'Connection dropped',
+    networkBody: 'We could not reach the server. Check your connection and try again.',
+    rateLimitedTitle: 'Please wait a moment',
+    rateLimitedBody: 'A code was just sent. Wait about a minute before asking for another one.',
     googleUnavailableTitle: 'Google sign-in is not ready yet',
     googleUnavailable: 'Please continue with Apple or email for now — Google sign-in is being switched on.',
     welcomeTitle: 'Calgym',

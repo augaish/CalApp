@@ -966,6 +966,10 @@ export const ar: TranslationSchema = {
     deleteSet: 'حذف المجموعة',
   },
   auth: {
+    networkTitle: 'انقطع الاتصال',
+    networkBody: 'تعذّر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.',
+    rateLimitedTitle: 'انتظر قليلاً',
+    rateLimitedBody: 'أُرسل رمز للتو. انتظر نحو دقيقة قبل طلب رمز آخر.',
     googleUnavailableTitle: 'الدخول عبر Google غير متاح بعد',
     googleUnavailable: 'تابع عبر Apple أو البريد الإلكتروني الآن — نعمل على تفعيل الدخول عبر Google.',
     continueEmail: 'المتابعة بالبريد الإلكتروني',

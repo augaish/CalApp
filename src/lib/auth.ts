@@ -1,4 +1,5 @@
 import { identifyEmail, linkInstall, setInstallId } from './api';
+import { isNetworkError, retryOnNetwork } from './auth-errors';
 import type { Account } from './store';
 import { useAppStore } from './store';
 import { getSupabase } from './supabase';
@@ -12,22 +13,37 @@ export { authConfigured } from './supabase';
  * from every mail client.
  */
 export async function sendEmailCode(email: string): Promise<void> {
-  const { error } = await getSupabase().auth.signInWithOtp({
-    email: email.trim().toLowerCase(),
-    options: { shouldCreateUser: true },
+  await retryOnNetwork(async () => {
+    const { error } = await getSupabase().auth.signInWithOtp({
+      email: email.trim().toLowerCase(),
+      options: { shouldCreateUser: true },
+    });
+    if (error) throw error;
   });
-  if (error) throw error;
 }
 
 /** Verify the emailed code and return the signed-in account. */
 export async function verifyEmailCode(email: string, code: string): Promise<Account> {
-  const { data, error } = await getSupabase().auth.verifyOtp({
-    email: email.trim().toLowerCase(),
-    token: code.trim(),
-    type: 'email',
-  });
-  if (error) throw error;
-  const user = data.user;
+  const sb = getSupabase();
+  const verify = async () => {
+    const { data, error } = await sb.auth.verifyOtp({
+      email: email.trim().toLowerCase(),
+      token: code.trim(),
+      type: 'email',
+    });
+    if (error) throw error;
+    return data.user;
+  };
+  let user;
+  try {
+    user = await verify();
+  } catch (err) {
+    if (!isNetworkError(err)) throw err;
+    // The reply was lost, but the code may already have been used: a session
+    // on the phone means it was, and asking again would only say "expired".
+    const { data } = await sb.auth.getSession();
+    user = data.session?.user ?? (await retryOnNetwork(verify));
+  }
   if (!user) throw new Error('no_user');
   return {
     name: (user.user_metadata?.name as string) ?? email.split('@')[0],

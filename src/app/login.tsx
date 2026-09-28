@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { sendEmailCode, syncAuthIdentity, verifyEmailCode } from '@/lib/auth';
 import { appleSignInAvailable, signInWithApple } from '@/lib/auth-apple';
 import { GoogleCancelled, GoogleUnavailable, signInWithGoogle } from '@/lib/auth-google';
+import { authFailure } from '@/lib/auth-errors';
 import { lightHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { normalizeDigits } from '@/lib/numbers';
@@ -23,9 +24,13 @@ import type { FocusArea, Language } from '@/lib/types';
 type Step = 'choose' | 'email' | 'code';
 
 /** The auth service's own wording, when it gave one. */
-function reason(err: unknown): string | undefined {
-  const msg = err instanceof Error ? err.message.trim() : '';
-  return msg || undefined;
+/** A sign-in failure told in words, with the raw text only when nothing better is known. */
+function explain(err: unknown, stage: 'send' | 'verify' | 'provider', t: (k: string) => string): [string, string | undefined] {
+  const f = authFailure(err, stage);
+  if (f.kind === 'network') return [t('auth.networkTitle'), t('auth.networkBody')];
+  if (f.kind === 'rateLimited') return [t('auth.rateLimitedTitle'), t('auth.rateLimitedBody')];
+  if (f.kind === 'badCode') return [t('auth.invalidCode'), undefined];
+  return [t('auth.signInFailed'), f.detail];
 }
 
 const FOCUS: { key: FocusArea; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -90,7 +95,7 @@ export default function Login() {
       if (outcome === 'restored') Alert.alert(t('auth.restored'));
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      if (!/canceled|cancelled|ERR_REQUEST_CANCELED/i.test(msg)) alertProblem(t('auth.signInFailed'), reason(err));
+      if (!/canceled|cancelled|ERR_REQUEST_CANCELED/i.test(msg)) alertProblem(...explain(err, 'provider', t));
       setBusy(false);
     }
   };
@@ -104,7 +109,7 @@ export default function Login() {
       if (outcome === 'restored') Alert.alert(t('auth.restored'));
     } catch (err) {
       if (err instanceof GoogleUnavailable) Alert.alert(t('auth.googleUnavailableTitle'), t('auth.googleUnavailable'));
-      else if (!(err instanceof GoogleCancelled)) alertProblem(t('auth.signInFailed'), reason(err));
+      else if (!(err instanceof GoogleCancelled)) alertProblem(...explain(err, 'provider', t));
       setBusy(false);
     }
   };
@@ -119,25 +124,26 @@ export default function Login() {
       await sendEmailCode(email);
       setStep('code');
     } catch (err) {
-      alertProblem(t('auth.signInFailed'), reason(err));
+      alertProblem(...explain(err, 'send', t));
     } finally {
       setBusy(false);
     }
   };
 
-  const confirmCode = async () => {
-    if (code.trim().length < 6) {
+  const confirmCode = async (value: string = code) => {
+    if (busy) return;
+    if (value.trim().length < 6) {
       alertProblem(t('auth.invalidCode'));
       return;
     }
     setBusy(true);
     try {
-      const account = await verifyEmailCode(email, code);
+      const account = await verifyEmailCode(email, value);
       const outcome = await syncAuthIdentity();
       setAccount(account);
       if (outcome === 'restored') Alert.alert(t('auth.restored'));
     } catch (err) {
-      alertProblem(t('auth.invalidCode'), reason(err));
+      alertProblem(...explain(err, 'verify', t));
       setBusy(false);
     }
   };
@@ -236,6 +242,8 @@ export default function Login() {
                 placeholder={t('auth.emailPlaceholder')}
                 placeholderTextColor={theme.textTertiary}
                 keyboardType="email-address"
+                textContentType="emailAddress"
+                autoComplete="email"
                 autoCapitalize="none"
                 autoCorrect={false}
                 autoFocus
@@ -252,16 +260,27 @@ export default function Login() {
               <Text style={{ color: theme.textSecondary, fontSize: 14, textAlign: 'center', marginBottom: Spacing.sm }}>{t('auth.codeSent', { email })}</Text>
               <TextInput
                 value={code}
-                onChangeText={(v) => setCode(normalizeDigits(v))}
+                onChangeText={(v) => {
+                  // Digits only, first six: an autofilled or pasted code may
+                  // carry a space or text around it, and a hard length limit
+                  // would make iOS drop it altogether.
+                  const digits = normalizeDigits(v).replace(/\D/g, '').slice(0, 6);
+                  setCode(digits);
+                  // A pasted or autofilled code signs in straight away.
+                  if (digits.length === 6 && digits !== code) void confirmCode(digits);
+                }}
                 placeholder="123456"
                 placeholderTextColor={theme.textTertiary}
                 keyboardType="number-pad"
-                maxLength={6}
+                // Lets iOS offer the code from Mail or Messages above the
+                // keyboard, and Android offer it from its own autofill.
+                textContentType="oneTimeCode"
+                autoComplete="one-time-code"
                 autoFocus
                 accessibilityLabel={t('auth.verify')}
                 style={[styles.input, styles.codeInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
               />
-              <Button label={busy ? t('auth.signingIn') : t('auth.verify')} onPress={confirmCode} disabled={busy} />
+              <Button label={busy ? t('auth.signingIn') : t('auth.verify')} onPress={() => void confirmCode()} disabled={busy} />
               <Button
                 label={t('auth.useAnotherEmail')}
                 variant="ghost"
