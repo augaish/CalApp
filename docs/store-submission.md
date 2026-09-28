@@ -26,7 +26,7 @@ Your details, used below:
 
 ## Step 1 ⬜ Check the newest build reached TestFlight
 1. Open **appstoreconnect.apple.com → Apps → Calgym → TestFlight**.
-2. Under **iOS builds**, look for the newest build: the one after 16, uploaded on the evening of 28 September.
+2. Under **iOS builds**, look for **build 17** (version 1.0.0), uploaded on the evening of 28 September.
 3. If it shows **Missing Compliance**, click it and choose **None of the algorithms mentioned**. Normally it won't ask, because the app declares no special encryption.
 
 **Done when:** the build shows **Ready to Test** (it can take 30–60 minutes after upload).
@@ -378,7 +378,7 @@ In the TestFlight build:
 
 ## Step 17 🏦 Submit for review
 1. Your app → **1.0 Prepare for Submission**:
-   - **Build → +:** choose the newest build (from step 1).
+   - **Build → +:** choose **build 17** (or a newer one if we make it).
    - **In-App Purchases and Subscriptions → +:** tick the four sold products (Essentials Monthly and Yearly, Pro Monthly and Yearly). Not Pro+.
 2. **Add for Review** (top right) → **Submit to App Review**.
 3. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
@@ -508,10 +508,10 @@ No app build is needed.
 ## What each build contains
 - **Build 15:** the lock-screen and Dynamic Island rest countdown, and dark mode "System".
 - **Build 16:** the larger lock-screen countdown.
-- **Newest build (28 September), the one to submit:**
+- **Build 17 (28 September), the one to submit:**
   - Notification buttons work with the app closed.
   - Background refresh of reminders.
-- **Newest Android APK (28 September):**
+- **Android APK `ae922784` (28 September):** https://expo.dev/accounts/augaishb/projects/calapp/builds/ae922784-6494-4609-811e-e8c98ae089c1
   - The rest countdown on the lock screen, with −15 s, +15 s and Skip.
   - It becomes the "Rest over" alert when the rest ends.
   - On Android 14+, allow **Profile → Notifications → Allow exact rest alerts** once.
