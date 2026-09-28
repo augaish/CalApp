@@ -43,7 +43,7 @@ EN:
 >
 > TRAINING
 > • Weekly schedule, one-tap workouts, sets that remember your last session
-> • A rest timer that keeps counting on the lock screen
+> • A rest timer on the lock screen, with −15 s, +15 s and Skip
 > • Workout history, personal records and progress
 >
 > HEALTH
@@ -52,6 +52,11 @@ EN:
 >
 > AI COACH
 > • Ask about your nutrition and training; answers use your own numbers
+>
+> SMART REMINDERS
+> • Planned from your own logs: nothing you've already done is reminded
+> • Water paced to your goal, a daily recap and a weekly wins summary
+> • Buttons right on the notification: add a glass, start your workout, or remind me later
 >
 > Works as a guest — no account needed. English and Arabic.
 >
@@ -70,7 +75,7 @@ AR:
 >
 > التمرين
 > • جدول أسبوعي وتمارين بلمسة، ومجموعات تتذكر جلستك السابقة
-> • مؤقت راحة يستمر على شاشة القفل
+> • مؤقت راحة على شاشة القفل مع −١٥ ث و+١٥ ث وتخطٍّ
 > • سجل التمارين والأرقام القياسية والتقدم
 >
 > الصحة
@@ -79,6 +84,11 @@ AR:
 >
 > المدرب الذكي
 > • اسأل عن تغذيتك وتمرينك بإجابات مبنية على أرقامك
+>
+> تذكيرات ذكية
+> • مبنية على ما تسجّله: لا تذكير بشيء أنجزته
+> • ماء موزّع على يومك نحو هدفك، وملخص يومي وإنجازات أسبوعية
+> • أزرار في الإشعار نفسه: أضف كوب ماء، أو ابدأ تمرينك، أو ذكّرني لاحقاً
 >
 > يعمل دون حساب، بالعربية والإنجليزية.
 >
@@ -121,6 +131,7 @@ Photos, report files and coach messages are sent for AI processing and not kept 
 > • Subscriptions: Calgym Essentials (Food or Training, plus Health) and Calgym Pro (both), each with a 14-day free trial. They are offered in the membership sheet after onboarding and in Profile → Membership, where Restore purchases, the trial terms and the Terms/Privacy links are shown. Please start the free trial with the sandbox account to reach every feature; without a plan the app shows recorded data read-only.
 > • Promo codes: Profile → Redeem a code. Test code: (create one in the admin console, e.g. a 7-day free code, and put it here).
 > • Health figures are estimates with a disclaimer; the app gives no medical advice.
+> • Notifications are optional and local: they are planned on the device from the person's own logs (no remote push). Their buttons (add water, remind me later, start workout) act inside the app. The background modes (fetch, processing) are used only to re-plan these local reminders a few times a day; the rest timer uses a Live Activity.
 
 ### Export compliance
 The app only uses standard HTTPS. `ITSAppUsesNonExemptEncryption` is already `false` in `app.json`, so builds won't ask.
@@ -144,6 +155,7 @@ Suggested order: Overview (today), meal scan result, Training with the schedule,
 - **Target audience:** 13+ (not designed for children).
 - **Health apps declaration:** select "Nutrition and weight management" and "Activity and fitness". The app is not a medical device.
 - **Account deletion:** the app lets users create an account, so answer **Yes**. Web link: `/account-deletion`.
+- **Permissions the listing shows:** notifications, camera, microphone (video meal notes), and **"Schedule exact alarms"**. The last is for the rest timer's alert, which must sound when the rest the person started ends. It is the user-grantable `SCHEDULE_EXACT_ALARM`, not the restricted `USE_EXACT_ALARM`, so Play asks for no declaration. If a form asks anyway, answer: "a user-started workout rest timer that alerts when the rest ends".
 
 ### Data safety
 - **Is data encrypted in transit?** Yes.
@@ -279,8 +291,8 @@ After it redeploys, open **admin → Overview → Launch checklist**. The three 
 
 **External group**
 1. **External Testing → +** → group name `Beta testers`.
-2. **Builds → +** → **build 15** (or the newest).
-3. **What to Test:** "Log meals by photo or text, run a workout from Training (watch the rest timer on the lock screen), try the AI coach, and switch Arabic/English in Profile."
+2. **Builds → +** → the newest build (the one started on 28 September, see the end of this section).
+3. **What to Test:** "Log meals by photo or text, run a workout from Training (watch the rest timer on the lock screen), try the AI coach, and switch Arabic/English in Profile. Leave notifications on for a day: reminders only for what you haven't logged, an evening recap, and buttons to add water or start a workout."
 4. **Submit for Review.** The first external build usually takes 24–48 hours; later builds are often approved automatically.
 5. After approval, add testers by email, or turn on the **Public Link** (up to 10,000 testers) and share it.
 
@@ -294,9 +306,44 @@ After it redeploys, open **admin → Overview → Launch checklist**. The three 
 
 ### Native changes in builds since 11
 - Build 15: the lock-screen and Dynamic Island rest countdown (the LiveActivity extension), and dark mode "System".
-- Build 16 (check it reached TestFlight): the larger lock-screen countdown layout, with the time first, big and clear.
-- Android APK of 28 September (build `28587322`): the rest countdown on the Android lock screen, as a silent notification with a large countdown.
-- Everything else since (plans, Essentials, trial, usage card) arrives over the air on these builds.
+- Build 16: the larger lock-screen countdown layout, with the time first, big and clear.
+- Android APK `28587322`: the first Android lock-screen countdown (a silent notification).
+- **iOS build and Android APK started 28 September evening (Phase 3). These are the builds to test and submit:**
+  - Background refresh: planned reminders stay accurate on days the app isn't opened. This adds the `fetch` and `processing` background modes.
+  - Notification buttons work with the app closed: "+ your glass" of water, "In 30 min" or "In 1 hour", "Log meal" and "Start workout".
+  - Android: the rest countdown shows on the lock screen, with −15 s, +15 s and Skip. When the rest ends, it turns into the "Rest over" alert with sound, exactly on time. On Android 14+, allow **Profile → Notifications → Allow exact rest alerts** once.
+  - The iOS build number is set automatically: the next after 16. It uploads to TestFlight by itself in about 30–40 minutes.
+- Everything else (plans, Essentials, trial, notification planning, tap-to-open, the in-app ±15 s) also arrives over the air on older builds.
+
+### Test these on the new builds
+1. **Rest timer, Android:**
+   - Complete a set, then lock the phone. The countdown is on the lock screen.
+   - Tap +15 s: the time jumps. Open the app: the session shows the same time.
+   - Tap Skip: the notification goes, and the app shows no rest.
+   - Let a rest finish with the phone locked: the same notification becomes "Rest over", with sound.
+2. **Rest timer, iPhone:** the lock-screen and Dynamic Island countdown as before. The "Rest over" alert still arrives with the phone locked.
+3. **Notification buttons** (long-press a notification on iPhone, or expand it on Android):
+   - Water "+250 ml" adds a glass without opening the app. The next water reminder counts it.
+   - "In 30 min" brings the meal reminder back 30 minutes later, unless you log the meal first.
+   - "Start workout" opens today's workout, already started.
+4. **Taps:** a water reminder opens Water, a meal reminder opens Food, the recap opens Overview.
+5. **Profile → Notifications → Coming up:** shows the plan, and after a "Later" it shows the moved reminder.
+
+---
+
+## Apple Small Business Program (15% commission)
+Apply at developer.apple.com/app-store/small-business-program → **Enroll**, signed in as the Account Holder (Team ID `ZV34R3L8FY`).
+
+| Question | Answer |
+|---|---|
+| Paid Applications Agreement accepted? | **Yes**, once App Store Connect → Business shows it **Active**. Accept it first if it doesn't. |
+| Majority interest in another developer account? | **No** |
+| Another account has majority interest in yours? | **No** |
+| Decision-making authority over another account? | **No** |
+| Another account has authority over yours? | **No** |
+| Associated Developer Account Details | Nothing to fill: the section only applies after a "Yes". If it still asks for one, recheck the four answers. Never list your own account there. |
+
+Apple confirms by email. The 15% rate starts at the beginning of the next Apple fiscal month after approval.
 
 ---
 
