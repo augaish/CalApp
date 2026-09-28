@@ -4,7 +4,8 @@ import { create } from 'zustand';
 import { fetchEntitlement, type Entitlement } from './api';
 import { gateOpen, lockReasonFor } from './plan-gates';
 import { configurePurchases, setPlanChangedHandler } from './purchases';
-import { setWriteGuard } from './store';
+import { setNotifyGateSource, syncReminders } from './reminders';
+import { setWriteGuard, useAppStore } from './store';
 import { syncTrialReminder } from './trial-reminder';
 
 /**
@@ -26,6 +27,10 @@ export const useEntitlement = create<EntitlementState>((set, get) => ({
     else set({ loaded: true });
     // A reminder two days before a store trial turns into the first charge.
     if (data) void syncTrialReminder(data.trial ? (data.planUntil ?? null) : null);
+    // What the plan covers decides which notifications make sense (Essentials
+    // Food: none about training). Only once reminders have been set up, so
+    // this never asks for permission before onboarding does.
+    if (data && useAppStore.getState().remindersInitialized) void syncReminders();
     // The server decides when subscriptions are on, by handing out the
     // store key; the first refresh that carries one switches the SDK on.
     if (data?.billing) configurePurchases(data.billing);
@@ -53,6 +58,12 @@ export function isPro(): boolean {
   const plan = useEntitlement.getState().plan;
   return plan === 'essentials' || plan === 'pro' || plan === 'proPlus';
 }
+
+// Notifications follow what the plan covers.
+setNotifyGateSource(() => {
+  const s = useEntitlement.getState();
+  return { plan: s.plan, locks: s.locks, module: s.module, features: s.features };
+});
 
 // With plan locks on, a write the plan doesn't cover does nothing and the
 // membership sheet says why — at most once a moment, however many writes a

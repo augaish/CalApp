@@ -1,10 +1,17 @@
 import { AppState, Platform } from 'react-native';
 
+import { renderNote } from './notify/copy';
+import { buildFacts } from './notify/facts';
+import { planNotes, type Channel, type PlannedNote } from './notify/planner';
 import i18n from './i18n';
-import { isSameDay, streakDays, useAppStore, workoutStreakDays } from './store';
-import type { MealType } from './types';
+import type { GateState } from './plan-gates';
+import { useAppStore } from './store';
 
 /**
+ * Notifications, planned from the person's own data (see notify/planner.ts):
+ * re-planned after every log and on every open, so a reminder for something
+ * already done disappears, and every message carries today's real numbers.
+ *
  * expo-notifications is loaded lazily so an installed binary that predates
  * the native module doesn't crash at import time — reminders simply report
  * "unavailable" until the app is rebuilt.
@@ -46,13 +53,6 @@ export const REST_ALERT_ID = 'calgym-rest';
 /** The reminder before a store trial's first charge (trial-reminder.ts); reminders never cancel it. */
 export const TRIAL_REMINDER_ID = 'calgym-trial';
 
-const WATER_HOURS = [10, 15, 20];
-const MEAL_PROMPT: Record<'breakfast' | 'lunch' | 'dinner', { hour: number; minute: number }> = {
-  breakfast: { hour: 9, minute: 0 },
-  lunch: { hour: 13, minute: 30 },
-  dinner: { hour: 20, minute: 0 },
-};
-
 export async function requestPermission(mod: NotificationsModule): Promise<boolean> {
   const settings = await mod.getPermissionsAsync();
   if (settings.granted) return true;
@@ -60,33 +60,6 @@ export async function requestPermission(mod: NotificationsModule): Promise<boole
   return req.granted;
 }
 
-/** Median hour the user usually logs workouts, or 18:00 until there's history. */
-function usualWorkoutHour(workouts: { at: string }[]): number {
-  const hours = workouts.map((w) => new Date(w.at).getHours()).sort((a, b) => a - b);
-  if (hours.length < 3) return 18;
-  return hours[Math.floor(hours.length / 2)];
-}
-
-/** A Date at hour:minute today, or null if that time has already passed. */
-function todayAt(hour: number, minute: number): Date | null {
-  const d = new Date();
-  d.setHours(hour, minute, 0, 0);
-  return d.getTime() > Date.now() ? d : null;
-}
-
-/**
- * Round numbers worth calling out — a streak's own count changes daily, so
- * checking "is today's count one of these" is enough to fire exactly once
- * per milestone with no extra "already congratulated" state to track.
- */
-const STREAK_MILESTONES = [3, 7, 14, 21, 30, 45, 60, 90, 100, 150, 200, 365];
-
-/**
- * Recompute and reschedule all reminders from the current on-device state.
- * Called on first launch, on app foreground, and after each log. Baseline
- * water/workout reminders repeat daily; meal prompts, the streak saver and the
- * macro summary are conditional and only scheduled for today when still due.
- */
 /** The OS permission as it stands — read only, never prompts. `null` when notifications are not available on this platform. */
 export async function notificationsGranted(): Promise<boolean | null> {
   const mod = notifications();
@@ -99,18 +72,72 @@ export async function notificationsGranted(): Promise<boolean | null> {
   }
 }
 
-export async function syncReminders(): Promise<{ granted: boolean }> {
+/** What the plan covers (Essentials module, no plan…), supplied by the entitlement store. */
+let gateSource: () => GateState = () => ({});
+export function setNotifyGateSource(fn: () => GateState): void {
+  gateSource = fn;
+}
+
+/** The plan as it stands now, rendered — for Settings' "Coming up" preview. */
+export function plannedPreview(now: Date = new Date()): { id: string; at: Date; channel: Channel; title: string; body: string }[] {
+  try {
+    const notes = planNotes(buildFacts(useAppStore.getState(), gateSource(), now));
+    return notes.map((n) => ({ id: n.id, at: n.at, channel: n.channel, ...renderNote(n, i18n.t.bind(i18n), i18n.language) }));
+  } catch {
+    return [];
+  }
+}
+
+/** One Android channel per switch, so each can also be tuned in system settings. */
+const CHANNELS: Channel[] = ['food', 'water', 'training', 'progress'];
+let channelsLang: string | null = null;
+
+async function ensureChannels(mod: NotificationsModule): Promise<void> {
+  if (Platform.OS !== 'android' || channelsLang === i18n.language) return;
+  for (const c of CHANNELS) {
+    await mod.setNotificationChannelAsync(`calgym-${c}`, {
+      name: i18n.t(`notifications.channel.${c}`),
+      // Default importance: on the lock screen and with a sound, but never a
+      // full-screen interruption. Recaps are gentler still.
+      importance: c === 'progress' ? mod.AndroidImportance.LOW : mod.AndroidImportance.DEFAULT,
+      sound: c === 'progress' ? null : 'default',
+    });
+  }
+  channelsLang = i18n.language;
+}
+
+async function schedule(mod: NotificationsModule, note: PlannedNote): Promise<void> {
+  const { title, body } = renderNote(note, i18n.t.bind(i18n), i18n.language);
+  const quiet = note.kind === 'weekRecap' || note.kind === 'comeback' || note.kind === 'restDay';
+  await mod.scheduleNotificationAsync({
+    identifier: note.id,
+    content: {
+      title,
+      body,
+      data: { kind: note.kind, channel: note.channel },
+      // iPhone: recaps and gentle notes arrive without lighting the screen;
+      // a fast ending is worth breaking through Focus for.
+      interruptionLevel: quiet ? 'passive' : note.kind === 'fastEnd' ? 'timeSensitive' : 'active',
+      sound: quiet ? undefined : 'default',
+    },
+    trigger: {
+      type: mod.SchedulableTriggerInputTypes.DATE,
+      date: note.at,
+      ...(Platform.OS === 'android' ? { channelId: `calgym-${note.channel}` } : {}),
+    },
+  });
+}
+
+async function runSync(): Promise<{ granted: boolean }> {
   const mod = notifications();
   if (!mod) return { granted: false };
-
   const s = useAppStore.getState();
-  const anyOn = s.remindMeals || s.remindWater || s.remindWorkouts;
+  const enabled = s.notifyPrefs?.enabled !== false;
+  const anyOn = enabled && (s.remindMeals || s.remindWater || s.remindWorkouts);
 
-  // Wipe every scheduled reminder rather than cancelling by a fixed ID list
-  // — a toggle switched off must never leave a stray notification still
-  // firing, including any left over from an older identifier scheme. The one
-  // exception is a running rest timer's alert (rest-alert.ts), which belongs
-  // to the workout in progress, not to these settings.
+  // Everything planned is re-planned from scratch: a switch turned off, or a
+  // reminder whose reason has gone (lunch logged), must never still fire.
+  // The rest timer and the trial reminder belong to other features.
   const scheduled = await mod.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled
@@ -120,128 +147,40 @@ export async function syncReminders(): Promise<{ granted: boolean }> {
   if (!anyOn) return { granted: true };
   if (!(await requestPermission(mod))) return { granted: false };
 
-  const daily = (id: string, hour: number, minute: number, title: string, body: string) =>
-    mod.scheduleNotificationAsync({
-      identifier: id,
-      content: { title, body },
-      trigger: { type: mod.SchedulableTriggerInputTypes.DAILY, hour, minute },
-    });
-  const once = (id: string, date: Date, title: string, body: string) =>
-    mod.scheduleNotificationAsync({
-      identifier: id,
-      content: { title, body },
-      trigger: { type: mod.SchedulableTriggerInputTypes.DATE, date },
-    });
-
-  const now = new Date();
-
-  // Water — recurring; fires daily even if the app is never opened.
-  if (s.remindWater) {
-    for (let i = 0; i < WATER_HOURS.length; i++) {
-      await daily(`rem-water-${i + 1}`, WATER_HOURS[i], 0, i18n.t('reminders.waterTitle'), i18n.t('reminders.waterBody'));
+  await ensureChannels(mod);
+  const notes = planNotes(buildFacts(s, gateSource(), new Date()));
+  for (const note of notes) {
+    try {
+      await schedule(mod, note);
+    } catch (err) {
+      console.warn('notification schedule failed:', note.id, err);
     }
   }
-
-  // Workout — recurring nudge at the user's usual training hour, plus a
-  // conditional streak saver (only meaningful when a streak is live).
-  if (s.remindWorkouts) {
-    const hour = usualWorkoutHour(s.workouts);
-    await daily('rem-workout', hour, 0, i18n.t('reminders.workoutTitle'), i18n.t('reminders.workoutBody'));
-
-    const streak = workoutStreakDays(s.workouts);
-    const trainedToday = s.workouts.some((w) => isSameDay(w.at, now));
-    const streakAt = todayAt(20, 30);
-    if (streak >= 2 && !trainedToday && streakAt) {
-      await once('rem-streak', streakAt, i18n.t('reminders.streakTitle'), i18n.t('reminders.streakBody', { count: streak }));
-    }
-    // Celebrate a round-number streak — gated on having actually trained
-    // today so this fires exactly once, the day the count reaches it, not
-    // again tomorrow while workoutStreakDays is still reporting yesterday's
-    // number ahead of today's first log.
-    const workoutCelebrateAt = todayAt(19, 30);
-    if (trainedToday && STREAK_MILESTONES.includes(streak) && workoutCelebrateAt) {
-      await once(
-        'rem-encourage-workout',
-        workoutCelebrateAt,
-        i18n.t('reminders.encourageWorkoutStreakTitle', { count: streak }),
-        i18n.t('reminders.encourageWorkoutStreakBody', { count: streak }),
-      );
-    }
-  }
-
-  // Meal prompts + evening check-in — recurring so they fire without the app
-  // being opened. Copy reads fine whether or not the meal was already logged.
-  if (s.remindMeals) {
-    for (const type of ['breakfast', 'lunch', 'dinner'] as MealType[]) {
-      const time = MEAL_PROMPT[type as 'breakfast' | 'lunch' | 'dinner'];
-      await daily(
-        `rem-meal-${type}`,
-        time.hour,
-        time.minute,
-        i18n.t('reminders.mealPromptTitle', { meal: i18n.t(`home.mealTypes.${type}`) }),
-        i18n.t('reminders.mealPromptBody'),
-      );
-    }
-    await daily('rem-macro', 21, 0, i18n.t('reminders.macroTitle'), i18n.t('reminders.eveningBody'));
-
-    // Same round-number celebration as the workout streak, mirrored for
-    // logging days — gated on today already having an entry, same reason.
-    const loggedToday = s.meals.some((m) => isSameDay(m.at, now));
-    const mealStreak = streakDays(s.meals);
-    const mealCelebrateAt = todayAt(21, 30);
-    if (loggedToday && STREAK_MILESTONES.includes(mealStreak) && mealCelebrateAt) {
-      await once(
-        'rem-encourage-meal',
-        mealCelebrateAt,
-        i18n.t('reminders.encourageStreakTitle', { count: mealStreak }),
-        i18n.t('reminders.encourageStreakBody', { count: mealStreak }),
-      );
-    }
-  }
-
-  // Fasting — a one-off alert for whenever the active fast's eating window
-  // opens, same as the other conditional `once()` calls: recomputed from
-  // scratch every sync, so starting/ending/cancelling a fast just naturally
-  // reschedules or drops it next time this runs.
-  if (anyOn && s.activeFast) {
-    const targetAt = new Date(new Date(s.activeFast.startedAt).getTime() + s.activeFast.targetHours * 3600000);
-    if (targetAt.getTime() > Date.now()) {
-      await mod.scheduleNotificationAsync({
-        identifier: 'rem-fast-end',
-        content: {
-          title: i18n.t('reminders.fastEndTitle'),
-          body: i18n.t('reminders.fastEndBody'),
-        },
-        trigger: { type: mod.SchedulableTriggerInputTypes.DATE, date: targetAt },
-      });
-    }
-  }
-
-  // Program milestones — a new week starting, or the whole program finishing
-  // — each only true on the exact day the boundary is crossed, so this fires
-  // once per milestone with no extra "already sent" bookkeeping.
-  if ((s.remindWorkouts || s.remindMeals) && s.activeProgram) {
-    const program = s.activeProgram;
-    const daysElapsed = Math.floor((now.getTime() - new Date(program.createdAt).getTime()) / 86400000);
-    const totalDays = program.durationWeeks * 7;
-    const programAt = todayAt(19, 0);
-    if (programAt && daysElapsed > 0 && daysElapsed < totalDays && daysElapsed % 7 === 0) {
-      const week = Math.floor(daysElapsed / 7) + 1;
-      await once(
-        'rem-program-week',
-        programAt,
-        i18n.t('reminders.encourageProgramWeekTitle', { week }),
-        i18n.t('reminders.encourageProgramWeekBody', { week, total: program.durationWeeks }),
-      );
-    } else if (programAt && daysElapsed === totalDays) {
-      await once(
-        'rem-program-done',
-        programAt,
-        i18n.t('reminders.encourageProgramDoneTitle'),
-        i18n.t('reminders.encourageProgramDoneBody', { total: program.durationWeeks }),
-      );
-    }
-  }
-
   return { granted: true };
+}
+
+// One sync at a time, and a burst of logs collapses into one re-plan.
+let running: Promise<{ granted: boolean }> | null = null;
+let again = false;
+
+/**
+ * Re-plan and reschedule every notification from the current data. Called
+ * after logs, on foreground, when the plan changes and from Settings.
+ */
+export async function syncReminders(): Promise<{ granted: boolean }> {
+  if (running) {
+    again = true;
+    return running;
+  }
+  running = (async () => {
+    let result = await runSync();
+    while (again) {
+      again = false;
+      result = await runSync();
+    }
+    return result;
+  })().finally(() => {
+    running = null;
+  });
+  return running;
 }

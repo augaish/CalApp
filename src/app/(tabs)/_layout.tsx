@@ -38,6 +38,14 @@ export default function TabLayout() {
   // Fasting's own alert is one-off (see reminders.ts), so starting/ending it
   // needs the same resync the others get — the fast's id changes on both.
   const activeFastId = useAppStore((s) => s.activeFast?.id);
+  // Everything else a plan reads: readings (body wins), targets, the week's
+  // schedule and moved workouts, and the notification settings themselves.
+  const weightCount = useAppStore((s) => s.weights.length);
+  const targets = useAppStore((s) => s.targets);
+  const schedule = useAppStore((s) => s.schedule);
+  const occurrences = useAppStore((s) => s.occurrences);
+  const notifyPrefs = useAppStore((s) => s.notifyPrefs);
+  const language = useAppStore((s) => s.language);
 
   // S41 route resolution: a deep link wins, then restored context. A cold
   // start that lands on Overview with a session still in progress reopens
@@ -81,7 +89,7 @@ export default function TabLayout() {
       if (st === 'active') void syncReminders();
     });
     return () => sub.remove();
-  }, [remindersInitialized, mealCount, workoutCount, waterCount, activeFastId]);
+  }, [remindersInitialized, mealCount, workoutCount, waterCount, activeFastId, weightCount, targets, schedule, occurrences, notifyPrefs, language]);
 
   useMembershipPrompt();
 

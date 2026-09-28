@@ -52,7 +52,7 @@ export interface Account {
   provider: 'google' | 'apple' | 'email' | 'guest';
 }
 
-interface AppState {
+export interface AppState {
   account: Account | null;
   language: Language | null;
   /** S20 Units: display only — records stay in kg / cm. */
@@ -185,6 +185,12 @@ interface AppState {
     Partial<Record<MealType, { recipeId: string; servings: number; programId?: string; batchId?: string }>>
   >;
   remindMeals: boolean;
+  /**
+   * The notification settings beyond the three switches (remindMeals/Water/
+   * Workouts are Food, Water and Training): the main switch, quiet hours and
+   * the daily maximum. Absent = the defaults in notify/planner.ts.
+   */
+  notifyPrefs?: { enabled?: boolean; quietStart?: number; quietEnd?: number; maxPerDay?: number };
   remindWater: boolean;
   remindWorkouts: boolean;
   /** Reminders have been auto-scheduled once (permission requested on first run). */
@@ -383,6 +389,7 @@ interface AppState {
   updateSession: (patch: Partial<ActiveSession>) => void;
   endSession: () => void;
   setRemindMeals: (on: boolean) => void;
+  setNotifyPrefs: (prefs: Partial<NonNullable<AppState['notifyPrefs']>>) => void;
   setRemindWater: (on: boolean) => void;
   setRemindWorkouts: (on: boolean) => void;
   setRemindersInitialized: () => void;
@@ -1226,6 +1233,7 @@ export const useAppStore = create<AppState>()(
         set((s) => (s.activeSession ? { activeSession: { ...s.activeSession, ...patch } } : {})),
       endSession: () => set({ activeSession: null }),
       setRemindMeals: (on) => set({ remindMeals: on }),
+      setNotifyPrefs: (prefs) => set((st) => ({ notifyPrefs: { ...(st.notifyPrefs ?? {}), ...prefs } })),
       setRemindWater: (on) => set({ remindWater: on }),
       setRemindWorkouts: (on) => set({ remindWorkouts: on }),
       setRemindersInitialized: () => set({ remindersInitialized: true }),
@@ -1380,6 +1388,7 @@ export const useAppStore = create<AppState>()(
         remindMeals,
         remindWater,
         remindWorkouts,
+        notifyPrefs,
         remindersInitialized,
         tutorialSeen,
         checklistDismissed,
@@ -1428,6 +1437,7 @@ export const useAppStore = create<AppState>()(
         remindMeals,
         remindWater,
         remindWorkouts,
+        notifyPrefs,
         remindersInitialized,
         tutorialSeen,
         checklistDismissed,
