@@ -413,13 +413,16 @@ In the TestFlight build, **signed in with a second Calgym account** (for example
 **Done when:** all of the above works. If something fails, send me a screenshot.
 
 ## Step 17 🏦 Submit for review
-1. Your app → **1.0 Prepare for Submission**:
-   - **Build → +:** choose **build 19** (or a newer one if we make it). Not 18.
-   - **In-App Purchases and Subscriptions** (a section on this same version page, under Build; not the Monetization menu): **Select In-App Purchases or Subscriptions** → tick Essentials Monthly and Yearly, Pro Monthly and Yearly → **Done**. Leave Pro+ unticked.
-     - Don't create anything under **Monetization → In-App Purchases**: that page is for one-off purchases. Your six subscriptions already exist under Monetization → Subscriptions.
-     - The section only appears once the subscriptions are **Ready to Submit** (price, localization and review screenshot filled in). If it's missing, open each subscription and check what it still needs.
-2. **Add for Review** (top right) → **Submit to App Review**.
-3. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
+Apple now puts the app version and the subscriptions into one **submission**, added from each subscription's own page.
+
+1. Your app → **1.0 Prepare for Submission** → **Build → +:** choose **build 19** (or newer). Not 18. **Save.**
+2. **Monetization → Subscriptions** → your group → **Essentials Monthly** → **Add for Review** (top right).
+   - A window opens: **Create New Submission**. Add the **1.0 app version** to it, and the **subscription group** if it offers it.
+3. Do the same for **Essentials Yearly**, **Pro Monthly** and **Pro Yearly**: **Add for Review** → add to the **same** submission. Leave Pro+ out.
+   - The button only works once a subscription is **Ready to Submit** (price, localization and review screenshot filled in). If it's greyed out, the subscription shows what's still missing.
+   - Don't create anything under **Monetization → In-App Purchases**. That page is for one-off purchases, which Calgym doesn't sell.
+4. Open the submission (the banner at the top, or **App Review** in the sidebar). Check it lists the app version, the group and the four subscriptions → **Submit for Review**.
+5. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
 
 ## Step 18 ⬜ Launch day (after "Pending Developer Release")
 1. Check your testers have their plan (admin → Users; granted in step 10). The `FOUNDERS` offer code from step 10 works for anyone new.
