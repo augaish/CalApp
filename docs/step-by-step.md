@@ -206,15 +206,13 @@ Everything below is ready to paste from [`store-submission.md`](store-submission
 
 ## 10. 🏦 After the bank account (Apple)
 1. Wait until the Paid Apps Agreement is **Active**.
-2. **Users and Access → Sandbox → Test Accounts** → add a tester, using an email that isn't any Apple ID.
-3. On the iPhone: **Settings → Developer → Sandbox Apple Account** → sign in with it. (Turn on Developer Mode if Developer isn't listed.)
-4. In the TestFlight build, buy Pro:
+2. In the TestFlight build, buy Pro with your normal Apple ID. You won't need a sandbox account, because TestFlight purchases are never charged. Then check:
    - Profile shows **Pro**.
    - **admin → Overview → Recent store events** shows the purchase.
    - The checklist ticks "First store event received".
-5. Test **Restore purchases**, **Pro → Pro+** (should be immediate) and a **free code**.
-6. Version 1.0 → **Build**: the newest build; **In-App Purchases and Subscriptions**: add all four → **Submit for Review**.
-7. After approval: **Release**, manually or automatically.
+3. Test **Restore purchases**, **Pro → Pro+** (should be immediate) and a **free code**.
+4. Version 1.0 → **Build**: the newest build; **In-App Purchases and Subscriptions**: add all four → **Submit for Review**.
+5. After approval: **Release**, manually or automatically.
 
 ---
 

@@ -398,14 +398,12 @@ Click **Save** at the top. Leave **Build** and **In-App Purchases** for step 17.
 4. **Submit for Review.** The first review takes about 24–48 hours.
 5. After approval: add testers by email, or turn on **Public Link** and share it.
 
-## Step 15 🏦 Sandbox tester
-1. App Store Connect → **Users and Access → Sandbox → Test Accounts → +**. Use an email that has never been an Apple ID, for example `yourname+sandbox1@gmail.com`.
-2. On your iPhone: **Settings → Developer → Sandbox Apple Account** → sign in with it.
-   - No **Developer** menu? Connect the phone to a Mac with Xcode once, or turn on **Settings → Privacy & Security → Developer Mode**.
+## Step 15 ⏭️ Sandbox tester (skip)
+Not needed. The app is tested through TestFlight, and TestFlight purchases use your normal Apple ID and are never charged. Sandbox test accounts are for builds installed from a Mac with Xcode, which we don't use.
 
 ## Step 16 🏦 Test a purchase
 In the TestFlight build:
-1. Open **Profile → Membership**. Choose **Training**, then start the **Essentials** free trial. Confirm with the sandbox account.
+1. Open **Profile → Membership**. Choose **Training**, then start the **Essentials** free trial. Confirm with your normal Apple ID. The sheet says "[Environment: Sandbox]", which means no money is taken.
 2. Check:
    - Profile shows **Essentials · Training** and **Free trial · ends …**.
    - **admin → Overview → Recent store events** shows the purchase, and the checklist ticks "First store event received".
