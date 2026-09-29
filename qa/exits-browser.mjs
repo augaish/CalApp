@@ -33,9 +33,11 @@ const PARAMS = {
 // spinner that hands on to a result by itself.
 // gym-result and meal-result show a scan held only in memory; they close
 // themselves without one, and their X is in the shared Title.
-const EXEMPT = new Set(['onboarding', 'welcome', 'login', 'add-menu', 'water', 'calendar', 'scan', 'photo-analyze', 'gym-result', 'meal-result',
+const EXEMPT = new Set(['onboarding', 'login', 'add-menu', 'water', 'calendar', 'scan', 'photo-analyze', 'gym-result', 'meal-result',
   // A native web view: blank in a browser build, so there is nothing to check here.
-  'inbody-web']);
+  'inbody-web',
+  // The moment after a purchase: one clear way on, "Let's go" (first-run-browser checks it).
+  'plan-welcome']);
 const routes = fs.readdirSync('src/app').filter((f) => f.endsWith('.tsx') && !f.startsWith('_') && !f.startsWith('+')).map((f) => f.replace('.tsx', '')).filter((r) => !EXEMPT.has(r));
 
 let fails = 0;

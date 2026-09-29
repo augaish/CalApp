@@ -91,6 +91,17 @@ export const ADMIN_HTML = `<!doctype html>
   .done.good { background:var(--green-soft); color:var(--green); }
   .done.bad { background:var(--danger-soft); color:var(--danger); }
   .done.warn { background:var(--warn-soft); color:var(--warn); }
+  .intro ol.steps-list { margin:6px 0 0; padding-inline-start:20px; color:var(--text); font-size:14.5px; line-height:1.55; }
+  .intro ol.steps-list li { margin:4px 0; }
+  .step { display:flex; gap:14px; padding:14px 0; border-top:1px solid var(--line); }
+  .step-no { flex:0 0 30px; height:30px; border-radius:50%; background:var(--primary-soft); color:var(--primary); font-weight:800; display:grid; place-items:center; }
+  .step-body { flex:1; min-width:0; }
+  .step-title { font-size:15px; text-transform:none; letter-spacing:0; color:var(--text); margin:4px 0 2px; font-weight:800; }
+  .summary { margin-top:12px; padding:12px 14px; border-radius:12px; background:var(--primary-soft); color:var(--primary); font-weight:600; font-size:14.5px; line-height:1.5; }
+  details.more { display:inline-block; }
+  details.more summary { cursor:pointer; color:var(--primary); font-weight:700; font-size:14px; padding:6px 10px; border:1px solid #CFC6EC; border-radius:10px; list-style:none; display:inline-block; }
+  details.more[open] > div { margin-top:6px; }
+  .summary.bad { background:var(--warn-soft); color:var(--warn); }
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
   .row > div { flex:1; min-width:140px; }
   .scroll { overflow-x:auto; }
@@ -325,8 +336,106 @@ export const ADMIN_HTML = `<!doctype html>
     </section>
 
     <section class="panel" role="tabpanel" id="p-codes" aria-labelledby="t-codes" hidden>
+    <div class="card intro">
+      <h2>How codes and partners work</h2>
+      <ol class="steps-list">
+        <li><b>A code</b> is a word people type in the app (Profile → Have a code?). It gives a <b>discount</b> or <b>free time</b> on a plan.</li>
+        <li><b>Apple and Google apply it</b>, not us (App Store rule 3.1.1). So each code needs a matching <b>offer</b> made once in App Store Connect and Play Console. Using the same name everywhere keeps it simple.</li>
+        <li><b>A partner</b> (a coach, gym or influencer) can own a code and earn a share of what their buyers pay. Partners see their own figures on a private page; you pay them outside the app and record it here.</li>
+      </ol>
+      <div class="chips" style="margin-top:10px"><button type="button" class="chip" onclick="document.getElementById('codes').scrollIntoView({ behavior: 'smooth' })">Make a code ↓</button><button type="button" class="chip" onclick="document.getElementById('partners').scrollIntoView({ behavior: 'smooth' })">Partners and payouts ↓</button></div>
+    </div>
+
+    <div class="card" id="codes">
+      <h2>Promotion codes</h2>
+      <div class="sub" style="margin-bottom:6px">Make a code in four short steps. The summary at the bottom says exactly what it will do before you save.</div>
+
+      <div class="step"><div class="step-no">1</div><div class="step-body">
+        <h3 class="step-title">What does it give?</h3>
+        <div class="row">
+          <div><label for="pc_code">Code people type</label><input id="pc_code" placeholder="e.g. SAVE30" autocomplete="off" oninput="pcSummary()" /></div>
+          <div><label for="pc_kind">Type</label><select id="pc_kind" onchange="pcKind()"><option value="free">Free time</option><option value="percent">Discount (% off)</option></select></div>
+          <div><label for="pc_plan">On which plan</label><select id="pc_plan" onchange="pcSummary()"><option value="pro">Pro</option><option value="essentials">Essentials</option><option value="proPlus">Pro+</option></select></div>
+        </div>
+        <div class="row pc-free">
+          <div><label for="pc_days">For how long (days)</label><input id="pc_days" type="number" min="1" max="3650" value="30" oninput="pcSummary()" /></div>
+          <div class="chips" style="flex:2;padding-bottom:2px" role="group" aria-label="Quick lengths">
+            <button type="button" class="chip" onclick="pcDays(30)">1 month</button>
+            <button type="button" class="chip" onclick="pcDays(90)">3 months</button>
+            <button type="button" class="chip" onclick="pcDays(180)">6 months</button>
+            <button type="button" class="chip" onclick="pcDays(365)">1 year</button>
+          </div>
+        </div>
+        <div class="row pc-pct hide">
+          <div><label for="pc_pct">% off</label><input id="pc_pct" type="number" min="1" max="100" placeholder="e.g. 30" oninput="pcSummary()" /></div>
+          <div class="sub" style="flex:2;padding-bottom:10px">Google takes the percentage. Apple takes a price: in App Store Connect choose the price closest to this % off for each country.</div>
+        </div>
+      </div></div>
+
+      <div class="step"><div class="step-no">2</div><div class="step-body">
+        <h3 class="step-title">Apple and Google offer <span class="muted" style="font-weight:600">(needed for the apps)</span></h3>
+        <div class="row">
+          <div><label for="pc_ios">App Store offer code</label><input id="pc_ios" placeholder="the custom code made in App Store Connect" oninput="pcSummary()" /></div>
+          <button type="button" class="ghost" style="flex:0 0 auto" onclick="pcSame('pc_ios')">Same as the code</button>
+          <div><label for="pc_android">Google Play offer id</label><input id="pc_android" placeholder="offerId, or basePlanId:offerId" oninput="pcSummary()" /></div>
+          <button type="button" class="ghost" style="flex:0 0 auto" onclick="pcSame('pc_android')">Same as the code</button>
+        </div>
+        <details class="how"><summary>How to make the offers</summary><div>
+          <b>Apple:</b> App Store Connect → your app → Monetization → Subscriptions → the plan (e.g. Pro Monthly) → <b>Offer Codes → Create</b>. Choose <b>Custom code</b> and type the same code. Type <i>Pay as you go</i> (a lower price for some months) for a discount, or <i>Free</i> for free time. Set how many people may use it.<br>
+          <b>Google:</b> Play Console → Monetize → Subscriptions → the plan → its base plan → <b>Add offer</b>. Offer ID in lower case (e.g. <code>save30</code>), eligibility <i>Developer determined</i>, and a phase with the discount or the free time.<br>
+          An offer belongs to one plan. For the yearly plan too, make a second offer and code (e.g. SAVE30Y).
+        </div></details>
+      </div></div>
+
+      <div class="step"><div class="step-no">3</div><div class="step-body">
+        <h3 class="step-title">Who earns from it? <span class="muted" style="font-weight:600">(optional)</span></h3>
+        <div class="row">
+          <div><label for="pc_partner">Partner who owns it</label><select id="pc_partner" onchange="pcSummary()"><option value="">— nobody —</option></select></div>
+          <div><label for="pc_comm">Their share %</label><input id="pc_comm" type="number" min="0" max="100" step="0.5" placeholder="e.g. 20" oninput="pcSummary()" /></div>
+          <div><label for="pc_term">Paid on</label><select id="pc_term" onchange="pcTerm()"><option value="lifetime">every payment</option><option value="first">first payment only</option><option value="months">payments for N months</option></select></div>
+          <div class="pc-months hide"><label for="pc_months">Months</label><input id="pc_months" type="number" min="1" max="120" value="12" oninput="pcSummary()" /></div>
+        </div>
+        <details class="how"><summary>Advanced: the partner was brought in by another partner</summary><div style="background:none;border:0;padding:0">
+          <div class="sub" style="margin-bottom:6px">Pick the code of whoever introduced this partner; they get a smaller share of these sales too (up to two levels up).</div>
+          <div class="row">
+            <div><label for="pc_parent">Linked to</label><select id="pc_parent" onchange="pcParent()"><option value="">— not linked —</option></select></div>
+            <div class="pc-link hide"><label for="pc_ppct">Their share %</label><input id="pc_ppct" type="number" min="0" max="100" step="0.5" placeholder="e.g. 5" oninput="pcSummary()" /></div>
+            <div class="pc-grand hide"><label id="pc_glabel" for="pc_gpct">Share % two levels up</label><input id="pc_gpct" type="number" min="0" max="100" step="0.5" placeholder="e.g. 2" oninput="pcSummary()" /></div>
+          </div>
+        </div></details>
+      </div></div>
+
+      <div class="step"><div class="step-no">4</div><div class="step-body">
+        <h3 class="step-title">Limits <span class="muted" style="font-weight:600">(optional)</span></h3>
+        <div class="row">
+          <div><label for="pc_max">How many people (blank = no limit)</label><input id="pc_max" type="number" min="1" oninput="pcSummary()" /></div>
+          <div><label for="pc_start">Starts</label><input id="pc_start" type="datetime-local" onchange="pcSummary()" /></div>
+          <div><label for="pc_end">Ends</label><input id="pc_end" type="datetime-local" onchange="pcSummary()" /></div>
+          <div><label for="pc_note">Note (only you see it)</label><input id="pc_note" placeholder="e.g. gym partnership" /></div>
+        </div>
+      </div></div>
+
+      <div class="summary" id="pc_summary" aria-live="polite"></div>
+      <div class="row" style="margin-top:10px">
+        <label style="margin:0"><input id="pc_active" type="checkbox" checked style="width:auto" /> Active</label>
+        <button onclick="savePromo()">Save code</button>
+        <button class="ghost" onclick="clearPromoForm()">Clear form</button>
+      </div>
+      <div id="pc_msg" class="sub hide" style="margin-top:8px"></div>
+
+      <h3 style="margin-top:22px">Your codes</h3>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Code</th><th>Gives</th><th>Earns</th><th title="People who typed it in the app">Used</th><th>Left</th><th title="Discount codes: people who then paid">Paid</th><th>Dates</th><th>Status</th><th></th></tr></thead>
+          <tbody id="pc_rows"></tbody>
+        </table>
+      </div>
+      <div id="pc_detail" class="hide" style="margin-top:12px"></div>
+    </div>
+
     <div class="card" id="partners">
       <h2>Partners</h2>
+      <div class="sub" style="margin-bottom:6px">Add a partner here, then give them a code in step 3 above.</div>
       <details class="how"><summary>How this works</summary><div>People and businesses who share your codes. Give a partner one or more codes below (each code sets its own discount for the buyer and share for the partner), and link a partner's code to the code of whoever brought them in — up to two levels up. Earnings are counted on what each payment brings in after the store's fee and tax, in US dollars. The last 30 days stay <i>pending</i> (the store refund window); <i>Owed</i> is what has cleared, less what you have recorded as paid. Payouts happen outside the app — record them here. Each partner has a private read-only link to their own figures.</div></details>
       <div class="row">
         <div><label>Name</label><input id="pt_name" placeholder="e.g. Sara (FitLife gym)" /></div>
@@ -341,59 +450,13 @@ export const ADMIN_HTML = `<!doctype html>
       <div id="pt_msg" class="sub hide" style="margin-top:8px"></div>
       <div class="scroll" style="margin-top:12px">
         <table>
-          <thead><tr><th>Partner</th><th>Codes</th><th>Payments</th><th>Earned</th><th>Pending</th><th>Paid</th><th>Owed</th><th></th></tr></thead>
+          <thead><tr><th>Partner</th><th>Codes</th><th title="Payments made by their buyers">Payments</th><th title="Their share of everything so far">Earned</th><th title="The last 30 days: still inside the store refund window">Pending</th><th title="What you have recorded as paid">Paid</th><th title="Earned and cleared, minus paid: what you owe now">Owed</th><th></th></tr></thead>
           <tbody id="pt_rows"></tbody>
         </table>
       </div>
+      <div class="sub" style="margin-top:8px"><b>Earned</b> = their share so far · <b>Pending</b> = the last 30 days (buyers can still get a refund) · <b>Owed</b> = what you owe now. After paying them (bank transfer etc.), press <b>Record payout</b>.</div>
     </div>
 
-    <div class="card" id="codes">
-      <h2>Promotion codes</h2>
-      <details class="how"><summary>How this works</summary><div><b>Free access</b> gives a tier for a number of days at no charge. In the iPhone and Android apps Apple and Google must grant it themselves (App Store rule 3.1.1), so give it a store offer too: an offer code for a free period in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code, "Free" for 1 or 3 months) and a Play offer with a free phase. For testers before launch, use Users → Give or remove a plan. <b>Percent off</b> is a real discount on a paid subscription, so the store has to know about it: create an offer code in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code) and/or a developer-determined offer on the Google Play base plan, then put those ids below. The store then charges the discounted price, in the person's currency, with VAT. <i>Used</i> counts redemptions in the app; <i>Paid</i> counts purchases matched back to them. To step a discount down (e.g. 50% for the first 100, then 30%), give the first code a use limit or end date and create the next one.</div></details>
-      <div class="row">
-        <div><label>Code</label><input id="pc_code" placeholder="RAMADAN50" autocomplete="off" /></div>
-        <div><label>Type</label><select id="pc_kind" onchange="pcKind()"><option value="free">Free access</option><option value="percent">Percent off</option></select></div>
-        <div><label>Tier</label><select id="pc_plan"><option value="pro">Pro</option><option value="essentials">Essentials</option><option value="proPlus">Pro+</option></select></div>
-        <div class="pc-free"><label>Days of access</label><input id="pc_days" type="number" min="1" max="3650" value="30" /></div>
-        <div class="pc-pct hide"><label>% off</label><input id="pc_pct" type="number" min="1" max="100" /></div>
-      </div>
-      <div class="row">
-        <div><label>App Store offer code</label><input id="pc_ios" placeholder="the custom code made in App Store Connect" /></div>
-        <div><label>Google Play offer id</label><input id="pc_android" placeholder="offerId, or basePlanId:offerId" /></div>
-        <p class="muted" style="grid-column:1/-1;margin:0">Free codes in the iPhone and Android apps need these too: Apple and Google must grant the free period themselves (App Store rule 3.1.1). Make an offer code for a free period in App Store Connect (and a Play offer) and put it here. Without them the apps refuse the code; for testers, use Users → Give or remove a plan.</p>
-      </div>
-      <div class="row">
-        <div><label>Max uses (blank = unlimited)</label><input id="pc_max" type="number" min="1" /></div>
-        <div><label>Starts (optional)</label><input id="pc_start" type="datetime-local" /></div>
-        <div><label>Ends (optional)</label><input id="pc_end" type="datetime-local" /></div>
-        <div><label>Note</label><input id="pc_note" placeholder="e.g. gym partnership" /></div>
-      </div>
-      <div class="sub" style="margin:14px 0 0"><b>Earnings</b> — who is paid from this code's sales. Leave the owner empty for a code that pays nobody.</div>
-      <div class="row">
-        <div><label>Owner (partner)</label><select id="pc_partner"><option value="">— nobody —</option></select></div>
-        <div><label>Owner's share %</label><input id="pc_comm" type="number" min="0" max="100" step="0.5" placeholder="e.g. 20" /></div>
-        <div><label>Paid on</label><select id="pc_term" onchange="pcTerm()"><option value="lifetime">every payment</option><option value="first">first payment only</option><option value="months">payments for N months</option></select></div>
-        <div class="pc-months hide"><label>Months</label><input id="pc_months" type="number" min="1" max="120" value="12" /></div>
-      </div>
-      <div class="row">
-        <div><label>Linked to (who brought the owner)</label><select id="pc_parent" onchange="pcParent()"><option value="">— not linked —</option></select></div>
-        <div class="pc-link hide"><label>Their share %</label><input id="pc_ppct" type="number" min="0" max="100" step="0.5" placeholder="e.g. 5" /></div>
-        <div class="pc-grand hide"><label id="pc_glabel">Share % two levels up</label><input id="pc_gpct" type="number" min="0" max="100" step="0.5" placeholder="e.g. 2" /></div>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <label style="margin:0"><input id="pc_active" type="checkbox" checked style="width:auto" /> Active</label>
-        <button onclick="savePromo()">Save code</button>
-        <button class="ghost" onclick="clearPromoForm()">Clear form</button>
-      </div>
-      <div id="pc_msg" class="sub hide" style="margin-top:8px"></div>
-      <div class="scroll" style="margin-top:12px">
-        <table>
-          <thead><tr><th>Code</th><th>Gives</th><th>Earns</th><th>Used</th><th>Left</th><th>Paid</th><th>Window</th><th>Status</th><th></th></tr></thead>
-          <tbody id="pc_rows"></tbody>
-        </table>
-      </div>
-      <div id="pc_detail" class="hide" style="margin-top:12px"></div>
-    </div>
     </section>
 
     <section class="panel" role="tabpanel" id="p-ai" aria-labelledby="t-ai" hidden>
@@ -1226,7 +1289,7 @@ export const ADMIN_HTML = `<!doctype html>
   // ── Promotion codes ──
   var PC_ERRORS = {
     code_too_short: 'A code needs at least 3 letters or digits.',
-    plan_must_be_paid: 'A code has to give Pro or Pro+.',
+    plan_must_be_paid: 'A code has to give a paid plan: Essentials, Pro or Pro+.',
     percent_out_of_range: 'Percent off must be between 1 and 100.',
     duration_out_of_range: 'Days of access must be between 1 and 3650.',
     offer_required: 'A percent code needs the App Store offer code, the Google Play offer id, or both.',
@@ -1248,6 +1311,52 @@ export const ADMIN_HTML = `<!doctype html>
     var pct = document.getElementById('pc_kind').value === 'percent';
     document.querySelectorAll('.pc-pct').forEach(function (el) { el.classList.toggle('hide', !pct); });
     document.querySelectorAll('.pc-free').forEach(function (el) { el.classList.toggle('hide', pct); });
+    pcSummary();
+  }
+  var PLAN_LABEL = { pro: 'Pro', essentials: 'Essentials', proPlus: 'Pro+' };
+  function pcDays(n) { document.getElementById('pc_days').value = n; pcSummary(); }
+  function pcSame(id) {
+    var code = document.getElementById('pc_code').value.trim();
+    document.getElementById(id).value = id === 'pc_android' ? code.toLowerCase() : code.toUpperCase();
+    pcSummary();
+  }
+  function lengthText(days) {
+    if (days % 365 === 0) return days / 365 === 1 ? '1 year' : days / 365 + ' years';
+    if (days % 30 === 0) return days / 30 === 1 ? '1 month' : days / 30 + ' months';
+    return days + ' day' + (days === 1 ? '' : 's');
+  }
+  // One plain paragraph: what the code does, who earns, its limits and what is missing.
+  function pcSummary() {
+    var box = document.getElementById('pc_summary');
+    if (!box) return;
+    var v = function (id) { return document.getElementById(id).value.trim(); };
+    var code = v('pc_code').toUpperCase();
+    if (!code) { box.className = 'summary'; box.textContent = 'Type a code to see what it will do.'; return; }
+    var plan = PLAN_LABEL[v('pc_plan')] || 'Pro';
+    var pct = v('pc_kind') === 'percent';
+    var days = parseInt(v('pc_days'), 10);
+    var parts = [];
+    parts.push(code + ' gives ' + (pct ? (v('pc_pct') ? v('pc_pct') + '% off ' : 'a discount on ') + plan : plan + ' free for ' + (days > 0 ? lengthText(days) : '…')) + '.');
+    var missing = [];
+    if (!v('pc_ios')) missing.push('the App Store offer code');
+    if (!v('pc_android')) missing.push('the Google Play offer id');
+    if (missing.length === 2) parts.push('The apps will refuse it until you add ' + missing.join(' and ') + ' (step 2).');
+    else if (missing.length === 1) parts.push('It works on ' + (v('pc_ios') ? 'iPhone' : 'Android') + ' only until you add ' + missing[0] + '.');
+    var owner = document.getElementById('pc_partner');
+    if (owner.value) {
+      var term = v('pc_term') === 'first' ? 'the first payment' : v('pc_term') === 'months' ? 'payments for ' + (v('pc_months') || '?') + ' months' : 'every payment';
+      parts.push(owner.options[owner.selectedIndex].textContent.replace(' (off)', '') + ' earns ' + (v('pc_comm') || '0') + '% of ' + term + '.');
+      if (v('pc_parent') && v('pc_ppct')) parts.push('Whoever brought them in (' + v('pc_parent') + ') earns ' + v('pc_ppct') + '%' + (v('pc_gpct') ? ', and the level above ' + v('pc_gpct') + '%' : '') + '.');
+    } else {
+      parts.push('Nobody earns from it.');
+    }
+    var lim = [];
+    if (v('pc_max')) lim.push('for the first ' + v('pc_max') + ' people');
+    if (v('pc_start')) lim.push('from ' + new Date(v('pc_start')).toLocaleDateString());
+    if (v('pc_end')) lim.push('until ' + new Date(v('pc_end')).toLocaleDateString());
+    parts.push(lim.length ? 'Valid ' + lim.join(', ') + '.' : 'No limit on people or dates.');
+    box.className = 'summary' + (missing.length === 2 ? ' bad' : '');
+    box.textContent = parts.join(' ');
   }
   function toLocalInput(iso) {
     if (!iso) return '';
@@ -1277,6 +1386,7 @@ export const ADMIN_HTML = `<!doctype html>
     pcKind();
     pcTerm();
     pcParent();
+    pcSummary();
   }
   function editPromo(p) {
     document.getElementById('pc_code').value = p.code;
@@ -1299,11 +1409,14 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('pc_term').value = e.term || 'lifetime';
     document.getElementById('pc_months').value = e.termMonths || 12;
     document.getElementById('pc_parent').value = e.parentCode || '';
+    // A linked code shows its link, rather than hiding it in the closed section.
+    document.getElementById('pc_parent').closest('details').open = !!e.parentCode;
     document.getElementById('pc_ppct').value = e.parentCode ? e.parentPct : '';
     document.getElementById('pc_gpct').value = e.parentCode ? e.grandparentPct : '';
     pcKind();
     pcTerm();
     pcParent();
+    pcSummary();
     pcMsg('Editing ' + p.code + ' — its counters are kept when you save.', false);
     document.getElementById('codes').scrollIntoView({ behavior: 'smooth' });
   }
@@ -1398,9 +1511,10 @@ export const ADMIN_HTML = `<!doctype html>
     }
     promos.forEach(function (p) {
       var tr = document.createElement('tr');
-      var tier = p.plan === 'proPlus' ? 'Pro+' : 'Pro';
-      var gives = p.kind === 'free' ? tier + ' free for ' + p.durationDays + ' days' : p.percentOff + '% off ' + tier;
-      var win = (p.startsAt ? new Date(p.startsAt).toLocaleDateString() : 'now') + ' → ' +
+      var tier = PLAN_LABEL[p.plan] || p.plan;
+      var gives = p.kind === 'free' ? tier + ' free for ' + lengthText(p.durationDays) : p.percentOff + '% off ' + tier;
+      if (!p.offerIos && !p.offerAndroid) gives += ' · needs store offers';
+      var win = (p.startsAt ? new Date(p.startsAt).toLocaleDateString() : 'Now') + ' → ' +
         (p.expiresAt ? new Date(p.expiresAt).toLocaleDateString() : 'no end');
       var status = p.problem ? (PC_PROBLEMS[p.problem] || p.problem) : 'live';
       tr.innerHTML =
@@ -1434,6 +1548,7 @@ export const ADMIN_HTML = `<!doctype html>
   }
   function pcTerm() {
     document.querySelectorAll('.pc-months').forEach(function (el) { el.classList.toggle('hide', document.getElementById('pc_term').value !== 'months'); });
+    pcSummary();
   }
   function codeByName(code) { for (var i = 0; i < promos.length; i++) if (promos[i].code === code) return promos[i]; return null; }
   function partnerName(id) { for (var i = 0; i < partners.length; i++) if (partners[i].id === id) return partners[i].name; return id ? '?' : ''; }
@@ -1443,6 +1558,7 @@ export const ADMIN_HTML = `<!doctype html>
     document.querySelectorAll('.pc-link').forEach(function (el) { el.classList.toggle('hide', !parent); });
     document.querySelectorAll('.pc-grand').forEach(function (el) { el.classList.toggle('hide', !grand); });
     if (grand) document.getElementById('pc_glabel').textContent = partnerName(grand.earning.partnerId) + ' (via ' + grand.code + ') share %';
+    pcSummary();
   }
   function fillCodeSelects(editing) {
     var sel = document.getElementById('pc_partner');
@@ -1582,8 +1698,7 @@ export const ADMIN_HTML = `<!doctype html>
         '<td><b>' + money(b.owed) + '</b></td>' +
         '<td style="white-space:nowrap"></td>';
       var actions = tr.lastChild;
-      [['Page', function () { window.open(partnerLink(pt), '_blank', 'noopener'); }], ['Copy link', copyLink], ['Record payout', payPartner],
-       ['Edit', editPartner], [pt.active ? 'Turn off' : 'Turn on', togglePartner], ['New link', newLink], ['Delete', removePartner]].forEach(function (a) {
+      var mk = function (a, host) {
         var btn = document.createElement('button');
         btn.className = 'ghost';
         btn.style.marginInlineEnd = '4px';
@@ -1591,8 +1706,17 @@ export const ADMIN_HTML = `<!doctype html>
         btn.style.padding = '6px 10px';
         btn.textContent = a[0];
         btn.addEventListener('click', function () { a[1](pt); });
-        actions.appendChild(btn);
-      });
+        host.appendChild(btn);
+      };
+      // The everyday actions in view; the rest one tap away under More.
+      [['Copy link', copyLink], ['Record payout', payPartner], ['Edit', editPartner]].forEach(function (a) { mk(a, actions); });
+      var more = document.createElement('details');
+      more.className = 'more';
+      more.innerHTML = '<summary>More</summary>';
+      var menu = document.createElement('div');
+      [['Open their page', function () { window.open(partnerLink(pt), '_blank', 'noopener'); }], [pt.active ? 'Turn off' : 'Turn on', togglePartner], ['New link', newLink], ['Delete', removePartner]].forEach(function (a) { mk(a, menu); });
+      more.appendChild(menu);
+      actions.appendChild(more);
       body.appendChild(tr);
     });
   }

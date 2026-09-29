@@ -160,6 +160,7 @@ const browser = await chromium.launch();
   await page.fill('#pc_comm', '12');
   await page.selectOption('#pc_term', 'months');
   await page.fill('#pc_months', '6');
+  await page.click('text=Advanced: the partner was brought in by another partner');
   await page.selectOption('#pc_parent', W);
   check('admin: the "two levels up" share appears for a code linked under a linked code', await page.isVisible('#pc_gpct') && /Zaid/.test(await page.textContent('#pc_glabel')), await page.textContent('#pc_glabel'));
   await page.fill('#pc_ppct', '4');

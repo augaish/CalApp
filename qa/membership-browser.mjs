@@ -40,7 +40,7 @@ const body = (page) => page.evaluate(() => document.body.innerText);
   await page.waitForTimeout(400);
   const f = await body(page);
   check('choosing Food shows Essentials · Food with its own inclusions', /Essentials · Food/.test(f) && /Recipes, portions and meal planning/.test(f) && /19\.99/.test(f) && /20 AI actions a month/.test(f));
-  check('Essentials offers Pro for the real difference', /Add Training too with Pro, for SAR 5\.00 more a month/.test(f));
+  check('Essentials offers Pro for the real difference', /Add Training too with Pro, for SAR\s5\.00 more a month/.test(f));
   check('web: says subscriptions are coming, no buy button that cannot work', /Subscriptions coming soon/.test(b));
   check('"Have a code?" and "Compare plans" are offered', /Have a code\?/.test(b) && /Membership and usage/.test(b));
   await page.screenshot({ path: `${OUT}/sheet.png` });
