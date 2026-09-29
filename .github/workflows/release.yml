@@ -29,6 +29,10 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
+      # A prebuilt module compiled for a newer ExpoModulesCore crashes the
+      # app at launch (build 18); stop here instead of shipping it.
+      - name: Check iOS prebuilt modules match ExpoModulesCore
+        run: ./scripts/check-ios-prebuilds.sh
       - run: >-
           eas build
           --platform ${{ github.event.inputs.platform || 'ios' }}
