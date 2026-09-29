@@ -413,15 +413,18 @@ In the TestFlight build, **signed in with a second Calgym account** (for example
 **Done when:** all of the above works. If something fails, send me a screenshot.
 
 ## Step 17 🏦 Submit for review
-Apple now puts the app version and the subscriptions into one **submission**, added from each subscription's own page.
+Apple puts the app version, the subscription group and the subscriptions into **one submission**. Do it in this order: the version first, then the subscriptions.
 
-1. Your app → **1.0 Prepare for Submission** → **Build → +:** choose **build 19** (or newer). Not 18. **Save.**
-2. **Monetization → Subscriptions** → your group → **Essentials Monthly** → **Add for Review** (top right).
-   - A window opens: **Create New Submission**. Add the **1.0 app version** to it, and the **subscription group** if it offers it.
-3. Do the same for **Essentials Yearly**, **Pro Monthly** and **Pro Yearly**: **Add for Review** → add to the **same** submission. Leave Pro+ out.
-   - The button only works once a subscription is **Ready to Submit** (price, localization and review screenshot filled in). If it's greyed out, the subscription shows what's still missing.
-   - Don't create anything under **Monetization → In-App Purchases**. That page is for one-off purchases, which Calgym doesn't sell.
-4. Open the submission (the banner at the top, or **App Review** in the sidebar). Check it lists the app version, the group and the four subscriptions → **Submit for Review**.
+1. **The group's name** (once): **Monetization → Subscriptions** → click the **group** (not a subscription) → **App Store Localization → +**:
+   - English: Subscription Group Display Name `Calgym`, App Name: use the app name → **Save**.
+   - Arabic: `كالجيم` → **Save**.
+   - Without this, Apple can't include the group: "must be submitted with its subscription group".
+2. **The version:** **Distribution → 1.0 Prepare for Submission** → **Build → +** → **build 19** (not 18) → **Save** → **Add for Review** (top right).
+   - This creates the submission with the version in it. If it lists something missing (a screenshot, privacy, age rating), fix that and press it again.
+3. **The subscriptions:** **Monetization → Subscriptions** → **Essentials Monthly** → **Add for Review** → pick the **existing** submission (not a new one). Then Essentials Yearly, Pro Monthly and Pro Yearly the same way. Leave Pro+ out.
+   - Greyed-out button: that subscription still misses something (usually the review screenshot or a localization).
+   - Don't create anything under **Monetization → In-App Purchases** (that is for one-off purchases).
+4. Open the submission (the banner at the top, or **App Review** in the sidebar). It should list: **iOS 1.0**, the **subscription group** and the **four subscriptions** → **Submit for Review**.
 5. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
 
 ## Step 18 ⬜ Launch day (after "Pending Developer Release")
