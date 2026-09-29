@@ -180,6 +180,27 @@ export function servingPluralCount(servings: number): number {
 export const SERVING_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
 
 /**
+ * How a food item's portion reads, in the language shown now. A recipe
+ * portion is rebuilt from its serving count ("½ serving" / "½ حصة") instead
+ * of the text saved with it, which stays in whatever language was on when
+ * it was logged; anything else shows the portion as written.
+ */
+export function portionText(
+  item: { portion?: string; recipeServings?: number },
+  t: (key: string, values?: Record<string, unknown>) => string,
+): string {
+  const n = item.recipeServings;
+  if (typeof n === 'number' && n > 0) return `${servingCountLabel(n)} ${t('recipe.servingUnit', { count: servingPluralCount(n) })}`;
+  return item.portion ?? '';
+}
+
+/** The offered step closest to a planned portion (1 when there is none). */
+export function nearestServingStep(servings: number | null | undefined): (typeof SERVING_STEPS)[number] {
+  if (servings == null || !(servings > 0)) return 1;
+  return SERVING_STEPS.reduce((best, s) => (Math.abs(s - servings) < Math.abs(best - servings) ? s : best), SERVING_STEPS[0]);
+}
+
+/**
  * A recipe with one ingredient's quantity corrected.
  *
  * Its nutrition moves with the amount, because an estimate per 150 g of onion

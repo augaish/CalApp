@@ -89,7 +89,7 @@ function shapeLabel(rows: WorkoutSet[], type: ExerciseType, t: (k: string, o?: R
   if (rows.length === 0) return null;
   if (type === 'weight_reps' || type === 'bodyweight_reps') {
     const reps = new Set(rows.map((r) => r.reps ?? 0));
-    if (reps.size === 1) return t('training.setsReps', { sets: rows.length, reps: [...reps][0] });
+    if (reps.size === 1) return `${t('training.setsOnly', { count: rows.length })} · ${t('training.repsCount', { count: [...reps][0] })}`;
     return t('training.setsOnly', { count: rows.length });
   }
   return t('training.setsOnly', { count: rows.length });
@@ -692,8 +692,8 @@ export default function Training() {
 }
 
 /** Kept for the history screen, which summarises a logged exercise the same way. */
-export function summarize(w: LoggedWorkout, sets: string, top: string, kg: string): string {
-  const parts = [`${w.sets.length} ${sets}`];
+export function summarize(w: LoggedWorkout, sets: (count: number) => string, top: string, kg: string): string {
+  const parts = [sets(w.sets.length)];
   if (w.type === 'weight_reps') {
     const best = Math.max(0, ...w.sets.map((s) => s.weightKg ?? 0));
     if (best > 0) parts.push(`${top} ${best} ${kg}`);

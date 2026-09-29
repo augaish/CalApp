@@ -21,6 +21,7 @@ import {
   roundMacros,
   scaleMacros,
   servingCountLabel,
+  nearestServingStep,
   servingPluralCount,
   SERVING_STEPS,
 } from '@/lib/recipes';
@@ -51,7 +52,7 @@ export default function PlanMeal() {
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
   const theme = useTheme();
   const router = useRouter();
-  const params = useLocalSearchParams<{ recipeId?: string; day?: string; slot?: string }>();
+  const params = useLocalSearchParams<{ recipeId?: string; day?: string; slot?: string; from?: string }>();
 
   const recipes = useAllRecipes();
   const activeProgram = useAppStore((s) => s.activeProgram);
@@ -69,7 +70,14 @@ export default function PlanMeal() {
     return i >= 0 ? i : 0;
   });
   const [slot, setSlot] = useState<MealType>(MEAL_SLOTS.includes(params.slot as MealType) ? (params.slot as MealType) : 'lunch');
-  const [servings, setServings] = useState(1);
+  // A replacement keeps the portion that was planned for the slot, so ½ a
+  // serving swapped stays ½ unless changed here.
+  const [servings, setServings] = useState<number>(() => {
+    const d = days.find((x) => dateKey(x) === params.day) ?? days[0];
+    const sl: MealType = MEAL_SLOTS.includes(params.slot as MealType) ? (params.slot as MealType) : 'lunch';
+    const planned = plannedMealFor(activeProgram?.mealPlan, d, sl, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id);
+    return nearestServingStep(planned?.items.length === 1 ? planned.items[0].recipeServings : undefined);
+  });
   // The programme this preview was built against (S14/AT15).
   const [programAtOpen] = useState(activeProgram?.id);
 
@@ -126,7 +134,10 @@ export default function PlanMeal() {
     ensureRecipeInStore(recipe.id, locale);
     setPlannedRecipe(key, slot, { recipeId: recipe.id, servings });
     successHaptic();
-    router.back();
+    // Chosen through the recipe picker: back to the plan it changed, past
+    // the picker and the recipe, rather than one step into the picker.
+    if (params.from === 'picker') router.dismissTo('/(tabs)/food');
+    else router.back();
   };
 
   const dateLabel = `${t(`home.mealTypes.${slot}`)} · ${day.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`;

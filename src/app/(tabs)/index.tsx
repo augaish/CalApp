@@ -38,6 +38,7 @@ import {
 } from '@/lib/store';
 import { targetsNeedUpdate } from '@/lib/tdee';
 import { useTour, useTourTarget } from '@/lib/tour';
+import { portionText } from '@/lib/recipes';
 import { useAllRecipes } from '@/lib/use-recipes';
 import type { MealType } from '@/lib/types';
 
@@ -147,6 +148,10 @@ export default function Overview() {
   const totals = totalsForDay(meals, selected);
   const incomplete = totals.incomplete ?? [];
   const kcalIncomplete = incomplete.includes('calories');
+  // Unknown protein on an entry makes the logged total a floor, so what is
+  // left is a ceiling: "at most 56 g", never a precise-looking "56 g".
+  const proteinIncomplete = incomplete.includes('proteinG');
+  const proteinLeft = Math.max(0, Math.round(targets.proteinG - totals.proteinG));
   const remaining = targets.calories - totals.calories;
   const over = remaining < 0;
   const waterMl = waterForDay(water, selected);
@@ -189,7 +194,7 @@ export default function Overview() {
     ? plannedMealFor(activeProgram?.mealPlan, selected, nextMeal, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id)
     : undefined;
   const nextPlannedKcal = nextPlanned ? nextPlanned.items.reduce((sum, i) => sum + i.calories, 0) : 0;
-  const nextPlannedPortion = nextPlanned?.items.length === 1 ? nextPlanned.items[0].portion : undefined;
+  const nextPlannedPortion = nextPlanned?.items.length === 1 ? portionText(nextPlanned.items[0], t) : undefined;
   const openMealEntry = (slot: MealType, via: 'scan' | 'menu') => {
     usePending.getState().setMealTypeHint(slot);
     router.push(via === 'scan' ? '/scan?mode=meal' : '/add-menu?scope=food');
@@ -433,8 +438,8 @@ export default function Overview() {
                   right below, and protein is what a meal choice most moves. */}
               <StatTile
                 icon="nutrition-outline"
-                value={`${num(Math.max(0, Math.round(targets.proteinG - totals.proteinG)))} g`}
-                label={t('today.tileProteinLeft')}
+                value={`${proteinIncomplete && proteinLeft > 0 ? '≤' : ''}${num(proteinLeft)} g`}
+                label={proteinIncomplete && proteinLeft > 0 ? t('today.tileProteinLeftAtMost') : t('today.tileProteinLeft')}
                 color={theme.protein}
               />
             </Pressable>

@@ -204,8 +204,10 @@ export default function GymResult() {
           {t('gymResult.suggestion')}
         </Text>
         <Text style={[styles.suggestValue, { color: theme.text }]}>
-          {analysis.suggestion.sets} {t('gymResult.sets')} × {analysis.suggestion.reps}{' '}
-          {t('gymResult.reps')}
+          {t('training.setsOnly', { count: analysis.suggestion.sets })} ×{' '}
+          {/^\d+$/.test(String(analysis.suggestion.reps).trim())
+            ? t('training.repsCount', { count: Number(analysis.suggestion.reps) })
+            : `${analysis.suggestion.reps} ${t('gymResult.reps')}`}
         </Text>
         {analysis.suggestion.note ? (
           <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{analysis.suggestion.note}</Text>

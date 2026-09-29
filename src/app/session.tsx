@@ -496,7 +496,7 @@ export default function SessionScreen() {
             {continuous
               ? t(loggedContinuous ? 'track.sessionLogged' : 'session.thisSession')
               : allSetsDone
-                ? `${t('session.setNumber', { n: setNo + 1 })} · ${t('session.allSetsDone', { total: goal })}`
+                ? `${t('session.setNumber', { n: setNo + 1 })} · ${t('session.allSetsDone', { count: goal })}`
                 : t('session.setOf', { n: setNo + 1, total: goal })}
           </Text>
           {!continuous && (

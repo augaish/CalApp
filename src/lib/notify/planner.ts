@@ -48,6 +48,8 @@ export interface DayFacts {
   date: Date;
   kcal: number;
   protein: number;
+  /** False when a logged item's protein is unknown: `protein` is then only a floor. */
+  proteinComplete?: boolean;
   waterMl: number;
   /** Meal slots logged on the day. */
   mealsLogged: MealSlot[];
@@ -269,7 +271,8 @@ export function candidates(f: NotifyFacts): PlannedNote[] {
         push('meal', 'food', when, slot === 'dinner' ? 55 : 50, { slot, kcalLeft: left }, `-${slot}`);
       }
       // Protein, once there's a day of eating to judge: afternoon, under half.
-      if (today && day.mealsLogged.length + day.mealMinutes.length > 0 && f.targets.protein > 0 && day.protein < f.targets.protein * 0.5) {
+      // Only with every item's protein known: "30 of 150 g" from a floor would nag wrongly.
+      if (today && day.proteinComplete !== false && day.mealsLogged.length + day.mealMinutes.length > 0 && f.targets.protein > 0 && day.protein < f.targets.protein * 0.5) {
         const dinner = usualOr(f.usual.dinner, DEFAULT_USUAL.dinner) ?? DEFAULT_USUAL.dinner;
         const when = Math.min(17 * 60 + 30, Math.max(15 * 60 + 30, dinner - 180));
         push('protein', 'food', when, 60, {
@@ -327,7 +330,7 @@ export function candidates(f: NotifyFacts): PlannedNote[] {
       }
       if (!day.plan && !day.trained && !day.missedYesterday && f.hasSchedule && !ramadan) {
         push('restDay', 'training', 10 * 60 + 30, 15, {
-          proteinLeft: foodOn ? Math.max(0, Math.round(f.targets.protein - day.protein)) : null,
+          proteinLeft: foodOn && day.proteinComplete !== false ? Math.max(0, Math.round(f.targets.protein - day.protein)) : null,
         });
       }
       if (day.program?.weekStarting || day.program?.finished) {

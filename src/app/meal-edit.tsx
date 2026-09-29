@@ -14,7 +14,7 @@ import { successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
-import { incompleteFlags, itemUnknownNutrients } from '@/lib/recipes';
+import { incompleteFlags, itemUnknownNutrients, portionText } from '@/lib/recipes';
 import type { FoodItem, MealAnalysis, MealType } from '@/lib/types';
 
 const PORTIONS: { m: number; label: string }[] = [
@@ -323,7 +323,7 @@ export default function MealEdit() {
               onChangeText={(text) => updateItem(index, { name: text })}
               style={[styles.itemNameInput, { color: theme.text, borderColor: theme.border }]}
             />
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{item.portion}</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{portionText(item, t)}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')}
               onPress={() => removeItem(index)}
               hitSlop={10}

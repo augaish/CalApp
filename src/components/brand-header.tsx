@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -234,6 +234,12 @@ export function PageHeader({
   const insets = useSafeAreaInsets();
   const ink = variant === 'gradient' ? theme.onGradient : theme.text;
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
+  // The title is centred on the screen, so it is kept clear of the wider of
+  // the two sides (Back and the right action); a long title — Arabic ones
+  // often are — then shrinks a little and ends in "…" in the space between,
+  // instead of running underneath the buttons.
+  const [sides, setSides] = useState({ start: 0, end: 0 });
+  const inset = Math.max(sides.start, sides.end, TOUCH) + Spacing.xs;
   const inner = (
     <>
       <View style={styles.row}>
@@ -243,14 +249,18 @@ export function PageHeader({
           accessibilityRole="button"
           accessibilityLabel={backLabel ?? (close ? t('common.close') : t('common.back'))}
           style={({ pressed }) => [styles.back, pressed && { opacity: 0.7 }]}
+          onLayout={(e) => {
+            const w = Math.ceil(e.nativeEvent.layout.width);
+            setSides((cur) => (cur.start === w ? cur : { ...cur, start: w }));
+          }}
         >
           <Icon name={close ? 'close' : 'chevron-back'} size={24} color={ink} />
           {!close && (
             <Text maxFontSizeMultiplier={1.3} style={{ color: ink, fontSize: 15, fontWeight: '600' }}>{backLabel ?? t('common.back')}</Text>
           )}
         </Pressable>
-        <View style={styles.titleWrap} pointerEvents="none">
-          <Text maxFontSizeMultiplier={1.3} style={[styles.pageTitle, { color: ink }]} numberOfLines={1}>
+        <View style={[styles.titleWrap, { paddingHorizontal: inset }]} pointerEvents="none">
+          <Text maxFontSizeMultiplier={1.3} style={[styles.pageTitle, { color: ink }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>
             {title}
           </Text>
           {!!subtitle && (
@@ -259,7 +269,15 @@ export function PageHeader({
             </Text>
           )}
         </View>
-        <View style={styles.rightSlot}>{right}</View>
+        <View
+          style={styles.rightSlot}
+          onLayout={(e) => {
+            const w = right ? Math.ceil(e.nativeEvent.layout.width) : 0;
+            setSides((cur) => (cur.end === w ? cur : { ...cur, end: w }));
+          }}
+        >
+          {right}
+        </View>
       </View>
       {children}
     </>

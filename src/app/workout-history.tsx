@@ -109,7 +109,7 @@ export default function WorkoutHistory() {
                           <Text style={{ color: theme.text, fontWeight: '700' }} numberOfLines={1}>
                             {nameOf(w)}
                           </Text>
-                          <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{summarize(w, t('training.sets'), t('training.top'), kg)}</Text>
+                          <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{summarize(w, (count) => t('training.setsOnly', { count }), t('training.top'), kg)}</Text>
                         </View>
                         {!!wCalories && (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>

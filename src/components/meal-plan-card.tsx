@@ -6,6 +6,7 @@ import { Icon } from '@/components/icon';
 import { weekdayLabel } from '@/components/schedule-plan-card';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { portionText } from '@/lib/recipes';
 import { plannedMealCalories } from '@/lib/store';
 import type { CoachSchedulePlan, MealPlan } from '@/lib/types';
 
@@ -109,7 +110,7 @@ export function MealPlanCard({
                     <View key={i} style={styles.itemRow}>
                       <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1 }} numberOfLines={1}>
                         {item.name}
-                        {item.portion ? ` · ${item.portion}` : ''}
+                        {portionText(item, t) ? ` · ${portionText(item, t)}` : ''}
                       </Text>
                       <Text style={{ color: theme.textTertiary, fontSize: 11 }}>
                         {`${Math.round(item.calories)} · P${Math.round(item.proteinG)} C${Math.round(item.carbsG)} F${Math.round(item.fatG)}`}

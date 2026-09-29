@@ -67,7 +67,9 @@ export default function Recipes() {
 
   // Opened as a picker for one planned slot, rather than as a plain library.
   const { day, slot } = useLocalSearchParams<{ day?: string; slot?: string }>();
-  const planTarget = day && slot ? `&day=${encodeURIComponent(day)}&slot=${encodeURIComponent(slot)}` : '';
+  // `intent=plan` tells the recipe screen this is choosing what goes in the
+  // slot (a swap, or planning an empty one) — not eating what is planned there.
+  const planTarget = day && slot ? `&day=${encodeURIComponent(day)}&slot=${encodeURIComponent(slot)}&intent=plan` : '';
 
   const recipes = useAllRecipes();
   const addRecipe = useAppStore((s) => s.addRecipe);

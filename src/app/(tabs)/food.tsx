@@ -31,7 +31,7 @@ import { timestampFor, useViewDay } from '@/lib/day';
 import { successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { usePending } from '@/lib/pending';
-import { isEstimated, itemUnknownNutrients, knownLabel } from '@/lib/recipes';
+import { isEstimated, itemUnknownNutrients, knownLabel, portionText } from '@/lib/recipes';
 import {
   dateKey,
   isSameDay,
@@ -372,7 +372,7 @@ export default function Food() {
                         {planned.name}
                       </Text>
                       <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
-                        {planned.items.length === 1 && planned.items[0].portion ? `${planned.items[0].portion} · ` : ''}
+                        {planned.items.length === 1 && portionText(planned.items[0], t) ? `${portionText(planned.items[0], t)} · ` : ''}
                         {knownLabel(num(plannedMealCalories(planned)), plannedKcalUnknown(planned))} {t('common.kcal')}
                       </Text>
                       {(plannedRecipe ? isEstimated(plannedRecipe) : false) && (
@@ -489,7 +489,7 @@ export default function Food() {
                           </Text>
                           {/* Two lines so the completeness marker is never the part that gets clipped. */}
                           <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={2}>
-                            {item.portion ? `${item.portion} · ` : ''}
+                            {portionText(item, t) ? `${portionText(item, t)} · ` : ''}
                             {kcalLabel}
                           </Text>
                           {/* Under the text rather than beside it, so the meal
@@ -643,7 +643,7 @@ function PlanDay({
                       {meal.name}
                     </Text>
                     <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
-                      {meal.items.length === 1 && meal.items[0].portion ? `${meal.items[0].portion} · ` : ''}
+                      {meal.items.length === 1 && portionText(meal.items[0], t) ? `${portionText(meal.items[0], t)} · ` : ''}
                       {knownLabel(num(plannedMealCalories(meal)), plannedKcalUnknown(meal))} {t('common.kcal')}
                     </Text>
                   </>

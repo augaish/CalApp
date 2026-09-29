@@ -137,9 +137,9 @@ export default function Review() {
       <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: Spacing.sm, marginBottom: Spacing.md }}>
         {selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })} ·{' '}
         {selectedDay?.calories != null
-          ? t('review.dayLogged', { kcal: num(selectedDay.calories), sets: selectedDay.setsDone })
+          ? t('review.dayLogged', { kcal: num(selectedDay.calories), sets: t('review.setsCount', { count: selectedDay.setsDone }) })
           : selectedDay?.setsDone
-            ? t('review.dayTrainedOnly', { sets: selectedDay.setsDone })
+            ? t('review.dayTrainedOnly', { sets: t('review.setsCount', { count: selectedDay.setsDone }) })
             : t('review.dayNothing')}
       </Text>
 

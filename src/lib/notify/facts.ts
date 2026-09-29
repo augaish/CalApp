@@ -215,6 +215,7 @@ function dayFacts(s: State, date: Date, now: Date): DayFacts {
     date: startOfDay(date),
     kcal: totals.calories,
     protein: totals.proteinG,
+    proteinComplete: !(totals.incomplete ?? []).includes('proteinG'),
     waterMl: waterForDay(water, date),
     mealsLogged: [...new Set(dayMeals.map(slotOf).filter((x): x is MealSlot => !!x))],
     mealMinutes: dayMeals.map((m) => minutesOf(m.at)),

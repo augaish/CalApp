@@ -55,9 +55,13 @@ export default function RecipeScreen() {
   const lang = i18n.language === 'ar' ? 'ar' : 'en';
   const theme = useTheme();
   const router = useRouter();
-  const { id, day, slot: slotParam } = useLocalSearchParams<{ id?: string; day?: string; slot?: string }>();
-  // Opened FROM a planned meal: you are about to eat it, not plan it.
-  const fromPlan = !!day;
+  const { id, day, slot: slotParam, intent } = useLocalSearchParams<{ id?: string; day?: string; slot?: string; intent?: string }>();
+  // Two ways to arrive with a date and a slot. From the recipe picker
+  // (`intent=plan`: a swap, or filling an empty slot) the choice is what goes
+  // there, so the action is a replacement preview. From a planned meal's
+  // View recipe, you are about to eat it, so the action is Log eaten.
+  const choosingForSlot = intent === 'plan' && !!day && !!slotParam;
+  const fromPlan = !!day && !choosingForSlot;
 
   const recipes = useAllRecipes();
   const updateRecipe = useAppStore((s) => s.updateRecipe);
@@ -85,6 +89,9 @@ export default function RecipeScreen() {
   const unknown = unknownNutritionCount(recipe);
   const visibleIngredients = showAll || ingredients.length <= COLLAPSED_INGREDIENTS + 1 ? ingredients : ingredients.slice(0, COLLAPSED_INGREDIENTS);
   const minutes = (recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0);
+
+  const goPlan = () =>
+    router.push(`/plan-meal?${new URLSearchParams({ recipeId: recipe.id, day: day ?? '', slot: slotParam ?? '', from: 'picker' }).toString()}`);
 
   const goLog = () => {
     const q = new URLSearchParams({ recipeId: recipe.id });
@@ -152,6 +159,8 @@ export default function RecipeScreen() {
       footer={
         !ready ? (
           <Button label={t('recipe.markReady')} icon="checkmark-circle" onPress={markReady} />
+        ) : choosingForSlot ? (
+          <Button label={t('recipe.useForSlot', { slot: t(`home.mealTypes.${slotParam}`) })} icon="swap-horizontal" onPress={goPlan} />
         ) : fromPlan ? (
           <Button label={t('recipe.logEatenShort')} icon="add" onPress={goLog} />
         ) : (

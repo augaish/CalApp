@@ -15,6 +15,7 @@ import { lightHaptic, successHaptic } from '@/lib/feedback';
 import {
   foodItemForServings,
   isEstimated,
+  nearestServingStep,
   perServing,
   roundMacros,
   scaleMacros,
@@ -25,7 +26,7 @@ import {
   knownLabel,
   recipeUnknownNutrients,
 } from '@/lib/recipes';
-import { dateKey, mealTypeForNow, useAppStore } from '@/lib/store';
+import { dateKey, mealTypeForNow, plannedMealFor, useAppStore } from '@/lib/store';
 import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
 import type { MealType, NutrientKey } from '@/lib/types';
 
@@ -57,7 +58,24 @@ export default function LogPortion() {
   const day = params.day ? dayFromKey(params.day) : new Date();
   const isToday = dateKey(day) === dateKey(new Date());
 
-  const [portion, setPortion] = useState<(typeof SERVING_STEPS)[number]>(1);
+  // Logging a planned meal starts from the portion that was planned (½ a
+  // serving stays ½); anything else starts at one serving.
+  const [plannedServings] = useState<number | null>(() => {
+    if (!params.day || !MEAL_SLOTS.includes(params.slot as MealType)) return null;
+    const s = useAppStore.getState();
+    const planned = plannedMealFor(
+      s.activeProgram?.mealPlan,
+      dayFromKey(params.day),
+      params.slot as MealType,
+      s.mealPlanSwaps,
+      s.mealPlanRecipes,
+      recipes,
+      s.activeProgram?.id,
+    );
+    const item = planned?.items.find((i) => i.recipeId === params.recipeId);
+    return item?.recipeServings ?? null;
+  });
+  const [portion, setPortion] = useState<(typeof SERVING_STEPS)[number]>(() => nearestServingStep(plannedServings));
   const [slot, setSlot] = useState<MealType>(
     MEAL_SLOTS.includes(params.slot as MealType) ? (params.slot as MealType) : mealTypeForNow(),
   );
@@ -171,9 +189,14 @@ export default function LogPortion() {
           >
             <Icon name="remove" size={22} color={theme.primary} />
           </Pressable>
-          <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20, flex: 1, textAlign: 'center' }}>
-            {portionLabel(portion)}
-          </Text>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20, textAlign: 'center' }}>{portionLabel(portion)}</Text>
+            {plannedServings != null && (
+              <Text style={{ color: theme.textTertiary, fontSize: 12, textAlign: 'center' }}>
+                {portion === nearestServingStep(plannedServings) ? t('logPortion.asPlanned') : t('logPortion.planned', { portion: portionLabel(plannedServings) })}
+              </Text>
+            )}
+          </View>
           <Pressable
             onPress={() => step(1)}
             disabled={stepIndex === SERVING_STEPS.length - 1 || !!loggedMeal}
