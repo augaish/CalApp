@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { MembershipCard } from '@/components/plan-status';
@@ -10,7 +10,7 @@ import { RowGroup, SettingsRow, StatusPill } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { buildExport } from '@/lib/account';
+import { chooseExport } from '@/lib/export';
 import { lightHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
@@ -86,13 +86,7 @@ export default function Profile() {
       { text: t('welcome.signIn'), onPress: () => signOut() },
     ]);
 
-  const exportData = async () => {
-    try {
-      await Share.share({ message: buildExport() });
-    } catch {
-      // share sheet dismissed — nothing to do
-    }
-  };
+  const exportData = () => chooseExport();
 
   const unitsLabel = units === 'imperial' ? `${t('units.lb')} / ${t('units.in')}` : `${t('progress.kg')} / ${t('units.cm')}`;
 

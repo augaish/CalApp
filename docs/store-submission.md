@@ -26,7 +26,7 @@ Your details, used below:
 
 ## Step 1 ⬜ Check the newest build reached TestFlight
 1. Open **appstoreconnect.apple.com → Apps → Calgym → TestFlight**.
-2. Under **iOS builds**, look for **build 17** (version 1.0.0), uploaded on the evening of 28 September.
+2. Under **iOS builds**, look for **build 18** (version 1.0.0), uploaded on 29 September. It adds the PDF report; build 17 is the one before it.
 3. If it shows **Missing Compliance**, click it and choose **None of the algorithms mentioned**. Normally it won't ask, because the app declares no special encryption.
 
 **Done when:** the build shows **Ready to Test** (it can take 30–60 minutes after upload).
@@ -405,7 +405,7 @@ In the TestFlight build:
 
 ## Step 17 🏦 Submit for review
 1. Your app → **1.0 Prepare for Submission**:
-   - **Build → +:** choose **build 17** (or a newer one if we make it).
+   - **Build → +:** choose **build 18** (or a newer one if we make it).
    - **In-App Purchases and Subscriptions → +:** tick the four sold products (Essentials Monthly and Yearly, Pro Monthly and Yearly). Not Pro+.
 2. **Add for Review** (top right) → **Submit to App Review**.
 3. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
@@ -535,7 +535,8 @@ No app build is needed.
 ## What each build contains
 - **Build 15:** the lock-screen and Dynamic Island rest countdown, and dark mode "System".
 - **Build 16:** the larger lock-screen countdown.
-- **Build 17 (28 September), the one to submit:**
+- **Build 18 (29 September), the one to submit:** everything in build 17, plus Export my data as a PDF report or a data file.
+- **Build 17 (28 September):**
   - Notification buttons work with the app closed.
   - Background refresh of reminders.
 - **Android APK `ae922784` (28 September):** https://expo.dev/accounts/augaishb/projects/calapp/builds/ae922784-6494-4609-811e-e8c98ae089c1

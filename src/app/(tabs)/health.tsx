@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { BodyMap, zoneIntensityFromSegmental, zoneStatusFromSegmental } from '@/components/body-map';
@@ -13,7 +13,7 @@ import { Button } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatWeight, formatWeightDelta, kgToDisplay, weightUnit } from '@/lib/units';
-import { buildExport } from '@/lib/account';
+import { chooseExport } from '@/lib/export';
 import { muscleTrend, overviewBodyStats, useAppStore, type MetricTrend as Trend } from '@/lib/store';
 import { useTourTarget } from '@/lib/tour';
 import type { WeightEntry } from '@/lib/types';
@@ -88,13 +88,7 @@ export default function Health() {
   const sourceOf = (w: WeightEntry) =>
     w.source === 'scan' ? (w.reportLabel ? t('health.sourceScanNamed', { device: w.reportLabel }) : t('health.sourceScan')) : t('health.sourceManual');
 
-  const exportData = async () => {
-    try {
-      await Share.share({ message: buildExport() });
-    } catch {
-      // The share sheet was dismissed; nothing to report.
-    }
-  };
+  const exportData = () => chooseExport();
 
   return (
     <CollapsingScreen title={t('health.title')}>
