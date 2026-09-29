@@ -390,7 +390,7 @@ Click **Save** at the top. Leave **Build** and **In-App Purchases** for step 17.
 ## Step 14 ⬜ TestFlight for outside testers (optional, can run in parallel)
 1. **TestFlight → Test Information:**
    - **Beta App Description:** `Calgym is a calorie and workout tracker. Snap a meal for calories and macros, follow your weekly training with a rest timer, and track weight and body composition. Please try logging a meal, a workout and a body reading, and tell us what felt slow or unclear.`
-   - **Feedback Email:** your support email.
+   - **Feedback Email:** support@calgym.org
    - **Privacy Policy URL:** `https://calapp-production-ab20.up.railway.app/privacy`
    - **Beta App Review Information:** your contact details, **Sign-in required: No**, and the same notes as in step 13.7.
 2. **External Testing → +** → group name `Beta testers` → **Builds → +** → the newest build.
@@ -480,7 +480,7 @@ The AI providers and RevenueCat work on your behalf, which Google does not count
 - **Full description:** the same text as step 13.3 (English and Arabic). Replace "Apple ID" with "Google Play account", and "Settings → Apple ID → Subscriptions" with "Google Play → Payments & subscriptions".
 - **App icon:** 512 × 512 PNG. **Feature graphic:** 1024 × 500.
 - **Phone screenshots:** 2–8, the same shots as for Apple.
-- **Category:** Health & Fitness. **Contact email:** your support email.
+- **Category:** Health & Fitness. **Contact email:** support@calgym.org.
 - Add Arabic with **Manage translations → Add your own translation → Arabic**.
 
 ## Step 24 ⬜ First upload (internal testing)
@@ -528,7 +528,7 @@ On each of the four base plans: **Add offer**:
 The app's "Continue with Google" button goes through Supabase Auth.
 1. **console.cloud.google.com** → new project **Calgym**.
 2. **APIs & Services → OAuth consent screen:**
-   - External, app name Calgym, your support email.
+   - External, app name Calgym, support@calgym.org.
    - Authorized domain `supabase.co`.
    - Scopes `email`, `profile`, `openid`.
    - Then **Publish app**.

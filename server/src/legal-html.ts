@@ -5,7 +5,7 @@
  *
  * Keep these accurate: they describe what the app actually does today.
  */
-const CONTACT = process.env.SUPPORT_EMAIL ?? 'augaishb1@gmail.com';
+const CONTACT = process.env.SUPPORT_EMAIL ?? 'support@calgym.org';
 const UPDATED = 'September 2026';
 const UPDATED_AR = 'سبتمبر ٢٠٢٦';
 

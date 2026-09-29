@@ -1080,7 +1080,7 @@ export const ar: TranslationSchema = {
     contact: 'التواصل',
     feedback: 'إرسال ملاحظات',
     feedbackHint: 'يفتح تطبيق البريد مع إصدار التطبيق مُدرجاً',
-    email: 'augaishb1@gmail.com',
+    email: 'support@calgym.org',
     note: 'ميزات الذكاء الاصطناعي موسومة كذلك في كل التطبيق. لا شيء هنا نصيحة طبية.',
   },
   profile: {

@@ -2690,7 +2690,7 @@ app.get('/admin/api/overview', async (c) => {
     { id: 'rc_webhook', done: set('REVENUECAT_WEBHOOK_SECRET'), label: 'RevenueCat webhook secret', how: 'RevenueCat → Integrations → Webhooks → URL /api/billing/revenuecat, authorization header = REVENUECAT_WEBHOOK_SECRET.' },
     { id: 'rc_first_event', done: overview.billingEventsEver > 0, label: 'First store event received', how: 'Make a sandbox purchase on TestFlight; it appears under Recent store events.' },
     { id: 'account_delete', done: supabaseAdminConfigured(), label: 'Account deletion removes the sign-in account', how: 'Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY (Supabase → Project settings → API) on Railway. Required by both stores.' },
-    { id: 'support_email', done: set('SUPPORT_EMAIL'), label: 'Support email for the legal pages', how: 'Set SUPPORT_EMAIL on Railway (otherwise the pages show a personal address).' },
+    { id: 'support_email', done: true, label: 'Support email for the legal pages', how: 'Set SUPPORT_EMAIL on Railway (the pages use support@calgym.org until then).' },
   ];
   const owed = Math.round(partners.reduce((sum, p) => sum + p.balance.owed, 0) * 100) / 100;
   return c.json({ ...overview, attention: { ...overview.attention, partnersOwedUsd: owed, deletionRequests: deletions }, checklist });

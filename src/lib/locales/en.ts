@@ -1080,7 +1080,7 @@ export const en = {
     contact: 'Contact',
     feedback: 'Send feedback',
     feedbackHint: 'Opens your mail app with the app version filled in',
-    email: 'augaishb1@gmail.com',
+    email: 'support@calgym.org',
     note: 'AI features are labelled as such throughout the app. Nothing here is medical advice.',
   },
   profile: {

@@ -169,7 +169,7 @@ App Store Connect → your app → **App Information** → **App Store Server No
 |---|---|---|
 | `SUPABASE_URL` | `https://uvhvxcvwpwkqvnvqdtyf.supabase.co` | ✅ |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_…` | ✅ |
-| `SUPPORT_EMAIL` | your support inbox | ✅ |
+| `SUPPORT_EMAIL` | support@calgym.org | ✅ |
 | `REVENUECAT_IOS_KEY` | `appl_…` | ⬜ |
 | `REVENUECAT_SECRET_KEY` | `sk_…` (V1) | ⬜ |
 | `REVENUECAT_WEBHOOK_SECRET` | the webhook's Authorization string | ⬜ |
