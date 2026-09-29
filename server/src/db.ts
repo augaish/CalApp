@@ -2283,7 +2283,9 @@ export async function adminOverview(days: number): Promise<AdminOverview | null>
     pool.query(
       `SELECT
          (SELECT COUNT(*) FROM barcode_cache WHERE status = 'pending')::int AS queue,
-         (SELECT COUNT(*) FROM ai_failures WHERE created_at > now() - interval '24 hours')::int AS failures,
+         (SELECT COUNT(*) FROM ai_failures
+           WHERE created_at > GREATEST(now() - interval '24 hours',
+                 COALESCE((SELECT (value #>> '{}')::timestamptz FROM app_settings WHERE key = 'ai_failures_seen_at'), '-infinity')))::int AS failures,
          (SELECT COUNT(*) FROM billing_events)::int AS billing_ever,
          COALESCE((SELECT SUM(amount_usd) FROM partner_earnings WHERE at <= now() - interval '30 days'), 0)
            - COALESCE((SELECT SUM(amount_usd) FROM partner_payouts), 0) AS owed,

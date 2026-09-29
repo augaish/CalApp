@@ -90,6 +90,7 @@ export const ADMIN_HTML = `<!doctype html>
   .done { margin-top:12px; padding:10px 14px; border-radius:12px; font-size:14px; font-weight:600; }
   .done.good { background:var(--green-soft); color:var(--green); }
   .done.bad { background:var(--danger-soft); color:var(--danger); }
+  .done.warn { background:var(--warn-soft); color:var(--warn); }
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
   .row > div { flex:1; min-width:140px; }
   .scroll { overflow-x:auto; }
@@ -289,6 +290,7 @@ export const ADMIN_HTML = `<!doctype html>
         <button onclick="saveLocks()">Save</button>
       </div>
       <div id="locks_msg" class="sub" style="margin-top:8px"></div>
+      <div id="locks_done" class="hide" role="status" aria-live="polite"></div>
     </div>
 
     <div class="card">
@@ -301,6 +303,7 @@ export const ADMIN_HTML = `<!doctype html>
         <div><label>Free trial (whole trial)</label><input id="lim_trial" type="number" min="0" /></div>
         <button onclick="saveLimits()">Save</button>
       </div>
+      <div id="lim_msg" class="hide" role="status" aria-live="polite"></div>
       <div class="sub" style="margin:10px 0 0">Every AI action counts, but not all cost the same — see the action costs below. A store free trial gets the paid features with the trial allowance until its first paid renewal.</div>
     </div>
 
@@ -316,6 +319,7 @@ export const ADMIN_HTML = `<!doctype html>
         <div><label>Programme</label><input id="w_program" type="number" min="1" max="50" /></div>
         <button onclick="saveWeights()">Save</button>
       </div>
+      <div id="w_msg" class="hide" role="status" aria-live="polite"></div>
       <div class="sub" style="margin:10px 0 0">How many credits each route spends from the allowance above. Designing a programme is a long tool-calling conversation costing many times a single meal photo — charging both as one action is what lets a free user spend the whole month on the most expensive route. Set these from the per-kind spend in the usage table, not by feel.</div>
     </div>
     </section>
@@ -417,7 +421,11 @@ export const ADMIN_HTML = `<!doctype html>
     <div class="card">
       <h2>AI failures</h2>
       <details class="how"><summary>How this works</summary><div>Why AI calls have been failing, in the provider's own words. Every route used to answer the app with one generic code, so an outage looked the same as a bad request and could only be guessed at. If one code dominates the last 24 hours, that is the outage.</div></details>
-      <div id="aif_empty" class="muted">No AI failures recorded.</div>
+      <div class="row hide" id="aif_seen_row" style="margin:0 0 10px;align-items:center">
+        <div class="sub" id="aif_seen_text" style="flex:1 1 260px"></div>
+        <button class="ghost" style="flex:0 0 auto" onclick="markAiSeen()">Mark as seen</button>
+      </div>
+      <div id="aif_empty" class="muted">No AI failures in the last 24 hours.</div>
       <div id="aif_summary"></div>
       <div id="aif_recent"></div>
     </div>
@@ -487,6 +495,7 @@ export const ADMIN_HTML = `<!doctype html>
         <label style="margin:0"><input id="sp_on" type="checkbox" style="width:auto" /> Enabled</label>
         <button onclick="saveSponsor()">Save sponsor</button>
       </div>
+      <div id="sp_msg" class="hide" role="status" aria-live="polite"></div>
     </div>
     </section>
   </div>
@@ -1110,37 +1119,109 @@ export const ADMIN_HTML = `<!doctype html>
   function reviewBarcode(barcode, action) {
     api('/admin/api/barcode-review', { barcode: barcode, action: action }).then(loadQueue);
   }
-  var WEIGHT_KINDS = ['meal','describe','equipment','exercise','bodyReading','coach','program'];
-  function saveWeights() {
-    var body = {};
-    WEIGHT_KINDS.forEach(function (k) {
-      var v = parseInt(document.getElementById('w_' + k).value, 10);
-      if (v >= 1) body[k] = v;
-    });
-    api('/admin/api/weights', body).then(load);
+  // ── Saving settings: always say what happened ──
+  function flash(id, text, kind) {
+    var box = document.getElementById(id);
+    box.className = 'done ' + kind;
+    box.textContent = text;
   }
+  function failed(id) {
+    return function (e) { flash(id, 'Not saved: the server didn’t answer (' + (e && e.message ? e.message : e) + '). Nothing changed. Try again.', 'bad'); };
+  }
+  // Editing after a save: say the new values aren't live until saved.
+  function watchUnsaved(msgId) {
+    var card = document.getElementById(msgId).closest('.card');
+    var mark = function () { flash(msgId, 'Unsaved changes. Press Save to apply them.', 'warn'); };
+    card.addEventListener('input', mark);
+    card.addEventListener('change', mark);
+  }
+  ['lim_msg', 'w_msg', 'sp_msg', 'locks_done'].forEach(watchUnsaved);
+  function wholeNumbers(fields, min, max) {
+    var body = {}, bad = [];
+    fields.forEach(function (f) {
+      var raw = document.getElementById(f[1]).value.trim();
+      var v = Number(raw);
+      if (raw === '' || !Number.isInteger(v) || v < min || (max != null && v > max)) bad.push(f[2]);
+      else body[f[0]] = v;
+    });
+    return { body: body, bad: bad };
+  }
+  function changes(fields, before, after) {
+    return fields.filter(function (f) { return before[f[0]] !== after[f[0]]; })
+      .map(function (f) { return f[2] + ' ' + before[f[0]] + ' → ' + after[f[0]]; });
+  }
+  var WEIGHT_KINDS = ['meal','describe','equipment','exercise','bodyReading','coach','program'];
+  var WEIGHT_FIELDS = [['meal','w_meal','Meal photo'],['describe','w_describe','Describe'],['equipment','w_equipment','Equipment'],['exercise','w_exercise','Exercise'],['bodyReading','w_bodyReading','Body reading'],['coach','w_coach','Coach msg'],['program','w_program','Programme']];
+  function saveWeights() {
+    var got = wholeNumbers(WEIGHT_FIELDS, 1, 50);
+    if (got.bad.length) { flash('w_msg', 'Not saved. ' + got.bad.join(', ') + (got.bad.length === 1 ? ' needs' : ' need') + ' a whole number from 1 to 50.', 'bad'); return; }
+    var before = Object.assign({}, data.weights || {});
+    flash('w_msg', 'Saving…', 'warn');
+    api('/admin/api/weights', got.body).then(function (r) {
+      var after = r.weights || {};
+      var off = WEIGHT_FIELDS.filter(function (f) { return after[f[0]] !== got.body[f[0]]; });
+      data.weights = after;
+      load();
+      if (off.length) flash('w_msg', 'Saved, but the server kept a different value for ' + off.map(function (f) { return f[2]; }).join(', ') + '. Check the boxes.', 'bad');
+      else {
+        var diff = changes(WEIGHT_FIELDS, before, after);
+        flash('w_msg', diff.length ? 'Saved. ' + diff.join(' · ') + '. Applies from the next AI action.' : 'Saved. Nothing changed: these were already the costs.', 'good');
+      }
+    }).catch(failed('w_msg'));
+  }
+  var LIMIT_FIELDS = [['free','lim_free','Free'],['essentials','lim_ess','Essentials'],['pro','lim_pro','Pro'],['proPlus','lim_proplus','Pro+'],['trial','lim_trial','Free trial']];
   function saveLimits() {
-    api('/admin/api/limits', {
-      free: parseInt(document.getElementById('lim_free').value, 10),
-      essentials: parseInt(document.getElementById('lim_ess').value, 10),
-      pro: parseInt(document.getElementById('lim_pro').value, 10),
-      proPlus: parseInt(document.getElementById('lim_proplus').value, 10),
-      trial: parseInt(document.getElementById('lim_trial').value, 10),
-    }).then(load);
+    var got = wholeNumbers(LIMIT_FIELDS, 0, null);
+    if (got.bad.length) { flash('lim_msg', 'Not saved. ' + got.bad.join(', ') + (got.bad.length === 1 ? ' needs' : ' need') + ' a whole number, 0 or more.', 'bad'); return; }
+    var before = Object.assign({}, data.limits, { trial: data.trialLimit });
+    flash('lim_msg', 'Saving…', 'warn');
+    api('/admin/api/limits', got.body).then(function (r) {
+      var after = Object.assign({}, r.limits, { trial: r.trialLimit });
+      var off = LIMIT_FIELDS.filter(function (f) { return after[f[0]] !== got.body[f[0]]; });
+      load();
+      if (off.length) flash('lim_msg', 'Saved, but the server kept a different value for ' + off.map(function (f) { return f[2]; }).join(', ') + '. Check the boxes.', 'bad');
+      else {
+        var diff = changes(LIMIT_FIELDS, before, after);
+        flash('lim_msg', diff.length ? 'Saved. ' + diff.join(' · ') + '. Applies from the next AI action; what people already used this month still counts.' : 'Saved. Nothing changed: these were already the allowances.', 'good');
+      }
+    }).catch(failed('lim_msg'));
   }
   function saveLocks() {
     var on = document.getElementById('locks_on').checked;
-    if (on && !confirm('Turn plan locks on? People without a plan can then only view and export their records, and Essentials members only use their own module.')) return;
-    api('/admin/api/plan-locks', { on: on }).then(load);
+    var was = !!data.planLocks;
+    if (on && !was && !confirm('Turn plan locks on? People without a plan can then only view and export their records, and Essentials members only use their own module.')) return;
+    flash('locks_done', 'Saving…', 'warn');
+    api('/admin/api/plan-locks', { on: on }).then(function (r) {
+      load();
+      if (r.on !== on) { flash('locks_done', 'Not saved: plan locks are still ' + (r.on ? 'on' : 'off') + '.', 'bad'); return; }
+      flash('locks_done', on === was ? 'Saved. Nothing changed: plan locks were already ' + (on ? 'on' : 'off') + '.' : 'Saved. Plan locks are now ' + (on ? 'ON' : 'OFF') + '. The apps pick this up the next time they open.', 'good');
+    }).catch(failed('locks_done'));
   }
   function saveSponsor() {
-    api('/admin/api/sponsor', {
+    var body = {
       enabled: document.getElementById('sp_on').checked,
       title: document.getElementById('sp_title').value,
       subtitle: document.getElementById('sp_sub').value,
-      imageUrl: document.getElementById('sp_img').value,
-      linkUrl: document.getElementById('sp_link').value,
-    }).then(load);
+      imageUrl: document.getElementById('sp_img').value.trim(),
+      linkUrl: document.getElementById('sp_link').value.trim(),
+    };
+    flash('sp_msg', 'Saving…', 'warn');
+    api('/admin/api/sponsor', body).then(function (r) {
+      var sp = r.sponsor || {};
+      load();
+      var dropped = [];
+      if (body.imageUrl && !sp.imageUrl) dropped.push('the image URL');
+      if (body.linkUrl && !sp.linkUrl) dropped.push('the link URL');
+      if (dropped.length) { flash('sp_msg', 'Saved, but ' + dropped.join(' and ') + ' was cleared: it must start with https://.', 'bad'); return; }
+      flash('sp_msg', 'Saved. The sponsor slot is ' + (sp.enabled ? 'shown' : 'hidden') + ' in the app from its next launch.', 'good');
+    }).catch(failed('sp_msg'));
+  }
+  function markAiSeen() {
+    api('/admin/api/ai-failures/seen', {}).then(function () {
+      setBadge('b-ai', 0);
+      document.getElementById('aif_seen_row').classList.add('hide');
+      if (typeof loadOverview === 'function') loadOverview();
+    }).catch(function () {});
   }
   // ── Promotion codes ──
   var PC_ERRORS = {
@@ -1607,7 +1688,7 @@ export const ADMIN_HTML = `<!doctype html>
     // Needs attention
     var att = d.attention, items = [];
     if (att.queue) items.push(['bad', '!', att.queue + ' product' + (att.queue === 1 ? '' : 's') + ' waiting for review', 'Content', 'content']);
-    if (att.aiFailures24h) items.push(['bad', '!', att.aiFailures24h + ' AI failure' + (att.aiFailures24h === 1 ? '' : 's') + ' in the last 24 hours', 'AI', 'ai']);
+    if (att.aiFailures24h) items.push(['bad', '!', att.aiFailures24h + ' new AI failure' + (att.aiFailures24h === 1 ? '' : 's') + ' in the last 24 hours', 'AI', 'ai']);
     if (att.partnersOwedUsd > 0) items.push(['todo', '$', '$' + att.partnersOwedUsd.toFixed(2) + ' owed to partners', 'Codes & partners', 'codes']);
     var todo = d.checklist.filter(function (c) { return !c.done; }).length;
     if (att.deletionRequests) items.push(['bad', '!', att.deletionRequests + ' account deletion request' + (att.deletionRequests === 1 ? '' : 's') + ' waiting', 'Users', 'users']);
@@ -1618,6 +1699,11 @@ export const ADMIN_HTML = `<!doctype html>
     }).join('') : '<li><span class="dot ok" aria-hidden="true">✓</span><div class="grow">Nothing needs you right now.</div></li>';
     setBadge('b-content', att.queue);
     setBadge('b-ai', att.aiFailures24h);
+    var seenRow = document.getElementById('aif_seen_row');
+    seenRow.classList.toggle('hide', !att.aiFailures24h);
+    document.getElementById('aif_seen_text').textContent = att.aiFailures24h
+      ? att.aiFailures24h + ' new failure' + (att.aiFailures24h === 1 ? '' : 's') + ' since you last looked. That is the red number on the AI tab; mark them as seen to clear it.'
+      : '';
     setBadge('b-users', att.deletionRequests || 0);
     // Launch checklist
     var done = d.checklist.length - todo;

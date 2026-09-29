@@ -2794,6 +2794,14 @@ app.get('/admin/api/promo-redemptions', async (c) => {
  * hypotheses, not fixed truths — the per-kind spend the usage table records is
  * what should eventually set them, so they are editable without a redeploy.
  */
+/** "I've seen these": the AI tab's count starts again from now. The
+ * failures themselves stay listed for the full 24 hours. */
+app.post('/admin/api/ai-failures/seen', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  await setSetting('ai_failures_seen_at', new Date().toISOString());
+  return c.json({ ok: true });
+});
+
 app.post('/admin/api/weights', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as never);
