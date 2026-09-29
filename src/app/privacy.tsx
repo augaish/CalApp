@@ -7,9 +7,8 @@ import { PageHeader } from '@/components/brand-header';
 import { InfoLine, RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
-import { deleteAccount } from '@/lib/account';
+import { deleteAccount, logOut } from '@/lib/account';
 import { SERVER_URL } from '@/lib/api';
-import { signOutAuth } from '@/lib/auth';
 import { useAppStore } from '@/lib/store';
 
 /**
@@ -22,7 +21,6 @@ export default function Privacy() {
   const theme = useTheme();
   const router = useRouter();
   const account = useAppStore((s) => s.account);
-  const signOut = useAppStore((s) => s.signOut);
   const resetAll = useAppStore((s) => s.resetAll);
   const aiConsent = useAppStore((s) => s.aiConsent);
   const setAiConsent = useAppStore((s) => s.setAiConsent);
@@ -43,12 +41,18 @@ export default function Privacy() {
       {
         text: t('profile.signOut'),
         style: 'destructive',
-        onPress: async () => {
-          await signOutAuth();
-          signOut();
-        },
+        onPress: () => void runLogOut(false),
       },
     ]);
+
+  const runLogOut = async (force: boolean) => {
+    if ((await logOut(force)) === 'done') return;
+    // Offline, most likely: the newest changes aren't in the account yet.
+    alertDestructive(t('profile.signOutUnsavedTitle'), t('profile.signOutUnsaved'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('profile.signOutAnyway'), style: 'destructive', onPress: () => void runLogOut(true) },
+    ]);
+  };
 
   const confirmReset = () =>
     alertDestructive(t('settings.resetData'), t('settings.resetDataConfirm'), [

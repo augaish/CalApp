@@ -168,14 +168,21 @@ function apply(snap: Snapshot, updatedAt: string) {
 
 /**
  * First sign-in on a device. An account that already holds logs is being
- * restored onto this phone; an empty one adopts whatever the guest built up
- * here. Returns what happened so the UI can say so.
+ * restored onto this phone; an empty one adopts whatever a guest built up
+ * here — but never logs that belong to another account (someone logged out
+ * and a different person signed in): those are cleared instead, so one
+ * person's history can't be copied into another's account.
  */
-export async function reconcileOnSignIn(): Promise<'restored' | 'uploaded' | 'none'> {
+export async function reconcileOnSignIn(uid: string): Promise<'restored' | 'uploaded' | 'none'> {
   const remote = await fetchRemote();
   if (remote && !isEmpty(remote.data)) {
     apply(remote.data, remote.updatedAt);
     return 'restored';
+  }
+  const owner = useAppStore.getState().dataOwner;
+  if (owner && owner !== uid) {
+    withoutBackup(() => useAppStore.getState().clearPersonal({ keepAccount: true }));
+    return 'none';
   }
   if (!isEmpty(snapshot())) {
     return (await pushSnapshot()) ? 'uploaded' : 'none';
@@ -224,6 +231,33 @@ export function startBackupWatcher(): void {
       void pushSnapshot();
     }, 4000);
   });
+}
+
+/** Change the store without it counting as the person's edit to back up. */
+export function withoutBackup(fn: () => void): void {
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  applying = true;
+  try {
+    fn();
+  } finally {
+    applying = false;
+  }
+}
+
+/**
+ * Upload anything not yet backed up, now (before logging out). True when the
+ * account's copy is current, or there is no account to back up to.
+ */
+export async function flushBackup(): Promise<boolean> {
+  if (timer) {
+    clearTimeout(timer);
+    timer = null;
+  }
+  if (!(await currentUid())) return true;
+  return pushSnapshot();
 }
 
 /** Remove the account's stored copy (called as part of deleting the account). */

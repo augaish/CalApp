@@ -142,6 +142,11 @@ export interface AppState {
   /** When this device last agreed with the account's stored copy. */
   syncedAt: string | null;
   /**
+   * The account the logs on this phone belong to, or null for a guest's.
+   * Signing in to a different, empty account must never copy them into it.
+   */
+  dataOwner: string | null;
+  /**
    * Per-date ordering override (dateKey → exerciseIds). A date with no entry
    * follows its weekday's plan, so editing the weekly schedule still moves
    * today around until the day itself has been reordered by hand.
@@ -233,6 +238,13 @@ export interface AppState {
 
   setAccount: (account: Account | null) => void;
   signOut: () => void;
+  setDataOwner: (uid: string | null) => void;
+  /**
+   * Log out: remove the account's logs, plans and coach history from this
+   * phone (they stay in the account's backup). Device preferences — language,
+   * units, appearance, reminders — stay.
+   */
+  clearPersonal: (opts?: { keepAccount?: boolean }) => void;
   setLanguage: (language: Language) => void;
   setUnits: (units: Units) => void;
   setAppearance: (appearance: AppearancePref) => void;
@@ -586,6 +598,7 @@ export const useAppStore = create<AppState>()(
       installId: null,
       linkedRef: null,
       syncedAt: null,
+      dataOwner: null,
       dayOrder: {},
       whoopBurnByDay: {},
       whoopWorkoutsByDay: {},
@@ -619,6 +632,47 @@ export const useAppStore = create<AppState>()(
 
       setAccount: (account) => set({ account }),
       signOut: () => set({ account: null }),
+      setDataOwner: (dataOwner) => set({ dataOwner }),
+      clearPersonal: (opts) =>
+        set({
+          ...(opts?.keepAccount ? {} : { account: null, linkedRef: null }),
+          syncedAt: null,
+          dataOwner: null,
+          focusAreas: ['food', 'training'],
+          profile: null,
+          targets: null,
+          meals: [],
+          exercises: [],
+          schedule: {},
+          savedSchedules: [],
+          activeScheduleId: null,
+          skips: {},
+          dayOrder: {},
+          whoopBurnByDay: {},
+          whoopWorkoutsByDay: {},
+          whoopBackfilledAt: null,
+          whoopLastFetchedAt: null,
+          workouts: [],
+          water: [],
+          weights: [],
+          activeProgram: null,
+          mealPlanSwaps: {},
+          mealPlanRecipes: {},
+          recipes: [],
+          shopping: null,
+          coachMessages: [],
+          coachAppliedPlans: [],
+          coachReferenceDocs: [],
+          activeFast: null,
+          fastingHistory: [],
+          activeSession: null,
+          occurrences: {},
+          favoriteIds: [],
+          notifySnooze: {},
+          notifyHandled: [],
+          planSwitch: null,
+          checklistDismissed: false,
+        }),
       setLanguage: (language) => set({ language }),
       setUnits: (units) => set({ units }),
       setAppearance: (appearance) => set({ appearance }),
@@ -1386,6 +1440,7 @@ export const useAppStore = create<AppState>()(
         installId,
         linkedRef,
         syncedAt,
+        dataOwner,
         dayOrder,
         whoopBurnByDay,
         whoopWorkoutsByDay,
@@ -1438,6 +1493,7 @@ export const useAppStore = create<AppState>()(
         installId,
         linkedRef,
         syncedAt,
+        dataOwner,
         dayOrder,
         whoopBurnByDay,
         whoopWorkoutsByDay,

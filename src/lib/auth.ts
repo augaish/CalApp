@@ -78,8 +78,10 @@ export async function syncAuthIdentity(): Promise<'restored' | 'uploaded' | 'non
   }
   // Logs follow the person too: restore the account's history onto a new phone,
   // or adopt this phone's guest history into an empty account.
-  const outcome = firstTimeHere ? await reconcileOnSignIn() : 'none';
+  const outcome = firstTimeHere ? await reconcileOnSignIn(uid) : 'none';
   if (!firstTimeHere) await syncOnLaunch();
+  // From here on the logs on this phone are this account's.
+  useAppStore.getState().setDataOwner(uid);
   startBackupWatcher();
   return outcome;
 }

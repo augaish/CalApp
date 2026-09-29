@@ -2,7 +2,7 @@ import { SERVER_URL } from './api';
 import { signOutAuth } from './auth';
 import { useAppStore } from './store';
 import { getSupabase } from './supabase';
-import { deleteRemoteData } from './sync';
+import { deleteRemoteData, flushBackup, withoutBackup } from './sync';
 
 /**
  * Everything the app holds about the user, as a portable JSON document.
@@ -74,4 +74,20 @@ export async function deleteAccount(): Promise<boolean> {
   await signOutAuth();
   useAppStore.getState().resetAll();
   return serverOk;
+}
+
+/**
+ * Log out of this phone. The account's copy is brought up to date first, then
+ * its logs, plans and coach history are removed from the phone — they come
+ * back when that account signs in again — so the next person to sign in here
+ * starts clean and never inherits (or uploads) someone else's history.
+ *
+ * 'unsaved' means the last changes could not be backed up (usually offline):
+ * nothing was changed, and the caller asks before calling again with force.
+ */
+export async function logOut(force = false): Promise<'done' | 'unsaved'> {
+  if (!force && !(await flushBackup())) return 'unsaved';
+  await signOutAuth();
+  withoutBackup(() => useAppStore.getState().clearPersonal());
+  return 'done';
 }
