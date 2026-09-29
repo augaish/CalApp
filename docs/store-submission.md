@@ -530,17 +530,16 @@ The app's "Continue with Google" button goes through Supabase Auth.
 2. **Google Auth Platform → Branding** (older consoles: **APIs & Services → OAuth consent screen**):
    - App name **Calgym**.
    - User support email: your own Gmail. Google only accepts the signed-in account or a Google Group here, not support@calgym.org. People see it on the Google sign-in screen.
-   - Audience: **External**.
-   - Developer contact email: **support@calgym.org**. Any address works here.
-   - Authorized domain `supabase.co`.
-   - Data Access (scopes): `email`, `profile`, `openid`.
-   - Audience → **Publish app**.
-3. **Credentials → Create credentials → OAuth client ID:**
-   - Type **Web application**.
-   - Redirect URI `https://uvhvxcvwpwkqvnvqdtyf.supabase.co/auth/v1/callback`.
-   - Copy the Client ID and the secret.
-4. **Supabase → Authentication → Sign In / Providers → Google:** enable it, paste both, and save.
-5. **Supabase → Authentication → URL Configuration → Redirect URLs:** add `calapp://**`.
+   - Audience: **External**. Developer contact email: **support@calgym.org** (any address works here).
+   - Then, back on **Branding**, scroll to **Authorized domains → + Add domain** → `supabase.co` → **Save**.
+3. **Data Access → Add or remove scopes:** tick `.../auth/userinfo.email`, `.../auth/userinfo.profile` and `openid` → **Update** → **Save**.
+4. **Clients → + Create client:**
+   - Application type **Web application**, name `Calgym (Supabase)`.
+   - **Authorized redirect URIs → + Add URI:** `https://uvhvxcvwpwkqvnvqdtyf.supabase.co/auth/v1/callback`.
+   - **Create.** Copy the **Client ID** and **Client secret** straight away, or download the JSON: Google may not show the secret again.
+5. **Audience → Publishing status: Testing → Publish app → Confirm.** While it says Testing, only listed test users can sign in with Google.
+6. **Supabase → Authentication → Sign In / Providers → Google:** enable it, paste the Client ID and secret, and save.
+7. **Supabase → Authentication → URL Configuration → Redirect URLs:** add `calapp://**`.
 
 No app build is needed.
 
