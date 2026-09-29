@@ -402,7 +402,7 @@ Click **Save** at the top. Leave **Build** and **In-App Purchases** for step 17.
 Not needed. The app is tested through TestFlight, and TestFlight purchases use your normal Apple ID and are never charged. Sandbox test accounts are for builds installed from a Mac with Xcode, which we don't use.
 
 ## Step 16 🏦 Test a purchase
-In the TestFlight build:
+In the TestFlight build, **signed in with a second Calgym account** (for example `augaishb1+test@gmail.com`), not your own Pro+ account. Store events replace a plan granted in admin, so a test subscription ending later would drop your own account to Free. Don't tap **Restore purchases** while signed in to your own account: that moves the test subscription onto it.
 1. Open **Profile → Membership**. Choose **Training**, then start the **Essentials** free trial. Confirm with your normal Apple ID. The sheet says "[Environment: Sandbox]", which means no money is taken.
 2. Check:
    - Profile shows **Essentials · Training** and **Free trial · ends …**.
