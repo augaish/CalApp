@@ -26,7 +26,8 @@ const base = (lang = 'en') => ({
 });
 const planned = (lang = 'en') => ({
   ...base(lang),
-  recipes: [recipe('ra', 'Chicken kabsa'), recipe('rb', 'Lentil stew')],
+  // The stew is 414 kcal a serving, so swapping ½ kabsa (664) for one serving is −250.
+  recipes: [recipe('ra', 'Chicken kabsa'), recipe('rb', 'Lentil stew', { ingredients: [ing('Lentils', 300, 600), ing('Onion', 200, 228)] })],
   mealPlanRecipes: { [key(today)]: { lunch: { recipeId: 'ra', servings: 0.5 } } },
 });
 
@@ -64,6 +65,12 @@ console.log('=== 1. Swap → replacement preview → Apply ===');
   b = await body(page); await shot(page, '1-replacement-preview');
   check('a replacement preview: before (kabsa) and after (stew), with Apply', /plan-meal/.test(page.url()) && /Chicken kabsa/.test(b) && /Lentil stew/.test(b) && /Apply/.test(b), page.url());
   check('the replacement keeps the planned ½ serving', /½ serving/.test(b));
+  await page.getByText('1', { exact: true }).last().click();
+  await page.waitForTimeout(400);
+  b = await body(page);
+  check('one 414 kcal serving instead of ½ kabsa (664) previews −250 kcal', /−250 kcal/.test(b), b.match(/.{0,30}250.{0,10}/)?.[0]);
+  await page.getByText('½', { exact: true }).last().click();
+  await page.waitForTimeout(300);
   await page.getByText(/^Apply/).last().click();
   await page.waitForTimeout(1500);
   const st = await store(page);
@@ -122,6 +129,14 @@ console.log('\n=== 3. Protein left with unknown values ===');
   await ctx.close();
 }
 
+{
+  const meals = [{ id: 'm1', at: at(0, 8), mealType: 'breakfast', items: [{ name: 'Chicken', calories: 900, proteinG: 160, carbsG: 0, fatG: 20, portion: '1' }] }];
+  const { ctx, page } = await open({ ...base(), meals }, '/');
+  const b = await body(page);
+  check('over the target: "protein goal reached", not "0 g left"', /protein goal reached/.test(b) && /160 g/.test(b));
+  await ctx.close();
+}
+
 // ═══ 4. Arabic ═══
 console.log('\n=== 4. Arabic ===');
 {
@@ -150,6 +165,23 @@ console.log('\n=== 4. Arabic ===');
   });
   const overlap = boxes.back && boxes.title && !(boxes.title.right <= boxes.back.left || boxes.title.left >= boxes.back.right);
   check('ar: the recipe title is clear of the Back button', !!boxes.title && !overlap, JSON.stringify(boxes));
+  await ctx.close();
+}
+
+{
+  const { ctx, page } = await open({ ...base('ar'), meals: [{ id: 'm1', at: at(0, 8), mealType: 'breakfast', items: [{ name: 'بيض', calories: 300, proteinG: 24, carbsG: 2, fatG: 20, portion: '3' }] }] }, '/', 'ar');
+  const b = await body(page);
+  check('ar: Overview grams are "غ", not Latin g', /126 غ/.test(b) && !/126 g/.test(b), b.match(/.{0,10}126.{0,10}/)?.[0]);
+  await ctx.close();
+}
+for (const [path, title] of [['/food', 'الطعام'], ['/', 'نظرة عامة'], ['/training', 'التمرين']]) {
+  const { ctx, page } = await open(planned('ar'), path, 'ar');
+  await shot(page, `4-ar-tab${path.replace('/', '-') || '-overview'}`);
+  const r = await page.evaluate((t) => {
+    const el = [...document.querySelectorAll('div,span')].find((e) => e.childElementCount === 0 && e.textContent.trim() === t && getComputedStyle(e).opacity !== '0' && e.getBoundingClientRect().top < 120);
+    return el ? { over: el.scrollWidth > el.clientWidth + 1, w: el.clientWidth, sw: el.scrollWidth } : null;
+  }, title);
+  check(`ar: the ${title} title shows in full`, !!r && !r.over, JSON.stringify(r));
   await ctx.close();
 }
 

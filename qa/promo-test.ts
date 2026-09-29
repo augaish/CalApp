@@ -97,7 +97,9 @@ await initDb();
 for (const c of ['GYMPARTNER', 'HALF50', 'ONEONLY', 'RACE', 'EDITME', 'PLUS30', 'RAMADAN50', 'WEEK7']) await deletePromo(c);
 // Users from earlier runs would carry their gifts into this one.
 {
-  const { Pool } = await import('/home/user/CalApp/server/node_modules/pg/lib/index.js');
+  // pg is CommonJS: from an ES module its exports sit under `default`.
+  const pg = (await import('/home/user/CalApp/server/node_modules/pg/lib/index.js')) as { Pool?: typeof import('pg').Pool; default?: { Pool: typeof import('pg').Pool } };
+  const Pool = (pg.Pool ?? pg.default?.Pool)!;
   const p = new Pool({ connectionString: process.env.DATABASE_URL });
   await p.query(`DELETE FROM app_users WHERE ref LIKE 'user-%' OR ref LIKE 'racer-%' OR ref LIKE 'acct-%'`);
   await p.query(`DELETE FROM ref_links WHERE from_ref LIKE 'user-%'`);

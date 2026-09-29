@@ -314,7 +314,11 @@ One thing does NOT follow the user's message language: if you call propose_weekl
 The user's own Calgym data is below (today first). USE IT: answer questions
 about their calories, macros, training and streaks directly from this data
 instead of asking them to repeat it. Days with 0 calories simply were not
-logged — say so rather than assuming they ate nothing. Refer to concrete
+logged — say so rather than assuming they ate nothing. A day's incomplete
+list names nutrients whose total is only a known minimum (some entries have
+that value unknown, marked unknown on the item): say "at least" for that
+total and "up to" for what is left of the target — never an exact remainder
+from an incomplete total. Refer to concrete
 numbers and compare against their targets when relevant. Each day's
 workouts list names every exercise logged that day with the 24h local time
 it was logged in parentheses, down to the second, e.g. "Bench Press

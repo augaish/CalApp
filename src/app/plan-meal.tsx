@@ -78,8 +78,10 @@ export default function PlanMeal() {
     const planned = plannedMealFor(activeProgram?.mealPlan, d, sl, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id);
     return nearestServingStep(planned?.items.length === 1 ? planned.items[0].recipeServings : undefined);
   });
-  // The programme this preview was built against (S14/AT15).
+  // The programme this preview was built against (S14/AT15), and what the
+  // opened slot held — a change to either underneath makes the preview stale.
   const [programAtOpen] = useState(activeProgram?.id);
+  const [slotAtOpen] = useState(() => (params.day && params.slot ? JSON.stringify(mealPlanRecipes[params.day]?.[params.slot as MealType] ?? null) : null));
 
   if (!recipe) return null;
 
@@ -126,7 +128,9 @@ export default function PlanMeal() {
           : '';
 
   const apply = () => {
-    if (activeProgram?.id !== programAtOpen) {
+    const openedSlotNow =
+      params.day && params.slot ? JSON.stringify(useAppStore.getState().mealPlanRecipes[params.day]?.[params.slot as MealType] ?? null) : null;
+    if (activeProgram?.id !== programAtOpen || openedSlotNow !== slotAtOpen) {
       Alert.alert(t('planMeal.staleTitle'), t('planMeal.staleBody'), [{ text: t('common.close'), onPress: () => router.back() }]);
       return;
     }

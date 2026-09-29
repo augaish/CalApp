@@ -438,8 +438,18 @@ export default function Overview() {
                   right below, and protein is what a meal choice most moves. */}
               <StatTile
                 icon="nutrition-outline"
-                value={`${proteinIncomplete && proteinLeft > 0 ? '≤' : ''}${num(proteinLeft)} g`}
-                label={proteinIncomplete && proteinLeft > 0 ? t('today.tileProteinLeftAtMost') : t('today.tileProteinLeft')}
+                value={
+                  proteinLeft > 0
+                    ? `${proteinIncomplete ? '≤' : ''}${num(proteinLeft)} ${t('common.grams')}`
+                    : `${proteinIncomplete ? '≥' : ''}${num(Math.round(totals.proteinG))} ${t('common.grams')}`
+                }
+                label={
+                  proteinLeft <= 0
+                    ? t('today.tileProteinReached')
+                    : proteinIncomplete
+                      ? t('today.tileProteinLeftAtMost')
+                      : t('today.tileProteinLeft')
+                }
                 color={theme.protein}
               />
             </Pressable>

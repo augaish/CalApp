@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassBacking } from '@/components/glass';
@@ -94,8 +94,33 @@ export function BrandRow({
   const theme = useTheme();
   const router = useRouter();
   const size = compact ? 30 : 36;
+  // The screen name comes first. When it, the AI Support label and the rest
+  // don't fit on one row (Arabic, larger text, Food's date pill), the AI
+  // pill drops its label and keeps its icon, rather than the name being cut.
+  // Widths are measured, never guessed per language.
+  const [w, setW] = useState({ row: 0, title: 0, pill: 0, extra: 0 });
+  const measure = (k: keyof typeof w) => (e: LayoutChangeEvent) => {
+    const v = Math.ceil(e.nativeEvent.layout.width);
+    setW((cur) => (cur[k] === v ? cur : { ...cur, [k]: v }));
+  };
+  const lead = onBack || showLogo ? size + Spacing.sm : 0;
+  // Row gaps: after the logo, either side of the spacer, before the avatar (and after Food's pill).
+  const fixed = lead + size + 3 * Spacing.sm + (extra ? w.extra + Spacing.sm : 0);
+  const aiIconOnly = right === 'ai' && w.row > 0 && w.title + w.pill + fixed > w.row;
   return (
-    <View style={[styles.row, compact && { minHeight: 40 }]}>
+    <View style={[styles.row, compact && { minHeight: 40 }]} onLayout={measure('row')}>
+      {/* Invisible copies, only to know how wide the full name and label are. */}
+      <View style={styles.measure} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+        <Text maxFontSizeMultiplier={1.3} style={[styles.brand, compact && { fontSize: 18 }]} onLayout={measure('title')}>
+          {title}
+        </Text>
+        {right === 'ai' && (
+          <View style={[styles.pill, { minHeight: size }]} onLayout={measure('pill')}>
+            <Icon name="sparkles" size={15} color="transparent" />
+            <Text maxFontSizeMultiplier={1.3} style={styles.pillText}>{t('tabs.ai')}</Text>
+          </View>
+        )}
+      </View>
       {onBack && (
         <Pressable
           onPress={onBack}
@@ -116,22 +141,29 @@ export function BrandRow({
           accessibilityLabel="Calgym"
         />
       )}
-      <Text maxFontSizeMultiplier={1.3} style={[styles.brand, compact && { fontSize: 18 }, { color: theme.onGradient }]} numberOfLines={1}>
+      <Text maxFontSizeMultiplier={1.3} style={[styles.brand, compact && { fontSize: 18 }, { color: theme.onGradient, flexShrink: 1 }]} numberOfLines={1}>
         {title}
       </Text>
       <View style={{ flex: 1 }} />
-      {extra}
+      {extra ? <View onLayout={measure('extra')}>{extra}</View> : null}
       {right === 'ai' ? (
         <View ref={aiRef} collapsable={false}>
           <Pressable
             onPress={() => router.push('/coach')}
             accessibilityRole="button"
             accessibilityLabel={t('tabs.ai')}
-            style={({ pressed }) => [styles.pill, { minHeight: size }, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [
+              styles.pill,
+              { minHeight: size },
+              aiIconOnly && { width: size, paddingHorizontal: 0, justifyContent: 'center' },
+              pressed && { opacity: 0.8 },
+            ]}
           >
             <GlassBacking radius={size / 2} fallbackColor={BACKING} tint={GLASS_TINT} />
             <Icon name="sparkles" size={15} color={theme.onGradient} />
-            <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]}>{t('tabs.ai')}</Text>
+            {!aiIconOnly && (
+              <Text maxFontSizeMultiplier={1.3} style={[styles.pillText, { color: theme.onGradient }]}>{t('tabs.ai')}</Text>
+            )}
           </Pressable>
         </View>
       ) : right === 'none' ? null : (
@@ -301,6 +333,7 @@ export function PageHeader({
 
 const styles = StyleSheet.create({
   brandBack: { alignItems: 'center', justifyContent: 'center' },
+  measure: { position: 'absolute', opacity: 0, flexDirection: 'row', start: 0, top: 0 },
   band: { paddingHorizontal: Spacing.page, paddingBottom: Spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, minHeight: TOUCH },
   logo: { width: 36, height: 36, borderRadius: 9 },

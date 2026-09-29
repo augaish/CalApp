@@ -1,3 +1,4 @@
+import { itemUnknownNutrients } from './recipes';
 import { fetchWhoopSummary } from './api';
 import { exerciseName, findExercise } from './exercises';
 import { ageFrom } from './tdee';
@@ -38,6 +39,8 @@ export interface CoachContext {
     burned: number;
     waterMl: number;
     workouts: string[];
+    /** Nutrients whose day total is only a known minimum: some entry's value is unknown. */
+    incomplete?: string[];
   }[];
   streakDays: number;
   workoutStreakDays: number;
@@ -78,7 +81,7 @@ export interface CoachContext {
     id: string;
     date: string;
     mealType: string;
-    items: { index: number; name: string; calories: number; proteinG: number; carbsG: number; fatG: number; portion?: string }[];
+    items: { index: number; name: string; calories: number; proteinG: number; carbsG: number; fatG: number; portion?: string; unknown?: string[] }[];
   }[];
 }
 
@@ -139,6 +142,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7, focus?: Co
       burned: share.training ? actualBurnedForDay(s.workouts, s.whoopBurnByDay, s.whoopWorkoutsByDay, d) : 0,
       waterMl: share.food ? waterForDay(s.water, d) : 0,
       workouts: share.training ? names.slice(0, 8) : [],
+      ...(share.food && (totals.incomplete ?? []).length > 0 ? { incomplete: totals.incomplete } : {}),
     });
   }
 
@@ -197,6 +201,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7, focus?: Co
             carbsG: Math.round(it.carbsG),
             fatG: Math.round(it.fatG),
             ...(it.portion ? { portion: it.portion } : {}),
+            ...(itemUnknownNutrients(it).length > 0 ? { unknown: itemUnknownNutrients(it) } : {}),
           })),
         }))
     : undefined;

@@ -53,6 +53,10 @@ export function PlanPicker({ offer }: { offer: Offer }) {
   const { plans, choice, setChoice, tier, priceFor, trialDaysFor, hasAnnual, period, setPeriod } = offer;
 
   const storePrice = priceFor(tier);
+  // A yearly price also said per month ("= 12.50 SAR / month"), from the
+  // store's own figure, so the saving is concrete next to the monthly plan.
+  const yearlyPkg = plans && period === 'annual' ? plans[tier].annual : undefined;
+  const perMonth = yearlyPkg ? `${(yearlyPkg.product.price / 12).toFixed(2)} ${yearlyPkg.product.currencyCode}` : null;
   const trial = trialDaysFor(tier);
   const monthly = tier === 'pro' ? fb.pro : fb.essentials;
   const yearly = tier === 'pro' ? fb.proYearly : fb.essentialsYearly;
@@ -130,6 +134,7 @@ export function PlanPicker({ offer }: { offer: Offer }) {
             </>
           )}
         </Text>
+        {perMonth ? <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600' }}>{t('upgrade.yearlyPerMonth', { price: perMonth })}</Text> : null}
         {trial ? <Text style={{ color: theme.primary, fontWeight: '800', fontSize: 13, marginTop: 4 }}>{t('upgrade.trialBadge', { days: trial })}</Text> : null}
         {trial && choice !== 'both' ? (
           <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18, marginTop: 4 }}>{t(`plans.trialAllNote.${choice}`, { days: trial })}</Text>
