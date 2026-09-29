@@ -227,24 +227,28 @@ Check these are already there: `SUPPORT_EMAIL`, `SUPABASE_URL`, `SUPABASE_SERVIC
 6. **Save.**
 
 ## Step 12 ⬜ Pricing, availability and App Privacy
-1. **Pricing and Availability:**
-   - Price **Free**. The subscriptions are sold inside the app.
-   - Availability: all countries (or the ones you want).
+1. **Pricing and Availability** (left sidebar, under **Monetization**, next to Subscriptions; some screens call it **App Pricing**):
+   - Price **Free** (USD 0). The subscriptions are sold inside the app.
+   - Availability: all countries and regions.
 2. **App Privacy → Privacy Policy URL:** `https://calapp-production-ab20.up.railway.app/privacy`
 3. **App Privacy → Get Started / Edit:**
    - "Do you or your third-party partners collect data?" **Yes**.
-   - Tick exactly these, and for each answer **Linked to the user: Yes**, **Used for tracking: No**:
+   - Tick exactly these 9:
 
-   | Tick | Purpose to choose |
+   | Section → item | Why |
    |---|---|
-   | Contact Info → **Email Address** | App Functionality |
-   | Health & Fitness → **Health** | App Functionality |
-   | Health & Fitness → **Fitness** | App Functionality |
-   | Purchases → **Purchase History** | App Functionality |
-   | Identifiers → **User ID** | App Functionality |
-   | Usage Data → **Product Interaction** | App Functionality, Analytics |
+   | Contact Info → **Name** | Sign in with Apple or Google can pass the name to the account |
+   | Contact Info → **Email Address** | Account sign-in |
+   | Health & Fitness → **Health** | Weight, body readings, birth date, sex, height in the account backup |
+   | Health & Fitness → **Fitness** | Workouts, meals, water in the backup; WHOOP data |
+   | User Content → **Other User Content** | Recipes people write, saved in their backup |
+   | Identifiers → **User ID** | The install or account ID |
+   | **Purchases** | Subscription status (RevenueCat) |
+   | Usage Data → **Product Interaction** | AI action counts, days used |
+   | Diagnostics → **Other Diagnostic Data** | The phone model shown in the admin page |
 
-   - Don't tick Photos or Messages. They are processed for the answer and not kept, which Apple doesn't count as collected. The review notes in step 13 say so.
+   - For each one: purpose **App Functionality** (Product Interaction: also **Analytics**); **Linked to the user: Yes**; **Used for tracking: No**.
+   - Leave everything else unticked. Payment Info is handled by Apple. Photos, audio and coach messages go to the AI for the answer and are not kept, so they are not "collected". The review notes in step 13 say so.
 4. **Publish** the privacy answers.
 
 ## Step 13 ⬜ The version page (1.0)
