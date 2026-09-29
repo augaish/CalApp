@@ -4,10 +4,14 @@
  * Two kinds, because the app stores allow two different things and it is
  * worth being honest about which is which:
  *
- *  • `free`    — we grant a tier for a number of days at no charge. No money
- *                moves, so this is entirely ours: we set the rules, we count
- *                the redemptions, and we can switch it off mid-campaign.
- *                This is the right tool for press, gyms, coaches and refunds.
+ *  • `free`    — a tier for a number of days at no charge. In the iPhone and
+ *                Android apps the stores' rules (App Store 3.1.1) don't let an
+ *                app's own code unlock a subscription, so there a free code
+ *                carries an App Store offer code / Play offer for a free
+ *                period, and the store grants it — like a percent code. A
+ *                free code with no store offer is refused in the apps; the
+ *                server grants it directly only elsewhere (the web preview).
+ *                Testers are granted plans from the admin console instead.
  *
  *  • `percent` — a genuine discount on a paid subscription. Apple and Google
  *                will not let anyone else price their products, so the money
@@ -62,7 +66,12 @@ export type RedeemFailure =
   | 'already_redeemed'
   /** A free code would be wasted: the account already pays for this tier or better. */
   | 'already_subscribed'
+  /** A free code with no store offer for this platform: the apps may not unlock it themselves. */
+  | 'store_only'
   | 'unavailable';
+
+/** Where a code is being redeemed. The apps pass it; anything else is treated as the web. */
+export type RedeemPlatform = 'ios' | 'android' | 'web';
 
 export type RedeemResult =
   | { ok: true; kind: 'free'; code: string; plan: Plan; until: string }
@@ -76,6 +85,8 @@ export type RedeemResult =
       offerAndroid: string | null;
       /** True when this person had already claimed it and is being handed the offer again. */
       again?: boolean;
+      /** A free code redeemed through the store: the free period's length. */
+      freeDays?: number;
     }
   | { ok: false; reason: RedeemFailure };
 
@@ -144,7 +155,7 @@ export interface CleanPromo {
   note: string | null;
 }
 
-const PLANS: Plan[] = ['free', 'pro', 'proPlus'];
+const PLANS: Plan[] = ['free', 'essentials', 'pro', 'proPlus'];
 
 /**
  * Normalise and bound what the admin console sent. Returns the row to store
@@ -184,8 +195,10 @@ export function cleanDraft(input: PromoDraft): { ok: true; value: CleanPromo } |
     const s = typeof v === 'string' ? v.trim() : '';
     return s ? s.slice(0, max) : null;
   };
-  const offerIos = kind === 'percent' ? text(input.offerIos) : null;
-  const offerAndroid = kind === 'percent' ? text(input.offerAndroid) : null;
+  // Both kinds may carry store offers: a percent code must (below); a free
+  // code needs them to work inside the apps at all.
+  const offerIos = text(input.offerIos);
+  const offerAndroid = text(input.offerAndroid);
   // Without an offer on at least one store a percent code cannot discount
   // anything, and would fail at the till rather than here.
   if (kind === 'percent' && !offerIos && !offerAndroid) return { ok: false, error: 'offer_required' };
@@ -283,7 +296,12 @@ export function grantUntil(durationDays: number | null, now: Date = new Date()):
  * app to hand to the store sheet, and the redemption we just counted is the
  * record that this person was given the offer.
  */
-export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemResult> {
+/** The store offer a code has for this platform, if any. */
+function storeOffer(row: PromoCode, platform: RedeemPlatform): string | null {
+  return platform === 'ios' ? row.offerIos : platform === 'android' ? row.offerAndroid : null;
+}
+
+export async function redeemPromo(rawCode: string, ref: string, platform: RedeemPlatform = 'web'): Promise<RedeemResult> {
   const { attributeUser, claimPromo, getOrCreateUser, getPromo, getRedemption, grantPromo } = await import('./db.js');
   const code = normalizeCode(rawCode);
   if (code.length < 3) return { ok: false, reason: 'unknown' };
@@ -292,6 +310,9 @@ export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemR
   if (!existing) return { ok: false, reason: 'unknown' };
 
   const user = await getOrCreateUser(ref);
+  // In the apps a free code goes through the store, or not at all.
+  const viaStore = existing.kind === 'free' && platform !== 'web';
+  if (viaStore && !storeOffer(existing, platform)) return { ok: false, reason: 'store_only' };
   let until: string | null = null;
   if (existing.kind === 'free') {
     // Days of a tier someone already pays for would simply be lost, and the
@@ -300,8 +321,10 @@ export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemR
     const paying = user?.storePlan?.plan ?? 'free';
     if (PLAN_RANK[paying] >= PLAN_RANK[existing.plan]) return { ok: false, reason: 'already_subscribed' };
     // A second gift starts where a running one ends, rather than overlapping it.
-    const base = user?.promo?.until ? new Date(user.promo.until) : new Date();
-    until = grantUntil(existing.durationDays, base.getTime() > Date.now() ? base : new Date());
+    if (!viaStore) {
+      const base = user?.promo?.until ? new Date(user.promo.until) : new Date();
+      until = grantUntil(existing.durationDays, base.getTime() > Date.now() ? base : new Date());
+    }
   }
 
   const claimed = await claimPromo(code, ref, until);
@@ -314,7 +337,7 @@ export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemR
     // come back for it. They already hold one of the campaign's places, so
     // hand the same offer over again — without counting them twice — as
     // long as the code itself is still live.
-    if (now.kind === 'percent') {
+    if (now.kind === 'percent' || viaStore) {
       const mine = await getRedemption(code, ref);
       const problem = codeProblem(now);
       if (mine && !mine.convertedAt && (problem === null || problem === 'exhausted')) {
@@ -328,7 +351,7 @@ export async function redeemPromo(rawCode: string, ref: string): Promise<RedeemR
   // (unless another partner's code got there first).
   await attributeUser(ref, code).catch((err) => console.error('attribution failed:', err));
 
-  if (claimed.kind === 'free') {
+  if (claimed.kind === 'free' && !viaStore) {
     await grantPromo(ref, claimed.plan, code, until as string);
     return { ok: true, kind: 'free', code, plan: claimed.plan, until: until as string };
   }
@@ -344,5 +367,6 @@ function percentResult(row: PromoCode): Extract<RedeemResult, { kind: 'percent' 
     percentOff: row.percentOff,
     offerIos: row.offerIos,
     offerAndroid: row.offerAndroid,
+    ...(row.kind === 'free' && row.durationDays ? { freeDays: row.durationDays } : {}),
   };
 }

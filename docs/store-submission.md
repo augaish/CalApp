@@ -203,9 +203,20 @@ Check these are already there: `SUPPORT_EMAIL`, `SUPABASE_URL`, `SUPABASE_SERVIC
 **Where:** `https://calapp-production-ab20.up.railway.app/admin`.
 1. **Membership → Membership prices:** Essentials `19.99`, Essentials yearly `149.99`, Pro `24.99`, Pro yearly `199.99`, currency `SAR`. Save.
 2. **Membership → Monthly AI allowance:** Free `7`, Essentials `20`, Pro `50`, Pro+ `400`, Free trial `50`. Save.
-3. **Codes & partners → Promotion codes → New:**
-   - `FOUNDERS`: free access, **Pro**, 90 days, max uses = your number of testers. This is for your testers.
-4. **Membership → Plan locks:** leave **OFF** for now. It's switched on in step 18.
+3. **Your testers (before launch):** admin → **Users → Grant a plan** → Pro, 90 days, for each tester. Apple doesn't allow an app's own codes to unlock paid features (rule 3.1.1), so free codes typed in the app now go through Apple and Google.
+4. **Free codes for after launch** (gyms, partners, `FOUNDERS`), once the Paid Apps agreement is active:
+   - App Store Connect → your app → **Subscriptions → Pro Monthly → Offer Codes → +**:
+     - Type: **custom code**, for example `FOUNDERS`.
+     - Eligibility: new and returning subscribers.
+     - Offer: **Free**, for 1 or 3 months.
+     - Set a redemption limit.
+   - Google Play (later): a developer-determined offer on the Pro base plan with a free phase, for example offer id `founders`.
+   - Admin → **Codes & partners → Promotion codes → New**:
+     - Type **Free access**, tier Pro, days = the free period.
+     - **App Store offer code** = the custom code from App Store Connect.
+     - **Google Play offer id** = the Play offer.
+   - In the app, typing the code opens Apple's (or Google's) own sheet with the code filled in. The store grants the free period and shows what follows before the person confirms.
+5. **Membership → Plan locks:** leave **OFF** for now. It's switched on in step 18.
 
 ## Step 11 ⬜ App information
 **Where:** App Store Connect → your app → **App Information** (left sidebar).
@@ -411,7 +422,7 @@ In the TestFlight build:
 3. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
 
 ## Step 18 ⬜ Launch day (after "Pending Developer Release")
-1. Send your testers the `FOUNDERS` code.
+1. Check your testers have their plan (admin → Users; granted in step 10). The `FOUNDERS` offer code from step 10 works for anyone new.
 2. **admin → Membership → Plan locks → ON.** From now on, new users need a plan (with the 14-day trial).
 3. App Store Connect → your version → **Release This Version**.
 4. Buy once for real on your own phone. You can refund it via reportaproblem.apple.com.

@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { AiConsentDeclinedError, ApiError, FeatureLockedError, QuotaError } from './api-errors';
 import { ensureAiConsent } from './ai-consent';
 import { deviceLabel } from './device';
@@ -272,21 +274,24 @@ export type RedeemFailure =
   | 'exhausted'
   | 'already_redeemed'
   | 'already_subscribed'
+  | 'store_only'
   | 'unavailable'
   | 'identify_required'
   | 'offline';
 
 export type RedeemResponse =
-  | { ok: true; kind: 'free'; code: string; plan: 'pro' | 'proPlus'; until: string }
+  | { ok: true; kind: 'free'; code: string; plan: 'essentials' | 'pro' | 'proPlus'; until: string }
   | {
       ok: true;
       kind: 'percent';
       code: string;
-      plan: 'pro' | 'proPlus';
+      plan: 'essentials' | 'pro' | 'proPlus';
       percentOff: number;
       offerIos: string | null;
       offerAndroid: string | null;
       again?: boolean;
+      /** A free code redeemed through the store: the free period's length. */
+      freeDays?: number;
     }
   | { ok: false; reason: RedeemFailure };
 
@@ -296,13 +301,14 @@ export async function redeemCode(code: string): Promise<RedeemResponse> {
     const res = await fetch(`${API_URL}/api/redeem`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
-      body: JSON.stringify({ code }),
+      // The apps redeem free codes through the store (App Store rule 3.1.1).
+      body: JSON.stringify({ code, platform: Platform.OS }),
     });
     const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (res.ok && data.ok) return data as RedeemResponse;
     const known: RedeemFailure[] = [
       'unknown', 'inactive', 'not_started', 'expired', 'exhausted',
-      'already_redeemed', 'already_subscribed', 'unavailable', 'identify_required',
+      'already_redeemed', 'already_subscribed', 'store_only', 'unavailable', 'identify_required',
     ];
     const reason = known.includes(data.error as RedeemFailure) ? (data.error as RedeemFailure) : 'unavailable';
     return { ok: false, reason };

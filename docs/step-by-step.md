@@ -180,7 +180,7 @@ Then check **admin → Overview → Launch checklist**. Everything except "First
 ## 7. ⬜ Admin page (…/admin)
 - **Membership → Membership prices:** Essentials `19.99` / year `149.99`, Pro `24.99` / year `199.99`, currency `SAR` (Pro+ `49.99` stays for later). These are only shown until the store is live; after that, the store's own price shows.
 - **Membership → Monthly AI allowance:** Free (locks off) `7`, Essentials `20`, Pro `50`, Pro+ `400`, Free trial `50`. A value saved here earlier overrides the new default, so check it.
-- **Codes & partners → Promotion codes:** a thank-you code for your testers: `FOUNDERS`, free access, **Pro**, 90 days, max uses = number of testers. Send it to them before you turn plan locks on.
+- **Testers:** give each one Pro from **Users → Grant a plan** (90 days) before you turn plan locks on. Free codes typed in the app go through Apple and Google (App Store rule 3.1.1): a free code needs an App Store offer code (Subscriptions → Offer Codes → custom code, Free for 1–3 months) and a Play offer, entered on the code in **Codes & partners → Promotion codes**. See store-submission.md step 10.
 - **Users → Grant a plan:** you can also give someone Essentials · Food, Essentials · Training or Pro directly (for example a tester who wants to try Essentials).
 - **Membership → Plan locks:** this switches the launch offer on. Leave it **off** until the store can sell (section 10); while off, everyone can use everything as today. Once on:
   - **No plan:** view and export only; no new logging and no AI.
@@ -272,7 +272,7 @@ Production → create a release with the newest `.aab` → roll out.
 - ⬜ Admin checklist is all ticked; the membership pop-up appears for free users once the store sells.
 - ⬜ One real purchase on each platform (refund it via Apple / Google if you like).
 - ⬜ Partners have their codes and private links.
-- ⬜ Send testers the `FOUNDERS` code, then turn **Plan locks** on in the admin page.
+- ⬜ Check testers have their granted plan, then turn **Plan locks** on in the admin page.
 - ⬜ With a Sandbox Apple ID that has never subscribed, check the paywall: Food / Training / Both, "14 days free", the terms above the button, and that choosing Essentials · Training shows only Training on Overview.
 - ⬜ Check the free trial appears on the yearly plans (use a Sandbox Apple ID that has never subscribed).
 - ⬜ Watch **admin → Overview** for the first days: purchases, AI failures and AI cost.

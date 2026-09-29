@@ -35,7 +35,7 @@ export default function Redeem() {
   const [done, setDone] = useState<Done | null>(null);
   const [storeNote, setStoreNote] = useState<string | null>(null);
 
-  const planName = (plan: string) => (plan === 'proPlus' ? t('upgrade.planProPlus') : t('upgrade.planPro'));
+  const planName = (plan: string) => (plan === 'proPlus' ? t('upgrade.planProPlus') : plan === 'essentials' ? t('plans.name.essentials') : t('upgrade.planPro'));
   const date = (iso: string) =>
     new Date(iso).toLocaleDateString(i18n.language === 'ar' ? 'ar' : 'en', {
       day: 'numeric',
@@ -161,12 +161,16 @@ export default function Redeem() {
                 <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>
                   {done.kind === 'free'
                     ? t('redeem.freeTitle', { plan: planName(done.plan) })
-                    : t('redeem.percentTitle', { percent: done.percentOff, plan: planName(done.plan) })}
+                    : done.freeDays
+                      ? t('redeem.storeFreeTitle', { days: done.freeDays, plan: planName(done.plan) })
+                      : t('redeem.percentTitle', { percent: done.percentOff, plan: planName(done.plan) })}
                 </Text>
                 <Text style={{ color: theme.textSecondary, marginTop: 4, lineHeight: 20 }}>
                   {done.kind === 'free'
                     ? t('redeem.freeBody', { date: date(done.until) })
-                    : t('redeem.percentBody')}
+                    : done.freeDays
+                      ? t('redeem.storeFreeBody', { store: Platform.OS === 'android' ? 'Google Play' : 'App Store' })
+                      : t('redeem.percentBody')}
                 </Text>
                 <Text style={{ color: theme.textTertiary, marginTop: 6, fontSize: 12, fontWeight: '700' }}>
                   {done.code}

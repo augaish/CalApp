@@ -317,17 +317,18 @@ export const ADMIN_HTML = `<!doctype html>
 
     <div class="card" id="codes">
       <h2>Promotion codes</h2>
-      <details class="how"><summary>How this works</summary><div><b>Free access</b> gives a tier for a number of days at no charge — handled entirely here, no store setup. <b>Percent off</b> is a real discount on a paid subscription, so the store has to know about it: create an offer code in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code) and/or a developer-determined offer on the Google Play base plan, then put those ids below. The store then charges the discounted price, in the person's currency, with VAT. <i>Used</i> counts redemptions in the app; <i>Paid</i> counts purchases matched back to them. To step a discount down (e.g. 50% for the first 100, then 30%), give the first code a use limit or end date and create the next one.</div></details>
+      <details class="how"><summary>How this works</summary><div><b>Free access</b> gives a tier for a number of days at no charge. In the iPhone and Android apps Apple and Google must grant it themselves (App Store rule 3.1.1), so give it a store offer too: an offer code for a free period in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code, "Free" for 1 or 3 months) and a Play offer with a free phase. For testers before launch, use Users → Grant a plan. <b>Percent off</b> is a real discount on a paid subscription, so the store has to know about it: create an offer code in App Store Connect (Subscriptions → your subscription → Offer Codes → custom code) and/or a developer-determined offer on the Google Play base plan, then put those ids below. The store then charges the discounted price, in the person's currency, with VAT. <i>Used</i> counts redemptions in the app; <i>Paid</i> counts purchases matched back to them. To step a discount down (e.g. 50% for the first 100, then 30%), give the first code a use limit or end date and create the next one.</div></details>
       <div class="row">
         <div><label>Code</label><input id="pc_code" placeholder="RAMADAN50" autocomplete="off" /></div>
         <div><label>Type</label><select id="pc_kind" onchange="pcKind()"><option value="free">Free access</option><option value="percent">Percent off</option></select></div>
-        <div><label>Tier</label><select id="pc_plan"><option value="pro">Pro</option><option value="proPlus">Pro+</option></select></div>
+        <div><label>Tier</label><select id="pc_plan"><option value="pro">Pro</option><option value="essentials">Essentials</option><option value="proPlus">Pro+</option></select></div>
         <div class="pc-free"><label>Days of access</label><input id="pc_days" type="number" min="1" max="3650" value="30" /></div>
         <div class="pc-pct hide"><label>% off</label><input id="pc_pct" type="number" min="1" max="100" /></div>
       </div>
-      <div class="row pc-pct hide">
+      <div class="row">
         <div><label>App Store offer code</label><input id="pc_ios" placeholder="the custom code made in App Store Connect" /></div>
         <div><label>Google Play offer id</label><input id="pc_android" placeholder="offerId, or basePlanId:offerId" /></div>
+        <p class="muted" style="grid-column:1/-1;margin:0">Free codes in the iPhone and Android apps need these too: Apple and Google must grant the free period themselves (App Store rule 3.1.1). Make an offer code for a free period in App Store Connect (and a Play offer) and put it here. Without them the apps refuse the code; for testers, use Users → Grant a plan.</p>
       </div>
       <div class="row">
         <div><label>Max uses (blank = unlimited)</label><input id="pc_max" type="number" min="1" /></div>

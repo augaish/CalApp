@@ -1897,8 +1897,9 @@ app.post('/api/link', async (c) => {
 app.post('/api/redeem', async (c) => {
   const ref = await callerRef(c);
   if (!ref) return c.json({ error: 'identify_required' }, 400);
-  const body = await c.req.json<{ code?: string }>().catch(() => ({}) as never);
-  const result = await redeemPromo(String(body.code ?? ''), ref);
+  const body = await c.req.json<{ code?: string; platform?: string }>().catch(() => ({}) as never);
+  const platform = body.platform === 'ios' || body.platform === 'android' ? body.platform : 'web';
+  const result = await redeemPromo(String(body.code ?? ''), ref, platform);
   if (!result.ok) return c.json({ error: result.reason }, result.reason === 'unknown' ? 404 : 409);
   if (result.kind === 'free') {
     const access = await checkAccess(ref, 'coach');

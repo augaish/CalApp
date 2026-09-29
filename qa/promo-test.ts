@@ -207,6 +207,27 @@ check('an unknown code says unknown', !unknown.ok && unknown.reason === 'unknown
 const tooShort = await redeemPromo('A', 'user-h');
 check('a code too short to be real is unknown, not a crash', !tooShort.ok && tooShort.reason === 'unknown');
 
+// In the apps a free code goes through the store (App Store rule 3.1.1).
+for (const c of ['FREEAPP', 'FREESTORE']) await deletePromo(c);
+await upsertPromo((cleanDraft({ code: 'FREEAPP', durationDays: 30 }) as { value: never }).value);
+const noOffer = await redeemPromo('FREEAPP', 'user-i', 'ios');
+check('iPhone: a free code with no store offer is refused as store-only', !noOffer.ok && noOffer.reason === 'store_only');
+check('  and nothing is granted', (await getOrCreateUser('user-i'))?.plan === 'free');
+const noOfferAndroid = await redeemPromo('FREEAPP', 'user-i', 'android');
+check('Android: the same', !noOfferAndroid.ok && noOfferAndroid.reason === 'store_only');
+const web = await redeemPromo('FREEAPP', 'user-j', 'web');
+check('the web preview still grants it directly', web.ok && web.kind === 'free' && (await getOrCreateUser('user-j'))?.plan === 'pro');
+const draft = cleanDraft({ code: 'FREESTORE', durationDays: 90, offerIos: 'FOUNDERS90', offerAndroid: 'founders90' });
+check('a free code may carry store offers', draft.ok && (draft as { value: { offerIos: string } }).value.offerIos === 'FOUNDERS90');
+await upsertPromo((draft as { value: never }).value);
+const viaStore = await redeemPromo('FREESTORE', 'user-k', 'ios');
+check('iPhone: a free code with an offer hands over the App Store offer', viaStore.ok && viaStore.kind === 'percent' && viaStore.offerIos === 'FOUNDERS90' && viaStore.freeDays === 90, JSON.stringify(viaStore));
+check('  and Calgym itself grants nothing — the store does', (await getOrCreateUser('user-k'))?.plan === 'free');
+const viaStoreAgain = await redeemPromo('FREESTORE', 'user-k', 'ios');
+check('  backing out of the store sheet and trying again hands it over again', viaStoreAgain.ok && viaStoreAgain.kind === 'percent' && viaStoreAgain.again === true);
+const essentials = cleanDraft({ code: 'ESSFREE', plan: 'essentials', durationDays: 30 });
+check('codes can be for Essentials too', essentials.ok && (essentials as { value: { plan: string } }).value.plan === 'essentials');
+
 check('the admin list carries every code', (await listPromos()).length >= 3);
 
 console.log(fails === 0 ? 'ALL PASS' : `${fails} FAILURES`);
