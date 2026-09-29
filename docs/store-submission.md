@@ -531,7 +531,12 @@ The app's "Continue with Google" button goes through Supabase Auth.
    - App name **Calgym**.
    - User support email: your own Gmail. Google only accepts the signed-in account or a Google Group here, not support@calgym.org. People see it on the Google sign-in screen.
    - Audience: **External**. Developer contact email: **support@calgym.org** (any address works here).
-   - Then, back on **Branding**, scroll to **Authorized domains → + Add domain** → `uvhvxcvwpwkqvnvqdtyf.supabase.co` (the project’s own address; plain `supabase.co` is refused) → **Save**.
+   - On **Branding → App domain**, fill the three links (Publish stays greyed out without them):
+     - Application home page: `https://calapp-production-ab20.up.railway.app/support`
+     - Privacy policy: `https://calapp-production-ab20.up.railway.app/privacy`
+     - Terms of service: `https://calapp-production-ab20.up.railway.app/terms`
+   - Don't upload a logo: a logo makes Google require a brand review first.
+   - Then, back on **Branding**, scroll to **Authorized domains → + Add domain** → `uvhvxcvwpwkqvnvqdtyf.supabase.co` (the project’s own address; plain `supabase.co` is refused), and a second one, `calapp-production-ab20.up.railway.app`, for the three links → **Save**.
 3. **Data Access → Add or remove scopes:** tick `.../auth/userinfo.email`, `.../auth/userinfo.profile` and `openid` → **Update** → **Save**.
 4. **Clients → + Create client:**
    - Application type **Web application**, name `Calgym (Supabase)`.
