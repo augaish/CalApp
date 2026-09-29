@@ -80,6 +80,16 @@ export const ADMIN_HTML = `<!doctype html>
   button { background:var(--primary); color:#fff; border:0; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; font-size:14px; min-height:42px; }
   button.ghost { background:#fff; color:var(--primary); border:1px solid #CFC6EC; }
   button.ghost:hover { background:var(--primary-soft); }
+  button.danger { background:#fff; color:var(--danger); border:1px solid #EBC4BF; }
+  button.danger:hover { background:var(--danger-soft); }
+  button:disabled, button:disabled:hover { opacity:.45; cursor:not-allowed; background:var(--primary); }
+  button.danger:disabled, button.danger:disabled:hover { background:#fff; }
+  .found { font-size:14px; margin:8px 0 2px; min-height:21px; }
+  .found .ok { color:var(--green); font-weight:700; }
+  .found .no { color:var(--warn); font-weight:600; }
+  .done { margin-top:12px; padding:10px 14px; border-radius:12px; font-size:14px; font-weight:600; }
+  .done.good { background:var(--green-soft); color:var(--green); }
+  .done.bad { background:var(--danger-soft); color:var(--danger); }
   .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
   .row > div { flex:1; min-width:140px; }
   .scroll { overflow-x:auto; }
@@ -188,6 +198,39 @@ export const ADMIN_HTML = `<!doctype html>
     </section>
 
     <section class="panel" role="tabpanel" id="p-users" aria-labelledby="t-users" hidden>
+    <div class="card" id="grant">
+      <h2>Give or remove a plan</h2>
+      <div class="sub">For testers, family and partners. Public giveaways go through store offer codes (Codes &amp; partners).</div>
+      <div class="row" style="margin-top:6px">
+        <div><label for="g_who">Email</label><input id="g_who" type="search" list="g_emails" placeholder="name@example.com" autocomplete="off" oninput="grantUpdate()" /></div>
+      </div>
+      <datalist id="g_emails"></datalist>
+      <div class="found" id="g_found" aria-live="polite"></div>
+      <label id="g_plan_l">Plan</label>
+      <div class="chips" role="group" aria-labelledby="g_plan_l" id="g_plans">
+        <button class="chip" data-gplan="essentials:food" aria-pressed="false" onclick="grantPick('plan', this)">Essentials · Food</button>
+        <button class="chip" data-gplan="essentials:training" aria-pressed="false" onclick="grantPick('plan', this)">Essentials · Training</button>
+        <button class="chip" data-gplan="pro" aria-pressed="false" onclick="grantPick('plan', this)">Pro</button>
+        <button class="chip" data-gplan="proPlus" aria-pressed="false" onclick="grantPick('plan', this)">Pro+</button>
+      </div>
+      <label id="g_len_l">For how long</label>
+      <div class="chips" role="group" aria-labelledby="g_len_l" id="g_lens">
+        <button class="chip" data-glen="30" aria-pressed="true" onclick="grantPick('len', this)">1 month</button>
+        <button class="chip" data-glen="90" aria-pressed="false" onclick="grantPick('len', this)">3 months</button>
+        <button class="chip" data-glen="365" aria-pressed="false" onclick="grantPick('len', this)">1 year</button>
+        <button class="chip" data-glen="0" aria-pressed="false" onclick="grantPick('len', this)">Forever</button>
+        <button class="chip" data-glen="custom" aria-pressed="false" onclick="grantPick('len', this)">Other…</button>
+      </div>
+      <div class="row">
+        <div class="hide" id="g_days_box"><label for="g_days">Days</label><input id="g_days" type="number" min="1" placeholder="e.g. 14" oninput="grantUpdate()" /></div>
+        <div><label for="g_note">Note (optional)</label><input id="g_note" placeholder="e.g. beta tester" /></div>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button id="g_give" onclick="grantGive()" disabled>Give plan</button>
+        <button class="danger" id="g_remove" onclick="grantRemove()" disabled>Remove plan</button>
+      </div>
+      <div id="g_msg" class="hide" role="status" aria-live="polite"></div>
+    </div>
     <div class="card" id="delreq">
       <h2>Account deletion requests</h2>
       <details class="how"><summary>How this works</summary><div>People who ask to delete their account from the public page (<code>/account-deletion</code>) — Google Play requires one. In the app, deletion is immediate and never shows up here. Delete the matching account(s) and close the request within 30 days, then confirm to the person by email.</div></details>
@@ -206,21 +249,6 @@ export const ADMIN_HTML = `<!doctype html>
       </div>
     </div>
 
-    <div class="card">
-      <h2>Grant or revoke a plan</h2>
-      <div class="row">
-        <div><label>User ref</label><input id="g_ref" placeholder="paste from the table" /></div>
-        <div><label>Days (blank = forever)</label><input id="g_days" type="number" min="1" /></div>
-        <div><label>Note</label><input id="g_note" placeholder="e.g. beta tester" /></div>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <button onclick="setPlan('essentials', 'food')">Grant Essentials · Food</button>
-        <button onclick="setPlan('essentials', 'training')">Grant Essentials · Training</button>
-        <button onclick="setPlan('pro')">Grant Pro</button>
-        <button onclick="setPlan('proPlus')">Grant Pro+</button>
-        <button class="ghost" onclick="setPlan('free')">Revoke</button>
-      </div>
-    </div>
     </section>
 
     <section class="panel" role="tabpanel" id="p-membership" aria-labelledby="t-membership" hidden>
@@ -603,12 +631,12 @@ export const ADMIN_HTML = `<!doctype html>
     var html = '';
     list.forEach(function (u) {
       var isPro = u.plan !== 'free';
-      var planLabel = u.plan === 'essentials' ? 'essentials' + (u.module ? ' · ' + u.module : ' · no module') : u.plan;
+      var planLabel = u.plan === 'essentials' && !u.module ? 'Essentials · no module' : planName(u.plan, u.module);
       html += '<tr>' +
         '<td style="font-family:monospace">' + esc(u.ref) + '</td>' +
         '<td>' + (u.email ? esc(u.email) : '<span class="muted">guest</span>') + '</td>' +
         '<td class="muted">' + (u.device ? esc(u.device) : '—') + '</td>' +
-        '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + esc(planLabel) + '</span></td>' +
+        '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + esc(planLabel) + '</span>' + (isPro && u.planUntil ? '<div class="muted" style="font-size:12px;white-space:nowrap">until ' + fmtDate(u.planUntil) + '</div>' : '') + '</td>' +
         '<td class="muted">' + esc(u.planSource) + '</td>' +
         '<td>' + u.used + '</td>' +
         '<td class="muted">' + fmtTokens(u.tokens) + '</td>' +
@@ -616,10 +644,11 @@ export const ADMIN_HTML = `<!doctype html>
         '<td class="muted">' + (u.histCostUsd * USD_TO_SAR).toFixed(2) + '</td>' +
         '<td class="muted">' + esc(u.note || '') + '</td>' +
         '<td class="muted">' + new Date(u.lastSeenAt).toLocaleDateString() + '</td>' +
-        '<td><button class="ghost" onclick="pick(\\'' + esc(u.ref) + '\\')">Select</button></td>' +
+        '<td><button class="ghost" onclick="pick(\\'' + esc(u.ref) + '\\')">Change plan</button></td>' +
         '</tr>';
     });
     document.getElementById('rows').innerHTML = html || '<tr><td colspan="12" class="muted">' + (q ? 'Nobody matches that search.' : 'No users yet.') + '</td></tr>';
+    grantFill();
   }
   var PLAN_IDS = ['free', 'pro', 'proPlus'];
   function renderProviders() {
@@ -805,21 +834,136 @@ export const ADMIN_HTML = `<!doctype html>
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) {
     return ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[c]; }); }
-  function pick(ref) {
-    var box = document.getElementById('g_ref');
-    box.value = ref;
-    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    box.focus();
+  // ── Give or remove a plan ──
+  var grant = { plan: null, len: '30', busy: false };
+  var PLAN_NAMES = { free: 'Free', essentials: 'Essentials', pro: 'Pro', proPlus: 'Pro+' };
+  function planName(plan, module) {
+    if (plan === 'essentials') return 'Essentials' + (module === 'food' ? ' · Food' : module === 'training' ? ' · Training' : '');
+    return PLAN_NAMES[plan] || plan;
   }
-  function setPlan(plan, module) {
-    var days = parseInt(document.getElementById('g_days').value, 10);
-    api('/admin/api/plan', {
-      ref: document.getElementById('g_ref').value,
-      plan: plan,
-      module: module,
-      days: isNaN(days) ? undefined : days,
-      note: document.getElementById('g_note').value || undefined,
-    }).then(load);
+  function fmtDate(iso) { return new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function sourceName(src) {
+    src = src || '';
+    if (src === 'admin') return 'given here';
+    if (src.indexOf('revenuecat') === 0) return /trial$/.test(src) ? 'store free trial' : 'App Store / Google Play subscription';
+    if (src.indexOf('promo') === 0) return 'code ' + (src.split(':')[1] || '');
+    return src;
+  }
+  // Who the box names: accounts signed in with that email, or one ref.
+  function grantTarget() {
+    var raw = document.getElementById('g_who').value.trim();
+    var q = raw.toLowerCase();
+    if (!q || !data) return null;
+    var users = data.users.filter(function (u) { return u.email && u.email.toLowerCase() === q; });
+    if (users.length) return { email: raw, users: users };
+    users = data.users.filter(function (u) { return u.ref.toLowerCase() === q; });
+    if (users.length) return { ref: users[0].ref, users: users };
+    // The table holds the most recent 1000; beyond that, let the server look.
+    var partial = data.stats && data.stats.totalUsers > data.users.length;
+    return { email: q.indexOf('@') > 0 ? raw : null, users: [], lookup: partial && q.indexOf('@') > 0 };
+  }
+  function grantDays() {
+    if (grant.len === 'custom') { var d = parseInt(document.getElementById('g_days').value, 10); return d > 0 ? d : null; }
+    return parseInt(grant.len, 10);
+  }
+  function grantLenText(days) {
+    if (!days) return 'forever';
+    if (days === 30) return 'for 1 month';
+    if (days === 90) return 'for 3 months';
+    if (days === 365) return 'for 1 year';
+    return 'for ' + days + ' day' + (days === 1 ? '' : 's');
+  }
+  function grantPick(kind, btn) {
+    var host = document.getElementById(kind === 'plan' ? 'g_plans' : 'g_lens');
+    Array.prototype.forEach.call(host.querySelectorAll('.chip'), function (c) { c.setAttribute('aria-pressed', c === btn ? 'true' : 'false'); });
+    if (kind === 'plan') grant.plan = btn.getAttribute('data-gplan');
+    else {
+      grant.len = btn.getAttribute('data-glen');
+      document.getElementById('g_days_box').classList.toggle('hide', grant.len !== 'custom');
+      if (grant.len === 'custom') document.getElementById('g_days').focus();
+    }
+    grantUpdate();
+  }
+  function grantUpdate() {
+    var t = grantTarget();
+    var found = document.getElementById('g_found');
+    var give = document.getElementById('g_give');
+    var remove = document.getElementById('g_remove');
+    var u = t && t.users[0];
+    if (!t) found.innerHTML = '<span class="muted">Type the email they signed up with, or pick it from the list.</span>';
+    else if (u) {
+      var more = t.users.length > 1 ? ' (' + t.users.length + ' accounts)' : '';
+      var now = u.plan === 'free' ? 'Free' : planName(u.plan, u.module) + ', ' + sourceName(u.planSource) + (u.planUntil ? ', until ' + fmtDate(u.planUntil) : '');
+      found.innerHTML = '<span class="ok">✓ ' + esc(u.email || u.ref) + more + '</span> · now ' + esc(now);
+    } else if (t.lookup) found.innerHTML = '<span class="no">Not among the latest users shown. Give will look the email up.</span>';
+    else found.innerHTML = '<span class="no">No account with this email yet. They need to sign up in the app first, then it appears here.</span>';
+    var days = grantDays();
+    var can = !!(t && (u || t.lookup) && grant.plan && days !== null) && !grant.busy;
+    give.disabled = !can;
+    var parts = grant.plan ? grant.plan.split(':') : null;
+    give.textContent = parts ? 'Give ' + planName(parts[0], parts[1]) + ' ' + (days === null ? '' : grantLenText(days)) : 'Give plan';
+    remove.disabled = !(u && u.plan !== 'free') || grant.busy;
+    remove.textContent = u && u.plan !== 'free' ? 'Remove ' + planName(u.plan, u.module) : 'Remove plan';
+  }
+  function grantFill() {
+    var list = document.getElementById('g_emails');
+    if (!list || !data) return;
+    var seen = {};
+    list.innerHTML = data.users.filter(function (u) {
+      if (!u.email || seen[u.email.toLowerCase()]) return false;
+      seen[u.email.toLowerCase()] = true;
+      return true;
+    }).map(function (u) { return '<option value="' + esc(u.email) + '">' + esc(planName(u.plan, u.module)) + '</option>'; }).join('');
+    grantUpdate();
+  }
+  function grantMsg(text, good) {
+    var box = document.getElementById('g_msg');
+    box.className = 'done ' + (good ? 'good' : 'bad');
+    box.textContent = text;
+  }
+  function grantSend(plan, module, days, done) {
+    var t = grantTarget();
+    grant.busy = true;
+    grantUpdate();
+    var body = { plan: plan, module: module, days: days || undefined, note: document.getElementById('g_note').value.trim() || undefined };
+    if (t.email) body.email = t.email; else body.ref = t.ref;
+    fetch('/admin/api/plan', { method: 'POST', headers: { 'x-admin-token': tok(), 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+      .then(function (res) {
+        grant.busy = false;
+        if (!res.ok) { grantMsg(res.j && res.j.error === 'no_account' ? 'No account with that email. They need to sign up in the app first.' : 'That didn’t work. Try again.', false); grantUpdate(); return; }
+        document.getElementById('g_note').value = '';
+        grantMsg(done(res.j), true);
+        load();
+      })
+      .catch(function () { grant.busy = false; grantMsg('That didn’t work. Check the connection and try again.', false); grantUpdate(); });
+  }
+  function grantGive() {
+    var parts = grant.plan.split(':');
+    var days = grantDays();
+    var who = grantTarget();
+    var name = (who.users[0] && who.users[0].email) || who.email || who.ref;
+    grantSend(parts[0], parts[1], days, function (u) {
+      return 'Done. ' + name + ' now has ' + planName(parts[0], parts[1]) + (u.planUntil ? ' until ' + fmtDate(u.planUntil) : ' with no end date') + '. The app picks it up the next time it opens.';
+    });
+  }
+  function grantRemove() {
+    var t = grantTarget();
+    var u = t.users[0];
+    var store = (u.planSource || '').indexOf('revenuecat') === 0;
+    var ask = 'Remove ' + planName(u.plan, u.module) + ' from ' + (u.email || u.ref) + '? They go back to Free.' +
+      (store ? ' This is a store subscription: removing it here does not cancel it, and the next renewal gives it back. They cancel it in their App Store / Google Play settings.' : '');
+    if (!confirm(ask)) return;
+    grantSend('free', undefined, null, function () { return 'Done. ' + (u.email || u.ref) + ' is back on Free.'; });
+  }
+  function pick(ref) {
+    var u = data && data.users.filter(function (x) { return x.ref === ref; })[0];
+    var box = document.getElementById('g_who');
+    box.value = (u && u.email) || ref;
+    document.getElementById('g_msg').className = 'hide';
+    grantUpdate();
+    document.getElementById('grant').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    box.focus({ preventScroll: true });
   }
   function renderQueue(rows) {
     var host = document.getElementById('queue');

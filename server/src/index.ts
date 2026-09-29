@@ -64,6 +64,7 @@ import {
   setSetting,
   setUserDevice,
   setUserEmail,
+  refsForEmail,
   setUserPlan,
   setUserModule,
   setWhoopConnection,
@@ -2578,23 +2579,30 @@ app.post('/admin/api/test-deepseek-text', async (c) => {
 
 app.post('/admin/api/plan', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json<{ ref?: string; plan?: string; days?: number; note?: string; module?: string }>().catch(() => ({}) as never);
-  const ref = (body.ref ?? '').trim();
-  if (!ref) return c.json({ error: 'invalid_request' }, 400);
+  const body = await c.req
+    .json<{ ref?: string; email?: string; plan?: string; days?: number; note?: string; module?: string }>()
+    .catch(() => ({}) as never);
+  // Either one account by ref, or every account signed in with an address.
+  const email = (body.email ?? '').trim();
+  const refs = email ? await refsForEmail(email) : [(body.ref ?? '').trim()].filter(Boolean);
+  if (email && !refs.length) return c.json({ error: 'no_account' }, 404);
+  if (!refs.length) return c.json({ error: 'invalid_request' }, 400);
   const plan: Plan = body.plan === 'essentials' || body.plan === 'pro' || body.plan === 'proPlus' ? body.plan : 'free';
-  // An admin grant of Essentials sets its module outright (no 30-day wait).
-  if (plan === 'essentials' && (body.module === 'food' || body.module === 'training')) {
-    await setUserModule(ref, body.module, new Date(), true);
-  }
   const until =
     plan !== 'free' && body.days && body.days > 0
       ? new Date(Date.now() + body.days * 86400000).toISOString()
       : null;
-  await setUserPlan(ref, plan, 'admin', until, body.note);
-  // Setting someone to free is a revoke: a running code gift goes too, or
-  // the person would stay on the gifted tier with the table showing free.
-  if (plan === 'free') await clearPromo(ref);
-  return c.json({ ok: true, ...(await getOrCreateUser(ref)) });
+  for (const ref of refs) {
+    // An admin grant of Essentials sets its module outright (no 30-day wait).
+    if (plan === 'essentials' && (body.module === 'food' || body.module === 'training')) {
+      await setUserModule(ref, body.module, new Date(), true);
+    }
+    await setUserPlan(ref, plan, 'admin', until, body.note);
+    // Setting someone to free is a revoke: a running code gift goes too, or
+    // the person would stay on the gifted tier with the table showing free.
+    if (plan === 'free') await clearPromo(ref);
+  }
+  return c.json({ ok: true, refs, ...(await getOrCreateUser(refs[0])) });
 });
 
 app.post('/admin/api/limits', async (c) => {

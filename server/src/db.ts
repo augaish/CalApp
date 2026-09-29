@@ -799,6 +799,16 @@ export async function setUserEmail(ref: string, email: string): Promise<void> {
   );
 }
 
+/** The accounts signed in with this address, most recently seen first. */
+export async function refsForEmail(email: string): Promise<string[]> {
+  if (!pool) return [];
+  const res = await pool.query(
+    `SELECT ref FROM app_users WHERE lower(email) = lower($1) ORDER BY last_seen_at DESC`,
+    [email.trim()],
+  );
+  return res.rows.map((r) => r.ref as string);
+}
+
 /**
  * Record what device an account was last seen on. Sent with the launch ping
  * (`/api/me`), so it covers every install — guest or signed-in — not only the
