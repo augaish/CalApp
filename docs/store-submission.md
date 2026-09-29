@@ -205,7 +205,6 @@ Check these are already there: `SUPPORT_EMAIL`, `SUPABASE_URL`, `SUPABASE_SERVIC
 2. **Membership → Monthly AI allowance:** Free `7`, Essentials `20`, Pro `50`, Pro+ `400`, Free trial `50`. Save.
 3. **Codes & partners → Promotion codes → New:**
    - `FOUNDERS`: free access, **Pro**, 90 days, max uses = your number of testers. This is for your testers.
-   - `APPREVIEW`: free access, **Pro**, 30 days, max uses 10. This is for Apple's and Google's reviewers.
 4. **Membership → Plan locks:** leave **OFF** for now. It's switched on in step 18.
 
 ## Step 11 ⬜ App information
@@ -233,7 +232,7 @@ Check these are already there: `SUPPORT_EMAIL`, `SUPABASE_URL`, `SUPABASE_SERVIC
 2. **App Privacy → Privacy Policy URL:** `https://calapp-production-ab20.up.railway.app/privacy`
 3. **App Privacy → Get Started / Edit:**
    - "Do you or your third-party partners collect data?" **Yes**.
-   - Tick exactly these 9:
+   - Tick exactly these 10:
 
    | Section → item | Why |
    |---|---|
@@ -246,102 +245,110 @@ Check these are already there: `SUPPORT_EMAIL`, `SUPABASE_URL`, `SUPABASE_SERVIC
    | **Purchases** | Subscription status (RevenueCat) |
    | Usage Data → **Product Interaction** | AI action counts, days used |
    | Diagnostics → **Other Diagnostic Data** | The phone model shown in the admin page |
+   | User Content → **Photos or Videos** | Meal and report photos go to the AI providers, which may keep API data for a limited time under their terms. For this one only: **Linked to the user: No** |
 
-   - For each one: purpose **App Functionality** (Product Interaction: also **Analytics**); **Linked to the user: Yes**; **Used for tracking: No**.
-   - Leave everything else unticked. Payment Info is handled by Apple. Photos, audio and coach messages go to the AI for the answer and are not kept, so they are not "collected". The review notes in step 13 say so.
+   - For each one (10 in all, with Photos or Videos below): purpose **App Functionality** (Product Interaction: also **Analytics**); **Linked to the user: Yes**; **Used for tracking: No**.
+   - Leave everything else unticked. Payment Info is handled by Apple. Calgym's server does not keep photos or coach messages; they are declared above (Photos or Videos; coach messages fall under Other User Content) because the AI providers may keep API data for a limited time.
 4. **Publish** the privacy answers.
 
 ## Step 13 ⬜ The version page (1.0)
 **Where:** your app → **iOS App → 1.0 Prepare for Submission**. Fill in the English page, then switch the language menu to Arabic and fill in the Arabic page.
 
 **13.1 Screenshots** (3–10 per language)
-- Take them on an iPhone Pro Max (15, 16 or 17) in light mode. Accepted sizes: 1320 × 2868, 1290 × 2796 or 1260 × 2736.
-- Suggested order:
-  1. Overview (today)
-  2. A meal scan result
-  3. Training with the schedule
-  4. A workout with the rest timer
-  5. Health body composition
-  6. The AI coach
-- Drag them into **iPhone 6.9" Display**.
+- Ready-made sets are in `docs/store-screenshots/en` and `docs/store-screenshots/ar` (1290 × 2796). Drag them into **iPhone 6.9" Display** in the numbered order.
+- They are drawn from the app's web preview with sample data. If you'd rather use captures from your iPhone (a Pro Max: 15, 16 or 17), take the same screens in light mode; they will match the submitted build exactly.
 
-**13.2 Promotional Text**
-- EN: `Snap a meal, log a workout, see your day. Calgym turns photos into calories and macros, keeps your training on plan and shows your progress at a glance.`
-- AR: `صوّر وجبتك وسجّل تمرينك وشاهد يومك. يحوّل كالجيم الصور إلى سعرات وعناصر غذائية، ويبقي تمرينك على الخطة، ويعرض تقدمك بلمحة.`
+**13.2 Promotional Text** (170 characters)
+- EN: `Track meals and workouts in one place. Plan what to eat, know what to train, and follow your progress with Calgym. In English and Arabic.`
+- AR: `وجباتك وتمارينك في مكان واحد. خطط لأكلك، نظّم تمرينك، وتابع تقدمك مع كالجيم. بالعربية والإنجليزية.`
 
 **13.3 Description.** Paste as is, English:
 
 ```
-Calgym is a calorie and workout tracker that does the typing for you.
+Make your next healthy step easier. Calgym brings food tracking, meal planning, workouts and body measurements together, so you can see what you've done and what comes next.
+
+Plan meals you can cook, adjust portions, build your shopping list and record what you actually eat. Follow your training schedule, move a missed workout and keep your progress in view.
 
 FOOD
-• Snap a meal and get calories and macros in seconds, or describe it in words
-• Scan barcodes; read a label when a product isn't found
-• Plan meals and recipes, and see what's left for the day
+• Snap a meal or describe it to get estimated calories, protein, carbs and fat
+• Scan barcodes, and read the label when a product isn't found
+• Recipes with ingredients and cooking steps; change the servings and the amounts follow
+• A weekly meal plan, and a shopping list built from it
 
 TRAINING
-• Weekly schedule, one-tap workouts, sets that remember your last session
-• A rest timer on the lock screen, with −15 s, +15 s and Skip
+• Your weekly schedule, with the sets and reps from your last session in view
+• Missed a workout? Move it to another day and carry on with your plan
+• A rest timer that stays on your lock screen
 • Workout history, personal records and progress
 
 HEALTH
-• Weight and body-composition trends; scan an InBody-style report
-• Connect WHOOP for real calorie burn
+• Weight and body-composition trends, including readings from body-composition reports
+• Connect WHOOP to see estimated calories burned
 
 AI COACH
-• Ask about your nutrition and training; answers use your own numbers
+• Ask about your nutrition and training; answers use the data you choose to share
 
 SMART REMINDERS
-• Planned from your own logs: nothing you've already done is reminded
-• Water paced to your goal, a daily recap and a weekly wins summary
-• Buttons right on the notification: add a glass, start your workout, or remind me later
+• Reminders adapt to what you've logged, with a daily recap and weekly highlights
+• Add water, start a workout or snooze, right from the notification
 
-Works as a guest — no account needed. English and Arabic.
+Works as a guest — no account needed. In English and Arabic.
 
-Calgym Essentials and Calgym Pro are auto-renewing subscriptions, each starting with a 14-day free trial for new subscribers that includes everything. Essentials covers Food or Training, plus Health, with 20 AI actions a month. Pro covers Food, Training and Health together, with 50 AI actions a month, the AI program builder and a coach that remembers your documents. Without a subscription you can still view and export everything you recorded. Payment is charged to your Apple ID at confirmation. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the period; manage them in Settings → Apple ID → Subscriptions.
+SUBSCRIPTIONS
+Calgym Essentials (Food or Training, plus Health, with 20 AI actions a month) and Calgym Pro (Food, Training and Health, with 50 AI actions a month, the AI program builder and document summaries for the coach) are auto-renewing subscriptions.
+Eligible new subscribers start with a 14-day free trial. The trial includes every Pro feature, with up to 50 AI actions, whichever plan you choose. It then renews as the plan you chose, at the price shown before you start, unless you cancel at least 24 hours before the trial ends.
+Payment is charged to your Apple ID account when the free trial ends, or when you confirm the purchase if there is no trial. Subscriptions renew automatically unless cancelled at least 24 hours before the end of the current period. Manage or cancel in Settings → Apple ID → Subscriptions.
+Without a subscription you can still view and export everything you recorded.
 Terms: https://calapp-production-ab20.up.railway.app/terms · Privacy: https://calapp-production-ab20.up.railway.app/privacy
 
-Calorie and nutrition figures are AI estimates and may be inaccurate. Not medical advice.
+AI-generated nutrition estimates may be inaccurate: review portions and ingredients before logging. Calgym does not give medical advice.
 ```
 
 Arabic:
 
 ```
-كالجيم عدّاد سعرات وتمارين يكتب عنك.
+خطوتك التالية نحو عادات صحية أوضح وأسهل. يجمع كالجيم متابعة الغذاء وتخطيط الوجبات والتمارين وقياسات الجسم، لتعرف ما أنجزته وما ينتظرك.
 
-الطعام
-• صوّر وجبتك واحصل على السعرات والعناصر الغذائية خلال ثوانٍ، أو صفها بالكلمات
+خطط لوجباتك بمكونات وخطوات تحضير واضحة، وعدّل الحصص وجهّز قائمة التسوق وسجّل ما أكلته فعلاً. تابع جدول تمارينك، وأعد جدولة التمرين الذي فاتك، وشاهد تقدمك.
+
+الغذاء
+• صوّر وجبتك أو صفها لتحصل على تقدير للسعرات والبروتين والكربوهيدرات والدهون
 • امسح الباركود، واقرأ الملصق إن لم يُعثر على المنتج
-• خطط لوجباتك ووصفاتك واعرف المتبقي ليومك
+• وصفات بمكوناتها وخطوات تحضيرها، والكميات تتغير مع عدد الحصص
+• خطة وجبات أسبوعية وقائمة تسوق مبنية عليها
 
-التمرين
-• جدول أسبوعي وتمارين بلمسة، ومجموعات تتذكر جلستك السابقة
-• مؤقت راحة على شاشة القفل مع −١٥ ث و+١٥ ث وتخطٍّ
-• سجل التمارين والأرقام القياسية والتقدم
+التمارين
+• جدولك الأسبوعي، مع مجموعاتك وتكراراتك من تمرينك السابق أمامك
+• فاتك تمرين؟ انقله إلى يوم آخر وتابع خطتك
+• مؤقت راحة يبقى ظاهراً على شاشة القفل
+• سجل التمارين والأرقام القياسية وتقدمك
 
 الصحة
-• اتجاهات الوزن وتركيب الجسم، وقراءة تقارير InBody
-• اربط WHOOP لحرق السعرات الفعلي
+• اتجاهات الوزن وتركيب الجسم، ومنها قراءات تقارير تركيب الجسم
+• اربط WHOOP لمتابعة تقديرات السعرات المحروقة
 
 المدرب الذكي
-• اسأل عن تغذيتك وتمرينك بإجابات مبنية على أرقامك
+• اسأل عن تغذيتك وتمرينك، وتعتمد الإجابات على البيانات التي تختار مشاركتها
 
 تذكيرات ذكية
-• مبنية على ما تسجّله: لا تذكير بشيء أنجزته
-• ماء موزّع على يومك نحو هدفك، وملخص يومي وإنجازات أسبوعية
-• أزرار في الإشعار نفسه: أضف كوب ماء، أو ابدأ تمرينك، أو ذكّرني لاحقاً
+• تذكيرات تتكيّف مع ما سجّلته، مع ملخص يومي وأبرز إنجازات الأسبوع
+• أضف ماءً أو ابدأ تمرينك أو أجّل التذكير من الإشعار مباشرة
 
 يعمل دون حساب، بالعربية والإنجليزية.
 
-كالجيم الأساسيات وكالجيم برو اشتراكات تتجدد تلقائياً، ويبدأ كل منهما بتجربة مجانية لمدة ١٤ يوماً للمشتركين الجدد تشمل كل المزايا. الأساسيات تشمل التغذية أو التمارين مع الصحة و٢٠ عملية ذكاء اصطناعي شهرياً. برو يشمل التغذية والتمارين والصحة معاً، مع ٥٠ عملية شهرياً ومصمم البرامج الذكي ومدرب يتذكر ملفاتك. وبدون اشتراك يمكنك الاطلاع على كل ما سجّلته وتصديره. يُخصم المبلغ من حساب Apple عند التأكيد، ويتجدد الاشتراك ما لم يُلغَ قبل ٢٤ ساعة على الأقل من نهاية الفترة، ويُدار من الإعدادات ← Apple ID ← الاشتراكات.
+الاشتراكات
+كالجيم الأساسيات (التغذية أو التمارين مع الصحة، و٢٠ عملية ذكاء اصطناعي شهرياً) وكالجيم برو (التغذية والتمارين والصحة، و٥٠ عملية شهرياً، ومصمم البرامج الذكي وملخصات ملفاتك للمدرب) اشتراكات تتجدد تلقائياً.
+يحصل المشتركون الجدد المؤهلون على تجربة مجانية لمدة ١٤ يوماً تشمل كل مزايا برو بحد أقصى ٥٠ عملية ذكاء اصطناعي، أياً كانت الخطة التي تختارها، ثم تتجدد بالخطة التي اخترتها وبالسعر المعروض قبل البدء، ما لم تُلغِها قبل ٢٤ ساعة على الأقل من نهاية التجربة.
+يُخصم المبلغ من حساب Apple عند انتهاء التجربة المجانية، أو عند تأكيد الشراء إن لم تكن هناك تجربة. يتجدد الاشتراك تلقائياً ما لم يُلغَ قبل ٢٤ ساعة على الأقل من نهاية الفترة الحالية، ويمكنك إدارته أو إلغاؤه من الإعدادات ← Apple ID ← الاشتراكات.
+وبدون اشتراك يمكنك الاطلاع على كل ما سجّلته وتصديره.
 الشروط: https://calapp-production-ab20.up.railway.app/terms · الخصوصية: https://calapp-production-ab20.up.railway.app/privacy
 
-أرقام السعرات تقديرات بالذكاء الاصطناعي وقد تكون غير دقيقة، وليست نصيحة طبية.
+تقديرات التغذية المولّدة بالذكاء الاصطناعي قد تكون غير دقيقة، فراجع الحصص والمكونات قبل التسجيل. كالجيم لا يقدّم نصيحة طبية.
 ```
 
-**13.4 Keywords**
-- EN: `calorie,counter,macro,tracker,diet,meal,food,scanner,workout,gym,fitness,protein,inbody,coach,weight`
-- AR: `سعرات,حاسبة,رجيم,دايت,وجبات,بروتين,تمارين,جيم,لياقة,وزن,انبادي,تغذية,مدرب,كالوري`
+**13.4 Keywords** (under 100 bytes each; words already in the name or subtitle are left out, since Apple searches those anyway)
+- EN: `macro,meal,recipe,gym,protein,weight,planner,nutrition,barcode,fitness,diary,diet,coach,shopping`
+- AR: `تغذية,وجبات,بروتين,وزن,وصفات,لياقة,رجيم,دايت,جيم,صيام`
 
 **13.5 URLs**
 - Support URL: `https://calapp-production-ab20.up.railway.app/support`
@@ -354,16 +361,15 @@ Arabic:
 **13.7 App Review Information**
 - **Sign-in required:** untick it. Guest mode needs no account.
 - **Contact:** your name, phone and email.
-- **Notes:** paste this (with the real code from step 10):
+- **Notes:** paste this:
 
 ```
 • No sign-in needed: tap "Continue as guest" on the first screen. Sign in with Apple, Google and email are also offered.
-• Subscriptions: Calgym Essentials (Food or Training, plus Health) and Calgym Pro (both), each with a 14-day free trial that includes every feature. They are offered in the membership sheet after onboarding and in Profile → Membership, where Restore purchases, the trial terms and the Terms/Privacy links are shown. Please start the free trial with the sandbox account to reach every feature; without a plan the app shows recorded data read-only.
-• Alternatively, Profile → Redeem a code → APPREVIEW gives Pro for 30 days.
-• AI features (meal photo, describe a meal, body report scan, AI coach, recipe/program generation) ask permission before anything is sent to our AI providers (Anthropic, DeepSeek). This can be changed in Profile → Privacy → AI processing. Photos and messages are processed in real time and not stored.
-• Account deletion: Profile → Privacy → Delete my account. It deletes on-device data, the cloud backup, the sign-in account and server records.
-• Notifications are optional and local: they are planned on the device from the person's own logs (no remote push). Their buttons (add water, remind me later, start workout) act inside the app. Background modes (fetch, processing) are used only to re-plan these local reminders; the rest timer uses a Live Activity.
-• Health figures are estimates with a disclaimer; the app gives no medical advice.
+• Subscriptions: Calgym Essentials (Food or Training, plus Health) and Calgym Pro (both). Eligible new subscribers get a 14-day free trial that includes every Pro feature (up to 50 AI actions); it then renews as the plan chosen. Plans are offered in the membership sheet after onboarding and in Profile → Membership, with Restore purchases, the trial terms and the Terms/Privacy links. Please start the free trial with your sandbox account to reach every feature; without a plan the app shows recorded data read-only.
+• AI features (meal photo, describe a meal, body report scan, AI coach, recipe and program generation) ask permission before anything is sent to our AI providers (Anthropic, DeepSeek); this can be changed in Profile → Privacy → AI processing. Calgym's server does not keep the photos or messages after the answer; the providers process them under their own API terms.
+• Account deletion: Profile → Privacy → Delete my account. It deletes the on-device data, the cloud backup, the sign-in account and the server records.
+• Notifications are optional and scheduled on the device from the person's own logs; the app sends no remote push. Their buttons (add water, remind me later, start workout) act inside the app. The background modes (fetch, processing) are used only to re-plan these reminders; the rest timer uses a Live Activity.
+• Nutrition figures are estimates with a disclaimer; the app gives no medical advice.
 ```
 
 **13.8 Version Release:** choose **Manually release this version**, so you pick the launch moment.
@@ -432,7 +438,7 @@ Answer each card:
 |---|---|
 | Privacy policy | `https://calapp-production-ab20.up.railway.app/privacy` |
 | Ads | **No** (Yes only while the Sponsor slot in admin → Content is switched on) |
-| App access | "All or some functionality is restricted" → add instructions: `No login needed: tap "Continue as guest". Features beyond viewing need a subscription, which starts with a 14-day free trial. To test everything free: Profile → Redeem a code → APPREVIEW.` |
+| App access | "All or some functionality is restricted" → add instructions: `No login needed: tap "Continue as guest". Features beyond viewing need a subscription: Profile → Membership → start the 14-day free trial (every feature included) with a license-test account.` |
 | Content rating | Start the questionnaire → category **Reference, News, or Educational**; answer No to violence, sex, gambling and similar; Yes to "users can interact with AI" if asked |
 | Target audience | **13 and over**; not designed for children |
 | Health apps | Tick **Nutrition and weight management** and **Activity and fitness**; not a medical device |

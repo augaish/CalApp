@@ -123,7 +123,7 @@ export default function Health() {
             {stats ? (
               <>
                 <HeroStat label={t('health.weight')} value={formatWeight(stats.weightKg, units, t)} delta={stats.weightDelta != null ? formatWeightDelta(stats.weightDelta, units, t) : undefined} color={trendColor(stats.weightTrend)} />
-                <HeroStat label={t('health.bodyFat')} value={stats.bodyFatPercent != null ? `${stats.bodyFatPercent}%` : '—'} delta={stats.bodyFatDelta != null ? `${signed(stats.bodyFatDelta)} pt` : undefined} color={trendColor(stats.bodyFatTrend)} />
+                <HeroStat label={t('health.bodyFat')} value={stats.bodyFatPercent != null ? `${stats.bodyFatPercent}%` : '—'} delta={stats.bodyFatDelta != null ? `${signed(stats.bodyFatDelta)} ${t('common.points')}` : undefined} color={trendColor(stats.bodyFatTrend)} />
                 <HeroStat label={t('health.muscle')} value={muscleKg != null ? formatWeight(muscleKg, units, t) : '—'} delta={muscleKgDelta != null ? formatWeightDelta(muscleKgDelta, units, t) : undefined} color={trendColor(muscleKgDelta != null ? muscleTrend(muscleKgDelta) : 'neutral')} />
                 <HeroStat label={t('progress.bmi')} value={stats.bmi.toFixed(1)} delta={stats.bmiDelta != null ? signed(stats.bmiDelta) : undefined} color={trendColor(stats.bmiTrend)} />
               </>

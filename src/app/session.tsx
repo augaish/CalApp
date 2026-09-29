@@ -649,7 +649,7 @@ export default function SessionScreen() {
         <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>{t('session.restTimer')}</Text>
         <View style={styles.restPick}>
           {REST_OPTIONS.map((s) => (
-            <Chip key={s} label={`${s} s`} selected={session.restSeconds === s} onPress={() => updateSession({ restSeconds: s })} />
+            <Chip key={s} label={`${s} ${t('common.secondsShort')}`} selected={session.restSeconds === s} onPress={() => updateSession({ restSeconds: s })} />
           ))}
         </View>
 

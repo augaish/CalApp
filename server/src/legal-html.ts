@@ -59,7 +59,7 @@ export const PRIVACY_HTML = page(
   <li><strong>Anthropic</strong> (Claude), United States, and</li>
   <li><strong>DeepSeek</strong>, China,</li>
 </ul>
-<p>depending on your plan and on which service is available. Each processes the content under its own API terms. We send only what is needed to answer — never your name or email — and we do not keep your photos, reports or messages after the answer is returned. The app asks your permission before anything is sent to an AI provider for the first time, and you can withdraw it at any time in Profile → Privacy → AI processing. The AI coach also receives a short summary of your recent totals (calories, macros, workouts) so its answer can refer to your own data; it is used only for that reply.</p>
+<p>depending on your plan and on which service is available. Each processes the content under its own API terms. We send only what is needed to answer — never your name or email — and our server does not keep your photos, reports or messages after the answer is returned. The providers may keep what they receive for a limited period under their own terms (for example, for safety and abuse monitoring). The app asks your permission before anything is sent to an AI provider for the first time, and you can withdraw it at any time in Profile → Privacy → AI processing. The AI coach also receives a short summary of your recent totals (calories, macros, workouts) so its answer can refer to your own data; it is used only for that reply.</p>
 
 <h2>What our server keeps</h2>
 <ul>
@@ -128,7 +128,7 @@ export const PRIVACY_HTML = page(
   <li><strong>Anthropic</strong> ‏(Claude)، الولايات المتحدة، و</li>
   <li><strong>DeepSeek</strong>، الصين،</li>
 </ul>
-<p>بحسب باقتك والخدمة المتاحة، ويعالج كلٌّ منهما المحتوى وفق شروط واجهته البرمجية. نرسل فقط ما يلزم للإجابة — ولا نرسل اسمك أو بريدك أبداً — ولا نحتفظ بصورك أو تقاريرك أو رسائلك بعد إرجاع الإجابة. يطلب التطبيق إذنك قبل إرسال أي شيء إلى مزوّد ذكاء اصطناعي أول مرة، ويمكنك سحب الإذن في أي وقت من الملف الشخصي ← الخصوصية ← المعالجة بالذكاء الاصطناعي. ويتلقى المدرب الذكي أيضاً ملخصاً قصيراً لإجمالياتك الأخيرة ليكون الرد مخصصاً لك، ويُستخدم لذلك الرد فقط.</p>
+<p>بحسب باقتك والخدمة المتاحة، ويعالج كلٌّ منهما المحتوى وفق شروط واجهته البرمجية. نرسل فقط ما يلزم للإجابة — ولا نرسل اسمك أو بريدك أبداً — ولا يحتفظ خادمنا بصورك أو تقاريرك أو رسائلك بعد إرجاع الإجابة. وقد يحتفظ المزوّدون بما يصلهم لفترة محدودة وفق شروطهم (مثلاً لأغراض السلامة ومنع إساءة الاستخدام). يطلب التطبيق إذنك قبل إرسال أي شيء إلى مزوّد ذكاء اصطناعي أول مرة، ويمكنك سحب الإذن في أي وقت من الملف الشخصي ← الخصوصية ← المعالجة بالذكاء الاصطناعي. ويتلقى المدرب الذكي أيضاً ملخصاً قصيراً لإجمالياتك الأخيرة ليكون الرد مخصصاً لك، ويُستخدم لذلك الرد فقط.</p>
 
 <h2>ما يحفظه خادمنا</h2>
 <ul>

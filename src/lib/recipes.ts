@@ -102,9 +102,11 @@ export function scaledIngredients(recipe: Recipe, cookingForServings: number): R
 
 /** How an amount reads on screen: the weight always, the familiar measure too
  * when it still applies. */
-export function ingredientAmountLabel(i: RecipeIngredient): string {
+export function ingredientAmountLabel(i: RecipeIngredient, t?: (key: string) => string): string {
   const amount = i.amount >= 10 ? Math.round(i.amount) : Math.round(i.amount * 10) / 10;
-  const weight = `${amount} ${i.unit}`;
+  // The unit in the language shown ("g" / "غ"), when a translator is given.
+  const unit = t ? t(i.unit === 'ml' ? 'common.ml' : 'common.grams') : i.unit;
+  const weight = `${amount} ${unit}`;
   return i.measure ? `${weight} · ${i.measure}` : weight;
 }
 

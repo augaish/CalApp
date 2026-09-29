@@ -259,7 +259,7 @@ export default function RecipeScreen() {
                 {ing.name}
                 <Text style={{ color: theme.textSecondary }}>
                   {' · '}
-                  {ingredientAmountLabel(ing)}
+                  {ingredientAmountLabel(ing, t)}
                   {ing.macrosUnknown ? ` · ${t('recipeEdit.unknownShort')}` : ''}
                 </Text>
               </Text>
