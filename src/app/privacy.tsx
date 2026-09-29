@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/brand-header';
 import { InfoLine, RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
-import { deleteAccount, logOut } from '@/lib/account';
+import { deleteAccount } from '@/lib/account';
 import { SERVER_URL } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 
@@ -20,7 +20,6 @@ export default function Privacy() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const account = useAppStore((s) => s.account);
   const resetAll = useAppStore((s) => s.resetAll);
   const aiConsent = useAppStore((s) => s.aiConsent);
   const setAiConsent = useAppStore((s) => s.setAiConsent);
@@ -32,25 +31,6 @@ export default function Privacy() {
     Alert.alert(t('aiConsent.withdrawTitle'), t('aiConsent.withdrawBody'), [
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('aiConsent.withdraw'), style: 'destructive', onPress: () => setAiConsent(undefined) },
-    ]);
-  };
-
-  const confirmSignOut = () =>
-    alertDestructive(t('profile.signOut'), t('profile.signOutConfirm'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('profile.signOut'),
-        style: 'destructive',
-        onPress: () => void runLogOut(false),
-      },
-    ]);
-
-  const runLogOut = async (force: boolean) => {
-    if ((await logOut(force)) === 'done') return;
-    // Offline, most likely: the newest changes aren't in the account yet.
-    alertDestructive(t('profile.signOutUnsavedTitle'), t('profile.signOutUnsaved'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('profile.signOutAnyway'), style: 'destructive', onPress: () => void runLogOut(true) },
     ]);
   };
 
@@ -93,7 +73,6 @@ export default function Privacy() {
         <SettingsRow icon="help-circle-outline" title={t('legal.support')} onPress={() => Linking.openURL(`${SERVER_URL}/support`)} last />
       </RowGroup>
       <RowGroup title={t('privacy.dangerZone')}>
-        {account?.email && <SettingsRow icon="log-out-outline" iconColor={theme.danger} title={t('profile.signOut')} onPress={confirmSignOut} chevron={false} />}
         <SettingsRow icon="trash-outline" iconColor={theme.danger} title={t('settings.resetData')} subtitle={t('privacy.resetHint')} onPress={confirmReset} chevron={false} />
         <SettingsRow icon="person-remove-outline" iconColor={theme.danger} title={t('legal.deleteAccount')} subtitle={t('privacy.deleteHint')} onPress={confirmDeleteAccount} chevron={false} last />
       </RowGroup>

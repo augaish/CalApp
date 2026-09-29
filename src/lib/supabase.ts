@@ -17,6 +17,23 @@ const SUPABASE_KEY =
 export const authConfigured = !!SUPABASE_URL && !!SUPABASE_KEY;
 
 /**
+ * Which sign-in providers are switched on in the Supabase dashboard. Asked
+ * before showing a provider's button: a provider that isn't on makes Supabase
+ * answer with a bare JSON error page inside the sign-in sheet. Null when the
+ * question can't be answered (offline).
+ */
+export async function enabledProviders(): Promise<Record<string, boolean> | null> {
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/settings`, { headers: { apikey: SUPABASE_KEY } });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { external?: Record<string, boolean> };
+    return body.external ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * `expo export` prerenders the web build in Node, where `window` — and so the
  * localStorage that AsyncStorage sits on — does not exist. Fall back to memory
  * there; a build has no session worth restoring. React Native defines `window`,

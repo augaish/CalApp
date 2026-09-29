@@ -3,7 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 
 import { parseAuthCallback } from './auth-callback';
 import type { Account } from './store';
-import { getSupabase } from './supabase';
+import { enabledProviders, getSupabase } from './supabase';
 
 /**
  * Sign in with Google, through Supabase Auth.
@@ -33,7 +33,15 @@ export class GoogleUnavailable extends Error {
   }
 }
 
+/** Whether to offer the Google button: only once Supabase has it switched on. */
+export async function googleSignInEnabled(): Promise<boolean> {
+  return (await enabledProviders())?.google === true;
+}
+
 export async function signInWithGoogle(): Promise<Account> {
+  // Never open the sheet onto Supabase's raw "provider is not enabled" page.
+  const providers = await enabledProviders();
+  if (providers && providers.google !== true) throw new GoogleUnavailable('provider_not_enabled');
   const redirectTo = Linking.createURL('auth-callback');
   const sb = getSupabase();
   const { data, error } = await sb.auth.signInWithOAuth({

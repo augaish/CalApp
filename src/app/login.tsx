@@ -13,7 +13,7 @@ import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { sendEmailCode, syncAuthIdentity, verifyEmailCode } from '@/lib/auth';
 import { appleSignInAvailable, signInWithApple } from '@/lib/auth-apple';
-import { GoogleCancelled, GoogleUnavailable, signInWithGoogle } from '@/lib/auth-google';
+import { GoogleCancelled, GoogleUnavailable, googleSignInEnabled, signInWithGoogle } from '@/lib/auth-google';
 import { authFailure } from '@/lib/auth-errors';
 import { lightHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
@@ -59,12 +59,19 @@ export default function Login() {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
+  // Shown only once Supabase confirms Google is switched on.
+  const [googleReady, setGoogleReady] = useState(false);
 
   useEffect(() => {
     let alive = true;
     appleSignInAvailable().then((ok) => {
       if (alive) setAppleReady(ok);
     });
+    if (Platform.OS !== 'web') {
+      googleSignInEnabled().then((ok) => {
+        if (alive) setGoogleReady(ok);
+      });
+    }
     return () => {
       alive = false;
     };
@@ -217,7 +224,7 @@ export default function Login() {
                   <Text style={styles.appleLabel}>{t('auth.continueApple')}</Text>
                 </Pressable>
               )}
-              {Platform.OS !== 'web' && (
+              {googleReady && (
                 <Pressable
                   onPress={withGoogle}
                   disabled={busy}

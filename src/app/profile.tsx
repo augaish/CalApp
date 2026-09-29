@@ -10,6 +10,8 @@ import { RowGroup, SettingsRow, StatusPill } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { logOut } from '@/lib/account';
+import { alertDestructive } from '@/lib/alerts';
 import { chooseExport } from '@/lib/export';
 import { lightHaptic } from '@/lib/feedback';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
@@ -88,6 +90,26 @@ export default function Profile() {
 
   const exportData = () => chooseExport();
 
+  const confirmSignOut = () =>
+    alertDestructive(t('profile.signOut'), t('profile.signOutConfirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('profile.signOut'),
+        style: 'destructive',
+        onPress: () => void runLogOut(false),
+      },
+    ]);
+
+  const runLogOut = async (force: boolean) => {
+    if ((await logOut(force)) === 'done') return;
+    // Offline, most likely: the newest changes aren't in the account yet.
+    alertDestructive(t('profile.signOutUnsavedTitle'), t('profile.signOutUnsaved'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('profile.signOutAnyway'), style: 'destructive', onPress: () => void runLogOut(true) },
+    ]);
+  };
+
+
   const unitsLabel = units === 'imperial' ? `${t('units.lb')} / ${t('units.in')}` : `${t('progress.kg')} / ${t('units.cm')}`;
 
   return (
@@ -159,6 +181,12 @@ export default function Profile() {
           last
         />
       </RowGroup>
+
+      {account?.email && (
+        <RowGroup>
+          <SettingsRow icon="log-out-outline" iconColor={theme.danger} title={t('profile.signOut')} onPress={confirmSignOut} chevron={false} last />
+        </RowGroup>
+      )}
     </Screen>
   );
 }
