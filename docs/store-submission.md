@@ -527,11 +527,14 @@ On each of the four base plans: **Add offer**:
 ## Google sign-in (one-time setup)
 The app's "Continue with Google" button goes through Supabase Auth.
 1. **console.cloud.google.com** → new project **Calgym**.
-2. **APIs & Services → OAuth consent screen:**
-   - External, app name Calgym, support@calgym.org.
+2. **Google Auth Platform → Branding** (older consoles: **APIs & Services → OAuth consent screen**):
+   - App name **Calgym**.
+   - User support email: your own Gmail. Google only accepts the signed-in account or a Google Group here, not support@calgym.org. People see it on the Google sign-in screen.
+   - Audience: **External**.
+   - Developer contact email: **support@calgym.org**. Any address works here.
    - Authorized domain `supabase.co`.
-   - Scopes `email`, `profile`, `openid`.
-   - Then **Publish app**.
+   - Data Access (scopes): `email`, `profile`, `openid`.
+   - Audience → **Publish app**.
 3. **Credentials → Create credentials → OAuth client ID:**
    - Type **Web application**.
    - Redirect URI `https://uvhvxcvwpwkqvnvqdtyf.supabase.co/auth/v1/callback`.
