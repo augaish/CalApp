@@ -531,7 +531,7 @@ The app's "Continue with Google" button goes through Supabase Auth.
    - App name **Calgym**.
    - User support email: your own Gmail. Google only accepts the signed-in account or a Google Group here, not support@calgym.org. People see it on the Google sign-in screen.
    - Audience: **External**. Developer contact email: **support@calgym.org** (any address works here).
-   - Then, back on **Branding**, scroll to **Authorized domains → + Add domain** → `supabase.co` → **Save**.
+   - Then, back on **Branding**, scroll to **Authorized domains → + Add domain** → `uvhvxcvwpwkqvnvqdtyf.supabase.co` (the project’s own address; plain `supabase.co` is refused) → **Save**.
 3. **Data Access → Add or remove scopes:** tick `.../auth/userinfo.email`, `.../auth/userinfo.profile` and `openid` → **Update** → **Save**.
 4. **Clients → + Create client:**
    - Application type **Web application**, name `Calgym (Supabase)`.
