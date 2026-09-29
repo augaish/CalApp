@@ -1,9 +1,9 @@
+import { Image } from 'expo-image';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { DatePickerModal } from '@/components/date-picker';
 import { GoalScenarioCards } from '@/components/goal-scenario-cards';
@@ -121,9 +121,12 @@ export default function Onboarding() {
     return (
       <Screen scroll={false}>
         <View style={styles.welcomeCenter}>
-          <View style={[styles.welcomeBadge, { backgroundColor: theme.cardSubtle }]}>
-            <Icon name="nutrition" size={44} color={theme.primary} />
-          </View>
+          <Image
+            source={require('../../assets/images/logo-tile.png')}
+            style={styles.welcomeLogo}
+            contentFit="contain"
+            accessibilityLabel="Calgym"
+          />
           <Text style={[Type.display, { color: theme.text, fontSize: 34, textAlign: 'center' }]}>
             {t('onboarding.welcomeTitle')}
           </Text>
@@ -154,10 +157,10 @@ export default function Onboarding() {
         <Title>{t('onboarding.aboutYou')}</Title>
         <View style={[styles.row, { marginBottom: Spacing.md }]}>
           <View style={{ flex: 1 }}>
-            <OptionRow emoji="👨" label={t('onboarding.male')} selected={sex === 'male'} onPress={() => setSex('male')} />
+            <OptionRow stacked emoji="👨" label={t('onboarding.male')} selected={sex === 'male'} onPress={() => setSex('male')} />
           </View>
           <View style={{ flex: 1 }}>
-            <OptionRow emoji="👩" label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
+            <OptionRow stacked emoji="👩" label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
           </View>
         </View>
         <View>
@@ -178,6 +181,7 @@ export default function Onboarding() {
           visible={showBirthDatePicker}
           value={birthDate ? new Date(birthDate) : new Date(new Date().setFullYear(new Date().getFullYear() - 25))}
           maxDate={new Date()}
+          startWith={birthDate ? 'day' : 'year'}
           onChange={(d) => setBirthDate(ymd(d))}
           onClose={() => setShowBirthDatePicker(false)}
         />
@@ -284,14 +288,7 @@ function MacroPill({ label, value, color }: { label: string; value: number; colo
 
 const styles = StyleSheet.create({
   welcomeCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  welcomeBadge: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.lg,
-  },
+  welcomeLogo: { width: 112, height: 112, borderRadius: 26, marginBottom: Spacing.lg },
   row: { flexDirection: 'row', gap: Spacing.sm },
   heroCard: {
     alignItems: 'center',

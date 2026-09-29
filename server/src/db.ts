@@ -201,6 +201,11 @@ export async function initDb(): Promise<void> {
   // The address a signed-in account uses, so support has something human to
   // recognise a row by. Guests never have one.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS email TEXT`);
+  // The App Store / Play country the app is served from, and the currency its
+  // prices arrived in: to see where people are, and to catch a store handing
+  // the app prices in another currency than it charges in.
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS store_country TEXT`);
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS store_currency TEXT`);
   // What the row was last seen on — set from the launch ping, so it covers
   // guests too, not only signed-in accounts.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS device TEXT`);
@@ -823,6 +828,15 @@ export async function setUserDevice(ref: string, device: string): Promise<void> 
   );
 }
 
+export async function setUserStore(ref: string, country: string | null, currency: string | null): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO app_users (ref, store_country, store_currency) VALUES ($1, $2, $3)
+     ON CONFLICT (ref) DO UPDATE SET store_country = EXCLUDED.store_country, store_currency = EXCLUDED.store_currency`,
+    [ref, country, currency],
+  );
+}
+
 /** Grant or revoke Pro (admin, and later the billing webhook). */
 export async function setUserPlan(
   ref: string,
@@ -1309,6 +1323,9 @@ export interface AdminRow {
   ref: string;
   email: string | null;
   device: string | null;
+  /** App Store / Play country (e.g. SAU) and the currency its prices came in. */
+  storeCountry?: string | null;
+  storeCurrency?: string | null;
   plan: string;
   planSource: string;
   planUntil: string | null;
@@ -1357,7 +1374,7 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
   if (!pool) return [];
   const period = currentPeriod();
   const res = await pool.query(
-    `SELECT u.ref, u.email, u.device, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
+    `SELECT u.ref, u.email, u.device, u.store_country, u.store_currency, u.plan, u.plan_source, u.plan_until, u.note, u.created_at, u.last_seen_at,
             u.promo_plan, u.promo_until, u.promo_code, u.module, u.module_set_at,
             COALESCE((SELECT SUM(c.count) FROM usage_counters c
                       WHERE c.ref = u.ref AND c.period = $1), 0)::int AS used,
@@ -1376,6 +1393,8 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
     ref: r.ref,
     email: r.email ?? null,
     device: r.device ?? null,
+    storeCountry: r.store_country ?? null,
+    storeCurrency: r.store_currency ?? null,
     ...(() => {
       // Show what the person actually has, gift included, so a code's
       // recipients do not read as free users in the table.

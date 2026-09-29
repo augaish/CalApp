@@ -5,6 +5,7 @@ import { useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoachTour } from '@/components/coach-tour';
+import { useCelebrate } from '@/lib/celebrate';
 import { useAppStore } from '@/lib/store';
 import { addButtonRect } from '@/lib/tab-bar';
 import { TAB_ROUTES, TOUR_STEPS, useTour } from '@/lib/tour';
@@ -23,6 +24,7 @@ export function TourOverlay() {
   const insets = useSafeAreaInsets();
   const setTourSeen = useAppStore((s) => s.setTourSeen);
   const active = useTour((s) => s.active);
+  const auto = useTour((s) => s.auto);
   const step = useTour((s) => s.step);
   const paused = useTour((s) => s.paused);
   const away = useTour((s) => s.away);
@@ -78,12 +80,24 @@ export function TourOverlay() {
     useTour.getState().stop();
     setTourSeen();
   };
+  // Put off or turned down: say where it lives, so it is never lost.
+  const whereItIs = () => useCelebrate.getState().celebrate(t('tour.whereLater'), 5000);
+  const skipForNow = () => {
+    useTour.getState().stop();
+    useAppStore.getState().snoozeTour();
+    whereItIs();
+  };
+  const never = () => {
+    finish();
+    whereItIs();
+  };
   return (
     <CoachTour
       steps={steps}
       index={step}
       onNext={() => (step < TOUR_STEPS.length - 1 ? useTour.getState().next() : finish())}
-      onSkip={finish}
+      onSkip={auto ? skipForNow : finish}
+      onNever={auto ? never : undefined}
       onTry={
         def.tryRoute
           ? () => {

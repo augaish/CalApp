@@ -212,6 +212,8 @@ export interface AppState {
   checklistDismissed: boolean;
   /** Spotlight coach-mark tour has been seen/skipped. */
   tourSeen: boolean;
+  /** Times the auto-started tour was put off with "Skip for now". */
+  tourSnoozed?: number;
   /** One ongoing coach conversation — persisted so leaving the tab or
    * restarting the app doesn't lose it, the way it used to. */
   coachMessages: ChatMessage[];
@@ -417,6 +419,8 @@ export interface AppState {
   setTutorialSeen: () => void;
   dismissChecklist: () => void;
   setTourSeen: () => void;
+  /** "Skip for now" on the tour: it is offered again once, at the next launch. */
+  snoozeTour: () => void;
   /** Re-arm the coach-mark tour (from Profile → Replay tour). */
   replayTour: () => void;
   setCoachMessages: (messages: ChatMessage[]) => void;
@@ -1306,7 +1310,8 @@ export const useAppStore = create<AppState>()(
       setTutorialSeen: () => set({ tutorialSeen: true }),
       dismissChecklist: () => set({ checklistDismissed: true }),
       setTourSeen: () => set({ tourSeen: true }),
-      replayTour: () => set({ tourSeen: false }),
+      snoozeTour: () => set((st) => ({ tourSnoozed: (st.tourSnoozed ?? 0) + 1 })),
+      replayTour: () => set({ tourSeen: false, tourSnoozed: 0 }),
       setCoachMessages: (messages) => set({ coachMessages: messages }),
       markCoachPlanApplied: (index) =>
         set((s) => ({ coachAppliedPlans: [...s.coachAppliedPlans, index] })),
@@ -1463,6 +1468,7 @@ export const useAppStore = create<AppState>()(
         tutorialSeen,
         checklistDismissed,
         tourSeen,
+        tourSnoozed,
         coachMessages,
         coachAppliedPlans,
         coachReferenceDocs,
@@ -1516,6 +1522,7 @@ export const useAppStore = create<AppState>()(
         tutorialSeen,
         checklistDismissed,
         tourSeen,
+        tourSnoozed,
         coachMessages,
         coachAppliedPlans,
         coachReferenceDocs,

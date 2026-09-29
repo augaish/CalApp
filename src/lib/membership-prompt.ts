@@ -1,7 +1,7 @@
 /**
  * When the membership sheet may offer itself, unasked. Gentle by design:
  *
- * - once, right after a new person finishes onboarding (and its tour);
+ * - once, right after a new person finishes onboarding (before the tour);
  * - then at most once a week, from the third day on;
  * - only to someone on the free plan, only when the store actually has a plan
  *   to sell, and never over a workout or while they are elsewhere than a tab.
@@ -40,8 +40,10 @@ export function promptDue(
   ctx: { free: boolean; tourDone: boolean; busy: boolean; launchOffer?: boolean },
   now: Date = new Date(),
 ): 'intro' | 'weekly' | null {
-  if (!ctx.free || !ctx.tourDone || ctx.busy) return null;
+  if (!ctx.free || ctx.busy) return null;
+  // Straight after onboarding, before the tour: the plans come first.
   if (!state.introShown) return 'intro';
+  if (!ctx.tourDone) return null;
   const since = (iso: string) => (now.getTime() - new Date(iso).getTime()) / DAY;
   if (!ctx.launchOffer && since(state.firstSeenAt) < FIRST_WEEKLY_AFTER_DAYS) return null;
   const gap = ctx.launchOffer ? LAUNCH_GAP_DAYS : WEEKLY_GAP_DAYS;

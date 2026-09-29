@@ -53,6 +53,8 @@ export function notifications(): NotificationsModule | null {
 export const REST_ALERT_ID = 'calgym-rest';
 /** The reminder before a store trial's first charge (trial-reminder.ts); reminders never cancel it. */
 export const TRIAL_REMINDER_ID = 'calgym-trial';
+/** The morning after a purchase: a nudge to start (plan-welcome.ts); reminders never cancel it. */
+export const WELCOME_NUDGE_ID = 'calgym-welcome';
 
 export async function requestPermission(mod: NotificationsModule): Promise<boolean> {
   const settings = await mod.getPermissionsAsync();
@@ -158,11 +160,11 @@ async function runSync(): Promise<{ granted: boolean }> {
 
   // Everything planned is re-planned from scratch: a switch turned off, or a
   // reminder whose reason has gone (lunch logged), must never still fire.
-  // The rest timer and the trial reminder belong to other features.
+  // The rest timer, the trial reminder and the welcome nudge belong to other features.
   const scheduled = await mod.getAllScheduledNotificationsAsync();
   await Promise.all(
     scheduled
-      .filter((n) => n.identifier !== REST_ALERT_ID && n.identifier !== TRIAL_REMINDER_ID)
+      .filter((n) => n.identifier !== REST_ALERT_ID && n.identifier !== TRIAL_REMINDER_ID && n.identifier !== WELCOME_NUDGE_ID)
       .map((n) => mod.cancelScheduledNotificationAsync(n.identifier)),
   );
   if (!anyOn) return { granted: true };

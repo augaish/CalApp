@@ -437,7 +437,7 @@ export default function Overview() {
               {/* Protein, not calories: the calorie figure is on the card
                   right below, and protein is what a meal choice most moves. */}
               <StatTile
-                icon="nutrition-outline"
+                icon="steak"
                 value={
                   proteinLeft > 0
                     ? `${proteinIncomplete ? '≤' : ''}${num(proteinLeft)} ${t('common.grams')}`
@@ -450,7 +450,7 @@ export default function Overview() {
                       ? t('today.tileProteinLeftAtMost')
                       : t('today.tileProteinLeft')
                 }
-                color={theme.protein}
+                color={theme.steak}
               />
             </Pressable>
             )}

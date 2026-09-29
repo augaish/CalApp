@@ -18,13 +18,17 @@ export function CoachTour({
   index,
   onNext,
   onSkip,
+  onNever,
   onTry,
   tryLabel,
 }: {
   steps: TourStep[];
   index: number;
   onNext: () => void;
+  /** "Skip for now" when onNever is given, otherwise plain "Skip". */
   onSkip: () => void;
+  /** "Don't show again": shown next to "Skip for now" under the buttons. */
+  onNever?: () => void;
   /** Opens the real screen behind this step; the tour resumes on return. */
   onTry?: () => void;
   tryLabel?: string;
@@ -47,7 +51,7 @@ export function CoachTour({
     : null;
 
   // Place the tooltip below the highlight when there's room, else above; centered when no rect.
-  const TOOLTIP_EST = 184;
+  const TOOLTIP_EST = onNever ? 232 : 184;
   let tooltipTop: number;
   if (!hole) {
     tooltipTop = H / 2 - TOOLTIP_EST / 2;
@@ -100,9 +104,11 @@ export function CoachTour({
           <Text style={[styles.title, { color: theme.text }]}>{step.title}</Text>
           <Text style={[styles.body, { color: theme.textSecondary }]}>{step.body}</Text>
           <View style={styles.row}>
-            <Pressable onPress={onSkip} hitSlop={8} style={styles.skip} accessibilityRole="button">
-              <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('tutorial.skip')}</Text>
-            </Pressable>
+            {!onNever && (
+              <Pressable onPress={onSkip} hitSlop={8} style={styles.skip} accessibilityRole="button">
+                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('tutorial.skip')}</Text>
+              </Pressable>
+            )}
             <View style={{ flex: 1 }} />
             {onTry && tryLabel && (
               <Pressable onPress={onTry} hitSlop={8} accessibilityRole="button" style={[styles.next, { backgroundColor: theme.surfaceTint, marginEnd: Spacing.sm }]}>
@@ -123,6 +129,16 @@ export function CoachTour({
               </Text>
             </Pressable>
           </View>
+          {onNever && (
+            <View style={[styles.skips, { borderTopColor: theme.border }]}>
+              <Pressable onPress={onSkip} hitSlop={8} style={styles.skip} accessibilityRole="button">
+                <Text style={{ color: theme.primary, fontWeight: '700' }}>{t('tour.skipForNow')}</Text>
+              </Pressable>
+              <Pressable onPress={onNever} hitSlop={8} style={styles.skip} accessibilityRole="button">
+                <Text style={{ color: theme.textSecondary, fontWeight: '600' }}>{t('tour.dontShowAgain')}</Text>
+              </Pressable>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -141,6 +157,7 @@ const styles = StyleSheet.create({
   body: { fontSize: 15, lineHeight: 21, marginBottom: Spacing.md },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   skip: { paddingVertical: 8, paddingHorizontal: 4 },
+  skips: { flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.ms, paddingTop: Spacing.xs, borderTopWidth: StyleSheet.hairlineWidth },
   next: {
     borderRadius: Radius.full,
     paddingVertical: 10,

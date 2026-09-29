@@ -237,6 +237,19 @@ export async function identifyEmail(email: string): Promise<void> {
   }
 }
 
+/** Tell the server which store country and currency the app's prices came from. */
+export async function reportStorefront(country: string | null, currency: string | null): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/storefront`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ country, currency }),
+    });
+  } catch {
+    // Diagnostics for the admin list only.
+  }
+}
+
 /** Fetch a shared plan by its code. */
 export async function fetchSharedPlan(code: string): Promise<unknown | null> {
   try {

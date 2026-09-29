@@ -1,6 +1,6 @@
 // How the store's packages become the upgrade screen's tiers and prices.
 import {
-  annualSaving, findOfferOption, groupPackages, hasAnyPlan, offerCodeUrl, periodOf, tierOf,
+  annualSaving, findOfferOption, formatMoney, groupPackages, hasAnyPlan, offerCodeUrl, periodOf, tierOf,
 } from '/home/user/CalApp/src/lib/store-plans.ts';
 
 let fails = 0;
@@ -63,6 +63,12 @@ eq('an offer the store does not have is not found', findOfferOption(play, 'summe
 eq('a blank offer id finds nothing', findOfferOption(play, ' '), null);
 
 eq('the App Store redemption link carries the code', offerCodeUrl(' RAMADAN50 '), 'https://apps.apple.com/redeem?ctx=offercodes&id=6793969631&code=RAMADAN50');
+
+// Amounts we work out ourselves, written the way the app's language writes money.
+check('riyals in Arabic are ر.س, not a code', /ر\.س/.test(formatMoney(12.5, 'SAR', 'ar')) && /12\.50/.test(formatMoney(12.5, 'SAR', 'ar')), formatMoney(12.5, 'SAR', 'ar'));
+check('riyals in English keep two decimals', /12\.50/.test(formatMoney(12.5, 'SAR', 'en')) && /SAR/.test(formatMoney(12.5, 'SAR', 'en')), formatMoney(12.5, 'SAR', 'en'));
+check('dollars in English use the symbol', formatMoney(1, 'USD', 'en') === '$1.00', formatMoney(1, 'USD', 'en'));
+check('an unknown currency code still reads', /3\.00/.test(formatMoney(3, 'ZZZ', 'en')), formatMoney(3, 'ZZZ', 'en'));
 
 console.log(fails === 0 ? 'ALL PASS' : `${fails} FAILURES`);
 process.exit(fails === 0 ? 0 : 1);

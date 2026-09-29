@@ -232,14 +232,54 @@ export function OptionRow({
   emoji,
   selected,
   onPress,
+  stacked = false,
 }: {
   label: string;
   description?: string;
   emoji?: string;
   selected: boolean;
   onPress: () => void;
+  /** For two side by side: emoji above a one-line label, tick in the corner. */
+  stacked?: boolean;
 }) {
   const t = useTheme();
+  if (stacked) {
+    return (
+      <Pressable
+        onPress={onPress}
+        accessibilityRole="radio"
+        accessibilityLabel={label}
+        accessibilityState={{ selected }}
+        style={({ pressed }) => [
+          styles.option,
+          styles.optionStacked,
+          { backgroundColor: selected ? t.cardSubtle : t.card, borderColor: selected ? t.primary : t.border },
+          cardShadow(t.shadow),
+          pressed && { transform: [{ scale: 0.99 }] },
+        ]}
+      >
+        {emoji ? <Text style={styles.optionEmoji}>{emoji}</Text> : null}
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={[styles.optionLabel, { color: selected ? t.primary : t.text, textAlign: 'center' }]}
+        >
+          {label}
+        </Text>
+        <View
+          style={[
+            styles.radio,
+            styles.radioCorner,
+            { borderColor: selected ? t.primary : t.border },
+            selected && { backgroundColor: t.primary },
+          ]}
+        >
+          {selected ? <Text style={{ color: t.onPrimary, fontSize: 12, fontWeight: '800' }}>✓</Text> : null}
+        </View>
+      </Pressable>
+    );
+  }
   return (
     <Pressable
       onPress={onPress}
@@ -587,6 +627,8 @@ const styles = StyleSheet.create({
     minHeight: 56,
   },
   optionEmoji: { fontSize: 26 },
+  optionStacked: { flexDirection: 'column', gap: 6, paddingTop: Spacing.md + 4, minHeight: 104, justifyContent: 'center' },
+  radioCorner: { position: 'absolute', top: 10, end: 10 },
   optionLabel: { fontSize: 17, fontWeight: '600' },
   radio: {
     width: 24,

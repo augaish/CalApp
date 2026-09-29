@@ -1,7 +1,7 @@
 import { Linking, NativeModules, Platform } from 'react-native';
 import type { PurchasesPackage } from 'react-native-purchases';
 
-import { currentRef, onIdentityChange, syncBilling } from './api';
+import { currentRef, onIdentityChange, reportStorefront, syncBilling } from './api';
 import { findOfferOption, groupPackages, offerCodeUrl, replacementFor, type StorePlans } from './store-plans';
 
 /**
@@ -97,6 +97,21 @@ export interface LoadedPlans {
 }
 
 /** The current offering, sorted into tiers. Null when the store has nothing to sell. */
+let storeReported = false;
+/** Once a launch: the store country and the currency the prices came in, for the admin list. */
+async function reportStoreOnce(currency: string | null): Promise<void> {
+  if (storeReported) return;
+  storeReported = true;
+  const Purchases = load();
+  let country: string | null = null;
+  try {
+    country = (await Purchases?.getStorefront?.())?.countryCode ?? null;
+  } catch {
+    // Older SDK or no store account: the currency still says enough.
+  }
+  await reportStorefront(country, currency);
+}
+
 export async function loadStorePlans(): Promise<LoadedPlans | null> {
   const Purchases = configured ? load() : null;
   if (!Purchases) return null;
@@ -104,6 +119,7 @@ export async function loadStorePlans(): Promise<LoadedPlans | null> {
     const offerings = await Purchases.getOfferings();
     const packages = offerings.current?.availablePackages ?? [];
     if (packages.length === 0) return null;
+    void reportStoreOnce(packages[0].product.currencyCode);
     return { plans: groupPackages(packages), packages };
   } catch (err) {
     console.warn('offerings failed:', err);

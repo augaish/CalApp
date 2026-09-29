@@ -25,7 +25,6 @@ export default function RootLayout() {
   const language = useAppStore((s) => s.language);
   const profile = useAppStore((s) => s.profile);
   const account = useAppStore((s) => s.account);
-  const tutorialSeen = useAppStore((s) => s.tutorialSeen);
   const appearance = useAppStore((s) => s.appearance) ?? 'light';
   const theme = useTheme();
   const scheme = useSchemeName();
@@ -85,12 +84,10 @@ export default function RootLayout() {
         <Stack.Protected guard={!!account && !profile}>
           <Stack.Screen name="onboarding" />
         </Stack.Protected>
-        <Stack.Protected guard={!!account && !!profile && !tutorialSeen}>
-          <Stack.Screen name="welcome" />
-        </Stack.Protected>
-        <Stack.Protected guard={!!account && !!profile && !!tutorialSeen}>
+        <Stack.Protected guard={!!account && !!profile}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="scan" options={{ presentation: 'fullScreenModal' }} />
+          <Stack.Screen name="plan-welcome" options={{ presentation: 'fullScreenModal', gestureEnabled: false, animation: 'fade' }} />
           <Stack.Screen name="meal-result" options={{ presentation: 'modal' }} />
           <Stack.Screen name="gym-result" options={{ presentation: 'modal' }} />
           <Stack.Screen

@@ -112,7 +112,7 @@ await ctx.close();
 
 // ═══ B4 Tour across tabs ═══
 console.log('\n=== B4 Tour ===');
-({ ctx, page } = await open(base('en', { tourSeen: false }), '/'));
+({ ctx, page } = await open(base('en', { tourSeen: false, tourSnoozed: 2 }), '/'));
 b = await body(page);
 check('B4 banner offered on Overview', /Take the two-minute tour/.test(b));
 await page.getByText('Take the two-minute tour', { exact: false }).click(); await page.waitForTimeout(2200);

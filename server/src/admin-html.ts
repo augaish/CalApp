@@ -644,7 +644,7 @@ export const ADMIN_HTML = `<!doctype html>
       html += '<tr>' +
         '<td style="font-family:monospace">' + esc(u.ref) + '</td>' +
         '<td>' + (u.email ? esc(u.email) : '<span class="muted">guest</span>') + '</td>' +
-        '<td class="muted">' + (u.device ? esc(u.device) : '—') + '</td>' +
+        '<td class="muted">' + (u.device ? esc(u.device) : '—') + (u.storeCountry || u.storeCurrency ? '<div style="font-size:12px">Store: ' + esc([u.storeCountry, u.storeCurrency].filter(Boolean).join(' · ')) + '</div>' : '') + '</td>' +
         '<td><span class="pill ' + (isPro ? 'pro' : 'free') + '">' + esc(planLabel) + '</span>' + (isPro && u.planUntil ? '<div class="muted" style="font-size:12px;white-space:nowrap">until ' + fmtDate(u.planUntil) + '</div>' : '') + '</td>' +
         '<td class="muted">' + esc(u.planSource) + '</td>' +
         '<td>' + u.used + '</td>' +

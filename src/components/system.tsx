@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { SteakIcon } from '@/components/steak-icon';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { selectionHaptic } from '@/lib/feedback';
@@ -164,7 +165,8 @@ export function StatTile({
   width = 104,
   height = 108,
 }: {
-  icon: keyof typeof Ionicons.glyphMap;
+  /** An icon name, or 'steak' for protein (drawn, see steak-icon.tsx). */
+  icon: keyof typeof Ionicons.glyphMap | 'steak';
   value: string;
   label: string;
   color?: string;
@@ -179,7 +181,7 @@ export function StatTile({
       accessibilityLabel={`${value} ${label}`}
       style={{ width, minHeight: height, borderRadius: Radius.control, backgroundColor: theme.surfaceTint, alignItems: 'center', justifyContent: 'center', padding: 8, gap: 2 }}
     >
-      <Icon name={icon} size={20} color={ink} />
+      {icon === 'steak' ? <SteakIcon size={22} color={ink} /> : <Icon name={icon} size={20} color={ink} />}
       <Text maxFontSizeMultiplier={1.3} style={{ color: theme.text, fontSize: 22, fontWeight: '800', fontVariant: ['tabular-nums'] }} numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>

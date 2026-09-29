@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { MonthYearGrid } from '@/components/date-picker';
 import { Icon } from '@/components/icon';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -39,6 +40,8 @@ export default function Calendar() {
   const workouts = useAppStore((s) => s.workouts);
   const meals = useAppStore((s) => s.meals);
   const [month, setMonth] = useState<Date>(startOfMonth(day));
+  // Tapping the title: years, then months, then back to days.
+  const [mode, setMode] = useState<'day' | 'year' | 'month'>('day');
 
   // Days that have activity, for the calendar dots.
   const workoutDays = useMemo(() => new Set(workouts.map((w) => dayKey(w.at))), [workouts]);
@@ -82,17 +85,27 @@ export default function Calendar() {
         <View style={[styles.handle, { backgroundColor: theme.border }]} />
 
         <View style={styles.monthRow}>
-          <Pressable accessibilityRole="button" accessibilityLabel={t('calendar.previousMonth')} onPress={() => changeMonth(-1)} hitSlop={10} style={styles.monthArrow}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('calendar.previousMonth')} onPress={() => changeMonth(-1)} hitSlop={10} disabled={mode !== 'day'} accessibilityElementsHidden={mode !== 'day'} style={[styles.monthArrow, mode !== 'day' && { opacity: 0 }]}>
             <Icon name="chevron-back" size={22} color={theme.text} />
           </Pressable>
-          <Text style={[styles.monthLabel, { color: theme.text }]}>
-            {month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
-          </Text>
+          <Pressable
+            onPress={() => setMode(mode === 'day' ? 'year' : 'day')}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={t('calendar.chooseYear')}
+            style={styles.titleBtn}
+          >
+            <Text style={[styles.monthLabel, { color: mode === 'day' ? theme.text : theme.primary }]}>
+              {mode === 'year' ? String(month.getFullYear()) : month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
+            </Text>
+            <Icon name={mode === 'day' ? 'chevron-down' : 'chevron-up'} size={16} color={theme.primary} />
+          </Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel={t('calendar.nextMonth')}
             onPress={() => changeMonth(1)}
             hitSlop={10}
-            disabled={nextMonthInFuture}
-            style={styles.monthArrow}
+            disabled={nextMonthInFuture || mode !== 'day'}
+            accessibilityElementsHidden={mode !== 'day'}
+            style={[styles.monthArrow, mode !== 'day' && { opacity: 0 }]}
           >
             <Icon
               name="chevron-forward"
@@ -102,6 +115,23 @@ export default function Calendar() {
           </Pressable>
         </View>
 
+        {mode !== 'day' ? (
+          <MonthYearGrid
+            mode={mode}
+            value={month}
+            max={today}
+            locale={locale}
+            onYear={(y) => {
+              setMonth(new Date(y, Math.min(month.getMonth(), y === today.getFullYear() ? today.getMonth() : 11), 1));
+              setMode('month');
+            }}
+            onMonth={(m) => {
+              setMonth(new Date(month.getFullYear(), m, 1));
+              setMode('day');
+            }}
+          />
+        ) : (
+          <>
         <View style={styles.weekdayRow}>
           {weekdayLabels.map((w, i) => (
             <Text maxFontSizeMultiplier={1.2} key={i} style={[styles.weekday, { color: theme.textTertiary }]}>
@@ -173,6 +203,8 @@ export default function Calendar() {
             );
           })}
         </View>
+          </>
+        )}
       </View>
     </View>
   );
@@ -197,6 +229,7 @@ const styles = StyleSheet.create({
   },
   monthArrow: { padding: 4 },
   monthLabel: { fontSize: 17, fontWeight: '700' },
+  titleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
   weekdayRow: { flexDirection: 'row', marginBottom: Spacing.sm },
   weekday: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600' },
   legendRow: { flexDirection: 'row', justifyContent: 'center', gap: Spacing.lg, marginBottom: Spacing.sm },

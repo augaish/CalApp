@@ -147,10 +147,47 @@ export const en = {
       },
     },
   },
+  planWelcome: {
+    title: "You're in! 🎉",
+    titleName: "You're in, {{name}}! 🎉",
+    leadTrial: 'Your {{days}} free days include everything in Pro.',
+    leadPro: 'Food, training and your coach, all in one place.',
+    leadProPlus: 'Everything in Pro, plus our most accurate analysis.',
+    leadFood: 'Everything you need to eat well, in one place.',
+    leadTraining: 'Everything you need to train well, in one place.',
+    row: {
+      snap: 'Snap a meal, get the macros',
+      train: 'Your plan, rest timer and records',
+      coach: 'Ask your coach anything',
+      recipes: 'Recipes, meal plans and your shopping list',
+      health: 'Weight, water and body readings',
+      records: 'History and personal records',
+      accuracy: 'Highest-accuracy meal analysis',
+      memory: 'A coach that remembers your files',
+    },
+    motto: {
+      '0': '“Small steps, every day. Let’s make today count.”',
+      '1': '“Consistency beats intensity. You’ve got this.”',
+      '2': '“The best time to start was yesterday. The next best is now.”',
+      '3': '“Progress, not perfection.”',
+      '4': '“Your future self will thank you for today.”',
+    },
+    trialNote: 'We’ll remind you 2 days before the trial ends.',
+    go: 'Let’s go',
+    nudgeTitle: 'Day 1 of {{plan}} 💪',
+    nudge: {
+      pro: 'Start with your first meal scan 📸: tap + and take a photo.',
+      food: 'Log breakfast with a photo. It takes seconds 📸',
+      training: 'Open Training and start today’s workout 🏋️',
+    },
+  },
   tour: {
     banner: 'New here? Take the two-minute tour',
     replay: 'Replay tour',
     tryIt: 'Try it',
+    skipForNow: 'Skip for now',
+    dontShowAgain: "Don't show again",
+    whereLater: 'Take the tour anytime: Profile → Help & feedback → Replay tour',
     steps: {
       'overview.steps': {
         title: 'Your next steps',
@@ -1845,6 +1882,7 @@ export const en = {
   calendar: {
     previousMonth: 'Previous month',
     nextMonth: 'Next month',
+    chooseYear: 'Choose month and year',
   },
   appearance: {
     title: 'Appearance',

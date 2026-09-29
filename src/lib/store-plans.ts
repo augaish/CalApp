@@ -161,3 +161,23 @@ export function replacementFor(oldId: string, newId: string): 'CHARGE_PRORATED_P
   if (rank(newId) > rank(oldId) && yearly(newId) === yearly(oldId)) return 'CHARGE_PRORATED_PRICE';
   return 'WITH_TIME_PRORATION';
 }
+
+/**
+ * An amount we work out ourselves (a yearly price per month, the difference
+ * to Pro) in the store's currency, written the way the app's language writes
+ * money — "12.50 SAR" becomes "12.50 ر.س." in Arabic and "SAR 12.50" in
+ * English — instead of a bare currency code. The store's own prices keep the
+ * store's own text (priceString).
+ */
+export function formatMoney(amount: number, currency: string, lang: 'en' | 'ar'): string {
+  try {
+    return new Intl.NumberFormat(lang === 'ar' ? 'ar' : 'en', {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  } catch {
+    return `${amount.toFixed(2)} ${currency}`;
+  }
+}

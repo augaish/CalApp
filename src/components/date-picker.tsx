@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { Radius, Spacing } from '@/constants/theme';
@@ -26,6 +26,7 @@ export function DatePickerModal({
   onChange,
   onClose,
   maxDate,
+  startWith = 'day',
 }: {
   visible: boolean;
   value: Date;
@@ -33,12 +34,26 @@ export function DatePickerModal({
   onClose: () => void;
   /** Defaults to today — a body reading can't be dated in the future. */
   maxDate?: Date;
+  /** 'year' for a date years back (a birth date): years, then months, then days. */
+  startWith?: 'day' | 'year';
 }) {
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const locale = i18n.language === 'ar' ? 'ar' : 'en';
   const [month, setMonth] = useState(() => startOfMonth(value));
+  // Tapping the title steps back: days → years → months → days.
+  const [mode, setMode] = useState<'day' | 'year' | 'month'>(startWith);
   const max = maxDate ?? new Date();
+  // Each opening starts from the current value, in the starting view
+  // (adjusted during render when `visible` flips, not in an effect).
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setMonth(startOfMonth(value));
+      setMode(startWith);
+    }
+  }
 
   const firstWeekday = month.getDay();
   const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -73,18 +88,34 @@ export function DatePickerModal({
             <Pressable
               onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
               hitSlop={10}
+              disabled={mode !== 'day'}
+              style={mode !== 'day' && styles.hidden}
+              accessibilityElementsHidden={mode !== 'day'}
               accessibilityRole="button"
               accessibilityLabel={t('calendar.previousMonth')}
             >
               <Icon name="chevron-back" size={22} color={theme.text} />
             </Pressable>
-            <Text style={[styles.monthLabel, { color: theme.text }]}>
-              {month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
-            </Text>
+            <Pressable
+              onPress={() => setMode(mode === 'day' ? 'year' : 'day')}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel={t('calendar.chooseYear')}
+              style={styles.titleBtn}
+            >
+              <Text style={[styles.monthLabel, { color: mode === 'day' ? theme.text : theme.primary }]}>
+                {mode === 'year'
+                  ? String(month.getFullYear())
+                  : month.toLocaleDateString(locale, { month: 'long', year: 'numeric' })}
+              </Text>
+              <Icon name={mode === 'day' ? 'chevron-down' : 'chevron-up'} size={16} color={theme.primary} />
+            </Pressable>
             <Pressable
               onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
               hitSlop={10}
-              disabled={nextMonthInFuture}
+              disabled={nextMonthInFuture || mode !== 'day'}
+              style={mode !== 'day' && styles.hidden}
+              accessibilityElementsHidden={mode !== 'day'}
               accessibilityRole="button"
               accessibilityLabel={t('calendar.nextMonth')}
             >
@@ -96,6 +127,23 @@ export function DatePickerModal({
             </Pressable>
           </View>
 
+          {mode !== 'day' ? (
+            <MonthYearGrid
+              mode={mode}
+              value={month}
+              max={max}
+              locale={locale}
+              onYear={(y) => {
+                setMonth(new Date(y, Math.min(month.getMonth(), y === max.getFullYear() ? max.getMonth() : 11), 1));
+                setMode('month');
+              }}
+              onMonth={(m) => {
+                setMonth(new Date(month.getFullYear(), m, 1));
+                setMode('day');
+              }}
+            />
+          ) : (
+          <>
           <View style={styles.weekdayRow}>
             {weekdayLabels.map((w, i) => (
               <Text key={i} style={[styles.weekday, { color: theme.textTertiary }]}>
@@ -140,9 +188,91 @@ export function DatePickerModal({
               );
             })}
           </View>
+          </>
+          )}
         </View>
       </View>
     </Modal>
+  );
+}
+
+/**
+ * Years (newest first, back to 100 years before the limit), or the twelve
+ * months of the shown year: the quick way to a date far from today, used by
+ * the date picker and the day calendar. Anything after `max` is disabled.
+ */
+export function MonthYearGrid({
+  mode,
+  value,
+  max,
+  locale,
+  onYear,
+  onMonth,
+}: {
+  mode: 'year' | 'month';
+  value: Date;
+  max: Date;
+  locale: string;
+  onYear: (year: number) => void;
+  onMonth: (month: number) => void;
+}) {
+  const theme = useTheme();
+  const scrolled = useRef(false);
+  const cell = (label: string, selected: boolean, disabled: boolean, onPress: () => void, key: string | number, a11y?: string) => (
+    <Pressable
+      key={key}
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={a11y ?? label}
+      accessibilityState={{ selected, disabled }}
+      style={styles.pickCell}
+    >
+      <View style={[styles.pickPill, selected && { backgroundColor: theme.primary }]}>
+        <Text
+          maxFontSizeMultiplier={1.2}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          style={{ color: selected ? theme.onPrimary : disabled ? theme.textTertiary : theme.text, fontWeight: selected ? '700' : '500', fontSize: 16 }}
+        >
+          {label}
+        </Text>
+      </View>
+    </Pressable>
+  );
+
+  if (mode === 'month') {
+    return (
+      <View style={styles.monthGrid}>
+        {Array.from({ length: 12 }, (_, m) => {
+          const d = new Date(value.getFullYear(), m, 1);
+          const future = d.getTime() > max.getTime();
+          return cell(d.toLocaleDateString(locale, { month: 'short' }), m === value.getMonth(), future, () => onMonth(m), m, d.toLocaleDateString(locale, { month: 'long', year: 'numeric' }));
+        })}
+      </View>
+    );
+  }
+
+  const top = max.getFullYear();
+  const years = Array.from({ length: 101 }, (_, i) => top - i);
+  // Rows of 4, 52pt tall: open with the chosen year in the middle of the view.
+  const row = Math.floor(years.indexOf(value.getFullYear()) / 4);
+  const offset = Math.max(0, (row - 2) * 52);
+  return (
+    <ScrollView
+      ref={(sv) => {
+        if (sv && !scrolled.current) {
+          scrolled.current = true;
+          requestAnimationFrame(() => sv.scrollTo({ y: offset, animated: false }));
+        }
+      }}
+      style={{ maxHeight: 300 }}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.yearGrid}>
+        {years.map((y) => cell(String(y), y === value.getFullYear(), false, () => onYear(y), y))}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -165,6 +295,12 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
   },
   monthLabel: { fontSize: 17, fontWeight: '700' },
+  hidden: { opacity: 0 },
+  titleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4 },
+  monthGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingVertical: Spacing.sm },
+  yearGrid: { flexDirection: 'row', flexWrap: 'wrap' },
+  pickCell: { width: '25%', height: 52, alignItems: 'center', justifyContent: 'center' },
+  pickPill: { minWidth: 64, height: 40, paddingHorizontal: 10, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
   weekdayRow: { flexDirection: 'row', marginBottom: Spacing.sm },
   weekday: { flex: 1, textAlign: 'center', fontSize: 12, fontWeight: '600' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },

@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Platform } from 'react-native';
@@ -33,6 +34,7 @@ function shortDate(iso: string): string {
  */
 export function useStoreOffer(reason?: string) {
   const { t } = useTranslation();
+  const router = useRouter();
   const plan = useEntitlement((s) => s.plan);
   const locks = useEntitlement((s) => s.locks);
   const module = useEntitlement((s) => s.module);
@@ -108,6 +110,8 @@ export function useStoreOffer(reason?: string) {
     // From Pro to Essentials is a downgrade: both stores apply it when the
     // current period (or free trial) ends, and keep everything until then.
     const downgrade = choice !== 'both' && (plan === 'pro' || plan === 'proPlus');
+    const tierBought: PaidTier = choice === 'both' ? 'pro' : 'essentials';
+    const trialDays = trialDaysFor(tierBought) ?? 0;
     const out = await purchase(selectedPkg);
     setBusy(null);
     if (out.kind === 'purchased' && downgrade) {
@@ -119,10 +123,12 @@ export function useStoreOffer(reason?: string) {
         [{ text: t('common.done'), onPress: onDone }],
       );
     } else if (out.kind === 'purchased') {
-      const name = choice === 'both' ? t('plans.name.pro') : t(`plans.name.essentials_${choice}`);
-      Alert.alert(t('upgrade.purchaseDoneTitle'), t('upgrade.purchaseDone', { plan: name }), [
-        { text: t('common.done'), onPress: onDone },
-      ]);
+      // The welcome moment, in place of a plain "Thank you" alert.
+      onDone();
+      setTimeout(
+        () => router.push({ pathname: '/plan-welcome', params: { tier: tierBought, focus: choice, trial: String(trialDays) } }),
+        350,
+      );
     } else if (out.kind === 'pending') {
       Alert.alert(t('upgrade.pendingTitle'), t('upgrade.purchasePending'));
     } else if (out.kind === 'failed') {

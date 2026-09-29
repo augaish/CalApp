@@ -12,8 +12,9 @@ const free = { free: true, tourDone: true, busy: false };
 
 // A new person.
 let s = initialPromptState(false, t0);
-check('new: nothing before the tour is done', promptDue(s, { ...free, tourDone: false }, t0) === null);
-check('new: the intro right after the tour', promptDue(s, free, t0) === 'intro');
+check('new: the intro comes first, before the tour', promptDue(s, { ...free, tourDone: false }, t0) === 'intro');
+check('new: the intro also after the tour', promptDue(s, free, t0) === 'intro');
+check('after the intro, nothing weekly until the tour is done', promptDue(markShown(s, t0), { ...free, tourDone: false }, new Date(t0.getTime() + 30 * 86400000)) === null);
 check('never mid-workout or off a tab', promptDue(s, { ...free, busy: true }, t0) === null);
 check('never to a member', promptDue(s, { ...free, free: false }, t0) === null);
 s = markShown(s, t0);

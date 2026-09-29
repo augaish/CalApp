@@ -13,6 +13,7 @@ import { useCelebrate } from '@/lib/celebrate';
 export function Celebration() {
   const message = useCelebrate((s) => s.message);
   const clear = useCelebrate((s) => s.clear);
+  const hold = useCelebrate((s) => s.hold);
   const theme = useTheme();
   const [anim] = useState(() => new Animated.Value(0));
   // Reduce Motion: the toast fades in place instead of springing down.
@@ -32,14 +33,14 @@ export function Celebration() {
       reduceMotion
         ? Animated.timing(anim, { toValue: 1, duration: 150, useNativeDriver: true })
         : Animated.spring(anim, { toValue: 1, useNativeDriver: true, friction: 7, tension: 80 }),
-      Animated.delay(reduceMotion ? 1800 : 1300),
+      Animated.delay(hold ?? (reduceMotion ? 1800 : 1300)),
       Animated.timing(anim, { toValue: 0, duration: 250, useNativeDriver: true }),
     ]);
     run.start(({ finished }) => {
       if (finished) clear();
     });
     return () => run.stop();
-  }, [message, anim, clear, reduceMotion]);
+  }, [message, anim, clear, reduceMotion, hold]);
 
   if (!message) return null;
 
@@ -64,6 +65,8 @@ export function Celebration() {
 const styles = StyleSheet.create({
   wrap: { position: 'absolute', top: 64, left: 0, right: 0, alignItems: 'center', zIndex: 1000 },
   pill: {
+    maxWidth: 340,
+    textAlign: 'center',
     fontSize: 15,
     fontWeight: '800',
     overflow: 'hidden',

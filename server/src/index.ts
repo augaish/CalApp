@@ -64,6 +64,7 @@ import {
   setSetting,
   setUserDevice,
   setUserEmail,
+  setUserStore,
   refsForEmail,
   setUserPlan,
   setUserModule,
@@ -2061,6 +2062,25 @@ app.post('/api/billing/sync', async (c) => {
  * service-role key on this server for the sake of one column. Guests never
  * call it.
  */
+/**
+ * Which store country the app is served from and the currency its prices came
+ * in, reported by the app after it loads the store's plans. Admin-only
+ * information: where people are, and whether the store's prices match.
+ */
+app.post('/api/storefront', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ error: 'identify_required' }, 401);
+  const body = await c.req.json<{ country?: string; currency?: string }>().catch(() => ({}) as never);
+  const code = (v: unknown, len: number) => (typeof v === 'string' && /^[A-Za-z]{2,3}$/.test(v.trim()) ? v.trim().toUpperCase().slice(0, len) : null);
+  try {
+    await setUserStore(ref, code(body?.country, 3), code(body?.currency, 3));
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('storefront failed:', err);
+    return c.json({ error: 'storefront_failed' }, 500);
+  }
+});
+
 app.post('/api/identify', async (c) => {
   const ref = await callerRef(c);
   if (!ref) return c.json({ error: 'identify_required' }, 401);

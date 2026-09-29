@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useEntitlement } from '@/lib/entitlement';
 import { useAppStore } from '@/lib/store';
 import type { Choice } from '@/lib/plan-gates';
-import { annualSaving } from '@/lib/store-plans';
+import { annualSaving, formatMoney } from '@/lib/store-plans';
 import type { useStoreOffer } from '@/lib/use-store-offer';
 
 type Offer = ReturnType<typeof useStoreOffer>;
@@ -47,7 +47,8 @@ function useFallbackPrices() {
  * difference in price.
  */
 export function PlanPicker({ offer }: { offer: Offer }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const lang = i18n.language === 'ar' ? 'ar' : 'en';
   const theme = useTheme();
   const fb = useFallbackPrices();
   const { plans, choice, setChoice, tier, priceFor, trialDaysFor, hasAnnual, period, setPeriod } = offer;
@@ -56,7 +57,7 @@ export function PlanPicker({ offer }: { offer: Offer }) {
   // A yearly price also said per month ("= 12.50 SAR / month"), from the
   // store's own figure, so the saving is concrete next to the monthly plan.
   const yearlyPkg = plans && period === 'annual' ? plans[tier].annual : undefined;
-  const perMonth = yearlyPkg ? `${(yearlyPkg.product.price / 12).toFixed(2)} ${yearlyPkg.product.currencyCode}` : null;
+  const perMonth = yearlyPkg ? formatMoney(yearlyPkg.product.price / 12, yearlyPkg.product.currencyCode, lang) : null;
   const trial = trialDaysFor(tier);
   const monthly = tier === 'pro' ? fb.pro : fb.essentials;
   const yearly = tier === 'pro' ? fb.proYearly : fb.essentialsYearly;
@@ -66,8 +67,8 @@ export function PlanPicker({ offer }: { offer: Offer }) {
   const essM = plans?.essentials.monthly?.product;
   const proM = plans?.pro.monthly?.product;
   const diff = essM && proM && essM.currencyCode === proM.currencyCode
-    ? `${(proM.price - essM.price).toFixed(2)} ${proM.currencyCode}`
-    : `${(fb.pro - fb.essentials).toFixed(2)} ${fb.currency}`;
+    ? formatMoney(proM.price - essM.price, proM.currencyCode, lang)
+    : formatMoney(fb.pro - fb.essentials, fb.currency, lang);
 
   return (
     <View>

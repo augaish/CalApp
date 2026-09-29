@@ -79,10 +79,10 @@ export default function EditProfile() {
       <Title close>{t('editProfile.title')}</Title>
       <View style={styles.row}>
         <View style={styles.flex}>
-          <OptionRow label={t('onboarding.male')} selected={sex === 'male'} onPress={() => setSex('male')} />
+          <OptionRow stacked emoji="👨" label={t('onboarding.male')} selected={sex === 'male'} onPress={() => setSex('male')} />
         </View>
         <View style={styles.flex}>
-          <OptionRow label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
+          <OptionRow stacked emoji="👩" label={t('onboarding.female')} selected={sex === 'female'} onPress={() => setSex('female')} />
         </View>
       </View>
       <View>
@@ -103,6 +103,7 @@ export default function EditProfile() {
         visible={showBirthDatePicker}
         value={birthDate ? new Date(birthDate) : new Date(new Date().setFullYear(new Date().getFullYear() - 25))}
         maxDate={new Date()}
+        startWith={birthDate ? 'day' : 'year'}
         onChange={(d) => setBirthDate(ymd(d))}
         onClose={() => setShowBirthDatePicker(false)}
       />

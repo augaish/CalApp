@@ -47,6 +47,8 @@ export const TOUR_STEPS: TourStepDef[] = [
 
 interface TourState {
   active: boolean;
+  /** Started by itself for someone new: offers "Skip for now" / "Don't show again". */
+  auto: boolean;
   step: number;
   /** True while a "Try it" excursion is open; the overlay hides and resumes on return. */
   paused: boolean;
@@ -54,7 +56,7 @@ interface TourState {
    * moment of leaving, when the pathname is still a tab) is what resumes. */
   away: boolean;
   rects: Partial<Record<TourTargetKey, TourRect>>;
-  start: () => void;
+  start: (auto?: boolean) => void;
   stop: () => void;
   next: () => void;
   pause: () => void;
@@ -65,12 +67,13 @@ interface TourState {
 
 export const useTour = create<TourState>((set) => ({
   active: false,
+  auto: false,
   step: 0,
   paused: false,
   away: false,
   rects: {},
-  start: () => set({ active: true, step: 0, paused: false, away: false, rects: {} }),
-  stop: () => set({ active: false, step: 0, paused: false, away: false, rects: {} }),
+  start: (auto = false) => set({ active: true, auto, step: 0, paused: false, away: false, rects: {} }),
+  stop: () => set({ active: false, auto: false, step: 0, paused: false, away: false, rects: {} }),
   next: () => set((s) => ({ step: Math.min(s.step + 1, TOUR_STEPS.length - 1) })),
   pause: () => set({ paused: true, away: false }),
   markAway: () => set({ away: true }),

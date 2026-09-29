@@ -23,6 +23,8 @@ export const Colors = {
     warning: '#C77D2E',
     success: '#2E9E5C',
     protein: '#3B82F6',
+    /** The protein tile's steak. */
+    steak: '#C4473D',
     carbs: '#C27A12',
     fat: '#C46FB0',
     shadow: '#3A2D5C',
@@ -55,6 +57,7 @@ export const Colors = {
     warning: '#FBBF24',
     success: '#4ADE80',
     protein: '#6BA3F5',
+    steak: '#F07C74',
     carbs: '#FBBF24',
     fat: '#DB8CCB',
     shadow: '#000000',
