@@ -415,7 +415,9 @@ In the TestFlight build, **signed in with a second Calgym account** (for example
 ## Step 17 🏦 Submit for review
 1. Your app → **1.0 Prepare for Submission**:
    - **Build → +:** choose **build 19** (or a newer one if we make it). Not 18.
-   - **In-App Purchases and Subscriptions → +:** tick the four sold products (Essentials Monthly and Yearly, Pro Monthly and Yearly). Not Pro+.
+   - **In-App Purchases and Subscriptions** (a section on this same version page, under Build; not the Monetization menu): **Select In-App Purchases or Subscriptions** → tick Essentials Monthly and Yearly, Pro Monthly and Yearly → **Done**. Leave Pro+ unticked.
+     - Don't create anything under **Monetization → In-App Purchases**: that page is for one-off purchases. Your six subscriptions already exist under Monetization → Subscriptions.
+     - The section only appears once the subscriptions are **Ready to Submit** (price, localization and review screenshot filled in). If it's missing, open each subscription and check what it still needs.
 2. **Add for Review** (top right) → **Submit to App Review**.
 3. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
 
