@@ -55,7 +55,7 @@ const tabs = await page.$$eval('a[role="tab"], [role="tab"]', (els) => els.map((
 check('five destinations: Overview Training Add Food Health', /Overview/.test(b) && /Training/.test(b) && /Food/.test(b) && /Health/.test(b), tabs.join(' | '));
 check('  AI Support is off the bar', !tabs.some((x) => /AI Support/.test(x)), tabs.join(' | '));
 check('  and reachable from the Overview header', /AI Support/.test(b));
-await page.getByText('AI Support', { exact: true }).first().click(); await page.waitForTimeout(1500);
+await page.getByRole('button', { name: 'AI Support' }).first().click(); await page.waitForTimeout(1500);
 check('  it opens as its own route', /\/coach/.test(page.url()), page.url().replace(BASE, ''));
 b = await body(page);
 check('  with the AI label kept', /AI Support/.test(b));

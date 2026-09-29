@@ -110,7 +110,7 @@ export function BrandRow({
   return (
     <View style={[styles.row, compact && { minHeight: 40 }]} onLayout={measure('row')}>
       {/* Invisible copies, only to know how wide the full name and label are. */}
-      <View style={styles.measure} pointerEvents="none" accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      <View style={styles.measure} pointerEvents="none" aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
         <Text maxFontSizeMultiplier={1.3} style={[styles.brand, compact && { fontSize: 18 }]} onLayout={measure('title')}>
           {title}
         </Text>
