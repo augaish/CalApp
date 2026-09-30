@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { PortionControl } from '@/components/portion-control';
 import { RefineBox } from '@/components/refine-box';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -14,16 +15,9 @@ import { successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { normalizeDigits } from '@/lib/numbers';
 import { useAppStore } from '@/lib/store';
-import { incompleteFlags, itemUnknownNutrients, portionText } from '@/lib/recipes';
+import { withMacroEdit } from '@/lib/portion';
+import { incompleteFlags, itemUnknownNutrients } from '@/lib/recipes';
 import type { FoodItem, MealAnalysis, MealType } from '@/lib/types';
-
-const PORTIONS: { m: number; label: string }[] = [
-  { m: 0.25, label: '¼' },
-  { m: 0.5, label: '½' },
-  { m: 1, label: '1' },
-  { m: 1.5, label: '1½' },
-  { m: 2, label: '2' },
-];
 
 function sameDay(a: Date, b: Date): boolean {
   return (
@@ -58,17 +52,6 @@ export default function MealEdit() {
   const [items, setItems] = useState<FoodItem[]>(() => (meal ? meal.items.map((i) => ({ ...i })) : []));
   const [mealType, setMealType] = useState<MealType>(meal?.mealType ?? 'snack');
   const [day, setDay] = useState<Date>(() => (meal ? new Date(meal.at) : new Date()));
-  // Baseline macros captured at open (treated as the ×1 portion), so portion
-  // scaling works on any saved record — not just freshly-scanned ones.
-  const [baseSnap, setBaseSnap] = useState(() =>
-    (meal ? meal.items : []).map((i) => ({
-      calories: i.calories,
-      proteinG: i.proteinG,
-      carbsG: i.carbsG,
-      fatG: i.fatG,
-    })),
-  );
-  const [mults, setMults] = useState<number[]>(() => (meal ? meal.items.map((i) => i.portionMultiplier ?? 1) : []));
   const [sharing, setSharing] = useState(false);
 
   if (!meal) {
@@ -85,61 +68,24 @@ export default function MealEdit() {
     setItems((prev) =>
       prev.map((item, i) => {
         if (i !== index) return item;
-        const next = { ...item, ...patch };
-        // Editing a macro by hand breaks the auto-scale link — and a value
-        // the person typed is known from then on, while the untouched
-        // unknowns stay unknown.
+        // A macro typed by hand becomes this portion's figure (the portion
+        // still scales it) — and a value the person typed is known from then
+        // on, while the untouched unknowns stay unknown.
         if ('calories' in patch || 'proteinG' in patch || 'carbsG' in patch || 'fatG' in patch) {
-          delete next.basePer100;
-          delete next.portionMultiplier;
+          const next = { ...withMacroEdit(item, macroPatch(patch)), ...patch };
           const stillUnknown = itemUnknownNutrients(item).filter((k) => !(k in patch));
           delete next.nutritionIncomplete;
           delete next.incompleteNutrients;
           Object.assign(next, incompleteFlags(stillUnknown));
+          return next;
         }
-        return next;
+        return { ...item, ...patch };
       }),
     );
   };
 
-  // Portion multiplier for AI/manual items — scales from the opened baseline.
-  const setPortion = (index: number, m: number) => {
-    const b = baseSnap[index];
-    if (!b) return;
-    setMults((prev) => prev.map((v, i) => (i === index ? m : v)));
-    setItems((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              portionMultiplier: m,
-              calories: Math.round(b.calories * m),
-              proteinG: Math.round(b.proteinG * m),
-              carbsG: Math.round(b.carbsG * m),
-              fatG: Math.round(b.fatG * m),
-            }
-          : item,
-      ),
-    );
-  };
-
-  // Grams-based scaling for barcode / packaged records.
-  const setGrams = (index: number, grams: number) => {
-    setItems((prev) =>
-      prev.map((item, i) => {
-        if (i !== index || !item.basePer100) return item;
-        const f = grams / 100;
-        return {
-          ...item,
-          gramsEaten: grams,
-          portion: `${Math.round(grams)} g`,
-          calories: Math.round(item.basePer100.calories * f),
-          proteinG: Math.round(item.basePer100.proteinG * f),
-          carbsG: Math.round(item.basePer100.carbsG * f),
-          fatG: Math.round(item.basePer100.fatG * f),
-        };
-      }),
-    );
+  const replaceItem = (index: number, next: FoodItem) => {
+    setItems((prev) => prev.map((item, i) => (i === index ? next : item)));
   };
 
   /**
@@ -149,7 +95,6 @@ export default function MealEdit() {
    */
   const removeItem = (index: number) => {
     setItems((prev) => prev.filter((_, i) => i !== index));
-    setMults((prev) => prev.filter((_, i) => i !== index));
   };
 
   const shiftDay = (delta: number) => {
@@ -194,19 +139,10 @@ export default function MealEdit() {
     finish(target, t('mealEdit.duplicated'));
   };
 
-  // A refine correction returns the whole item list fresh — it becomes the
-  // new ×1 baseline for portion scaling, same as reopening a different meal.
+  // A refine correction returns the whole item list fresh, each item one
+  // portion of what it describes.
   const applyRefine = (result: MealAnalysis) => {
     setItems(result.items.map((it) => ({ ...it })));
-    setBaseSnap(
-      result.items.map((it) => ({
-        calories: it.calories,
-        proteinG: it.proteinG,
-        carbsG: it.carbsG,
-        fatG: it.fatG,
-      })),
-    );
-    setMults(result.items.map(() => 1));
   };
 
   const total = items.reduce((sum, i) => sum + i.calories, 0);
@@ -323,7 +259,6 @@ export default function MealEdit() {
               onChangeText={(text) => updateItem(index, { name: text })}
               style={[styles.itemNameInput, { color: theme.text, borderColor: theme.border }]}
             />
-            <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{portionText(item, t)}</Text>
             <Pressable accessibilityRole="button" accessibilityLabel={t('common.remove')}
               onPress={() => removeItem(index)}
               hitSlop={10}
@@ -333,50 +268,13 @@ export default function MealEdit() {
             </Pressable>
           </View>
 
-          {item.basePer100 ? (
-            <View style={[styles.gramsRow, { backgroundColor: theme.cardSubtle }]}>
-              <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600', flex: 1 }}>
-                {t('mealResult.amountEaten')}
-              </Text>
-              <TextInput
-                defaultValue={String(Math.round(item.gramsEaten ?? 100))}
-                keyboardType="number-pad"
-                maxLength={4}
-                onChangeText={(text) => setGrams(index, parseInt(normalizeDigits(text), 10) || 0)}
-                style={[styles.gramsInput, { color: theme.text, borderColor: theme.border, backgroundColor: theme.background }]}
-              />
-              <Text style={{ color: theme.textSecondary, fontSize: 14 }}>{t('common.grams')}</Text>
-            </View>
-          ) : (
-            <View style={styles.portionRow}>
-              <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '600', marginEnd: 4 }}>
-                {t('mealResult.portion')}
-              </Text>
-              {PORTIONS.map(({ m, label }) => {
-                const active = Math.abs((mults[index] ?? 1) - m) < 0.001;
-                return (
-                  <Pressable accessibilityRole="button"
-                    key={m}
-                    onPress={() => setPortion(index, m)}
-                    style={[
-                      styles.portionChip,
-                      { borderColor: active ? theme.primary : theme.border, backgroundColor: active ? theme.primary : 'transparent' },
-                    ]}
-                  >
-                    <Text style={{ color: active ? '#fff' : theme.textSecondary, fontWeight: '700', fontSize: 13 }}>
-                      {label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+          <PortionControl item={item} onChange={(next) => replaceItem(index, next)} />
 
           <View style={styles.numRow}>
-            <NumBox key={`c${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('common.kcal')} value={item.calories} onChange={(v) => updateItem(index, { calories: v })} />
-            <NumBox key={`p${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('home.protein')} value={item.proteinG} onChange={(v) => updateItem(index, { proteinG: v })} />
-            <NumBox key={`ca${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('home.carbs')} value={item.carbsG} onChange={(v) => updateItem(index, { carbsG: v })} />
-            <NumBox key={`f${item.gramsEaten ?? ''}${mults[index] ?? ''}`} label={t('home.fat')} value={item.fatG} onChange={(v) => updateItem(index, { fatG: v })} />
+            <NumBox key={`c${portionKey(item)}`} label={t('common.kcal')} value={item.calories} onChange={(v) => updateItem(index, { calories: v })} />
+            <NumBox key={`p${portionKey(item)}`} label={t('home.protein')} value={item.proteinG} onChange={(v) => updateItem(index, { proteinG: v })} />
+            <NumBox key={`ca${portionKey(item)}`} label={t('home.carbs')} value={item.carbsG} onChange={(v) => updateItem(index, { carbsG: v })} />
+            <NumBox key={`f${portionKey(item)}`} label={t('home.fat')} value={item.fatG} onChange={(v) => updateItem(index, { fatG: v })} />
           </View>
         </Card>
       ))}
@@ -385,6 +283,16 @@ export default function MealEdit() {
     </Screen>
   );
 }
+
+/** Just the macros of a patch, leaving out the ones it does not set. */
+function macroPatch(patch: Partial<FoodItem>) {
+  const out: Partial<Pick<FoodItem, 'calories' | 'proteinG' | 'carbsG' | 'fatG'>> = {};
+  for (const k of ['calories', 'proteinG', 'carbsG', 'fatG'] as const) if (typeof patch[k] === 'number') out[k] = patch[k];
+  return out;
+}
+
+/** Changes whenever the portion does, so the macro boxes show the new figures. */
+const portionKey = (item: FoodItem) => `${item.portionMultiplier ?? ''}|${item.recipeServings ?? ''}|${item.gramsEaten ?? ''}`;
 
 function NumBox({
   label,
@@ -451,40 +359,6 @@ const styles = StyleSheet.create({
     flex: 1,
     borderBottomWidth: 1,
     paddingVertical: 4,
-  },
-  portionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: Spacing.sm,
-  },
-  portionChip: {
-    minWidth: 40,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: Radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  gramsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    borderRadius: Radius.sm,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 8,
-    marginBottom: Spacing.sm,
-  },
-  gramsInput: {
-    borderWidth: 1,
-    borderRadius: Radius.sm,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-    minWidth: 72,
   },
   numRow: { flexDirection: 'row', gap: Spacing.sm },
   numBox: { flex: 1 },

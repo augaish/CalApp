@@ -1,8 +1,9 @@
 import { timestampFor } from './day';
 import { findExercise, guessCategory, matchExerciseByName } from './exercises';
+import { withMacroEdit } from './portion';
 import { incompleteFlags, itemUnknownNutrients } from './recipes';
 import { useAppStore } from './store';
-import type { CoachAction } from './types';
+import type { CoachAction, FoodItem } from './types';
 
 /**
  * Apply one change AI Support proposed. Every path goes through the same
@@ -41,11 +42,16 @@ export function applyCoachAction(action: CoachAction): ApplyResult {
       const patch = action.patch;
       const next = previous.map((it, i) => {
         if (i !== action.itemIndex) return it;
-        const out = { ...it, ...patch };
-        // A macro set by hand breaks any scaling link, and becomes known.
-        if ('calories' in patch || 'proteinG' in patch || 'carbsG' in patch || 'fatG' in patch) {
-          delete out.basePer100;
+        const macros: Partial<Pick<FoodItem, 'calories' | 'proteinG' | 'carbsG' | 'fatG'>> = {};
+        for (const k of ['calories', 'proteinG', 'carbsG', 'fatG'] as const) if (typeof patch[k] === 'number') macros[k] = patch[k];
+        // A macro set by hand becomes that portion's figure, and becomes known.
+        const out = Object.keys(macros).length ? { ...withMacroEdit(it, macros), ...patch } : { ...it, ...patch };
+        // A new portion written out is the new "1".
+        if (typeof patch.portion === 'string') {
+          delete out.portionBase;
           delete out.portionMultiplier;
+        }
+        if ('calories' in patch || 'proteinG' in patch || 'carbsG' in patch || 'fatG' in patch) {
           const stillUnknown = itemUnknownNutrients(it).filter((k) => !(k in patch));
           delete out.nutritionIncomplete;
           delete out.incompleteNutrients;

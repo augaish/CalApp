@@ -43,6 +43,16 @@ export interface DailyTargets {
   fatG: number;
 }
 
+export interface PortionBase {
+  /** One portion as written when it was logged, e.g. "1 large plate (~400 g)". */
+  label: string;
+  /** Its weight or volume, when known. */
+  amount?: number;
+  unit?: 'g' | 'ml';
+  /** One portion's nutrition, unrounded. */
+  macros: { calories: number; proteinG: number; carbsG: number; fatG: number };
+}
+
 export interface FoodItem {
   /** Dish name in the user's language */
   name: string;
@@ -59,10 +69,13 @@ export interface FoodItem {
   basePer100?: { calories: number; proteinG: number; carbsG: number; fatG: number };
   /** Grams eaten — drives scaling when `basePer100` is present. */
   gramsEaten?: number;
-  /** The ¼/½/1/1½/2 portion chip chosen against the AI's own base estimate
-   * (non-barcode items only) — persisted so reopening a saved meal can show
-   * which chip was actually picked instead of always defaulting to "1". */
+  /** How many of `portionBase` were eaten (the ¼/½/1/1½/2 chips, or any
+   * amount typed in grams) — persisted so reopening a saved meal shows what
+   * was actually picked instead of always defaulting to "1". */
   portionMultiplier?: number;
+  /** What "1" is for this item, so portion changes always scale from one
+   * whole portion and never from macros already scaled. See lib/portion. */
+  portionBase?: PortionBase;
   /**
    * Where this came from, when it was cooked from a saved recipe. The macros
    * above stay a SNAPSHOT taken at the moment it was logged — editing the

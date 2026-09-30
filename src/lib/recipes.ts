@@ -1,4 +1,5 @@
 import type { FoodItem, NutrientKey, Recipe, RecipeIngredient } from './types';
+import { parsePortionAmount, portionLabelFor } from './portion';
 
 /**
  * Everything numeric about a recipe.
@@ -188,11 +189,18 @@ export const SERVING_STEPS = [0.25, 0.5, 0.75, 1, 1.5, 2] as const;
  * it was logged; anything else shows the portion as written.
  */
 export function portionText(
-  item: { portion?: string; recipeServings?: number },
+  item: { portion?: string; recipeServings?: number; portionMultiplier?: number; portionBase?: unknown },
   t: (key: string, values?: Record<string, unknown>) => string,
 ): string {
   const n = item.recipeServings;
   if (typeof n === 'number' && n > 0) return `${servingCountLabel(n)} ${t('recipe.servingUnit', { count: servingPluralCount(n) })}`;
+  // Saved before labels followed the portion: the text still describes one
+  // whole portion, so "½" of it is spelled out here.
+  const m = item.portionMultiplier;
+  if (!item.portionBase && item.portion && typeof m === 'number' && m > 0 && Math.abs(m - 1) > 1e-6) {
+    const amount = parsePortionAmount(item.portion);
+    return portionLabelFor({ label: item.portion, ...amount, macros: ZERO }, m);
+  }
   return item.portion ?? '';
 }
 
