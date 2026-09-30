@@ -564,7 +564,7 @@ The privacy policy now has a **WHOOP** section (English and Arabic) covering wha
 ## Step 30 ⬜ Brand check (WHOOP Design Guidelines)
 Nothing to change. Calgym writes "WHOOP" as plain text and doesn't use the WHOOP logo, so the logo rules don't apply. WHOOP figures are labelled as WHOOP's. If you ever add the WHOOP logo, use the official files unchanged, in black or white only, at least 100 px wide (30 px for the round icon).
 
-## Step 31 ⬜ Submit for approval
+## Step 31 ✅ Submit for approval (submitted 30 Sep 2026)
 1. In the dashboard, open the app and use **Submit for approval**. If you can't see the button, open WHOOP's **App Approval** page (developer.whoop.com → Docs → Developing → App Approval) and use the request link there.
 2. If it asks what the app does, paste this:
 
@@ -572,6 +572,7 @@ Nothing to change. Calgym writes "WHOOP" as plain text and doesn't use the WHOOP
 
 3. If they want to try it themselves: new Calgym users get a 14-day free trial that includes WHOOP. For longer access, give them a code from **admin → Codes**.
 4. Once approved there's nothing to change in the app. The limit lifts on WHOOP's side.
+5. **When Apple approves:** reply to WHOOP with the App Store link. Our form said it was coming.
 
 # Reference
 
