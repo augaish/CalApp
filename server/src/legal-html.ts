@@ -59,7 +59,11 @@ export const PRIVACY_HTML = page(
   <li><strong>Anthropic</strong> (Claude), United States, and</li>
   <li><strong>DeepSeek</strong>, China,</li>
 </ul>
-<p>depending on your plan and on which service is available. Each processes the content under its own API terms. We send only what is needed to answer — never your name or email — and our server does not keep your photos, reports or messages after the answer is returned. The providers may keep what they receive for a limited period under their own terms (for example, for safety and abuse monitoring). The app asks your permission before anything is sent to an AI provider for the first time, and you can withdraw it at any time in Profile → Privacy → AI processing. The AI coach also receives a short summary of your recent totals (calories, macros, workouts) so its answer can refer to your own data; it is used only for that reply.</p>
+<p>depending on your plan and on which service is available. Each processes the content under its own API terms. We send only what is needed to answer — never your name or email — and our server does not keep your photos, reports or messages after the answer is returned. The providers may keep what they receive for a limited period under their own terms (for example, for safety and abuse monitoring). The app asks your permission before anything is sent to an AI provider for the first time, and you can withdraw it at any time in Profile → Privacy → AI processing. The AI coach also receives a short summary of your recent totals (calories, macros, workouts) so its answer can refer to your own data; it is used only for that reply. You choose what it may see in Profile → Privacy → Manage shared context.</p>
+
+<h2>WHOOP</h2>
+<p>If you connect WHOOP, we read your WHOOP workouts, recovery, sleep and daily strain through WHOOP's official API, with the permission you give on WHOOP's own sign-in page. We use them to show calories burned and recovery in the app, and — only if you allow it — to give the AI coach context for its reply. WHOOP data sent to the coach goes only to Anthropic, never to DeepSeek, and is used only for that reply. We never sell WHOOP data, share it with anyone else, or use it to train AI models.</p>
+<p>Disconnecting WHOOP (Health → Connections, or Profile → Privacy → Connections) cancels our access at WHOOP, deletes our access tokens and removes WHOOP data from the app and your backup. Deleting your account does the same.</p>
 
 <h2>What our server keeps</h2>
 <ul>
@@ -67,7 +71,7 @@ export const PRIVACY_HTML = page(
   <li><strong>Your email address</strong>, if you create an account, with your plan — so we can recognise your account and help you if you contact support. Never used for marketing.</li>
   <li><strong>Your subscription status.</strong> Purchases are made and paid through Apple or Google; we never see card details. We use RevenueCat to confirm what you are subscribed to: it receives the installation or account ID and the store's purchase records.</li>
   <li><strong>Promotion and partner codes</strong> you redeem, and when. If a code belongs to one of our partners, they see only totals — how many used it and what it earned — never who you are.</li>
-  <li><strong>A WHOOP connection</strong>, only if you connect one: the access tokens needed to read your WHOOP workouts and calories. Disconnect any time in Connections; it is deleted with your account.</li>
+  <li><strong>A WHOOP connection</strong>, only if you connect one: the access tokens needed to read your WHOOP data (see WHOOP above). Our server does not store your WHOOP data itself. Disconnect any time in Connections; it is deleted with your account.</li>
   <li><strong>A workout plan you choose to share</strong>: exercises and target sets only, deleted after six months.</li>
 </ul>
 
@@ -128,7 +132,11 @@ export const PRIVACY_HTML = page(
   <li><strong>Anthropic</strong> ‏(Claude)، الولايات المتحدة، و</li>
   <li><strong>DeepSeek</strong>، الصين،</li>
 </ul>
-<p>بحسب باقتك والخدمة المتاحة، ويعالج كلٌّ منهما المحتوى وفق شروط واجهته البرمجية. نرسل فقط ما يلزم للإجابة — ولا نرسل اسمك أو بريدك أبداً — ولا يحتفظ خادمنا بصورك أو تقاريرك أو رسائلك بعد إرجاع الإجابة. وقد يحتفظ المزوّدون بما يصلهم لفترة محدودة وفق شروطهم (مثلاً لأغراض السلامة ومنع إساءة الاستخدام). يطلب التطبيق إذنك قبل إرسال أي شيء إلى مزوّد ذكاء اصطناعي أول مرة، ويمكنك سحب الإذن في أي وقت من الملف الشخصي ← الخصوصية ← المعالجة بالذكاء الاصطناعي. ويتلقى المدرب الذكي أيضاً ملخصاً قصيراً لإجمالياتك الأخيرة ليكون الرد مخصصاً لك، ويُستخدم لذلك الرد فقط.</p>
+<p>بحسب باقتك والخدمة المتاحة، ويعالج كلٌّ منهما المحتوى وفق شروط واجهته البرمجية. نرسل فقط ما يلزم للإجابة — ولا نرسل اسمك أو بريدك أبداً — ولا يحتفظ خادمنا بصورك أو تقاريرك أو رسائلك بعد إرجاع الإجابة. وقد يحتفظ المزوّدون بما يصلهم لفترة محدودة وفق شروطهم (مثلاً لأغراض السلامة ومنع إساءة الاستخدام). يطلب التطبيق إذنك قبل إرسال أي شيء إلى مزوّد ذكاء اصطناعي أول مرة، ويمكنك سحب الإذن في أي وقت من الملف الشخصي ← الخصوصية ← المعالجة بالذكاء الاصطناعي. ويتلقى المدرب الذكي أيضاً ملخصاً قصيراً لإجمالياتك الأخيرة (السعرات والعناصر الغذائية والتمارين) ليكون الرد مخصصاً لك، ويُستخدم لذلك الرد فقط. وتختار ما يمكنه رؤيته من الملف الشخصي ← الخصوصية ← إدارة السياق المشترك.</p>
+
+<h2>WHOOP</h2>
+<p>إذا ربطت WHOOP، نقرأ تمارينك والتعافي والنوم والإجهاد اليومي من WHOOP عبر واجهته البرمجية الرسمية، بالإذن الذي تمنحه في صفحة تسجيل الدخول الخاصة بـ WHOOP. نستخدمها لعرض السعرات المحروقة والتعافي في التطبيق، ولإعطاء المدرب الذكي سياقاً لرده فقط إذا سمحت بذلك. وما يُرسل من بيانات WHOOP إلى المدرب يذهب إلى Anthropic فقط، ولا يُرسل إلى DeepSeek أبداً، ويُستخدم لذلك الرد فقط. ولا نبيع بيانات WHOOP ولا نشاركها مع أي جهة أخرى ولا نستخدمها لتدريب نماذج الذكاء الاصطناعي.</p>
+<p>فصل WHOOP (الصحة ← الربط، أو الملف الشخصي ← الخصوصية ← الربط) يلغي وصولنا لدى WHOOP، ويحذف رموز الوصول، ويزيل بيانات WHOOP من التطبيق ومن نسختك الاحتياطية. وحذف حسابك يفعل الشيء نفسه.</p>
 
 <h2>ما يحفظه خادمنا</h2>
 <ul>
@@ -136,7 +144,7 @@ export const PRIVACY_HTML = page(
   <li><strong>بريدك الإلكتروني</strong> إذا أنشأت حساباً، مع باقتك، لنتعرّف على حسابك ونساعدك عند التواصل مع الدعم. لا يُستخدم للتسويق.</li>
   <li><strong>حالة اشتراكك:</strong> تتم المشتريات والدفع عبر Apple أو Google ولا نرى بيانات بطاقتك. ونستخدم RevenueCat للتحقق من اشتراكك، ويتلقى معرّف التثبيت أو الحساب وسجلات الشراء من المتجر.</li>
   <li><strong>أكواد العروض والشركاء</strong> التي تستخدمها ومتى. وإذا كان الكود لأحد شركائنا فلا يرى إلا الإجماليات — عدد من استخدموه وما حققه — ولا يعرف هويتك أبداً.</li>
-  <li><strong>ربط WHOOP</strong> إن اخترت ربطه فقط: رموز الوصول اللازمة لقراءة تمارينك وسعراتك من WHOOP. يمكنك فصله في أي وقت من صفحة الربط، ويُحذف مع حسابك.</li>
+  <li><strong>ربط WHOOP</strong> إن اخترت ربطه فقط: رموز الوصول اللازمة لقراءة بياناتك من WHOOP (انظر قسم WHOOP أعلاه). ولا يحفظ خادمنا بيانات WHOOP نفسها. يمكنك فصله في أي وقت من صفحة الربط، ويُحذف مع حسابك.</li>
   <li><strong>جدول تمرين تختار مشاركته:</strong> التمارين والمجموعات المستهدفة فقط، ويُحذف بعد ستة أشهر.</li>
 </ul>
 

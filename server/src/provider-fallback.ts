@@ -29,16 +29,20 @@ const defaultDeps = async (): Promise<FallbackDeps> => {
  *
  * Returns null when every AI that answered gave something unusable; rethrows
  * the last error when none answered at all.
+ *
+ * `fallback: false` keeps the request on `primary` alone — for data that
+ * may only go to one provider (WHOOP data goes to Anthropic only).
  */
 export async function withProviderFallback<T>(
   route: string,
   primary: AiProvider,
   run: Record<AiProvider, () => Promise<T | null | undefined>>,
   deps?: FallbackDeps,
+  opts?: { fallback?: boolean },
 ): Promise<T | null> {
   const { available, record } = deps ?? (await defaultDeps());
   const other: AiProvider = primary === 'deepseek' ? 'claude' : 'deepseek';
-  const order = [primary, ...(available(other) ? [other] : [])];
+  const order = [primary, ...(opts?.fallback !== false && available(other) ? [other] : [])];
   let lastErr: unknown = null;
   let answered = false;
   for (const provider of order) {

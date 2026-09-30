@@ -172,6 +172,30 @@ export async function getValidAccessToken(ref: string, force = false): Promise<s
 }
 
 /**
+ * Tells WHOOP to cancel this app's access for a person (WHOOP's "revoke user
+ * access" endpoint), so disconnecting really ends it at WHOOP instead of only
+ * forgetting our tokens. Best effort: a token that is already dead has
+ * nothing left to revoke, and the caller deletes our copy either way.
+ */
+export async function revokeWhoopAccess(ref: string): Promise<boolean> {
+  try {
+    const token = await getValidAccessToken(ref);
+    if (!token) return false;
+    const res = await fetch(`${API_BASE}/user/access`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok && res.status !== 401) {
+      console.warn(`whoop revoke failed for ${ref}:`, res.status, await res.text().catch(() => ''));
+    }
+    return res.ok;
+  } catch (err) {
+    console.warn(`whoop revoke failed for ${ref}:`, err);
+    return false;
+  }
+}
+
+/**
  * Thrown when WHOOP rejects the access token outright (401) — a much
  * stronger signal than "no data came back" that the connection itself is
  * dead (revoked from WHOOP's side, or simply expired despite our own
@@ -370,4 +394,18 @@ export async function fetchTodayStrain(accessToken: string): Promise<number | nu
 /** 1 kJ ≈ 0.239 kcal — WHOOP reports energy in kilojoules, everywhere else in this app is kcal. */
 export function kilojoulesToKcal(kj: number): number {
   return kj / 4.184;
+}
+
+/**
+ * Whether a request's context carries WHOOP data. WHOOP's API terms do not
+ * let its data go to third parties beyond what the person agreed to; our
+ * privacy policy promises it goes to Anthropic only — so such a request never
+ * runs on DeepSeek, not even as a fallback. The app marks WHOOP-derived
+ * figures with `wearableData`; the `whoop` block is checked too for older
+ * builds that send it without the flag.
+ */
+export function hasWearableData(context: unknown): boolean {
+  if (!context || typeof context !== 'object') return false;
+  const c = context as { whoop?: unknown; wearableData?: unknown };
+  return !!c.whoop || c.wearableData === true;
 }

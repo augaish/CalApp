@@ -5,3 +5,12 @@ export function setInstallId(id: string | null) { installId = id; }
 export function currentRef() { return installId; }
 export async function linkInstall(_id: string) { return true; }
 export async function identifyEmail(_email: string) {}
+/** WHOOP summary through global fetch, so a test can answer it. */
+export async function fetchWhoopSummary() {
+  try {
+    const res = await fetch(`${SERVER_URL}/api/whoop/summary`);
+    return res.ok ? await res.json() : null;
+  } catch {
+    return null;
+  }
+}

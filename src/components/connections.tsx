@@ -3,7 +3,7 @@ import { useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
@@ -12,6 +12,7 @@ import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { disconnectWhoop, fetchWhoopStatus, whoopAuthorizeUrl } from '@/lib/api';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
+import { useAppStore } from '@/lib/store';
 
 /**
  * A wearable or platform this app cannot connect to yet. Shown as a plain
@@ -91,6 +92,7 @@ export function WhoopConnectionRow() {
         const params = new URLSearchParams(result.url.split('?')[1] ?? '');
         if (params.get('status') === 'success') {
           successHaptic();
+          askCoachSharing();
         } else {
           alertProblem(t('profile.whoopConnectFailed'), params.get('reason') || undefined);
         }
@@ -99,6 +101,15 @@ export function WhoopConnectionRow() {
       setBusy(false);
       await refresh();
     }
+  };
+
+  // WHOOP data reaches AI Support only with an explicit yes, asked once per
+  // connection. "Not now" keeps it off; it can be changed in Manage shared context.
+  const askCoachSharing = () => {
+    Alert.alert(t('profile.whoopShareTitle'), t('profile.whoopShareBody'), [
+      { text: t('profile.whoopShareNo'), style: 'cancel', onPress: () => useAppStore.getState().setCoachShare({ wearable: false }) },
+      { text: t('profile.whoopShareYes'), onPress: () => useAppStore.getState().setCoachShare({ wearable: true }) },
+    ]);
   };
 
   const confirmDisconnect = () => {
@@ -113,6 +124,9 @@ export function WhoopConnectionRow() {
           setBusy(false);
           if (ok) {
             lightHaptic();
+            // WHOOP data may not be kept once access ends — off the phone,
+            // and so out of the backup on its next sync.
+            useAppStore.getState().clearWhoopData();
             await refresh();
           }
         },

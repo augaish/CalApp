@@ -33,6 +33,7 @@ import {
   createShareLink,
   deleteUser,
   deleteWhoopConnection,
+  whoopRefsFor,
   barcodeQueue,
   flagBarcode,
   getCachedBarcode,
@@ -122,6 +123,8 @@ import {
   fetchWorkoutsInRange,
   getValidAccessToken,
   kilojoulesToKcal,
+  hasWearableData,
+  revokeWhoopAccess,
   whoopConfigured,
   WhoopAuthError,
 } from './whoop.js';
@@ -832,6 +835,10 @@ async function providerFor(access: Access): Promise<AiProvider> {
   return providers[access.plan] ?? 'claude';
 }
 
+async function providerForContext(access: Access, context: unknown): Promise<AiProvider> {
+  return hasWearableData(context) ? 'claude' : providerFor(access);
+}
+
 /**
  * What the dashboard's provider setting cannot cover, and why. Every route
  * now follows the per-tier setting; the only exception left is a file
@@ -1476,7 +1483,7 @@ app.post('/api/coach', async (c) => {
   try {
     const system = coachSystemPrompt(language, contextText(body.context)) + coachScopeNote(access);
     const tools = coachToolsFor(access);
-    if ((await providerFor(access)) === 'deepseek') {
+    if ((await providerForContext(access, body.context)) === 'deepseek') {
       // OpenAI-shaped: the system prompt is the first message rather than a
       // separate field, and the schedule tool stays optional (tool_choice
       // auto) because most coach messages are just conversation.
@@ -1630,7 +1637,7 @@ app.post('/api/generate-recipe', async (c) => {
   if (!claim.ok) return c.json(quotaError(access), 402);
   const system = recipePrompt(language, request, contextText(body.context));
   try {
-    const recipe = await withProviderFallback('/api/generate-recipe', await providerFor(access), {
+    const recipe = await withProviderFallback('/api/generate-recipe', await providerForContext(access, body.context), {
       deepseek: async () => {
         const ds = await withOneRetry(() =>
           deepseekToolCall(
@@ -1669,7 +1676,7 @@ app.post('/api/generate-recipe', async (c) => {
         );
         return toolUse ? sanitizeRecipe(toolUse.input) : undefined;
       },
-    });
+    }, undefined, { fallback: !hasWearableData(body.context) });
     if (!recipe) {
       await release(ref, 'recipe');
       return c.json({ error: 'analysis_failed' }, 502);
@@ -1693,7 +1700,7 @@ app.post('/api/generate-program', async (c) => {
   if (!claim.ok) return claim.reason === 'cap' ? c.json(featureLocked(access), 403) : c.json(quotaError(access), 402);
   const system = programPrompt(language, contextText(body.context));
   try {
-    const program = await withProviderFallback('/api/generate-program', await providerFor(access), {
+    const program = await withProviderFallback('/api/generate-program', await providerForContext(access, body.context), {
       deepseek: async () => {
         // Far more headroom than Claude's 9000: on a reasoning model the
         // chain-of-thought shares this budget with the answer, and the answer
@@ -1738,7 +1745,7 @@ app.post('/api/generate-program', async (c) => {
         );
         return toolUse ? sanitizeProgram(toolUse.input) : undefined;
       },
-    });
+    }, undefined, { fallback: !hasWearableData(body.context) });
     if (!program) {
       await release(ref, 'program');
       return c.json({ error: 'analysis_failed' }, 502);
@@ -2110,6 +2117,7 @@ app.delete('/api/me', async (c) => {
       // Leave the records in place too, so the person can simply try again.
       return c.json({ error: 'account_delete_failed', account }, 502);
     }
+    await revokeWhoopFor(ref);
     await deleteUser(ref);
     return c.json({ ok: true, account });
   } catch (err) {
@@ -2247,9 +2255,16 @@ app.get('/api/whoop/status', async (c) => {
 app.post('/api/whoop/disconnect', async (c) => {
   const ref = await callerRef(c);
   if (!ref) return c.json({ error: 'identify_required' }, 401);
+  // Cancel the access at WHOOP too, not only our copy of the tokens.
+  const revoked = await revokeWhoopAccess(ref);
   await deleteWhoopConnection(ref);
-  return c.json({ ok: true });
+  return c.json({ ok: true, revoked });
 });
+
+/** Cancel WHOOP access for every connection in a person's account (account deletion). */
+async function revokeWhoopFor(ref: string): Promise<void> {
+  for (const r of await whoopRefsFor(ref).catch(() => [] as string[])) await revokeWhoopAccess(r);
+}
 
 /**
  * Runs one WHOOP data fetch with a single self-heal retry: if the cached
@@ -2732,7 +2747,10 @@ app.post('/admin/api/deletion-request-done', async (c) => {
   // The sign-in account first: if that fails the request stays open to retry.
   const account = await deleteAuthUserByEmail(request.email);
   if (account === 'failed') return c.json({ error: 'account_delete_failed' }, 502);
-  for (const ref of refs) await deleteUser(ref);
+  for (const ref of refs) {
+    await revokeWhoopFor(ref);
+    await deleteUser(ref);
+  }
   await markDeletionRequestDone(request.id);
   return c.json({ ok: true, deleted: refs.length, account });
 });

@@ -433,6 +433,14 @@ Apple puts the app version, the subscription group and the subscriptions into **
 3. App Store Connect → your version → **Release This Version**.
 4. Buy once for real on your own phone. You can refund it via reportaproblem.apple.com.
 5. Watch **admin → Overview** for the first days: purchases, AI failures and AI cost.
+6. Tell me "Apple approved". I then send the waiting over-the-air update (see **Waiting for Apple approval** below). It needs no new build and reaches everyone on 1.0.
+
+### Waiting for Apple approval (sent together as one update)
+Pushed to GitHub and tested, but not sent to phones yet:
+- **Edit meal portions.** A meal saved at ½ reopens at ½ of the whole plate. Every item gets an Amount eaten box with − and +, plus the ¼ ½ 1 1½ 2 chips, and the two stay in sync. Labels follow the portion.
+- **WHOOP and AI Support.** Sharing WHOOP data with AI Support starts off, and you're asked once after connecting WHOOP. Disconnecting clears WHOOP data from the phone and the backup.
+
+Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, and keeping WHOOP data away from DeepSeek.
 
 ---
 
@@ -529,6 +537,41 @@ On each of the four base plans: **Add offer**:
 2. The first review takes from a few days up to a week.
 
 ---
+
+# Part C — WHOOP approval (lifts the 10-member limit)
+
+Until WHOOP approves Calgym, only **10 WHOOP members** can connect. Number 11 gets an error from WHOOP. WHOOP reviews requests about once a month, and some developers report waiting two months or more, so send it early.
+
+## Step 28 ⬜ Test with your own WHOOP
+1. On your iPhone: **Health → Connections → WHOOP → Connect**, then sign in to WHOOP and allow.
+2. Check the Training tab shows your WHOOP workouts and calories.
+3. You need at least one real WHOOP member tested before you apply. You count.
+
+## Step 29 ⬜ Check the app in the WHOOP Developer Dashboard
+Go to **developer-dashboard.whoop.com**, sign in, and open your app. Make sure:
+
+| Field | Value |
+|---|---|
+| App name | `Calgym` |
+| Contact email(s) | `support@calgym.org` (and your own, if you want replies directly) |
+| Privacy Policy URL | `https://calapp-production-ab20.up.railway.app/privacy` |
+| Redirect URL | `https://calapp-production-ab20.up.railway.app/api/whoop/callback` (must match exactly) |
+| Scopes | `read:workout`, `read:recovery`, `read:sleep`, `read:cycles`, `offline`. Nothing else. |
+| Logo | The Calgym app icon: `docs/marketing-kit` → `logo/app-icon-original/` → the 512 px file |
+
+The privacy policy now has a **WHOOP** section (English and Arabic) covering what we read, what we use it for, that AI Support gets it only if you allow it and only through Anthropic, that we never sell it or train AI with it, and that disconnecting cancels access and removes it. WHOOP checks this page.
+
+## Step 30 ⬜ Brand check (WHOOP Design Guidelines)
+Nothing to change. Calgym writes "WHOOP" as plain text and doesn't use the WHOOP logo, so the logo rules don't apply. WHOOP figures are labelled as WHOOP's. If you ever add the WHOOP logo, use the official files unchanged, in black or white only, at least 100 px wide (30 px for the round icon).
+
+## Step 31 ⬜ Submit for approval
+1. In the dashboard, open the app and use **Submit for approval**. If you can't see the button, open WHOOP's **App Approval** page (developer.whoop.com → Docs → Developing → App Approval) and use the request link there.
+2. If it asks what the app does, paste this:
+
+   > Calgym is a food and training tracker for iPhone and Android (English and Arabic), live on the App Store. Members connect WHOOP with OAuth to see their WHOOP workouts and calories burned next to the meals and training they log, and their recovery, sleep and strain on the Health tab. If the member separately allows it, our AI coach uses their recovery, sleep and strain to shape training advice. That data goes only to Anthropic (Claude) under its commercial API terms, is never used to train models, and is never sold or shared. We store only the OAuth tokens on our server. The WHOOP figures stay on the member's phone and in their own private backup. Disconnecting revokes access through WHOOP's revoke endpoint and deletes the tokens and the WHOOP data. Deleting the account does the same. Privacy policy: https://calapp-production-ab20.up.railway.app/privacy
+
+3. If they want to try it themselves: new Calgym users get a 14-day free trial that includes WHOOP. For longer access, give them a code from **admin → Codes**.
+4. Once approved there's nothing to change in the app. The limit lifts on WHOOP's side.
 
 # Reference
 

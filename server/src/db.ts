@@ -683,6 +683,17 @@ export async function getWhoopConnection(ref: string): Promise<WhoopConnection |
   };
 }
 
+/** Every ref in this person's account (their own and linked device ids) that has a WHOOP connection. */
+export async function whoopRefsFor(ref: string): Promise<string[]> {
+  if (!pool) return [];
+  const res = await pool.query(
+    `SELECT ref FROM whoop_connections
+      WHERE ref = $1 OR ref IN (SELECT from_ref FROM ref_links WHERE to_ref = $1)`,
+    [ref],
+  );
+  return res.rows.map((r) => r.ref as string);
+}
+
 export async function deleteWhoopConnection(ref: string): Promise<void> {
   if (!pool) return;
   await pool.query(`DELETE FROM whoop_connections WHERE ref = $1`, [ref]);

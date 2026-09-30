@@ -45,6 +45,8 @@ export interface CoachContext {
   streakDays: number;
   workoutStreakDays: number;
   /** Only present when WHOOP is connected and has scored data — see server/src/prompts.ts for how the coach is told to read these. */
+  /** Set when any figure here came from WHOOP — see server hasWearableData. */
+  wearableData?: true;
   whoop?: {
     recoveryScore?: number | null;
     hrvMs?: number | null;
@@ -108,7 +110,10 @@ function hhmmss(iso: string): string {
 export async function buildCoachContext(lang: Language, dayCount = 7, focus?: CoachFocus): Promise<CoachContext> {
   const s = useAppStore.getState();
   // What may be shared is decided in Manage shared context (S18), never here.
-  const share: CoachShare = s.coachShare ?? { food: true, training: true, body: true, wearable: true };
+  const share: CoachShare = s.coachShare ?? { food: true, training: true, body: true, wearable: false };
+  // WHOOP's burn counts only when WHOOP data may be shared at all.
+  const whoopBurn = share.wearable ? s.whoopBurnByDay : {};
+  const whoopWorkouts = share.wearable ? s.whoopWorkoutsByDay : {};
   const days: CoachContext['days'] = [];
 
   for (let i = 0; i < dayCount; i++) {
@@ -139,7 +144,7 @@ export async function buildCoachContext(lang: Language, dayCount = 7, focus?: Co
       proteinG: share.food ? Math.round(totals.proteinG) : 0,
       carbsG: share.food ? Math.round(totals.carbsG) : 0,
       fatG: share.food ? Math.round(totals.fatG) : 0,
-      burned: share.training ? actualBurnedForDay(s.workouts, s.whoopBurnByDay, s.whoopWorkoutsByDay, d) : 0,
+      burned: share.training ? actualBurnedForDay(s.workouts, whoopBurn, whoopWorkouts, d) : 0,
       waterMl: share.food ? waterForDay(s.water, d) : 0,
       workouts: share.training ? names.slice(0, 8) : [],
       ...(share.food && (totals.incomplete ?? []).length > 0 ? { incomplete: totals.incomplete } : {}),
@@ -239,6 +244,9 @@ export async function buildCoachContext(lang: Language, dayCount = 7, focus?: Co
     streakDays: share.food ? streakDays(s.meals) : 0,
     workoutStreakDays: share.training ? workoutStreakDays(s.workouts) : 0,
     whoop,
+    // Tells the server WHOOP figures are inside (the burn totals too), so the
+    // request stays on the one AI provider WHOOP data may go to.
+    ...(share.wearable && (whoop || Object.keys(whoopBurn).length > 0) ? { wearableData: true as const } : {}),
     latestBodyReading,
     fasting,
     referenceDocs: s.coachReferenceDocs.length

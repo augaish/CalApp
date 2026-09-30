@@ -431,6 +431,9 @@ export interface AppState {
   addCoachReferenceDoc: (doc: Omit<CoachReferenceDoc, 'id' | 'addedAt'>) => void;
   removeCoachReferenceDoc: (docId: string) => void;
   setCoachShare: (patch: Partial<CoachShare>) => void;
+  /** Forget every WHOOP figure kept on this phone (and so in the backup) —
+   * on disconnect, when WHOOP data may no longer be kept. */
+  clearWhoopData: () => void;
   /** Begins a new fast — replaces any already-active one (the UI should
    * never offer starting a second while one is running, but this stays a
    * plain overwrite rather than a no-op so it can't get stuck). */
@@ -626,7 +629,9 @@ export const useAppStore = create<AppState>()(
       coachMessages: [],
       coachAppliedPlans: [],
       coachReferenceDocs: [],
-      coachShare: { food: true, training: true, body: true, wearable: true },
+      // WHOOP data reaches the coach only once the person says yes (asked
+      // when they connect WHOOP) — WHOOP's API terms want an explicit opt-in.
+      coachShare: { food: true, training: true, body: true, wearable: false },
       activeFast: null,
       fastingHistory: [],
       activeSession: null,
@@ -1329,6 +1334,14 @@ export const useAppStore = create<AppState>()(
           coachReferenceDocs: s.coachReferenceDocs.filter((d) => d.id !== docId),
         })),
       setCoachShare: (patch) => set((s) => ({ coachShare: { ...s.coachShare, ...patch } })),
+      clearWhoopData: () =>
+        set((s) => ({
+          whoopBurnByDay: {},
+          whoopWorkoutsByDay: {},
+          whoopBackfilledAt: null,
+          whoopLastFetchedAt: null,
+          coachShare: { ...s.coachShare, wearable: false },
+        })),
       startFast: (protocol, targetHours) =>
         set({ activeFast: { id: id(), startedAt: new Date().toISOString(), protocol, targetHours } }),
       endFast: () =>
@@ -1421,7 +1434,7 @@ export const useAppStore = create<AppState>()(
     })),
     {
       name: 'calapp-store',
-      version: 15,
+      version: 16,
       storage: createJSONStorage(() => AsyncStorage),
       migrate: migrateStore,
       partialize: ({
@@ -1882,6 +1895,12 @@ export function migrateStore(persisted: unknown, version: number): unknown {
     };
     const tidy = tidyLibraryState(slice);
     if (tidy) Object.assign(state, tidy);
+  }
+
+  // Sharing WHOOP data with the coach used to start on. It is an explicit
+  // opt-in now, so everyone starts from "no" and is asked.
+  if (version < 16 && state.coachShare && typeof state.coachShare === 'object') {
+    state.coachShare = { ...(state.coachShare as object), wearable: false };
   }
 
   if (version >= 2) return state;
