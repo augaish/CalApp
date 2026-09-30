@@ -4,7 +4,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
-import { PRIVACY_HTML, SUPPORT_HTML, TERMS_HTML, accountDeletionHtml } from './legal-html.js';
+import { PRIVACY_HTML, SUPPORT_HTML, TERMS_HTML, WHOOP_INTEGRATION_HTML, WHOOP_SHOTS, accountDeletionHtml } from './legal-html.js';
 import {
   actionWeights,
   aiProviders,
@@ -2127,6 +2127,16 @@ app.delete('/api/me', async (c) => {
 });
 
 app.get('/privacy', (c) => c.html(PRIVACY_HTML));
+// A public page showing WHOOP how the integration looks and handles data
+// (their app-approval form asks for a link to screenshots).
+app.get('/whoop', (c) => c.html(WHOOP_INTEGRATION_HTML));
+app.get('/whoop/img/:file', async (c) => {
+  const shot = WHOOP_SHOTS.find((s) => s.file === c.req.param('file'));
+  if (!shot) return c.notFound();
+  const { readFile } = await import('node:fs/promises');
+  const body = await readFile(new URL(`./assets/whoop/${shot.file}`, import.meta.url));
+  return c.body(body, 200, { 'Content-Type': 'image/jpeg', 'Cache-Control': 'public, max-age=86400' });
+});
 app.get('/terms', (c) => c.html(TERMS_HTML));
 app.get('/support', (c) => c.html(SUPPORT_HTML));
 

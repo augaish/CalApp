@@ -62,7 +62,7 @@ export const PRIVACY_HTML = page(
 <p>depending on your plan and on which service is available. Each processes the content under its own API terms. We send only what is needed to answer — never your name or email — and our server does not keep your photos, reports or messages after the answer is returned. The providers may keep what they receive for a limited period under their own terms (for example, for safety and abuse monitoring). The app asks your permission before anything is sent to an AI provider for the first time, and you can withdraw it at any time in Profile → Privacy → AI processing. The AI coach also receives a short summary of your recent totals (calories, macros, workouts) so its answer can refer to your own data; it is used only for that reply. You choose what it may see in Profile → Privacy → Manage shared context.</p>
 
 <h2>WHOOP</h2>
-<p>If you connect WHOOP, we read your WHOOP workouts, recovery, sleep and daily strain through WHOOP's official API, with the permission you give on WHOOP's own sign-in page. We use them to show calories burned and recovery in the app, and — only if you allow it — to give the AI coach context for its reply. WHOOP data sent to the coach goes only to Anthropic, never to DeepSeek, and is used only for that reply. We never sell WHOOP data, share it with anyone else, or use it to train AI models.</p>
+<p>If you connect WHOOP, we read your WHOOP workouts, recovery, sleep and daily strain through WHOOP's official API, with the permission you give on WHOOP's own sign-in page. We use your WHOOP workouts to show the calories you really burned in the app, and — only if you allow it — your recovery, sleep and strain to give the AI coach context for its reply. WHOOP data sent to the coach goes only to Anthropic, never to DeepSeek, and is used only for that reply. We never sell WHOOP data, share it with anyone else, or use it to train AI models.</p>
 <p>Disconnecting WHOOP (Health → Connections, or Profile → Privacy → Connections) cancels our access at WHOOP, deletes our access tokens and removes WHOOP data from the app and your backup. Deleting your account does the same.</p>
 
 <h2>What our server keeps</h2>
@@ -135,7 +135,7 @@ export const PRIVACY_HTML = page(
 <p>بحسب باقتك والخدمة المتاحة، ويعالج كلٌّ منهما المحتوى وفق شروط واجهته البرمجية. نرسل فقط ما يلزم للإجابة — ولا نرسل اسمك أو بريدك أبداً — ولا يحتفظ خادمنا بصورك أو تقاريرك أو رسائلك بعد إرجاع الإجابة. وقد يحتفظ المزوّدون بما يصلهم لفترة محدودة وفق شروطهم (مثلاً لأغراض السلامة ومنع إساءة الاستخدام). يطلب التطبيق إذنك قبل إرسال أي شيء إلى مزوّد ذكاء اصطناعي أول مرة، ويمكنك سحب الإذن في أي وقت من الملف الشخصي ← الخصوصية ← المعالجة بالذكاء الاصطناعي. ويتلقى المدرب الذكي أيضاً ملخصاً قصيراً لإجمالياتك الأخيرة (السعرات والعناصر الغذائية والتمارين) ليكون الرد مخصصاً لك، ويُستخدم لذلك الرد فقط. وتختار ما يمكنه رؤيته من الملف الشخصي ← الخصوصية ← إدارة السياق المشترك.</p>
 
 <h2>WHOOP</h2>
-<p>إذا ربطت WHOOP، نقرأ تمارينك والتعافي والنوم والإجهاد اليومي من WHOOP عبر واجهته البرمجية الرسمية، بالإذن الذي تمنحه في صفحة تسجيل الدخول الخاصة بـ WHOOP. نستخدمها لعرض السعرات المحروقة والتعافي في التطبيق، ولإعطاء المدرب الذكي سياقاً لرده فقط إذا سمحت بذلك. وما يُرسل من بيانات WHOOP إلى المدرب يذهب إلى Anthropic فقط، ولا يُرسل إلى DeepSeek أبداً، ويُستخدم لذلك الرد فقط. ولا نبيع بيانات WHOOP ولا نشاركها مع أي جهة أخرى ولا نستخدمها لتدريب نماذج الذكاء الاصطناعي.</p>
+<p>إذا ربطت WHOOP، نقرأ تمارينك والتعافي والنوم والإجهاد اليومي من WHOOP عبر واجهته البرمجية الرسمية، بالإذن الذي تمنحه في صفحة تسجيل الدخول الخاصة بـ WHOOP. نستخدم تمارينك في WHOOP لعرض السعرات التي أحرقتها فعلاً في التطبيق، ونستخدم التعافي والنوم والإجهاد لإعطاء المدرب الذكي سياقاً لرده فقط إذا سمحت بذلك. وما يُرسل من بيانات WHOOP إلى المدرب يذهب إلى Anthropic فقط، ولا يُرسل إلى DeepSeek أبداً، ويُستخدم لذلك الرد فقط. ولا نبيع بيانات WHOOP ولا نشاركها مع أي جهة أخرى ولا نستخدمها لتدريب نماذج الذكاء الاصطناعي.</p>
 <p>فصل WHOOP (الصحة ← الربط، أو الملف الشخصي ← الخصوصية ← الربط) يلغي وصولنا لدى WHOOP، ويحذف رموز الوصول، ويزيل بيانات WHOOP من التطبيق ومن نسختك الاحتياطية. وحذف حسابك يفعل الشيء نفسه.</p>
 
 <h2>ما يحفظه خادمنا</h2>
@@ -352,3 +352,47 @@ ${state === 'sent' ? '' : form}
 </div>`,
   );
 }
+
+/** Screenshots of the WHOOP integration, in the order the page shows them. */
+export const WHOOP_SHOTS: { file: string; title: string; caption: string }[] = [
+  { file: '05-connections.jpg', title: 'Connect', caption: 'Health → Connections. WHOOP connects through WHOOP’s own OAuth sign-in and shows its real state. Tapping it again disconnects, which revokes access at WHOOP.' },
+  { file: '07-opt-in.jpg', title: 'Explicit opt-in for AI Support', caption: 'Right after connecting, one question: may AI Support use recovery, sleep and strain? “Not now” keeps it off. Ships in the update that follows our App Store approval.' },
+  { file: '03-training-whoop.jpg', title: 'Real calories burned', caption: 'Training tab. The day’s burn comes from WHOOP (“From WHOOP”, with sync time) and is split across the logged exercises, replacing our estimate.' },
+  { file: '01-overview.jpg', title: 'Overview', caption: 'The WHOOP burn feeds the day’s summary next to what was eaten.' },
+  { file: '04-history.jpg', title: 'Workout history', caption: 'Past sessions carry WHOOP’s calories, marked with a watch icon so it is clear where the figure came from.' },
+  { file: '06-shared-context.jpg', title: 'Member control', caption: 'Profile → Privacy → Manage shared context. The WHOOP data switch decides whether AI Support may see recovery, sleep and strain. It starts off; shown here after the member allowed it.' },
+];
+
+export const WHOOP_INTEGRATION_HTML = page(
+  'WHOOP integration',
+  `<style>
+  .wrap { max-width:1040px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:22px; margin-top:18px; }
+  figure { margin:0; }
+  figure img { width:100%; border-radius:22px; border:1px solid var(--line); display:block; }
+  figcaption { font-size:14px; color:var(--muted); margin-top:8px; }
+  figcaption b { display:block; color:var(--text); font-size:15px; }
+</style>
+<h1>Calgym × WHOOP</h1>
+<div class="updated">How Calgym uses WHOOP data · ${UPDATED}</div>
+<p>Calgym is a food and training tracker for iPhone and Android, in English and Arabic. Members can connect WHOOP so the calories they really burned replace our estimates, and — only if they allow it — so the AI coach can take their recovery, sleep and strain into account.</p>
+<h2>What we read, and why</h2>
+<ul>
+  <li><strong>Workouts</strong> (read:workout): calories burned, strain and time, shown in the Training and Overview tabs and in workout history.</li>
+  <li><strong>Recovery, sleep, cycles</strong> (read:recovery, read:sleep, read:cycles): sent to the AI coach with a question only when the member has allowed it.</li>
+  <li><strong>offline</strong>: a refresh token, so members are not asked to reconnect every hour.</li>
+</ul>
+<h2>How the data is handled</h2>
+<ul>
+  <li>Our server stores only the OAuth tokens. WHOOP figures are kept on the member’s phone and in their own private backup.</li>
+  <li>AI requests with WHOOP data go to Anthropic (Claude) only, never to another provider, and are not used to train models.</li>
+  <li>We never sell WHOOP data or share it with anyone else.</li>
+  <li>Disconnecting calls WHOOP’s revoke endpoint, deletes the tokens and clears WHOOP data from the phone and backup. Deleting the account does the same.</li>
+</ul>
+<p>Privacy policy: <a href="/privacy">/privacy</a> (see the WHOOP section) · Contact: <a href="mailto:${CONTACT}">${CONTACT}</a></p>
+<h2>Screens</h2>
+<p style="color:var(--muted);font-size:14px">From the app with sample data.</p>
+<div class="grid">
+${WHOOP_SHOTS.map((s) => `<figure><img src="/whoop/img/${s.file}" alt="${s.title}" loading="lazy" /><figcaption><b>${s.title}</b>${s.caption}</figcaption></figure>`).join('\n')}
+</div>`,
+);
