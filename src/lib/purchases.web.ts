@@ -1,4 +1,5 @@
-import { groupPackages, type StorePackageLike, type StorePlans } from './store-plans';
+import i18n from './i18n';
+import { formatMoney, groupPackages, type StorePackageLike, type StorePlans } from './store-plans';
 
 /**
  * The web build sells nothing: subscriptions go through the App Store and
@@ -34,9 +35,10 @@ const TRIAL = { price: 0, periodUnit: 'WEEK', periodNumberOfUnits: 2, cycles: 1 
 const sample = (id: string, packageType: string, price: number, period: string): StorePackageLike => ({
   identifier: packageType === 'CUSTOM' ? id.replace('calgym_', '').replace('yearly', 'annual') : packageType === 'ANNUAL' ? '$rc_annual' : '$rc_monthly',
   packageType,
-  product: { identifier: id, priceString: `SAR ${price.toFixed(2)}`, price, currencyCode: 'SAR', subscriptionPeriod: period, introPrice: TRIAL },
+  // Written the way the store writes it for someone in Saudi Arabia, in the app's language.
+  product: { identifier: id, priceString: formatMoney(price, 'SAR', i18n.language === 'ar' ? 'ar' : 'en'), price, currencyCode: 'SAR', subscriptionPeriod: period, introPrice: TRIAL },
 });
-const PREVIEW_PACKAGES = [
+const previewPackages = () => [
   sample('calgym_essentials_monthly', 'CUSTOM', 19.99, 'P1M'),
   sample('calgym_essentials_yearly', 'CUSTOM', 149.99, 'P1Y'),
   sample('calgym_pro_monthly', 'MONTHLY', 24.99, 'P1M'),
@@ -49,7 +51,8 @@ export interface LoadedPlans {
 }
 export async function loadStorePlans(): Promise<LoadedPlans | null> {
   if (!storePreview()) return null;
-  return { plans: groupPackages(PREVIEW_PACKAGES), packages: PREVIEW_PACKAGES };
+  const packages = previewPackages();
+  return { plans: groupPackages(packages), packages };
 }
 
 export async function trialEligibility(productIds: string[]): Promise<Record<string, boolean>> {
