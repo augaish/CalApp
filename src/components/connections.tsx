@@ -82,7 +82,7 @@ export function WhoopConnectionRow() {
     if (!gate.guard('health')) return;
     setBusy(true);
     try {
-      const result = await WebBrowser.openAuthSessionAsync(whoopAuthorizeUrl(), 'calapp://whoop-callback');
+      const result = await WebBrowser.openAuthSessionAsync(await whoopAuthorizeUrl(), 'calapp://whoop-callback');
       // The confirmation page closes the browser session almost the instant
       // it redirects here, well before anyone could read it — the reason
       // travels in the URL instead, so a failure is visible in the app.

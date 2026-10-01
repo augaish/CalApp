@@ -14,3 +14,4 @@ export async function fetchWhoopSummary() {
     return null;
   }
 }
+export function setAccessTokenProvider(_fn: (() => Promise<string | null>) | null) {}

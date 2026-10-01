@@ -138,7 +138,8 @@ import {
 import { estimateCostUsd } from './pricing.js';
 import { decide, planFromSubscriber, type RevenueCatEvent, type SubscriberRecord } from './revenuecat.js';
 import { cleanEarning, cleanPartner } from './partners.js';
-import { deleteAuthUser, deleteAuthUserByEmail, supabaseAdminConfigured } from './supabase-admin.js';
+import { deleteAuthUser, deleteAuthUserByEmail, findAuthUserByEmail, supabaseAdminConfigured } from './supabase-admin.js';
+import { bearerOf, identify, isAccountRef, ownStoreId, requireAccountToken, verifyAccessToken } from './identity.js';
 import { partnerNotFoundHtml, partnerPageHtml } from './partner-html.js';
 import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining } from './promo.js';
 import {
@@ -438,14 +439,24 @@ function validRef(raw: string): string | null {
 
 /**
  * Who is calling. A guest sends their per-install id and a signed-in user
- * sends their account id; an install that has since been claimed by an account
- * resolves to that account, so usage and plan stay with the person.
+ * sends their account id plus their Supabase access token, which is what
+ * actually proves it (see identity.ts). Without a token — older builds — an
+ * install that has since been claimed by an account resolves to that
+ * account, until REQUIRE_ACCOUNT_TOKEN switches that trust off.
  */
 async function callerRef(c: {
   req: { header: (n: string) => string | undefined };
 }): Promise<string | null> {
-  const ref = validRef(c.req.header('x-calgym-user') ?? '');
-  return ref ? await resolveRef(ref) : null;
+  return identify(validRef(c.req.header('x-calgym-user') ?? ''), bearerOf(c.req.header('authorization')), {
+    resolveRef,
+    verify: (t) => verifyAccessToken(t),
+    enforce: enforcingAccountToken(),
+  });
+}
+
+/** Strict mode only bites when the server can actually check tokens. */
+function enforcingAccountToken(): boolean {
+  return requireAccountToken() && supabaseAdminConfigured();
 }
 
 /**
@@ -2049,14 +2060,16 @@ app.post('/api/billing/revenuecat', async (c) => {
  * reports as active, for the caller's own id.
  */
 app.post('/api/billing/sync', async (c) => {
-  const raw = validRef(c.req.header('x-calgym-user') ?? '');
+  const header = validRef(c.req.header('x-calgym-user') ?? '');
   const ref = await callerRef(c);
-  if (!raw || !ref) return c.json({ error: 'identify_required' }, 400);
+  if (!header || !ref) return c.json({ error: 'identify_required' }, 400);
   const key = process.env.REVENUECAT_SECRET_KEY;
   if (!key) return c.json({ ok: false, result: 'not_configured' });
   try {
     // The store purchase is filed under the id the app configured with,
-    // which is the raw header id; the plan goes to whoever that id now is.
+    // which is the raw header id; the plan goes to whoever that id now is —
+    // but only when that id is really the caller's, never someone else's.
+    const raw = await ownStoreId(header, ref, resolveRef);
     const read = await subscriberPlan(raw, key);
     if (!read.ok) return c.json({ ok: false, result: read.result });
     const found = read.found;
@@ -2103,7 +2116,12 @@ app.post('/api/identify', async (c) => {
   const ref = await callerRef(c);
   if (!ref) return c.json({ error: 'identify_required' }, 401);
   const body = await c.req.json<{ email?: string }>().catch(() => ({}) as never);
-  const email = (body?.email ?? '').trim().toLowerCase().slice(0, 200);
+  // With a sign-in token the address comes from Supabase, not from the body.
+  // Either way it is only a label for the admin list: plans given by email
+  // look the address up in Supabase Auth (see /admin/api/plan).
+  const token = bearerOf(c.req.header('authorization'));
+  const verified = token ? await verifyAccessToken(token) : null;
+  const email = (verified?.email ?? body?.email ?? '').trim().toLowerCase().slice(0, 200);
   if (!/^\S+@\S+\.\S+$/.test(email)) return c.json({ error: 'invalid_request' }, 400);
   try {
     await setUserEmail(ref, email);
@@ -2116,20 +2134,43 @@ app.post('/api/identify', async (c) => {
 
 /** Account deletion — required by both app stores. Irreversible. */
 app.delete('/api/me', async (c) => {
-  const ref = await callerRef(c);
-  if (!ref) return c.json({ error: 'invalid_request' }, 400);
+  const raw = validRef(c.req.header('x-calgym-user') ?? '');
+  if (!raw) return c.json({ error: 'invalid_request' }, 400);
   // A signed-in person also sends their sign-in token, so the account itself
-  // can be deleted and not only the records attached to it.
-  const bearer = (c.req.header('authorization') ?? '').match(/^Bearer\s+(.+)$/i)?.[1] ?? null;
+  // can be deleted and not only the records attached to it — and the token,
+  // not the header, decides whose account that is.
+  const bearer = bearerOf(c.req.header('authorization'));
   try {
+    const resolved = await resolveRef(raw);
+    let target: string;
+    let alsoThisInstall = false;
+    if (bearer && supabaseAdminConfigured()) {
+      const user = await verifyAccessToken(bearer);
+      if (!user) return c.json({ error: 'account_delete_failed', account: 'invalid_token' }, 502);
+      target = user.id;
+      // This phone's own install id goes too, unless it belongs to someone else.
+      alsoThisInstall = raw !== user.id && !isAccountRef(raw) && (resolved === raw || resolved === user.id);
+    } else if (bearer) {
+      // No Supabase keys to check with: the records follow the header as before.
+      target = resolved;
+    } else {
+      // Without a sign-in only a plain guest install can be deleted: an
+      // account, or an install linked to one, needs that account's token.
+      if (isAccountRef(raw) || resolved !== raw) return c.json({ error: 'sign_in_required' }, 401);
+      target = raw;
+    }
     const account = await deleteAuthUser(bearer);
     if (account === 'not_configured') console.error('account deletion: SUPABASE_SERVICE_ROLE_KEY is not set; the sign-in account was left in place');
     if (account === 'failed' || account === 'invalid_token') {
       // Leave the records in place too, so the person can simply try again.
       return c.json({ error: 'account_delete_failed', account }, 502);
     }
-    await revokeWhoopFor(ref);
-    await deleteUser(ref);
+    await revokeWhoopFor(target);
+    await deleteUser(target);
+    if (alsoThisInstall) {
+      await revokeWhoopFor(raw);
+      await deleteUser(raw);
+    }
     return c.json({ ok: true, account });
   } catch (err) {
     console.error('delete account failed:', err);
@@ -2231,14 +2272,50 @@ function whoopStatusPage(ok: boolean, message: string): string {
 </body></html>`;
 }
 
-/** Step 1: send the user's browser to WHOOP's consent screen. `ref` travels as a query param — this is a plain navigation, not a fetch, so no auth header is available. */
+/**
+ * One-use tickets for starting a WHOOP connection. The browser tab that goes
+ * to WHOOP is a plain navigation that cannot carry the app's headers, so the
+ * app asks for a ticket first (with its headers, so the server knows who it
+ * is) and opens the link that ticket makes. Kept in memory: a ticket lives
+ * ten minutes, and losing them on a restart only means tapping Connect again.
+ */
+const whoopTickets = new Map<string, { ref: string; until: number }>();
+
+app.post('/api/whoop/start', async (c) => {
+  const ref = await callerRef(c);
+  if (!ref) return c.json({ error: 'identify_required' }, 401);
+  if (!whoopConfigured()) return c.json({ error: 'not_configured' }, 503);
+  const now = Date.now();
+  for (const [k, v] of whoopTickets) if (v.until < now) whoopTickets.delete(k);
+  const ticket = crypto.randomUUID();
+  whoopTickets.set(ticket, { ref, until: now + 10 * 60_000 });
+  return c.json({ url: `${publicBase(c)}/api/whoop/authorize?ticket=${ticket}` });
+});
+
+/** Step 1: send the user's browser to WHOOP's consent screen, for the person a ticket (or, from older builds, `ref`) names. */
 app.get('/api/whoop/authorize', async (c) => {
   if (!whoopConfigured()) {
     return c.html(whoopStatusPage(false, 'WHOOP is not configured on the server yet.'), 503);
   }
+  const ticket = c.req.query('ticket');
+  if (ticket) {
+    const held = whoopTickets.get(ticket);
+    whoopTickets.delete(ticket);
+    if (!held || held.until < Date.now()) {
+      return c.html(whoopStatusPage(false, 'This link expired or was already used — try connecting again from the app.'), 400);
+    }
+    const state = crypto.randomUUID();
+    await saveWhoopOAuthState(state, held.ref);
+    return c.redirect(buildAuthorizeUrl(whoopRedirectUri(c), state), 302);
+  }
   const ref = validRef(c.req.query('ref') ?? '');
   if (!ref) return c.html(whoopStatusPage(false, 'Missing or invalid user reference.'), 400);
   const resolved = await resolveRef(ref);
+  // A bare ?ref= proves nothing: once sign-in proof is required it can only
+  // start a connection for a plain guest install, never for an account.
+  if (enforcingAccountToken() && (isAccountRef(ref) || resolved !== ref)) {
+    return c.html(whoopStatusPage(false, 'Please update Calgym from the App Store, then connect WHOOP again.'), 400);
+  }
   const state = crypto.randomUUID();
   await saveWhoopOAuthState(state, resolved);
   return c.redirect(buildAuthorizeUrl(whoopRedirectUri(c), state), 302);
@@ -2654,9 +2731,18 @@ app.post('/admin/api/plan', async (c) => {
   const body = await c.req
     .json<{ ref?: string; email?: string; plan?: string; days?: number; note?: string; module?: string }>()
     .catch(() => ({}) as never);
-  // Either one account by ref, or every account signed in with an address.
+  // Either one account by ref, or the account signed in with an address. The
+  // address is looked up in Supabase Auth, which verified it — never in the
+  // emails apps report to us, which anyone could set to anything.
   const email = (body.email ?? '').trim();
-  const refs = email ? await refsForEmail(email) : [(body.ref ?? '').trim()].filter(Boolean);
+  let refs: string[];
+  if (email) {
+    const found = await findAuthUserByEmail(email);
+    if (found === 'failed') return c.json({ error: 'lookup_failed' }, 502);
+    refs = found === 'not_configured' ? await refsForEmail(email) : found ? [found.id] : [];
+  } else {
+    refs = [(body.ref ?? '').trim()].filter(Boolean);
+  }
   if (email && !refs.length) return c.json({ error: 'no_account' }, 404);
   if (!refs.length) return c.json({ error: 'invalid_request' }, 400);
   const plan: Plan = body.plan === 'essentials' || body.plan === 'pro' || body.plan === 'proPlus' ? body.plan : 'free';
@@ -2755,6 +2841,7 @@ app.get('/admin/api/overview', async (c) => {
   const checklist = [
     { id: 'database', done: cacheEnabled, label: 'Database connected', how: 'Set DATABASE_URL on Railway.' },
     { id: 'claude', done: set('ANTHROPIC_API_KEY'), label: 'Claude API key', how: 'Set ANTHROPIC_API_KEY on Railway.' },
+    { id: 'account_token', done: enforcingAccountToken(), label: 'Signed-in requests must prove who they are', how: 'Once the app update that sends sign-in proof has reached most phones (a week or two after it ships), set REQUIRE_ACCOUNT_TOKEN=1 on Railway. Needs SUPABASE_SERVICE_ROLE_KEY.' },
     { id: 'deepseek', done: set('DEEPSEEK_API_KEY'), label: 'DeepSeek API key', how: 'Set DEEPSEEK_API_KEY on Railway (optional — without it everything runs on Claude).' },
     { id: 'rc_ios', done: set('REVENUECAT_IOS_KEY'), label: 'RevenueCat iOS public key', how: 'RevenueCat → Project settings → API keys → Apple public key → REVENUECAT_IOS_KEY.' },
     { id: 'rc_android', done: set('REVENUECAT_ANDROID_KEY'), label: 'RevenueCat Android public key', how: 'RevenueCat → API keys → Google public key → REVENUECAT_ANDROID_KEY.' },

@@ -62,8 +62,32 @@ export function currentRef(): string {
   return installId ?? useAppStore.getState().ensureInstallId();
 }
 
-function authHeaders(): Record<string, string> {
-  return { 'x-calgym-user': currentRef() };
+/**
+ * Where the signed-in person's Supabase access token comes from — registered
+ * by auth.ts, so this module never has to load the sign-in SDK itself. Null
+ * (or no provider) means a guest: only the install id is sent.
+ */
+let accessTokenProvider: (() => Promise<string | null>) | null = null;
+export function setAccessTokenProvider(fn: (() => Promise<string | null>) | null) {
+  accessTokenProvider = fn;
+}
+
+/**
+ * Who this request is from. A signed-in app also sends its access token: the
+ * header alone proves nothing, and the server takes the token's account as
+ * the caller (server/src/identity.ts).
+ */
+async function authHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = { 'x-calgym-user': currentRef() };
+  if (accessTokenProvider) {
+    try {
+      const token = await accessTokenProvider();
+      if (token) headers.Authorization = `Bearer ${token}`;
+    } catch {
+      // No token is no worse than before: the request goes as the install.
+    }
+  }
+  return headers;
 }
 
 // Defined in a leaf module so the rule for what to say about each failure
@@ -90,7 +114,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   if (AI_PATHS.has(path) && !(await ensureAiConsent())) throw new AiConsentDeclinedError();
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
     body: JSON.stringify(body),
   });
   if (res.status === 402 || res.status === 403) {
@@ -185,7 +209,7 @@ export async function linkInstall(installId: string): Promise<boolean> {
   try {
     const res = await fetch(`${API_URL}/api/link`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ from: installId }),
     });
     return res.ok;
@@ -209,7 +233,7 @@ export async function createShareLink(
   try {
     const res = await fetch(`${API_URL}/api/share`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ payload, kind }),
     });
     if (!res.ok) return null;
@@ -229,7 +253,7 @@ export async function identifyEmail(email: string): Promise<void> {
   try {
     await fetch(`${API_URL}/api/identify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ email }),
     });
   } catch {
@@ -242,7 +266,7 @@ export async function reportStorefront(country: string | null, currency: string 
   try {
     await fetch(`${API_URL}/api/storefront`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ country, currency }),
     });
   } catch {
@@ -254,7 +278,7 @@ export async function reportStorefront(country: string | null, currency: string 
 export async function fetchSharedPlan(code: string): Promise<unknown | null> {
   try {
     const res = await fetch(`${API_URL}/api/share/${encodeURIComponent(code)}`, {
-      headers: authHeaders(),
+      headers: await authHeaders(),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { payload?: unknown };
@@ -271,7 +295,7 @@ export async function fetchEntitlement(): Promise<Entitlement | null> {
     // admin table gets a device for every account — guest or signed-in — not
     // only the ones that ever reach a sign-in screen.
     const device = encodeURIComponent(deviceLabel());
-    const res = await fetch(`${API_URL}/api/me?device=${device}`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}/api/me?device=${device}`, { headers: await authHeaders() });
     if (!res.ok) return null;
     return (await res.json()) as Entitlement;
   } catch {
@@ -313,7 +337,7 @@ export async function redeemCode(code: string): Promise<RedeemResponse> {
   try {
     const res = await fetch(`${API_URL}/api/redeem`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       // The apps redeem free codes through the store (App Store rule 3.1.1).
       body: JSON.stringify({ code, platform: Platform.OS }),
     });
@@ -337,7 +361,7 @@ export async function redeemCode(code: string): Promise<RedeemResponse> {
  */
 export async function syncBilling(): Promise<boolean> {
   try {
-    const res = await fetch(`${API_URL}/api/billing/sync`, { method: 'POST', headers: authHeaders() });
+    const res = await fetch(`${API_URL}/api/billing/sync`, { method: 'POST', headers: await authHeaders() });
     const data = (await res.json().catch(() => ({}))) as { result?: string };
     return data.result === 'granted';
   } catch {
@@ -356,7 +380,7 @@ export async function setModule(module: 'food' | 'training'): Promise<SetModuleR
   try {
     const res = await fetch(`${API_URL}/api/module`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ module }),
     });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; nextChange?: string };
@@ -380,14 +404,28 @@ export interface WhoopStatus {
  * browser follows to WHOOP's own consent screen — so the caller ref travels
  * as a query param rather than the usual x-calgym-user header.
  */
-export function whoopAuthorizeUrl(): string {
-  const ref = currentRef();
-  return `${API_URL}/api/whoop/authorize?ref=${encodeURIComponent(ref)}`;
+/**
+ * The link that starts a WHOOP connection. The browser tab cannot carry this
+ * app's headers, so the server first hands out a one-use ticket for whoever
+ * these headers prove the caller is; a server without tickets yet gets the
+ * old ?ref= link.
+ */
+export async function whoopAuthorizeUrl(): Promise<string> {
+  try {
+    const res = await fetch(`${API_URL}/api/whoop/start`, { method: 'POST', headers: await authHeaders() });
+    if (res.ok) {
+      const { url } = (await res.json()) as { url?: string };
+      if (url) return url;
+    }
+  } catch {
+    // Fall through to the old link.
+  }
+  return `${API_URL}/api/whoop/authorize?ref=${encodeURIComponent(currentRef())}`;
 }
 
 export async function fetchWhoopStatus(): Promise<WhoopStatus | null> {
   try {
-    const res = await fetch(`${API_URL}/api/whoop/status`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}/api/whoop/status`, { headers: await authHeaders() });
     if (!res.ok) return null;
     return (await res.json()) as WhoopStatus;
   } catch {
@@ -399,7 +437,7 @@ export async function disconnectWhoop(): Promise<boolean> {
   try {
     const res = await fetch(`${API_URL}/api/whoop/disconnect`, {
       method: 'POST',
-      headers: authHeaders(),
+      headers: await authHeaders(),
     });
     return res.ok;
   } catch {
@@ -433,7 +471,7 @@ export async function fetchWhoopDayBurn(startIso: string, endIso: string): Promi
   try {
     const params = new URLSearchParams({ start: startIso, end: endIso });
     const res = await fetch(`${API_URL}/api/whoop/day-burn?${params.toString()}`, {
-      headers: authHeaders(),
+      headers: await authHeaders(),
     });
     if (!res.ok) return { totalKcal: null, workouts: [] };
     return (await res.json()) as WhoopDayBurn;
@@ -456,7 +494,7 @@ export interface WhoopHistoryWorkout extends WhoopDayWorkout {
  */
 export async function fetchWhoopHistory(days = 60): Promise<WhoopHistoryWorkout[]> {
   try {
-    const res = await fetch(`${API_URL}/api/whoop/history?days=${days}`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}/api/whoop/history?days=${days}`, { headers: await authHeaders() });
     if (!res.ok) return [];
     const data = (await res.json()) as { workouts: WhoopHistoryWorkout[] };
     return data.workouts;
@@ -478,7 +516,7 @@ export interface WhoopSummary {
 /** Recovery/strain/sleep snapshot for the coach's context — see coach-context.ts. */
 export async function fetchWhoopSummary(): Promise<WhoopSummary | null> {
   try {
-    const res = await fetch(`${API_URL}/api/whoop/summary`, { headers: authHeaders() });
+    const res = await fetch(`${API_URL}/api/whoop/summary`, { headers: await authHeaders() });
     if (!res.ok) return null;
     return (await res.json()) as WhoopSummary;
   } catch {
@@ -675,7 +713,7 @@ export async function lookupBarcode(
   if (isMockMode) return null;
   try {
     const res = await fetch(`${API_URL}/api/barcode?code=${encodeURIComponent(barcode)}`, {
-      headers: authHeaders(),
+      headers: await authHeaders(),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { item: FoodItem | null; source?: string | null };
@@ -699,7 +737,7 @@ export async function reportBarcode(barcode: string, item: FoodItem): Promise<vo
   try {
     await fetch(`${API_URL}/api/barcode/report`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify({ barcode, item }),
     });
   } catch {

@@ -1,11 +1,17 @@
-import { identifyEmail, linkInstall, setInstallId } from './api';
+import { identifyEmail, linkInstall, setAccessTokenProvider, setInstallId } from './api';
 import { isNetworkError, retryOnNetwork } from './auth-errors';
 import type { Account } from './store';
 import { useAppStore } from './store';
-import { getSupabase } from './supabase';
+import { authConfigured, getSupabase } from './supabase';
 import { reconcileOnSignIn, startBackupWatcher, syncOnLaunch } from './sync';
 
 export { authConfigured } from './supabase';
+
+// Every server request from a signed-in app carries its access token, which
+// is what proves who it is. getSession refreshes an expired token on the way.
+if (authConfigured) {
+  setAccessTokenProvider(async () => (await getSupabase().auth.getSession()).data.session?.access_token ?? null);
+}
 
 /**
  * Email sign-in via a 6-digit one-time code. Chosen over magic links because a

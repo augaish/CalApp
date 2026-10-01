@@ -434,13 +434,15 @@ Apple puts the app version, the subscription group and the subscriptions into **
 4. Buy once for real on your own phone. You can refund it via reportaproblem.apple.com.
 5. Watch **admin → Overview** for the first days: purchases, AI failures and AI cost.
 6. Tell me "Apple approved". I then send the waiting over-the-air update (see **Waiting for Apple approval** below). It needs no new build and reaches everyone on 1.0.
+7. **About two weeks after that update:** Railway → your server → Variables → add `REQUIRE_ACCOUNT_TOKEN` = `1`. From then on the server only believes signed-in requests that carry the sign-in token. admin → Overview → Launch checklist shows "Signed-in requests must prove who they are" as done. Don't add it earlier: phones without the update would lose their plan until they update.
 
 ### Waiting for Apple approval (sent together as one update)
 Pushed to GitHub and tested, but not sent to phones yet:
 - **Edit meal portions.** A meal saved at ½ reopens at ½ of the whole plate. Every item gets an Amount eaten box with − and +, plus the ¼ ½ 1 1½ 2 chips, and the two stay in sync. Labels follow the portion.
 - **WHOOP and AI Support.** Sharing WHOOP data with AI Support starts off, and you're asked once after connecting WHOOP. Disconnecting clears WHOOP data from the phone and the backup.
+- **Sign-in proof.** A signed-in phone sends its Supabase sign-in token with every request, so nobody can act as someone else by copying their account ID. WHOOP connect uses a one-time ticket.
 
-Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, and keeping WHOOP data away from DeepSeek.
+Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, keeping WHOOP data away from DeepSeek, the WHOOP sign-in page fix, account deletion that only deletes the sign-in token's own account, and "give plan by email" matching only the email Supabase verified.
 
 ---
 
