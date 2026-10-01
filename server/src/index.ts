@@ -405,6 +405,17 @@ const PROGRAM_TOOL: Anthropic.Tool = {
 const app = new Hono();
 app.use('*', cors());
 
+// Baseline browser protections for every page and reply: no framing (the
+// admin console can't be loaded inside someone else's page), no MIME
+// sniffing, and no full URLs leaking out as referrers. A route may still set
+// its own (the partner page sends no referrer at all).
+app.use('*', async (c, next) => {
+  c.header('X-Frame-Options', 'DENY');
+  c.header('X-Content-Type-Options', 'nosniff');
+  c.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+  await next();
+});
+
 /**
  * The origin to build shareable links from. Behind Railway's proxy the request
  * arrives as http internally, so the forwarded scheme is what the outside world
@@ -2175,6 +2186,22 @@ function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
+/**
+ * The app's return link as a JavaScript string literal, safe to place inside
+ * <script>. The message can carry text from the request (WHOOP's `error`
+ * param), so it is never spliced into the script by hand: JSON.stringify
+ * quotes it, and every "<" is escaped so nothing can close the script tag.
+ */
+export function appReturnLink(ok: boolean, message: string): string {
+  const link = `calapp://whoop-callback?status=${ok ? 'success' : 'error'}&reason=${encodeURIComponent(message)}`;
+  return JSON.stringify(link).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+}
+
+/** WHOOP's own denial code, cut down to what such a code can look like. */
+export function whoopDenialText(raw: string): string {
+  return raw.replace(/[^A-Za-z0-9 _.-]/g, '').slice(0, 80) || 'unknown';
+}
+
 /** Small standalone confirmation page — this loads in a system browser tab, not inside the app. */
 function whoopStatusPage(ok: boolean, message: string): string {
   return `<!doctype html><html><head><meta charset="utf-8" />
@@ -2199,7 +2226,7 @@ function whoopStatusPage(ok: boolean, message: string): string {
   // which is watching for exactly this scheme to close itself automatically
   // the instant it sees this redirect — usually before a person can read the
   // text above, which is why the reason travels along with it instead.
-  window.location.href = 'calapp://whoop-callback?status=${ok ? 'success' : 'error'}&reason=${encodeURIComponent(message)}';
+  window.location.href = ${appReturnLink(ok, message)};
 </script>
 </body></html>`;
 }
@@ -2221,7 +2248,7 @@ app.get('/api/whoop/authorize', async (c) => {
 app.get('/api/whoop/callback', async (c) => {
   const deniedReason = c.req.query('error');
   if (deniedReason) {
-    return c.html(whoopStatusPage(false, `WHOOP said: ${deniedReason}`));
+    return c.html(whoopStatusPage(false, `WHOOP said: ${whoopDenialText(deniedReason)}`));
   }
   const state = c.req.query('state') ?? '';
   const code = c.req.query('code') ?? '';
