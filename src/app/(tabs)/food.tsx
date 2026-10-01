@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 
 import { Icon } from '@/components/icon';
 import { ModuleBanner } from '@/components/plan-status';
@@ -28,7 +29,7 @@ import { Button } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { timestampFor, useViewDay } from '@/lib/day';
-import { successHaptic } from '@/lib/feedback';
+import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { usePending } from '@/lib/pending';
 import { isEstimated, itemUnknownNutrients, knownLabel, portionText } from '@/lib/recipes';
@@ -191,6 +192,29 @@ export default function Food() {
       },
     ]);
 
+  // Swipe a row left and tap Delete: gone straight away, with a few seconds
+  // to undo instead of a question first. Long press still asks.
+  const [deleted, setDeleted] = useState<{ meal: LoggedMeal; index: number; whole: boolean; name: string } | null>(null);
+  const deletedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const deleteRow = (meal: LoggedMeal, itemIndex: number) => {
+    const index = useAppStore.getState().meals.findIndex((m) => m.id === meal.id);
+    const whole = meal.items.length <= 1;
+    if (whole) removeMeal(meal.id);
+    else updateMeal(meal.id, { items: meal.items.filter((_, i) => i !== itemIndex) });
+    lightHaptic();
+    setDeleted({ meal, index, whole, name: meal.items[itemIndex]?.name ?? '' });
+    if (deletedTimer.current) clearTimeout(deletedTimer.current);
+    deletedTimer.current = setTimeout(() => setDeleted(null), 6000);
+  };
+  const undoDelete = () => {
+    if (!deleted) return;
+    if (deleted.whole) useAppStore.getState().restoreMeal(deleted.meal, deleted.index);
+    else updateMeal(deleted.meal.id, { items: deleted.meal.items });
+    setDeleted(null);
+    if (deletedTimer.current) clearTimeout(deletedTimer.current);
+    successHaptic();
+  };
+
   const openLog = (slot: MealType) => {
     usePending.getState().setMealTypeHint(slot);
     router.push('/add-menu?scope=food');
@@ -235,6 +259,7 @@ export default function Food() {
   );
 
   return (
+    <View style={{ flex: 1 }}>
     <CollapsingScreen
       title={t('tabs.food')}
       header={header}
@@ -459,8 +484,23 @@ export default function Food() {
                     const kcalUnknown = unknown.includes('calories');
                     const kcalLabel = kcalUnknown && item.calories === 0 ? t('nutrition.unknown') : `${knownLabel(num(item.calories), kcalUnknown)} ${t('common.kcal')}`;
                     return (
-                      <Pressable
+                      <Swipeable
                         key={`${meal.id}-${itemIndex}`}
+                        overshootRight={false}
+                        rightThreshold={40}
+                        renderRightActions={() => (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`${t('common.delete')} · ${item.name}`}
+                            onPress={() => deleteRow(meal, itemIndex)}
+                            style={[styles.swipeDelete, { backgroundColor: theme.danger }]}
+                          >
+                            <Icon name="trash" size={22} color="#fff" />
+                            <Text style={styles.swipeDeleteText}>{t('common.delete')}</Text>
+                          </Pressable>
+                        )}
+                      >
+                      <Pressable
                         onPress={() =>
                           router.push(
                             item.recipeId
@@ -469,6 +509,8 @@ export default function Food() {
                           )
                         }
                         onLongPress={() => (meal.items.length > 1 ? confirmDeleteItem(meal, itemIndex) : confirmDelete(meal.id))}
+                        accessibilityActions={[{ name: 'delete', label: t('common.delete') }]}
+                        onAccessibilityAction={(e) => e.nativeEvent.actionName === 'delete' && deleteRow(meal, itemIndex)}
                         accessibilityRole="button"
                         accessibilityLabel={`${item.name} · ${kcalLabel} · ${unknown.length > 0 ? t('mealPlan.incomplete') : t('mealPlan.logged')}`}
                         style={({ pressed }) => [
@@ -504,6 +546,7 @@ export default function Food() {
                         </View>
                         <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
                       </Pressable>
+                      </Swipeable>
                     );
                   }),
                 )}
@@ -534,6 +577,17 @@ export default function Food() {
         </>
       )}
     </CollapsingScreen>
+    {deleted && (
+      <View style={[styles.undoBar, { backgroundColor: theme.text }]} accessibilityLiveRegion="polite">
+        <Text style={{ color: theme.background, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+          {t('food.deletedRow', { name: deleted.name })}
+        </Text>
+        <Pressable accessibilityRole="button" onPress={undoDelete} hitSlop={10}>
+          <Text style={{ color: theme.background, fontWeight: '800' }}>{t('mealPlan.undo')}</Text>
+        </Pressable>
+      </View>
+    )}
+    </View>
   );
 }
 
@@ -743,6 +797,20 @@ function PlanDay({
 }
 
 const styles = StyleSheet.create({
+  swipeDelete: { justifyContent: 'center', alignItems: 'center', width: 88, gap: 2 },
+  swipeDeleteText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  undoBar: {
+    position: 'absolute',
+    left: Spacing.md,
+    right: Spacing.md,
+    bottom: 110,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 12,
+  },
   segmentWrap: { borderRadius: Radius.control + 6, padding: 4 },
   planHead: { marginBottom: Spacing.ms, gap: 2 },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },

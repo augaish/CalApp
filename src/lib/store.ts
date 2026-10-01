@@ -258,6 +258,8 @@ export interface AppState {
   setTargets: (targets: DailyTargets) => void;
   logMeal: (items: FoodItem[], photoUri?: string, mealType?: MealType, at?: string) => void;
   removeMeal: (id: string) => void;
+  /** Put a deleted meal back where it was in the list (Undo after a swipe). */
+  restoreMeal: (meal: LoggedMeal, index: number) => void;
   /** Edit a logged meal in place (items, meal type, and/or date-time). */
   updateMeal: (
     id: string,
@@ -704,6 +706,13 @@ export const useAppStore = create<AppState>()(
           ],
         })),
       removeMeal: (mealId) => set((s) => ({ meals: s.meals.filter((m) => m.id !== mealId) })),
+      restoreMeal: (meal, index) =>
+        set((s) => {
+          if (s.meals.some((m) => m.id === meal.id)) return {};
+          const meals = [...s.meals];
+          meals.splice(Math.max(0, Math.min(index, meals.length)), 0, meal);
+          return { meals };
+        }),
       updateMeal: (mealId, patch) =>
         set((s) => ({
           meals: s.meals.map((m) =>
@@ -822,7 +831,7 @@ export const useAppStore = create<AppState>()(
               : placeholder >= 0
                 ? existing.sets.map((st, i) => (i === placeholder ? stamped : st))
                 : [...existing.sets, stamped];
-            const withPR = markPRs(sets, exercise.type);
+            const withPR = markPRs(sets, exercise.type, isAssistedExercise(exercise.id, exercise.name));
             return {
               workouts: s.workouts.map((w) =>
                 w.id === existing.id
@@ -842,7 +851,7 @@ export const useAppStore = create<AppState>()(
               ),
             };
           }
-          const sets = markPRs([stamped], exercise.type);
+          const sets = markPRs([stamped], exercise.type, isAssistedExercise(exercise.id, exercise.name));
           // A session started for a moved occurrence links its actual records
           // to that occurrence; `at` is still the real performed time.
           const occ = s.activeSession?.occurrenceId && s.activeSession.dayKey === dateKey(new Date(when)) ? s.activeSession.occurrenceId : undefined;
@@ -875,7 +884,7 @@ export const useAppStore = create<AppState>()(
               const category = ex?.category;
               return {
                 ...w,
-                sets: markPRs(sets, w.type),
+                sets: markPRs(sets, w.type, isAssistedWorkout(w)),
                 updatedAt,
                 caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, updatedAt), ex),
               };
@@ -897,7 +906,7 @@ export const useAppStore = create<AppState>()(
             const category = ex?.category;
             workouts.push({
               ...w,
-              sets: markPRs(sets, w.type),
+              sets: markPRs(sets, w.type, isAssistedWorkout(w)),
               caloriesBurned: burnForSets(sets, bodyKg, category, elapsedMinutes(w.at, w.updatedAt), ex),
             });
           }
@@ -1155,7 +1164,7 @@ export const useAppStore = create<AppState>()(
           : planned && planned.length > 0
             ? planned.map((p) => ({ ...p, done: trained, isPR: false }))
             : [{ done: trained }];
-        const sets = markPRs(base, exercise.type);
+        const sets = markPRs(base, exercise.type, isAssistedExercise(exercise.id, exercise.name));
         set((s) => ({
           workouts: [
             {
@@ -1873,7 +1882,7 @@ export function migrateStore(persisted: unknown, version: number): unknown {
   if (version < 14 && Array.isArray(state.workouts)) {
     state.workouts = (state.workouts as LoggedWorkout[]).map((w) => {
       if (!Array.isArray(w.sets) || !w.sets.some((s) => s.done) || w.sets.every((s) => s.done)) return w;
-      return { ...w, sets: markPRs(w.sets.filter((s) => s.done), w.type) };
+      return { ...w, sets: markPRs(w.sets.filter((s) => s.done), w.type, isAssistedWorkout(w)) };
     });
   }
 
@@ -2409,19 +2418,39 @@ function stampFor(day: Date): string {
  * tie-break. Exported so anything that orders or highlights sets agrees with
  * the trophy instead of growing its own definition of "best".
  */
-export function setScore(s: WorkoutSet, type: LoggedWorkout['type']): number {
+export function setScore(s: WorkoutSet, type: LoggedWorkout['type'], assisted = false): number {
   if (type === 'bodyweight_reps') return s.reps ?? 0;
   if (type === 'time') return s.seconds ?? 0;
   if (type === 'distance_time') return s.distanceM ?? 0;
+  // On an assisted machine the weight is help, not load: less of it is the
+  // harder, better set. Still always above zero, so "nothing yet" stays 0.
+  if (assisted) return Math.max(0, ASSIST_CEILING_KG - (s.weightKg ?? 0)) * 1000 + (s.reps ?? 0);
   return (s.weightKg ?? 0) * 1000 + (s.reps ?? 0);
 }
 
+const ASSIST_CEILING_KG = 1000;
+const ASSISTED_IDS = new Set(['assisted-pull-up-machine', 'assisted-dip-machine']);
+
+/**
+ * Exercises where the weight on the stack helps you (assisted pull-up and dip
+ * machines): progress means going lower. Built-in ones by id; anyone's own
+ * by name, in either language.
+ */
+export function isAssistedExercise(id: string, name?: string): boolean {
+  return ASSISTED_IDS.has(id.replace(/^builtin:/, '')) || /assist|مساعد/i.test(name ?? '');
+}
+
+/** The same, for a logged session. */
+export function isAssistedWorkout(w: Pick<LoggedWorkout, 'exerciseId' | 'exerciseName'>): boolean {
+  return isAssistedExercise(w.exerciseId, w.exerciseName);
+}
+
 /** Index of the best set in a session (highest score; first wins ties), or -1. */
-export function bestSetIndex(sets: WorkoutSet[], type: LoggedWorkout['type']): number {
+export function bestSetIndex(sets: WorkoutSet[], type: LoggedWorkout['type'], assisted = false): number {
   let bestIdx = -1;
   let best = 0;
   sets.forEach((s, i) => {
-    const score = setScore(s, type);
+    const score = setScore(s, type, assisted);
     if (score > best) {
       best = score;
       bestIdx = i;
@@ -2431,8 +2460,8 @@ export function bestSetIndex(sets: WorkoutSet[], type: LoggedWorkout['type']): n
 }
 
 /** Flags the single best set in a session as the PR (highest score, first wins ties). */
-function markPRs(sets: WorkoutSet[], type: LoggedWorkout['type']): WorkoutSet[] {
-  const bestIdx = bestSetIndex(sets, type);
+function markPRs(sets: WorkoutSet[], type: LoggedWorkout['type'], assisted = false): WorkoutSet[] {
+  const bestIdx = bestSetIndex(sets, type, assisted);
   return sets.map((s, i) => ({ ...s, isPR: i === bestIdx }));
 }
 
@@ -2446,7 +2475,7 @@ export function bestScoreBefore(
   for (const w of workouts) {
     if (w.exerciseId !== exerciseId) continue;
     if (startOfDay(new Date(w.at)).getTime() >= startOfDay(day).getTime()) continue;
-    for (const s of w.sets) best = Math.max(best, setScore(s, w.type));
+    for (const s of w.sets) best = Math.max(best, setScore(s, w.type, isAssistedWorkout(w)));
   }
   return best;
 }
@@ -2478,7 +2507,7 @@ export function bestSetEver(
     if (w.exerciseId !== exerciseId) continue;
     for (const s of w.sets) {
       if (!s.done) continue;
-      const score = setScore(s, w.type);
+      const score = setScore(s, w.type, isAssistedWorkout(w));
       if (score > bestScore) {
         bestScore = score;
         best = { set: s, at: w.at, type: w.type };

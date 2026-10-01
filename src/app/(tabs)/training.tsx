@@ -36,6 +36,7 @@ import {
   useAppStore,
   whoopCalibrationFactor,
   workoutFor,
+  isAssistedExercise,
 } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
@@ -519,6 +520,7 @@ export default function Training() {
                 // Today's sets, else last time's, else the plan — and the
                 // strip says which, so the numbers never look invented.
                 const lastSession = lastSessionBefore(workouts, exId, selected);
+                const assisted = isAssistedExercise(exId, ex?.name);
                 // Only lifted sets are today's. A record whose rows nobody
                 // lifted (an unticked exercise keeping its numbers) reads as
                 // last time, which is what those numbers are.
@@ -526,7 +528,7 @@ export default function Training() {
                 const source: 'today' | 'last' | 'plan' = lifted.length ? 'today' : lastSession?.sets.length ? 'last' : 'plan';
                 const rows: WorkoutSet[] = (
                   source === 'today' ? lifted : source === 'last' ? lastSession!.sets.map((s) => ({ ...s, done: false })) : planned.map((p) => ({ ...p, done: false }))
-                ).sort((a, b) => setScore(a, type) - setScore(b, type));
+                ).sort((a, b) => setScore(a, type, assisted) - setScore(b, type, assisted));
                 const best = bestSetEver(workouts, exId);
                 const wTodayCalories = wToday ? selectedDayAllocation.get(wToday.id) : undefined;
                 const shape = shapeLabel(rows, type, t);
@@ -567,7 +569,7 @@ export default function Training() {
                         {rows.length > 0 && !dragging && (
                           <View style={styles.setStrip}>
                             {rows.map((s, i) => {
-                              const top = i === bestSetIndex(rows, type);
+                              const top = i === bestSetIndex(rows, type, assisted);
                               return (
                                 <View key={i} style={[styles.setChip, top ? { backgroundColor: accent + '22', borderColor: accent + '55' } : { backgroundColor: theme.surfaceTint, borderColor: 'transparent' }]}>
                                   <Text style={{ color: top ? accent : theme.textSecondary, fontSize: 11, fontWeight: top ? '800' : '600' }}>{setChipLabel(s, type, kg, min)}</Text>

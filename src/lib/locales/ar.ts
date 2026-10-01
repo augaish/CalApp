@@ -435,6 +435,7 @@ export const ar: TranslationSchema = {
     cookingSteps: 'خطوات الطهي',
   },
   food: {
+    deletedRow: 'تم حذف: {{name}}',
     recipesSaved: '{{n}} محفوظة',
     recipesNone: 'اكتب واحدة',
     shoppingOpen: 'قائمة قيد التجهيز',

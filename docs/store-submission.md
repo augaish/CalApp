@@ -441,6 +441,11 @@ Pushed to GitHub and tested, but not sent to phones yet:
 - **Edit meal portions.** A meal saved at ½ reopens at ½ of the whole plate. Every item gets an Amount eaten box with − and +, plus the ¼ ½ 1 1½ 2 chips, and the two stay in sync. Labels follow the portion.
 - **WHOOP and AI Support.** Sharing WHOOP data with AI Support starts off, and you're asked once after connecting WHOOP. Disconnecting clears WHOOP data from the phone and the backup.
 - **Sign-in proof.** A signed-in phone sends its Supabase sign-in token with every request, so nobody can act as someone else by copying their account ID. WHOOP connect uses a one-time ticket.
+- **Swipe to delete food.** Swipe a row in Food left and tap Delete. It's gone at once, with Undo for a few seconds. Long press still asks first.
+- **Sets start from "Last time".** Every set opens with the highlighted Last time chip's weight and reps; change them or just tap Complete.
+- **Rest keeps running.** Switching exercise in a workout no longer stops the rest timer. Only zero, Skip rest, Undo or Finish do.
+- **Assisted machines.** On assisted pull-up and dip machines, less assistance counts as the better set: trophies, Best, records, the graph.
+- **Dead Hang** added to the library, timed like the plank.
 
 Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, keeping WHOOP data away from DeepSeek, the WHOOP sign-in page fix, account deletion that only deletes the sign-in token's own account, and "give plan by email" matching only the email Supabase verified.
 

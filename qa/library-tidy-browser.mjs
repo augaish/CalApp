@@ -39,7 +39,7 @@ for (const lang of ['en', 'ar']) {
   await page.waitForTimeout(2500);
   console.log(`=== ${lang}: the library after load ===`);
   const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('calapp-store')));
-  check('the store is on v15', stored.version === 15, String(stored.version));
+  check('the store is on the current version (v16)', stored.version === 16, String(stored.version));
   const ids = stored.state.exercises.map((e) => e.id);
   check('the custom "سحب علوي" is gone (folded into Lat Pulldown)', !ids.includes('custom:a'), ids.join(','));
   check('  its two sets now belong to the built-in', stored.state.workouts[0].exerciseId === 'builtin:lat-pulldown' && stored.state.workouts[0].sets.length === 2);

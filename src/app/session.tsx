@@ -28,6 +28,8 @@ import {
   useAppStore,
   whoopCalibrationFactor,
   workoutFor,
+  isAssistedExercise,
+  isAssistedWorkout,
 } from '@/lib/store';
 import type { ExerciseType, PlannedSet, WorkoutSet } from '@/lib/types';
 
@@ -122,14 +124,18 @@ export default function SessionScreen() {
   const target: SetShape | undefined = planned[setNo];
   // The record to beat, not "whatever came last" (AT03).
   const best = exId ? bestSetEver(workouts, exId) : undefined;
+  const assisted = !!exId && isAssistedExercise(exId, ex?.name);
   const lastSession = exId ? lastSessionBefore(workouts, exId, day) : undefined;
   const lastSet: SetShape | undefined = lastSession?.sets[setNo] ?? lastSession?.sets[lastSession.sets.length - 1];
 
-  // Prefill once from the target, else the set just finished, else last
-  // time; hand edits are kept per (exercise, set) and never overwritten by
-  // a reps change (AT04).
+  // Prefill from the highlighted "Last time" chip — the same set number last
+  // time — so the boxes show exactly what that chip says, every set, and a
+  // repeat is just Complete. With no matching set last time: the plan's
+  // target, else the set just finished, else last time's final set. Hand
+  // edits are kept per (exercise, set) and never overwritten (AT04).
   const prefillKey = `${exId ?? ''}:${setNo}`;
-  const prefillSrc = target ?? doneSets[doneSets.length - 1] ?? lastSet;
+  const lastMatching: SetShape | undefined = lastSession?.sets[setNo];
+  const prefillSrc = lastMatching ?? target ?? doneSets[doneSets.length - 1] ?? lastSet;
   const prefill: Required<SetShape> = {
     weightKg: prefillSrc?.weightKg ?? 0,
     reps: prefillSrc?.reps ?? 0,
@@ -258,7 +264,7 @@ export default function SessionScreen() {
     // A new all-time best gets its own moment: the heavy thud and its own
     // words, not the everyday "set logged". The first set ever of an
     // exercise has nothing to beat, so it is an ordinary set.
-    const newRecord = !continuous && !!best && setScore(set, type) > setScore(best.set, type);
+    const newRecord = !continuous && !!best && setScore(set, type, assisted) > setScore(best.set, type, assisted);
     if (newRecord) {
       recordHaptic();
       useCelebrate.getState().celebrate(t('celebrate.newRecord', { set: label(set) }));
@@ -328,10 +334,25 @@ export default function SessionScreen() {
     lightHaptic();
   };
 
+  // Moving to another exercise never touches a running rest: it ends at
+  // zero, on Skip rest, on Undo or when the workout finishes — not because
+  // you walked to a different machine. "Next" now names where you went.
   const jumpTo = (next: number) => {
     if (next === index || next < 0 || next >= total) return;
     setMoved(null);
-    updateSession({ index: next, currentId: ids[next], restEndsAt: null });
+    const toId = ids[next];
+    const resting = !!session?.restEndsAt && restRemaining > 0;
+    if (resting) {
+      const to = findExercise(toId, custom);
+      const done = workoutFor(workouts, toId, day)?.sets.filter((st) => st.done).length ?? 0;
+      updateSession({
+        index: next,
+        currentId: toId,
+        restNext: t('session.restNextExercise', { name: to ? exerciseName(to, lang) : toId, n: done + 1, total: goalFor(toId) }),
+      });
+    } else {
+      updateSession({ index: next, currentId: toId });
+    }
     lightHaptic();
   };
   const go = (delta: number) => jumpTo(Math.min(total - 1, Math.max(0, index + delta)));
@@ -389,7 +410,7 @@ export default function SessionScreen() {
         </View>
         <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           {rows.map((r, i) => {
-            const bestIdx = r.done.length ? bestSetIndex(r.done, r.w!.type) : -1;
+            const bestIdx = r.done.length ? bestSetIndex(r.done, r.w!.type, isAssistedWorkout(r.w!)) : -1;
             return (
               <View key={r.id} style={[styles.summaryRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
                 <View style={{ flex: 1 }}>
@@ -661,7 +682,7 @@ export default function SessionScreen() {
                 <View key={i} style={[styles.doneRow, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border }]}>
                   <Text style={{ color: theme.textSecondary, width: 24, fontWeight: '700' }}>{i + 1}</Text>
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }}>{label(s)}</Text>
-                  {i === bestSetIndex(doneSets, type) && <Icon name="trophy" size={14} color={theme.carbs} />}
+                  {i === bestSetIndex(doneSets, type, assisted) && <Icon name="trophy" size={14} color={theme.carbs} />}
                   {i === doneSets.length - 1 && (
                     <Pressable onPress={undoLast} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('session.undoLast')}>
                       <Text style={{ color: theme.primary, fontWeight: '700' }}>{t('session.undo')}</Text>

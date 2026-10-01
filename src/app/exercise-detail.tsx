@@ -37,6 +37,8 @@ import {
   whoopCalibrationFactor,
   whoopKcalForWorkout,
   workoutFor,
+  isAssistedExercise,
+  isAssistedWorkout,
 } from '@/lib/store';
 import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
 
@@ -48,6 +50,11 @@ function est1RM(w: number, reps: number): number {
 
 /** Comparable "best set" metric per exercise type, for the progress graph. */
 function sessionMetric(w: LoggedWorkout): number {
+  // Assisted machines: the session's best is the least help it needed.
+  if (w.type === 'weight_reps' && isAssistedWorkout(w)) {
+    const help = w.sets.map((s) => s.weightKg ?? 0).filter((kg) => kg > 0);
+    return help.length ? Math.round(Math.min(...help)) : 0;
+  }
   let best = 0;
   for (const s of w.sets) {
     if (w.type === 'bodyweight_reps') best = Math.max(best, s.reps ?? 0);
@@ -356,6 +363,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
       {tab === 'track' && (
         <TrackTab
           type={type}
+          assisted={isAssistedExercise(exercise.id, exercise.name)}
           continuous={continuous}
           weight={weight}
           reps={reps}
@@ -505,6 +513,7 @@ function TrackTab({
   onLogReference,
   caloriesBurned,
   fromWhoop,
+  assisted = false,
   editingIndex,
   onSelect,
   onDelete,
@@ -547,6 +556,8 @@ function TrackTab({
   caloriesBurned?: number;
   /** Whether `caloriesBurned` came from a matched WHOOP workout. */
   fromWhoop?: boolean;
+  /** Assisted machine: less weight is the better set. */
+  assisted?: boolean;
   editingIndex: number | null;
   onSelect: (s: WorkoutSet, i: number) => void;
   onDelete: (i: number) => void;
@@ -642,7 +653,7 @@ function TrackTab({
         <Card>
           {sets.map(({ set: s, index }, i) => {
             const active = editingIndex === index;
-            const isBest = i === bestSetIndex(sets.map((r) => r.set), type);
+            const isBest = i === bestSetIndex(sets.map((r) => r.set), type, assisted);
             return (
               <Pressable accessibilityRole="button"
                 key={index}
@@ -774,7 +785,7 @@ function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; typ
                   </Text>
                 ) : null}
               </View>
-              {i === bestSetIndex(w.sets, w.type) && <Icon name="trophy" size={13} color={theme.carbs} />}
+              {i === bestSetIndex(w.sets, w.type, isAssistedWorkout(w)) && <Icon name="trophy" size={13} color={theme.carbs} />}
               {type === 'weight_reps' && (s.weightKg ?? 0) > 0 && (s.reps ?? 0) > 0 ? (
                 <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
                   {t('track.est1rm')} {est1RM(s.weightKg ?? 0, s.reps ?? 0)}

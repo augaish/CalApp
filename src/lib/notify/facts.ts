@@ -14,6 +14,7 @@ import {
   weightTrend,
   workoutStreakDays,
   type AppState,
+  isAssistedWorkout,
 } from '../store';
 import type { LoggedMeal, LoggedWorkout, WeightEntry } from '../types';
 import {
@@ -135,7 +136,7 @@ export function prsOn(workouts: LoggedWorkout[], day: Date): number {
     if (before <= 0) continue;
     const todayBest = workouts
       .filter((x) => x.exerciseId === w.exerciseId && isSameDay(x.at, day))
-      .flatMap((x) => x.sets.filter((s) => s.done).map((s) => setScore(s, x.type)))
+      .flatMap((x) => x.sets.filter((s) => s.done).map((s) => setScore(s, x.type, isAssistedWorkout(x))))
       .reduce((a, b) => Math.max(a, b), 0);
     if (todayBest > before) {
       prs++;
@@ -192,7 +193,7 @@ function dayFacts(s: State, date: Date, now: Date): DayFacts {
     const last = workouts
       .filter((w) => w.exerciseId === planIds[0] && new Date(w.at).getTime() < startOfDay(date).getTime())
       .sort((a, b) => new Date(b.at).getTime() - new Date(a.at).getTime())[0];
-    const best = last?.sets.filter((x) => x.done).sort((a, b) => setScore(b, last.type) - setScore(a, last.type))[0];
+    const best = last?.sets.filter((x) => x.done).sort((a, b) => setScore(b, last.type, isAssistedWorkout(last)) - setScore(a, last.type, isAssistedWorkout(last)))[0];
     lead = { name: ex?.name ?? last?.exerciseName ?? '', weightKg: best?.weightKg, reps: best?.reps };
     if (!lead.name) lead = undefined;
   }

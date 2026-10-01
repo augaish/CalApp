@@ -433,6 +433,7 @@ export const en = {
     cookingSteps: 'Cooking steps',
   },
   food: {
+    deletedRow: 'Deleted: {{name}}',
     recipesSaved: '{{n}} saved',
     recipesNone: 'Write one',
     shoppingOpen: 'List in progress',
