@@ -62,7 +62,7 @@ for (const lang of ['en', 'ar']) {
       continue;
     }
     // A back control may carry the name of where it goes ("‹ Recipes").
-    const names = lang === 'ar' ? /^(رجوع|إغلاق|إلغاء|الوصفات)$/ : /^(Back|Close|Cancel|Recipes)$/;
+    const names = lang === 'ar' ? /^(رجوع|إغلاق|إلغاء|الوصفات|الملف الشخصي)$/ : /^(Back|Close|Cancel|Recipes|Profile)$/;
     const exits = page.getByRole('button', { name: names });
     const n = await exits.count();
     let visibleTop = false;

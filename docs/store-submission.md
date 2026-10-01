@@ -446,6 +446,11 @@ Pushed to GitHub and tested, but not sent to phones yet:
 - **Rest keeps running.** Switching exercise in a workout no longer stops the rest timer. Only zero, Skip rest, Undo or Finish do.
 - **Assisted machines.** On assisted pull-up and dip machines, less assistance counts as the better set: trophies, Best, records, the graph.
 - **Dead Hang** added to the library, timed like the plank.
+- **New Profile and Settings.**
+  - Profile now shows only you: account, Membership, Food targets, Training preferences, Help & feedback, Log out.
+  - A gear in the header opens **Settings**: Language, Units, Appearance, Notifications, Privacy & data, Redeem a code.
+  - Export my data is now inside Privacy & data.
+  - In Arabic the header buttons now sit on the correct side.
 
 Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, keeping WHOOP data away from DeepSeek, the WHOOP sign-in page fix, account deletion that only deletes the sign-in token's own account, and "give plan by email" matching only the email Supabase verified.
 

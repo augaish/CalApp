@@ -301,6 +301,10 @@ export function PageHeader({
             </Text>
           )}
         </View>
+        {/* A spacer, not marginStart: 'auto', keeps the right-hand action at
+            the far edge in either direction — the web build reads start
+            margins left-to-right even when the page is Arabic. */}
+        <View style={styles.spacer} pointerEvents="none" />
         <View
           style={styles.rightSlot}
           onLayout={(e) => {
@@ -356,5 +360,6 @@ const styles = StyleSheet.create({
   titleWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   pageTitle: { fontSize: 18, fontWeight: '800' },
   pageSubtitle: { fontSize: 12, fontWeight: '600' },
-  rightSlot: { marginStart: 'auto', minWidth: TOUCH, alignItems: 'flex-end', zIndex: 1 },
+  spacer: { flex: 1 },
+  rightSlot: { minWidth: TOUCH, alignItems: 'flex-end', zIndex: 1 },
 });

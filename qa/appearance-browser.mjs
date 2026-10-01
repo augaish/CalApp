@@ -1,4 +1,4 @@
-// Appearance: Light by default; System / Light / Dark from Profile, and the palette follows.
+// Appearance: Light by default; System / Light / Dark from Profile → Settings, and the palette follows.
 import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
 const BASE = 'http://127.0.0.1:8099';
 const state = (appearance) => ({
@@ -49,10 +49,10 @@ await ctx.close();
 ({ ctx, page } = await open('light', 'dark'));
 check('Light pinned stays light on a dark phone', (await pageBg(page)) === LIGHT, await pageBg(page));
 await ctx.close();
-({ ctx, page } = await open('dark', 'light', '/profile'));
+({ ctx, page } = await open('dark', 'light', '/settings'));
 check('Dark pinned is dark on a light phone', (await pageBg(page)) === DARK, await pageBg(page));
 const b = (await page.textContent('body')).replace(/\s+/g, ' ');
-check('Profile shows the Appearance setting with its value', /Appearance\s*Dark/.test(b));
+check('Settings shows the Appearance setting with its value', /Appearance\s*Dark/.test(b));
 check('no page errors', page.errors.length === 0, page.errors.join(' | '));
 await ctx.close();
 await browser.close();

@@ -1,85 +1,35 @@
 import { useRouter } from 'expo-router';
-import * as Updates from 'expo-updates';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { MembershipCard } from '@/components/plan-status';
 import { PageHeader } from '@/components/brand-header';
-import { RowGroup, SettingsRow, StatusPill } from '@/components/system';
+import { RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { logOut } from '@/lib/account';
 import { alertDestructive } from '@/lib/alerts';
-import { chooseExport } from '@/lib/export';
 import { lightHaptic } from '@/lib/feedback';
-import { applyRTL, setI18nLanguage } from '@/lib/i18n';
 import { useAppStore } from '@/lib/store';
-import type { Language, Units } from '@/lib/types';
 
 /**
- * S20 Profile — account status stated as it is (Guest or signed in), an
- * explained sync route, then Preferences, Goals and Account groups. Goal
- * rows open editors; nothing here rewrites diary history. Connections live
- * in Health; AI Support stays a labelled route.
+ * Profile — about the person: account, the explained sync route for a guest,
+ * membership, goals and help (AI Support stays on every tab's header). How the app behaves (language, units,
+ * appearance, notifications, privacy & data, codes) lives in Settings behind
+ * the gear. Goal rows open editors; nothing here rewrites diary history.
  */
 export default function Profile() {
   const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const language = useAppStore((s) => s.language) ?? 'en';
-  const setLanguage = useAppStore((s) => s.setLanguage);
-  const units = useAppStore((s) => s.units);
-  const setUnits = useAppStore((s) => s.setUnits);
   const targets = useAppStore((s) => s.targets);
   const account = useAppStore((s) => s.account);
   const signOut = useAppStore((s) => s.signOut);
   const isGuest = !account?.email && account?.provider === 'guest';
-
-  const switchLanguage = (lang: Language) => {
-    if (lang === language) return;
-    setLanguage(lang);
-    setI18nLanguage(lang);
-    if (applyRTL(lang)) {
-      Alert.alert(t('settings.restartNeeded'), t('settings.restartBody'), [
-        {
-          text: t('settings.restartNow'),
-          onPress: async () => {
-            try {
-              await Updates.reloadAsync();
-            } catch {
-              // Dev / Expo Go: direction fully applies on next app start.
-            }
-          },
-        },
-      ]);
-    }
-  };
-
-  const chooseLanguage = () =>
-    Alert.alert(t('settings.language'), undefined, [
-      { text: t('settings.english'), onPress: () => switchLanguage('en') },
-      { text: t('settings.arabic'), onPress: () => switchLanguage('ar') },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
-
-  const appearance = useAppStore((s) => s.appearance) ?? 'light';
-  const setAppearance = useAppStore((s) => s.setAppearance);
-  const chooseAppearance = () =>
-    Alert.alert(t('appearance.title'), t('appearance.note'), [
-      { text: t('appearance.system'), onPress: () => setAppearance('system') },
-      { text: t('appearance.light'), onPress: () => setAppearance('light') },
-      { text: t('appearance.dark'), onPress: () => setAppearance('dark') },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
-
-  const chooseUnits = () =>
-    Alert.alert(t('units.title'), t('units.note'), [
-      { text: t('units.metric'), onPress: () => setUnits('metric' as Units) },
-      { text: t('units.imperial'), onPress: () => setUnits('imperial' as Units) },
-      { text: t('common.cancel'), style: 'cancel' },
-    ]);
+  const name = account?.name?.trim() || t('profile.guest');
+  const initial = !isGuest && account?.name?.trim() ? Array.from(account.name.trim())[0].toUpperCase() : null;
 
   /** Sync needs an identity first. Data on this device is kept and merged after sign-in. */
   const startSync = () =>
@@ -87,8 +37,6 @@ export default function Profile() {
       { text: t('common.cancel'), style: 'cancel' },
       { text: t('welcome.signIn'), onPress: () => signOut() },
     ]);
-
-  const exportData = () => chooseExport();
 
   const confirmSignOut = () =>
     alertDestructive(t('profile.signOut'), t('profile.signOutConfirm'), [
@@ -110,26 +58,42 @@ export default function Profile() {
   };
 
 
-  const unitsLabel = units === 'imperial' ? `${t('units.lb')} / ${t('units.in')}` : `${t('progress.kg')} / ${t('units.cm')}`;
-
   return (
-    <Screen header={<PageHeader title={t('profile.title')} />}>
+    <Screen
+      header={
+        <PageHeader
+          title={t('profile.title')}
+          right={
+            <Pressable
+              onPress={() => router.push('/settings')}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.title')}
+              style={({ pressed }) => [styles.headerButton, pressed && { opacity: 0.7 }]}
+            >
+              <Icon name="settings-outline" size={22} color={theme.onGradient} />
+            </Pressable>
+          }
+        />
+      }
+    >
       <Pressable
         onPress={() => router.push('/edit-profile')}
         accessibilityRole="button"
-        accessibilityLabel={`${account?.name ?? t('profile.guest')}. ${t('settings.editProfile')}`}
+        accessibilityLabel={`${name}. ${t('settings.editProfile')}`}
         style={({ pressed }) => [styles.account, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.8 }]}
       >
         <View style={[styles.avatar, { backgroundColor: theme.surfaceTint }]}>
-          <Icon name="person" size={34} color={theme.primary} />
+          {initial ? (
+            <Text style={{ color: theme.primary, fontSize: 24, fontWeight: '700' }}>{initial}</Text>
+          ) : (
+            <Icon name="person" size={30} color={theme.primary} />
+          )}
         </View>
         <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-            <Text style={{ color: theme.text, fontSize: 22, fontWeight: '800' }} numberOfLines={1}>
-              {account?.name ?? t('profile.guest')}
-            </Text>
-            <StatusPill label={isGuest ? t('profile.guest') : t('profile.signedIn')} tone={isGuest ? 'neutral' : 'active'} />
-          </View>
+          <Text style={{ color: theme.text, fontSize: 20, fontWeight: '800' }} numberOfLines={1}>
+            {name}
+          </Text>
           <Text style={{ color: theme.textSecondary, fontSize: 14, marginTop: 2 }} numberOfLines={1}>
             {account?.email ?? t('profile.onThisDevice')}
           </Text>
@@ -143,17 +107,9 @@ export default function Profile() {
         </RowGroup>
       )}
 
-      <RowGroup title={t('profile.preferences')}>
-        <SettingsRow icon="globe-outline" title={t('settings.language')} value={language === 'ar' ? t('settings.arabic') : t('settings.english')} onPress={chooseLanguage} />
-        <SettingsRow icon="resize-outline" title={t('units.title')} value={unitsLabel} onPress={chooseUnits} />
-        <SettingsRow icon="contrast-outline" title={t('appearance.title')} value={t(`appearance.${appearance}`)} onPress={chooseAppearance} />
-        <SettingsRow icon="notifications-outline" title={t('notifications.title')} onPress={() => router.push('/notifications')} last />
-      </RowGroup>
-
-      <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '700', marginBottom: 6, marginTop: Spacing.sm }}>{t('profile.membership')}</Text>
       <MembershipCard />
 
-      <RowGroup title={t('profile.goals')}>
+      <RowGroup>
         <SettingsRow
           icon="restaurant-outline"
           title={t('profile.foodTargets')}
@@ -161,13 +117,6 @@ export default function Profile() {
           onPress={() => router.push('/edit-targets')}
         />
         <SettingsRow icon="barbell-outline" title={t('profile.trainingPreferences')} onPress={() => router.push('/program')} last />
-      </RowGroup>
-
-      <RowGroup title={t('profile.account')}>
-        <SettingsRow icon="pricetag-outline" title={t('redeem.title')} onPress={() => router.push('/redeem')} />
-        <SettingsRow icon="document-text-outline" title={t('legal.exportData')} onPress={exportData} />
-        <SettingsRow icon="sparkles-outline" title={t('tabs.ai')} onPress={() => router.push('/coach')} />
-        <SettingsRow icon="shield-checkmark-outline" title={t('profile.privacy')} onPress={() => router.push('/privacy')} last />
       </RowGroup>
 
       <RowGroup>
@@ -183,9 +132,16 @@ export default function Profile() {
       </RowGroup>
 
       {account?.email && (
-        <RowGroup>
-          <SettingsRow icon="log-out-outline" iconColor={theme.danger} title={t('profile.signOut')} onPress={confirmSignOut} chevron={false} last />
-        </RowGroup>
+        <Pressable
+          onPress={confirmSignOut}
+          accessibilityRole="button"
+          accessibilityLabel={t('profile.signOut')}
+          hitSlop={8}
+          style={({ pressed }) => [styles.signOut, pressed && { opacity: 0.6 }]}
+        >
+          <Icon name="log-out-outline" size={20} color={theme.danger} />
+          <Text style={{ color: theme.danger, fontSize: 16, fontWeight: '700' }}>{t('profile.signOut')}</Text>
+        </Pressable>
       )}
     </Screen>
   );
@@ -193,5 +149,7 @@ export default function Profile() {
 
 const styles = StyleSheet.create({
   account: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
-  avatar: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center' },
+  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  headerButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.18)' },
+  signOut: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.sm, minHeight: 48, marginTop: Spacing.sm, alignSelf: 'center', paddingHorizontal: Spacing.lg },
 });

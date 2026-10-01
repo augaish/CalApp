@@ -59,11 +59,11 @@ export const PRIVACY_HTML = page(
   <li><strong>Anthropic</strong> (Claude), United States, and</li>
   <li><strong>DeepSeek</strong>, China,</li>
 </ul>
-<p>depending on your plan and on which service is available. Each processes the content under its own API terms. We send only what is needed to answer — never your name or email — and our server does not keep your photos, reports or messages after the answer is returned. The providers may keep what they receive for a limited period under their own terms (for example, for safety and abuse monitoring). The app asks your permission before anything is sent to an AI provider for the first time, and you can withdraw it at any time in Profile → Privacy → AI processing. The AI coach also receives a short summary of your recent totals (calories, macros, workouts) so its answer can refer to your own data; it is used only for that reply. You choose what it may see in Profile → Privacy → Manage shared context.</p>
+<p>depending on your plan and on which service is available. Each processes the content under its own API terms. We send only what is needed to answer — never your name or email — and our server does not keep your photos, reports or messages after the answer is returned. The providers may keep what they receive for a limited period under their own terms (for example, for safety and abuse monitoring). The app asks your permission before anything is sent to an AI provider for the first time, and you can withdraw it at any time in Profile → Settings → Privacy &amp; data → AI processing. The AI coach also receives a short summary of your recent totals (calories, macros, workouts) so its answer can refer to your own data; it is used only for that reply. You choose what it may see in Profile → Settings → Privacy &amp; data → Manage shared context.</p>
 
 <h2>WHOOP</h2>
 <p>If you connect WHOOP, we read your WHOOP workouts, recovery, sleep and daily strain through WHOOP's official API, with the permission you give on WHOOP's own sign-in page. We use your WHOOP workouts to show the calories you really burned in the app, and — only if you allow it — your recovery, sleep and strain to give the AI coach context for its reply. WHOOP data sent to the coach goes only to Anthropic, never to DeepSeek, and is used only for that reply. We never sell WHOOP data, share it with anyone else, or use it to train AI models.</p>
-<p>Disconnecting WHOOP (Health → Connections, or Profile → Privacy → Connections) cancels our access at WHOOP, deletes our access tokens and removes WHOOP data from the app and your backup. Deleting your account does the same.</p>
+<p>Disconnecting WHOOP (Health → Connections, or Profile → Settings → Privacy &amp; data → Connections) cancels our access at WHOOP, deletes our access tokens and removes WHOOP data from the app and your backup. Deleting your account does the same.</p>
 
 <h2>What our server keeps</h2>
 <ul>
@@ -100,9 +100,9 @@ export const PRIVACY_HTML = page(
 
 <h2>Your choices</h2>
 <ul>
-  <li><strong>Export.</strong> Profile → Export my data gives you a copy of everything stored on your device.</li>
-  <li><strong>AI processing.</strong> Profile → Privacy → AI processing turns it off or on.</li>
-  <li><strong>Delete.</strong> Profile → Privacy → Delete my account erases the data on your phone, your backup, your sign-in account and every server record linked to you. This cannot be undone. Without the app, use <a href="/account-deletion">our account deletion page</a>.</li>
+  <li><strong>Export.</strong> Profile → Settings → Privacy &amp; data → Export my data gives you a copy of everything stored on your device.</li>
+  <li><strong>AI processing.</strong> Profile → Settings → Privacy &amp; data → AI processing turns it off or on.</li>
+  <li><strong>Delete.</strong> Profile → Settings → Privacy &amp; data → Delete my account erases the data on your phone, your backup, your sign-in account and every server record linked to you. This cannot be undone. Without the app, use <a href="/account-deletion">our account deletion page</a>.</li>
   <li><strong>Subscriptions</strong> are cancelled in your App Store or Google Play settings; deleting the app or your account does not cancel them.</li>
 </ul>
 
@@ -132,11 +132,11 @@ export const PRIVACY_HTML = page(
   <li><strong>Anthropic</strong> ‏(Claude)، الولايات المتحدة، و</li>
   <li><strong>DeepSeek</strong>، الصين،</li>
 </ul>
-<p>بحسب باقتك والخدمة المتاحة، ويعالج كلٌّ منهما المحتوى وفق شروط واجهته البرمجية. نرسل فقط ما يلزم للإجابة — ولا نرسل اسمك أو بريدك أبداً — ولا يحتفظ خادمنا بصورك أو تقاريرك أو رسائلك بعد إرجاع الإجابة. وقد يحتفظ المزوّدون بما يصلهم لفترة محدودة وفق شروطهم (مثلاً لأغراض السلامة ومنع إساءة الاستخدام). يطلب التطبيق إذنك قبل إرسال أي شيء إلى مزوّد ذكاء اصطناعي أول مرة، ويمكنك سحب الإذن في أي وقت من الملف الشخصي ← الخصوصية ← المعالجة بالذكاء الاصطناعي. ويتلقى المدرب الذكي أيضاً ملخصاً قصيراً لإجمالياتك الأخيرة (السعرات والعناصر الغذائية والتمارين) ليكون الرد مخصصاً لك، ويُستخدم لذلك الرد فقط. وتختار ما يمكنه رؤيته من الملف الشخصي ← الخصوصية ← إدارة السياق المشترك.</p>
+<p>بحسب باقتك والخدمة المتاحة، ويعالج كلٌّ منهما المحتوى وفق شروط واجهته البرمجية. نرسل فقط ما يلزم للإجابة — ولا نرسل اسمك أو بريدك أبداً — ولا يحتفظ خادمنا بصورك أو تقاريرك أو رسائلك بعد إرجاع الإجابة. وقد يحتفظ المزوّدون بما يصلهم لفترة محدودة وفق شروطهم (مثلاً لأغراض السلامة ومنع إساءة الاستخدام). يطلب التطبيق إذنك قبل إرسال أي شيء إلى مزوّد ذكاء اصطناعي أول مرة، ويمكنك سحب الإذن في أي وقت من الملف الشخصي ← الإعدادات ← الخصوصية والبيانات ← المعالجة بالذكاء الاصطناعي. ويتلقى المدرب الذكي أيضاً ملخصاً قصيراً لإجمالياتك الأخيرة (السعرات والعناصر الغذائية والتمارين) ليكون الرد مخصصاً لك، ويُستخدم لذلك الرد فقط. وتختار ما يمكنه رؤيته من الملف الشخصي ← الإعدادات ← الخصوصية والبيانات ← إدارة السياق المشترك.</p>
 
 <h2>WHOOP</h2>
 <p>إذا ربطت WHOOP، نقرأ تمارينك والتعافي والنوم والإجهاد اليومي من WHOOP عبر واجهته البرمجية الرسمية، بالإذن الذي تمنحه في صفحة تسجيل الدخول الخاصة بـ WHOOP. نستخدم تمارينك في WHOOP لعرض السعرات التي أحرقتها فعلاً في التطبيق، ونستخدم التعافي والنوم والإجهاد لإعطاء المدرب الذكي سياقاً لرده فقط إذا سمحت بذلك. وما يُرسل من بيانات WHOOP إلى المدرب يذهب إلى Anthropic فقط، ولا يُرسل إلى DeepSeek أبداً، ويُستخدم لذلك الرد فقط. ولا نبيع بيانات WHOOP ولا نشاركها مع أي جهة أخرى ولا نستخدمها لتدريب نماذج الذكاء الاصطناعي.</p>
-<p>فصل WHOOP (الصحة ← الربط، أو الملف الشخصي ← الخصوصية ← الربط) يلغي وصولنا لدى WHOOP، ويحذف رموز الوصول، ويزيل بيانات WHOOP من التطبيق ومن نسختك الاحتياطية. وحذف حسابك يفعل الشيء نفسه.</p>
+<p>فصل WHOOP (الصحة ← الربط، أو الملف الشخصي ← الإعدادات ← الخصوصية والبيانات ← الربط) يلغي وصولنا لدى WHOOP، ويحذف رموز الوصول، ويزيل بيانات WHOOP من التطبيق ومن نسختك الاحتياطية. وحذف حسابك يفعل الشيء نفسه.</p>
 
 <h2>ما يحفظه خادمنا</h2>
 <ul>
@@ -173,9 +173,9 @@ export const PRIVACY_HTML = page(
 
 <h2>خياراتك</h2>
 <ul>
-  <li><strong>التصدير:</strong> الملف الشخصي ← تصدير بياناتي.</li>
-  <li><strong>المعالجة بالذكاء الاصطناعي:</strong> الملف الشخصي ← الخصوصية ← المعالجة بالذكاء الاصطناعي لإيقافها أو تشغيلها.</li>
-  <li><strong>الحذف:</strong> الملف الشخصي ← الخصوصية ← حذف حسابي يمسح بيانات هاتفك ونسختك الاحتياطية وحساب الدخول وكل سجل مرتبط بك على خوادمنا نهائياً. ودون التطبيق استخدم <a href="/account-deletion">صفحة حذف الحساب</a>.</li>
+  <li><strong>التصدير:</strong> الملف الشخصي ← الإعدادات ← الخصوصية والبيانات ← تصدير بياناتي.</li>
+  <li><strong>المعالجة بالذكاء الاصطناعي:</strong> الملف الشخصي ← الإعدادات ← الخصوصية والبيانات ← المعالجة بالذكاء الاصطناعي لإيقافها أو تشغيلها.</li>
+  <li><strong>الحذف:</strong> الملف الشخصي ← الإعدادات ← الخصوصية والبيانات ← حذف حسابي يمسح بيانات هاتفك ونسختك الاحتياطية وحساب الدخول وكل سجل مرتبط بك على خوادمنا نهائياً. ودون التطبيق استخدم <a href="/account-deletion">صفحة حذف الحساب</a>.</li>
   <li><strong>الاشتراكات</strong> تُلغى من إعدادات App Store أو Google Play، ولا يلغيها حذف التطبيق أو الحساب.</li>
 </ul>
 
@@ -263,14 +263,14 @@ export const SUPPORT_HTML = page(
   <li><strong>Cancel or change a subscription:</strong> iPhone — Settings → your name → Subscriptions → Calgym. Android — Google Play → Profile → Payments &amp; subscriptions → Subscriptions.</li>
   <li><strong>Moved to a new phone?</strong> Open Calgym → Profile → Membership → Restore purchases.</li>
   <li><strong>Refunds</strong> are decided by Apple (<a href="https://reportaproblem.apple.com">reportaproblem.apple.com</a>) or Google Play under their policies.</li>
-  <li><strong>Have a code?</strong> Profile → Redeem a code.</li>
+  <li><strong>Have a code?</strong> Profile → Settings → Redeem a code.</li>
 </ul>
 
 <h2>Your data</h2>
 <ul>
   <li><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Use</a></li>
   <li><a href="/account-deletion">Delete your account</a> — in the app or from this page.</li>
-  <li>Turn AI processing on or off: Profile → Privacy → AI processing.</li>
+  <li>Turn AI processing on or off: Profile → Settings → Privacy &amp; data → AI processing.</li>
 </ul>
 
 <h2>About the numbers</h2>
@@ -288,14 +288,14 @@ export const SUPPORT_HTML = page(
   <li><strong>إلغاء الاشتراك أو تغييره:</strong> في iPhone — الإعدادات ← اسمك ← الاشتراكات ← كالجيم. وفي Android — Google Play ← الملف الشخصي ← المدفوعات والاشتراكات ← الاشتراكات.</li>
   <li><strong>انتقلت إلى هاتف جديد؟</strong> افتح كالجيم ← الملف الشخصي ← العضوية ← استعادة المشتريات.</li>
   <li><strong>الاسترداد</strong> تقرّره Apple أو Google Play وفق سياساتهما.</li>
-  <li><strong>لديك كود؟</strong> الملف الشخصي ← استخدام كود.</li>
+  <li><strong>لديك كود؟</strong> الملف الشخصي ← الإعدادات ← استخدام كود.</li>
 </ul>
 
 <h2>بياناتك</h2>
 <ul>
   <li><a href="/privacy">سياسة الخصوصية</a> · <a href="/terms">شروط الاستخدام</a></li>
   <li><a href="/account-deletion">حذف حسابك</a> — من التطبيق أو من هذه الصفحة.</li>
-  <li>تشغيل المعالجة بالذكاء الاصطناعي أو إيقافها: الملف الشخصي ← الخصوصية.</li>
+  <li>تشغيل المعالجة بالذكاء الاصطناعي أو إيقافها: الملف الشخصي ← الإعدادات ← الخصوصية والبيانات.</li>
 </ul>
 </div>`,
 );
@@ -330,7 +330,7 @@ export function accountDeletionHtml(state: 'form' | 'sent' | 'invalid' = 'form',
 <div class="updated">Calgym · account deletion</div>
 ${banner}
 <h2>Fastest: in the app</h2>
-<p>Open Calgym → Profile → Privacy → <strong>Delete my account</strong>. It happens at once: the data on your phone, your cloud backup, your sign-in account and every record on our server linked to you are deleted. It cannot be undone.</p>
+<p>Open Calgym → Profile → Settings → Privacy &amp; data → <strong>Delete my account</strong>. It happens at once: the data on your phone, your cloud backup, your sign-in account and every record on our server linked to you are deleted. It cannot be undone.</p>
 
 <h2>Without the app</h2>
 <p>Send a request below with the email address you signed in with. We delete the same things within 30 days and confirm by email. Guests (no account) can delete everything simply by deleting the app — nothing personal is kept about them.</p>
@@ -344,7 +344,7 @@ ${state === 'sent' ? '' : form}
 <div class="ar">
 <h1>حذف حساب كالجيم</h1>
 <h2>الأسرع: من التطبيق</h2>
-<p>افتح كالجيم ← الملف الشخصي ← الخصوصية ← <strong>حذف حسابي</strong>. يتم الحذف فوراً: بيانات هاتفك ونسختك الاحتياطية وحساب الدخول وكل سجل مرتبط بك على خادمنا. ولا يمكن التراجع عنه.</p>
+<p>افتح كالجيم ← الملف الشخصي ← الإعدادات ← الخصوصية والبيانات ← <strong>حذف حسابي</strong>. يتم الحذف فوراً: بيانات هاتفك ونسختك الاحتياطية وحساب الدخول وكل سجل مرتبط بك على خادمنا. ولا يمكن التراجع عنه.</p>
 <h2>دون التطبيق</h2>
 <p>أرسل طلباً من النموذج أعلاه بالبريد الذي سجّلت الدخول به، وسنحذف الأشياء نفسها خلال ٣٠ يوماً ونؤكد ذلك بالبريد. أما الضيوف (دون حساب) فيكفيهم حذف التطبيق.</p>
 <h2>ما يُحتفظ به</h2>
@@ -360,7 +360,7 @@ export const WHOOP_SHOTS: { file: string; title: string; caption: string }[] = [
   { file: '03-training-whoop.jpg', title: 'Real calories burned', caption: 'Training tab. The day’s burn comes from WHOOP (“From WHOOP”, with sync time) and is split across the logged exercises, replacing our estimate.' },
   { file: '01-overview.jpg', title: 'Overview', caption: 'The WHOOP burn feeds the day’s summary next to what was eaten.' },
   { file: '04-history.jpg', title: 'Workout history', caption: 'Past sessions carry WHOOP’s calories, marked with a watch icon so it is clear where the figure came from.' },
-  { file: '06-shared-context.jpg', title: 'Member control', caption: 'Profile → Privacy → Manage shared context. The WHOOP data switch decides whether AI Support may see recovery, sleep and strain. It starts off; shown here after the member allowed it.' },
+  { file: '06-shared-context.jpg', title: 'Member control', caption: 'Profile → Settings → Privacy & data → Manage shared context. The WHOOP data switch decides whether AI Support may see recovery, sleep and strain. It starts off; shown here after the member allowed it.' },
 ];
 
 export const WHOOP_INTEGRATION_HTML = page(

@@ -8,13 +8,14 @@ import { InfoLine, RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { useTheme } from '@/hooks/use-theme';
 import { deleteAccount } from '@/lib/account';
+import { chooseExport } from '@/lib/export';
 import { SERVER_URL } from '@/lib/api';
 import { useAppStore } from '@/lib/store';
 
 /**
- * S20 Privacy and permissions — what is shared with AI Support, the policy
- * documents, and the destructive account actions, each behind its own
- * confirmation. Nothing here happens on a single tap.
+ * S20 Privacy & data — what is shared with AI Support, a copy of your data,
+ * the policy documents, and the destructive account actions, each behind
+ * its own confirmation. Nothing here happens on a single tap.
  */
 export default function Privacy() {
   const { t } = useTranslation();
@@ -54,7 +55,7 @@ export default function Privacy() {
     ]);
 
   return (
-    <Screen header={<PageHeader title={t('profile.privacy')} />}>
+    <Screen header={<PageHeader title={t('profile.privacyData')} />}>
       <RowGroup title={t('privacy.sharing')}>
         <SettingsRow
           icon="shield-checkmark-outline"
@@ -66,6 +67,9 @@ export default function Privacy() {
         <SettingsRow icon="sparkles-outline" title={t('coach.manageContext')} subtitle={t('privacy.aiHint')} onPress={() => router.push('/coach-memory')} />
         <SettingsRow icon="notifications-outline" title={t('notifications.title')} onPress={() => router.push('/notifications')} />
         <SettingsRow icon="link-outline" title={t('profile.connections')} subtitle={t('privacy.connectionsHint')} onPress={() => router.push('/connections')} last />
+      </RowGroup>
+      <RowGroup title={t('privacy.yourData')}>
+        <SettingsRow icon="document-text-outline" title={t('legal.exportData')} subtitle={t('privacy.exportHint')} onPress={() => chooseExport()} last />
       </RowGroup>
       <RowGroup title={t('legal.section')}>
         <SettingsRow icon="shield-checkmark-outline" title={t('legal.privacy')} onPress={() => Linking.openURL(`${SERVER_URL}/privacy`)} />

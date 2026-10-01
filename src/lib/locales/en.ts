@@ -1104,6 +1104,8 @@ export const en = {
   },
 
   privacy: {
+    yourData: 'Your data',
+    exportHint: 'A copy of everything on this phone',
     sharing: 'Sharing',
     aiHint: 'What AI Support may see',
     connectionsHint: 'WHOOP and other data sources',
@@ -1155,6 +1157,7 @@ export const en = {
     trainingPreferences: 'Training preferences',
     membership: 'Membership',
     privacy: 'Privacy and permissions',
+    privacyData: 'Privacy & data',
     help: 'Help & feedback',
   },
   addMenu: {
@@ -1205,7 +1208,7 @@ export const en = {
   },
   aiConsent: {
     title: 'Allow AI processing?',
-    body: 'To read your meal photos, body reports and questions, Calgym sends them to its AI providers, Anthropic (Claude) and DeepSeek. They use them only to answer and do not keep them. Your name and email are never sent. You can change this any time in Profile → Privacy.',
+    body: 'To read your meal photos, body reports and questions, Calgym sends them to its AI providers, Anthropic (Claude) and DeepSeek. They use them only to answer and do not keep them. Your name and email are never sent. You can change this any time in Profile → Settings → Privacy & data.',
     allow: 'Allow',
     notNow: 'Not now',
     row: 'AI processing',
