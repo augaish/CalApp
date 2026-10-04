@@ -437,7 +437,7 @@ Apple puts the app version, the subscription group and the subscriptions into **
 7. **About two weeks after that update:** Railway → your server → Variables → add `REQUIRE_ACCOUNT_TOKEN` = `1`. From then on the server only believes signed-in requests that carry the sign-in token. admin → Overview → Launch checklist shows "Signed-in requests must prove who they are" as done. Don't add it earlier: phones without the update would lose their plan until they update.
 
 ### Waiting for Apple approval (sent together as one update)
-Pushed to GitHub and tested, but not sent to phones yet:
+Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app already has all of it** (sent 4 October on the `preview` channel, which only the Android APK uses; the iPhone app under review is on `production`). After approval the update goes to `production` only.
 - **Edit meal portions.** A meal saved at ½ reopens at ½ of the whole plate. Every item gets an Amount eaten box with − and +, plus the ¼ ½ 1 1½ 2 chips, and the two stay in sync. Labels follow the portion.
 - **WHOOP and AI Support.** Sharing WHOOP data with AI Support starts off, and you're asked once after connecting WHOOP. Disconnecting clears WHOOP data from the phone and the backup.
 - **Sign-in proof.** A signed-in phone sends its Supabase sign-in token with every request, so nobody can act as someone else by copying their account ID. WHOOP connect uses a one-time ticket.
