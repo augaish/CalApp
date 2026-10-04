@@ -628,7 +628,10 @@ No app build is needed.
 - **Build 17 (28 September):**
   - Notification buttons work with the app closed.
   - Background refresh of reminders.
-- **Android APK `ae922784` (28 September):** https://expo.dev/accounts/augaishb/projects/calapp/builds/ae922784-6494-4609-811e-e8c98ae089c1
+- **Android APK `dbe52909` (4 October), the latest — use this one:** https://expo.dev/accounts/augaishb/projects/calapp/builds/dbe52909-85b9-49ee-b686-fbd3f96fda50
+  - Everything in the list below, including the new AI program, the PDF export and everything waiting for Apple.
+  - Later fixes arrive over the air on the `preview` channel.
+- **Older Android APK `ae922784` (28 September):** https://expo.dev/accounts/augaishb/projects/calapp/builds/ae922784-6494-4609-811e-e8c98ae089c1
   - The rest countdown on the lock screen, with −15 s, +15 s and Skip.
   - It becomes the "Rest over" alert when the rest ends.
   - On Android 14+, allow **Profile → Notifications → Allow exact rest alerts** once.
