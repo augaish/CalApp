@@ -31,7 +31,7 @@ let { ctx, page } = await open('en', SARA);
 let b = await body(page);
 check('name, email, and the edit route', /Sara/.test(b) && /sara@example\.com/.test(b));
 check('initial instead of the person icon', (await page.getByText('S', { exact: true }).count()) >= 1);
-check('membership card, food targets, training, help, sign out', /AI actions this month/.test(b) && /Food targets/.test(b) && /1850 kcal/.test(b) && /Training preferences/.test(b) && /Help & feedback/.test(b) && /Log out/.test(b));
+check('membership card, food targets, plan preferences, help, sign out', /AI actions this month/.test(b) && /Food targets/.test(b) && /1850 kcal/.test(b) && /Plan preferences/.test(b) && /Help & feedback/.test(b) && /Log out/.test(b));
 check('moved off Profile: language, units, appearance, notifications, privacy, export, redeem', !/Language|Units|Appearance|Notifications|Privacy|Export my data|Redeem a code/.test(b), b.match(/Language|Units|Appearance|Notifications|Privacy|Export my data|Redeem a code/)?.[0]);
 check('no "Signed in" pill any more', !/Signed in/.test(b));
 check('header has the Settings gear (AI Support stays on the tabs)', (await page.getByRole('button', { name: 'Settings' }).count()) === 1 && (await page.getByRole('button', { name: 'AI Support' }).count()) === 0);

@@ -178,7 +178,7 @@ export function planLabelKey(plan: Plan, locks: boolean | undefined, module: Mod
 }
 
 /** Kinds in the order the breakdown lists them. */
-export const USAGE_KINDS = ['meal', 'describe', 'recipe', 'equipment', 'exercise', 'bodyReading', 'coach', 'program'] as const;
+export const USAGE_KINDS = ['meal', 'describe', 'recipe', 'equipment', 'exercise', 'bodyReading', 'coach', 'program', 'tailor'] as const;
 
 /**
  * This month's use as rows: how many times each kind was used and how many

@@ -21,12 +21,15 @@ export function SchedulePlanCard({
   added,
   onAdd,
   style,
+  hideAction,
 }: {
   plan: CoachSchedulePlan;
   locale: string;
   added: boolean;
   onAdd: () => void;
   style?: StyleProp<ViewStyle>;
+  /** No Add button: the plan is shown, not offered (a program's draft or active week). */
+  hideAction?: boolean;
 }) {
   const { t } = useTranslation();
   const theme = useTheme();
@@ -68,6 +71,7 @@ export function SchedulePlanCard({
           ))}
         </View>
       ))}
+      {!hideAction && (
       <Pressable
         onPress={onAdd}
         disabled={added}
@@ -88,6 +92,7 @@ export function SchedulePlanCard({
           {added ? t('coach.schedulePlan.added') : t('coach.schedulePlan.add')}
         </Text>
       </Pressable>
+      )}
     </View>
   );
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
+import { AllergyBanner } from '@/components/allergy-banner';
 import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
@@ -171,6 +172,7 @@ export default function RecipeScreen() {
         )
       }
     >
+      <AllergyBanner texts={[recipe.name, ...recipe.ingredients.map((i) => i.name)]} />
       {/* 1. What it is — photo or category illustration, same geometry (C09). */}
       <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
         <View style={styles.head}>

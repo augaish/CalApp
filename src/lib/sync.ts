@@ -53,6 +53,8 @@ export interface Snapshot {
   shopping?: State['shopping'];
   fastingHistory?: State['fastingHistory'];
   favoriteIds?: State['favoriteIds'];
+  /** Answers given before a program build, allergies included. */
+  planPrefs?: State['planPrefs'];
 }
 
 type State = ReturnType<typeof useAppStore.getState>;
@@ -82,6 +84,7 @@ export function snapshot(): Snapshot {
     shopping: s.shopping,
     fastingHistory: s.fastingHistory,
     favoriteIds: s.favoriteIds,
+    planPrefs: s.planPrefs,
   };
 }
 
@@ -159,6 +162,7 @@ function apply(snap: Snapshot, updatedAt: string) {
       shopping: snap.shopping,
       fastingHistory: snap.fastingHistory,
       favoriteIds: snap.favoriteIds,
+      planPrefs: snap.planPrefs,
     });
     useAppStore.getState().setSyncedAt(updatedAt);
   } finally {

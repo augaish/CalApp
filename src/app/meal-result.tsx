@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
+import { AllergyBanner } from '@/components/allergy-banner';
 import { Icon } from '@/components/icon';
 import { PortionControl } from '@/components/portion-control';
 import { RefineBox } from '@/components/refine-box';
@@ -125,6 +126,7 @@ export default function MealResult() {
     >
       <Title close>{t('mealResult.title')}</Title>
       <Subtitle>{t('mealResult.editHint2')}</Subtitle>
+      <AllergyBanner texts={items.map((i) => i.name)} />
 
       {photoUri && <Image source={{ uri: photoUri }} style={styles.photo} contentFit="cover" />}
 

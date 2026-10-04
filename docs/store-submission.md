@@ -447,12 +447,20 @@ Pushed to GitHub and tested, but not sent to phones yet:
 - **Assisted machines.** On assisted pull-up and dip machines, less assistance counts as the better set: trophies, Best, records, the graph.
 - **Dead Hang** added to the library, timed like the plank.
 - **New Profile and Settings.**
-  - Profile now shows only you: account, Membership, Food targets, Training preferences, Help & feedback, Log out.
+  - Profile now shows only you: account, Membership, Food targets, Plan preferences, Help & feedback, Log out.
   - A gear in the header opens **Settings**: Language, Units, Appearance, Notifications, Privacy & data, Redeem a code.
   - Export my data is now inside Privacy & data.
   - In Arabic the header buttons now sit on the correct side.
+- **AI program, rebuilt.**
+  - Before building it asks a few quick questions, one screen each: what to plan (Training, Food or Both), which days and how long, gym or home, experience, injuries; meals a day, eating style, allergies, foods you don't like, cooking or eating out; goal and pace. "Skip questions" still builds from your data.
+  - While it builds: "Calgym is thinking…" with the steps ticking off. The last step only ticks when the program has really arrived.
+  - It ends on a **draft**. Nothing changes until you tap **Start this program**.
+  - **Tailor it with AI**: a short chat ("move leg day to Monday", "no fish") with a "What changed" card for each change. The first 2 changes are free (the build pays for them); after that each change is 1 AI action. A question that changes nothing is free.
+  - **Start** does it all at once: the program's week becomes a new saved schedule and the active one, and the targets and meal plan switch over. The week you had is saved in Schedules first ("Before AI program · date"), so you can switch back any time.
+  - The server holds the AI to your answers: training only on the days you picked, and no meal that names one of your allergies (or meat, for vegetarian).
+- **Plan preferences** replaces "Training preferences" on Profile: your saved answers, allergies included. Meal scans and recipes now show "May contain: Nuts" when a name mentions one of your allergies.
 
-Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, keeping WHOOP data away from DeepSeek, the WHOOP sign-in page fix, account deletion that only deletes the sign-in token's own account, and "give plan by email" matching only the email Supabase verified.
+Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, keeping WHOOP data away from DeepSeek, the WHOOP sign-in page fix, account deletion that only deletes the sign-in token's own account, and "give plan by email" matching only the email Supabase verified. Also live: the server side of the new AI program (questions, the day and allergy checks, the 2 free changes); phones on the current version keep using the old one-tap build, which still works.
 
 ---
 

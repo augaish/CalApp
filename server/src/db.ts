@@ -385,6 +385,16 @@ export async function initDb(): Promise<void> {
       done_at    TIMESTAMPTZ
     )
   `);
+  // One row per program draft: how many free tailoring changes it has left.
+  // The program build pays for the first two; after that each is an action.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS program_drafts (
+      id         TEXT PRIMARY KEY,
+      ref        TEXT NOT NULL,
+      free_left  INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS user_days (
       day DATE NOT NULL,
@@ -2407,4 +2417,36 @@ export async function openDeletionRequests(): Promise<number> {
   if (!pool) return 0;
   const res = await pool.query(`SELECT COUNT(*)::int AS n FROM deletion_requests WHERE done_at IS NULL`);
   return Number(res.rows[0]?.n ?? 0);
+}
+
+// ── Program drafts: free tailoring changes ────────────────────────────────
+
+/** Record a new draft with its free changes. */
+export async function createProgramDraft(id: string, ref: string, free: number): Promise<void> {
+  if (!pool) return;
+  await pool.query('INSERT INTO program_drafts (id, ref, free_left) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING', [id, ref, free]);
+  // Drafts are short-lived; a month is plenty to finish tailoring one.
+  await pool.query("DELETE FROM program_drafts WHERE created_at < now() - interval '60 days'").catch(() => {});
+}
+
+/**
+ * Take one free change from this caller's draft. Null when the draft is not
+ * theirs or unknown; otherwise whether a free one was taken and how many are
+ * left. Without a database (local runs) every change is free.
+ */
+export async function takeFreeChange(id: string, ref: string): Promise<{ free: boolean; left: number } | null> {
+  if (!pool) return { free: true, left: 99 };
+  const taken = await pool.query<{ free_left: number }>(
+    'UPDATE program_drafts SET free_left = free_left - 1 WHERE id = $1 AND ref = $2 AND free_left > 0 RETURNING free_left',
+    [id, ref],
+  );
+  if (taken.rows[0]) return { free: true, left: taken.rows[0].free_left };
+  const row = await pool.query<{ free_left: number }>('SELECT free_left FROM program_drafts WHERE id = $1 AND ref = $2', [id, ref]);
+  return row.rows[0] ? { free: false, left: 0 } : null;
+}
+
+/** Give a free change back when the change itself failed or changed nothing. */
+export async function returnFreeChange(id: string, ref: string): Promise<void> {
+  if (!pool) return;
+  await pool.query('UPDATE program_drafts SET free_left = free_left + 1 WHERE id = $1 AND ref = $2', [id, ref]);
 }

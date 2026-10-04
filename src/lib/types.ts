@@ -462,16 +462,73 @@ export interface Program {
   durationWeeks: number;
   summary: string;
   targets: DailyTargets;
-  schedule: CoachSchedulePlan;
+  /** Absent on a food-only program. */
+  schedule?: CoachSchedulePlan;
   /** Optional: programs accepted before meal plans existed have none, and a
    * generated plan the server couldn't validate is simply absent. */
   mealPlan?: MealPlan;
+  /** What it was built to cover. Absent on programs from before the questions: both. */
+  scope?: PlanScope;
+  /** The saved schedule starting it created, so the program can be found in Schedules. */
+  scheduleId?: string;
 }
 
 /** What the server hands back before the user has accepted it — everything
  * a Program has except the bookkeeping fields (id/createdAt/goal) the store
  * adds on acceptance. */
-export type GeneratedProgram = Pick<Program, 'summary' | 'durationWeeks' | 'targets' | 'schedule' | 'mealPlan'>;
+export type GeneratedProgram = Pick<Program, 'summary' | 'durationWeeks' | 'targets' | 'schedule' | 'mealPlan'> & {
+  /** The server's record of this draft, for its free tailoring changes. */
+  draftId?: string;
+  freeChanges?: number;
+};
+
+export type PlanScope = 'training' | 'food' | 'both';
+
+/**
+ * What someone told us before a program was built. Saved, so the next build
+ * starts from them and allergies can warn on meal scans and recipes. Mirrors
+ * PlanAnswers in server/src/program-rules.ts.
+ */
+export interface PlanAnswers {
+  scope: PlanScope;
+  skipped?: boolean;
+  days?: number;
+  /** 0 = Sunday … 6 = Saturday. */
+  weekdays?: number[];
+  sessionMinutes?: number;
+  place?: 'gym' | 'home' | 'both';
+  experience?: 'beginner' | 'intermediate' | 'advanced';
+  injuries?: string;
+  mealsPerDay?: '2' | '3' | '3+snack';
+  eatingStyle?: 'any' | 'high_protein' | 'vegetarian' | 'low_carb';
+  /** AllergenId values (src/lib/allergens.ts). */
+  allergies?: string[];
+  allergyOther?: string;
+  dislikes?: string;
+  cooking?: 'home' | 'out' | 'mix';
+  goal?: Goal;
+  pace?: 'gentle' | 'steady' | 'faster';
+}
+
+/** One line of the tailoring chat on a draft. */
+export interface TailorMessage {
+  role: 'user' | 'assistant';
+  text: string;
+  /** What the change did, shown as a "What changed" card. */
+  changes?: string[];
+  /** Whether this change used an AI action (after the free ones). */
+  charged?: boolean;
+}
+
+/** A program built but not started yet: Start, tailor, or start over. */
+export interface ProgramDraft {
+  program: GeneratedProgram;
+  answers: PlanAnswers | null;
+  draftId?: string;
+  freeLeft: number;
+  chat: TailorMessage[];
+  createdAt: string;
+}
 
 export interface EquipmentAnalysis {
   /** Machine name in the user's language */

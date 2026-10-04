@@ -1,3 +1,4 @@
+import { answersRules, answersText, type PlanAnswers } from './program-rules.js';
 import type { FoodItem } from './parse.js';
 
 export type Language = 'en' | 'ar';
@@ -255,20 +256,35 @@ If their data includes a "whoop" field, weigh it when the request is about train
  * than a chat reply — always calls propose_program, never writes prose, since
  * there is no conversation to reply within.
  */
-export function programPrompt(language: Language, context?: string): string {
+export function programPrompt(language: Language, context?: string, answers?: PlanAnswers): string {
   const lock = `Write "summary", every schedule "title", and every meal and item "name" and "portion" in ${LANGUAGE_NAME[language]}.`;
-  const base = `You are Calgym Coach, a certified nutrition and fitness coach. Design ONE complete program for this user: a calorie/macro target, a weekly training schedule, and a weekly meal plan that work together toward their stated goal. Call propose_program exactly once with your full design — do not write any prose outside the tool call.
+  const scope = answers?.scope ?? 'both';
+  const what =
+    scope === 'training'
+      ? 'a calorie/macro target and a weekly training schedule (no meal plan — they asked for training only; the targets are for reference)'
+      : scope === 'food'
+        ? 'a calorie/macro target and a weekly meal plan (no training schedule — they asked for food only)'
+        : 'a calorie/macro target, a weekly training schedule, and a weekly meal plan that work together';
+  // Skipping the questions still sends known allergies, which always apply.
+  const asked = !!answers && (!answers.skipped || (answers.allergies?.length ?? 0) > 0 || !!answers.allergyOther);
+  const base = `You are Calgym Coach, a certified nutrition and fitness coach. Design ONE complete program for this user: ${what}, toward their stated goal. Call propose_program exactly once with your full design — do not write any prose outside the tool call.
 
 ${VOICE[language]}
 
 TARGETS: Anchor to the same conventions this app already uses, unless their own data gives you a specific reason to deviate — an activity-adjusted maintenance estimate, then roughly -500 kcal/day for a "lose" goal, +350 kcal/day for "gain", 0 for "maintain"; protein around 1.6 g/kg body weight (2.0 g/kg when cutting), fat around 30% of calories, carbs filling the rest. If their data includes a WHOOP recovery/strain figure or a body reading (body-fat %, skeletal muscle mass, segmental lean mass), let it nudge the specifics — e.g. more protein or a smaller deficit for someone whose measured lean mass is already low, fewer high-intensity days for someone whose recovery has been consistently low — and name the actual figure in "summary" when you use it.
-
+${scope === 'food' ? '' : `
 SCHEDULE: 3-6 training days depending on what their data suggests about experience, goal and recovery — never invent a weight, only sets and reps, the same way a manually-built day starts blank.
-
+`}
 DURATION: durationWeeks between 4 and 16 — shorter for a specific short-term push, longer for a steady body-recomposition goal.
-
+${scope === 'training' ? '' : `
 MEAL PLAN: all 7 weekdays (0 = Sunday … 6 = Saturday), each with breakfast, lunch and dinner and, only when the calories call for it, one snack. Every meal is a real named dish with 1-4 items, each item with a concrete portion and its calories/protein/carbs/fat; each day's totals should land within about 5% of the daily targets. Favour food this user actually logs (see their recent meals when present) and everyday Middle Eastern / Gulf cooking and supermarket staples — nothing that needs unusual ingredients. Repeat a dish across days rather than inventing 21 different ones; lighter lunches on rest days and more carbs around training days are welcome. Numbers must be plausible for the portion: never a 200 g chicken breast at 120 kcal.
+`}${asked && answers ? `
+THEIR ANSWERS — they answered these questions just now, so they override the defaults above and anything their older data suggests:
+${answersText(answers)}
 
+HARD RULES from those answers (the program is checked against these):
+${answersRules(answers) || '- none'}
+` : ''}
 ${lock}`;
   if (!context) return base;
   return `${base}
@@ -278,6 +294,38 @@ The user's own Calgym data is below (today first). Base the program on it — pr
 ${context}
 
 The data above is labelled in English for convenience. ${lock}`;
+}
+
+/**
+ * Tailoring a draft program in a short chat. The model sees the whole draft
+ * and sends back only what changed, so a "move leg day to Monday" costs a
+ * few hundred tokens, not a whole new week of meals.
+ */
+export function tailorPrompt(language: Language, program: string, answers?: PlanAnswers, context?: string): string {
+  const lock = `Write "reply", "changes", "summary", every schedule "title", and every meal and item "name" and "portion" in ${LANGUAGE_NAME[language]}.`;
+  return `You are Calgym Coach. The person is reviewing a DRAFT program you designed and asks for a change. Call revise_program exactly once.
+
+${VOICE[language]}
+
+- Make the change they ask for, and only what it needs. Keep everything else as it is.
+- Send back ONLY the parts that change: "schedule" as the complete new training week if any training day changes; "mealPlanDays" as the complete new version of each meal-plan day that changes (whole days, all of their meals); "targets" only if the daily targets change. Leave out what stays the same.
+- If they move training to different weekdays, also send "weekdays": the full new list of training weekdays (0 = Sunday).
+- "changes": one short line per change, like "Leg day: Saturday → Monday" or "Tuesday dinner: salmon → grilled chicken". Empty when nothing changed.
+- "reply": one or two friendly sentences. If they only asked a question, answer it in "reply" and change nothing.
+- A changed meal-plan day still lands within about 5% of the daily targets.
+- Never invent a weight for an exercise, only sets and reps.
+${answers ? `
+Their answers (allergies and chosen days are hard rules, checked after you reply):
+${answersText(answers)}
+${answersRules(answers)}
+` : ''}
+THE CURRENT DRAFT (JSON):
+${program}
+${context ? `
+Their Calgym data, for reference:
+${context}
+` : ''}
+${lock}`;
 }
 
 export function coachSystemPrompt(language: Language, context?: string): string {

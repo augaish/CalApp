@@ -29,6 +29,7 @@ export function buildExport(): string {
       savedSchedules: s.savedSchedules,
       occurrences: s.occurrences,
       activeProgram: s.activeProgram,
+      planPrefs: s.planPrefs,
       fastingHistory: s.fastingHistory,
       shopping: s.shopping,
     },

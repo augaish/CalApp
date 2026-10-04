@@ -8,6 +8,8 @@ import type { PlannedRecipeMeal } from './shopping';
 import { applyMoves, resolvePlan, undoOp, type OccurrenceMove } from './occurrences';
 import type { MembershipPromptState } from './membership-prompt';
 import { dailyTargets } from './tdee';
+import { resolveCoachSchedule } from './coach-schedule';
+import { paceForAnswers } from './plan-answers';
 import type {
   AppearancePref,
   ActiveSession,
@@ -33,8 +35,10 @@ import type {
   MuscleGroup,
   PlannedMeal,
   PlannedSet,
+  PlanAnswers,
   Profile,
   Program,
+  ProgramDraft,
   Recipe,
   WeightEntry,
   WhoopDayWorkout,
@@ -172,6 +176,14 @@ export interface AppState {
   weights: WeightEntry[];
   /** The one AI-designed program currently in effect, if the user has accepted one. */
   activeProgram: Program | null;
+  /**
+   * The answers given before a program build (days, food, allergies, goal),
+   * kept so the next build starts from them. Allergies here also warn on
+   * meal scans and recipes. Shown and edited in Profile → Plan preferences.
+   */
+  planPrefs: PlanAnswers | null;
+  /** A program built but not started: nothing in the app changes until Start. */
+  programDraft: ProgramDraft | null;
   /** Per-day meal-plan swaps: dateKey → slot → the weekday whose planned
    * meal stands in for that slot. Empty for days following the plan as
    * written. Additive (old persisted state simply lacks it → `{}`). */
@@ -382,6 +394,20 @@ export interface AppState {
    * applyCoachSchedule) so a program is just data here, same as any other
    * proposal the coach hands the UI to act on. */
   setActiveProgram: (program: Program | null) => void;
+  setPlanPrefs: (prefs: PlanAnswers | null) => void;
+  setProgramDraft: (draft: ProgramDraft | null) => void;
+  /**
+   * Start a built program, all at once: its week becomes a new saved schedule
+   * and the active one (the week you had is kept in Schedules first, so you
+   * can switch back any time), and its targets and meal plan take effect. A
+   * training-only program leaves food alone; a food-only one leaves training
+   * alone. Returns the id of the schedule it created, if any.
+   */
+  startProgram: (
+    program: Program,
+    names: { schedule: string; previous: string },
+    answers?: PlanAnswers | null,
+  ) => string | null;
   /** Swap the planned meal for one slot on one day (dateKey) for the plan's
    * meal in that slot from another weekday — "not kabsa today, give me
    * Tuesday's lunch instead". Pass null to go back to the day's own meal. */
@@ -472,6 +498,7 @@ export interface AppState {
     recipes?: AppState['recipes'];
     mealPlanRecipes?: AppState['mealPlanRecipes'];
     mealPlanSwaps?: AppState['mealPlanSwaps'];
+    planPrefs?: AppState['planPrefs'];
     shopping?: AppState['shopping'];
     fastingHistory?: AppState['fastingHistory'];
     favoriteIds?: AppState['favoriteIds'];
@@ -617,6 +644,8 @@ export const useAppStore = create<AppState>()(
       water: [],
       weights: [],
       activeProgram: null,
+      planPrefs: null,
+      programDraft: null,
       mealPlanSwaps: {},
       mealPlanRecipes: {},
       recipes: [],
@@ -667,6 +696,8 @@ export const useAppStore = create<AppState>()(
           water: [],
           weights: [],
           activeProgram: null,
+          planPrefs: null,
+          programDraft: null,
           mealPlanSwaps: {},
           mealPlanRecipes: {},
           recipes: [],
@@ -1234,6 +1265,63 @@ export const useAppStore = create<AppState>()(
           else day[slot] = { ...value, programId: s.activeProgram?.id };
           return { mealPlanRecipes: { ...s.mealPlanRecipes, [dayKey]: day } };
         }),
+      setPlanPrefs: (planPrefs) => set({ planPrefs }),
+      setProgramDraft: (programDraft) => set({ programDraft }),
+      startProgram: (program, names, answers) => {
+        const s = get();
+        const scope = program.scope ?? 'both';
+        const prev = s.activeProgram;
+        const now = new Date().toISOString();
+        let scheduleId: string | null = null;
+        let next: Program = { ...program };
+
+        if (scope !== 'food' && program.schedule) {
+          const resolved = resolveCoachSchedule(program.schedule, s.exercises, {});
+          // The program's week, whole: a day it does not train is rest.
+          const week: AppState['schedule'] = {};
+          for (const d of resolved.days) week[d.weekday] = { title: d.title, exerciseIds: d.exerciseIds, plans: d.plans };
+          // Keep the week you had before it is replaced — unless it is already
+          // saved exactly as it is — so Schedules can bring it back.
+          const hasWeek = Object.values(s.schedule).some((d) => (d?.exerciseIds?.length ?? 0) > 0);
+          const activeSaved = s.savedSchedules.find((x) => x.id === s.activeScheduleId);
+          const alreadySaved = !!activeSaved && JSON.stringify(activeSaved.days) === JSON.stringify(s.schedule);
+          const kept: AppState['savedSchedules'] =
+            hasWeek && !alreadySaved
+              ? [{ id: `sched:${id()}`, name: names.previous.trim(), days: s.schedule, createdAt: now }]
+              : [];
+          scheduleId = `sched:${id()}`;
+          set({
+            exercises: [...s.exercises, ...resolved.newExercises],
+            schedule: week,
+            savedSchedules: [
+              ...s.savedSchedules,
+              ...kept,
+              { id: scheduleId, name: names.schedule.trim(), days: week, createdAt: now, activatedAt: now },
+            ],
+            activeScheduleId: scheduleId,
+          });
+          next.scheduleId = scheduleId;
+        } else if (scope === 'food') {
+          // Food only: training stays exactly as it is, and so does the
+          // program's training half when there was one.
+          next = { ...next, schedule: prev?.schedule, scheduleId: prev?.scheduleId };
+        }
+
+        if (scope === 'training') {
+          // Training only: your targets and meal plan stay as they were.
+          next = { ...next, targets: prev?.targets ?? s.targets ?? next.targets, mealPlan: prev?.mealPlan };
+        } else {
+          if (s.profile && answers?.goal) {
+            const pace = paceForAnswers(answers.goal, answers.pace);
+            set({ profile: { ...s.profile, goal: answers.goal, ...(pace != null ? { paceKgPerWeek: pace } : {}) } });
+          }
+          set({ targets: program.targets });
+        }
+        if (next.schedule && next.mealPlan && scope !== 'both') next.scope = 'both';
+        get().setActiveProgram(next);
+        set({ programDraft: null, ...(answers ? { planPrefs: { ...answers, skipped: undefined } } : {}) });
+        return scheduleId;
+      },
       saveScheduleAs: (name) => {
         const sid = `sched:${id()}`;
         const now = new Date().toISOString();
@@ -1381,12 +1469,12 @@ export const useAppStore = create<AppState>()(
       applySnapshot: (snap) => {
         const {
           savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
-          mealPlanSwaps, shopping, fastingHistory, favoriteIds,
+          mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs,
         } = snap;
         const plans = Object.fromEntries(
           Object.entries({
             savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
-            mealPlanSwaps, shopping, fastingHistory, favoriteIds,
+            mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs,
           }).filter(([, v]) => v !== undefined),
         ) as Partial<AppState>;
         set({
@@ -1427,6 +1515,8 @@ export const useAppStore = create<AppState>()(
           water: [],
           weights: [],
           activeProgram: null,
+          planPrefs: null,
+          programDraft: null,
           remindMeals: true,
           remindWater: true,
           remindWorkouts: true,
@@ -1477,6 +1567,8 @@ export const useAppStore = create<AppState>()(
         water,
         weights,
         activeProgram,
+        planPrefs,
+        programDraft,
         mealPlanSwaps,
         mealPlanRecipes,
         remindMeals,
@@ -1531,6 +1623,8 @@ export const useAppStore = create<AppState>()(
         water,
         weights,
         activeProgram,
+        planPrefs,
+        programDraft,
         mealPlanSwaps,
         mealPlanRecipes,
         remindMeals,

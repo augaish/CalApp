@@ -122,6 +122,9 @@ export const DEFAULT_ACTION_WEIGHTS: Record<string, number> = {
   // A full recipe is a long tool call — ingredients with four macros each,
   // plus steps — but nothing like designing a whole week of training and food.
   recipe: 2,
+  // One change to a draft program, after its two free ones: only the parts
+  // that change come back, so it costs about a coach reply.
+  tailor: 1,
 };
 
 /** Admin-overridable per-kind action weights. */

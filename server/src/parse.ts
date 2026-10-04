@@ -629,7 +629,8 @@ export interface ProgramPlan {
   summary: string;
   durationWeeks: number;
   targets: ProgramTargets;
-  schedule: CoachSchedulePlan;
+  /** Absent on a food-only program. */
+  schedule?: CoachSchedulePlan;
   /** Absent when the model's meal plan didn't survive validation — the
    * client treats that as "no food plan", never as an error. */
   mealPlan?: MealPlan;
@@ -740,12 +741,26 @@ export function sanitizeRecipe(raw: unknown): RecipePlan | undefined {
   };
 }
 
-export function sanitizeProgram(raw: unknown): ProgramPlan | undefined {
+export function sanitizeProgram(raw: unknown, scope: 'training' | 'food' | 'both' = 'both'): ProgramPlan | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const input = raw as Record<string, unknown>;
-  const schedule = sanitizeSchedulePlan(input.schedule);
-  if (!schedule) return undefined;
-  const t = (input.targets ?? {}) as Record<string, unknown>;
+  const schedule = scope === 'food' ? undefined : sanitizeSchedulePlan(input.schedule);
+  // A training program with no usable week, or a food one with no usable
+  // meals, is not the program that was asked for.
+  if (scope !== 'food' && !schedule) return undefined;
+  const mealPlan = scope === 'training' ? undefined : sanitizeMealPlan(input.mealPlan);
+  if (scope === 'food' && !mealPlan) return undefined;
+  return {
+    summary: str(input.summary).slice(0, 400),
+    durationWeeks: Math.min(16, Math.max(4, Math.round(num(input.durationWeeks, 8)))),
+    targets: sanitizeTargets(input.targets),
+    schedule,
+    mealPlan,
+  };
+}
+
+function sanitizeTargets(raw: unknown): ProgramTargets {
+  const t = (raw ?? {}) as Record<string, unknown>;
   const calories = Math.max(1200, Math.round(num(t.calories, 2000)));
   const proteinG = Math.max(0, Math.round(num(t.proteinG, 0)));
   const fatG = Math.max(0, Math.round(num(t.fatG, 0)));
@@ -753,11 +768,57 @@ export function sanitizeProgram(raw: unknown): ProgramPlan | undefined {
   // written, the same way toMealAnalysis reconciles a meal's own numbers —
   // three independently-estimated macros rarely add up to the stated total.
   const carbsG = Math.max(0, Math.round((calories - proteinG * 4 - fatG * 9) / 4));
-  return {
-    summary: str(input.summary).slice(0, 400),
-    durationWeeks: Math.min(16, Math.max(4, Math.round(num(input.durationWeeks, 8)))),
-    targets: { calories, proteinG, carbsG, fatG },
-    schedule,
-    mealPlan: sanitizeMealPlan(input.mealPlan),
-  };
+  return { calories, proteinG, carbsG, fatG };
+}
+
+/** One round of tailoring: what changed, in parts — anything left out stays as it was. */
+export interface ProgramRevision {
+  reply: string;
+  changes: string[];
+  summary?: string;
+  durationWeeks?: number;
+  targets?: ProgramTargets;
+  schedule?: CoachSchedulePlan;
+  /** Whole days of the meal plan to replace, by weekday. */
+  mealPlanDays?: MealPlanDay[];
+  /** The training weekdays, when the person asked to move them. */
+  weekdays?: number[];
+}
+
+export function sanitizeRevision(raw: unknown): ProgramRevision | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const input = raw as Record<string, unknown>;
+  const changes = (Array.isArray(input.changes) ? input.changes : [])
+    .map((c) => str(c).slice(0, 140))
+    .filter(Boolean)
+    .slice(0, 8);
+  const rev: ProgramRevision = { reply: str(input.reply).slice(0, 600), changes };
+  if (input.summary !== undefined && str(input.summary)) rev.summary = str(input.summary).slice(0, 400);
+  if (input.durationWeeks !== undefined && num(input.durationWeeks, 0) > 0) {
+    rev.durationWeeks = Math.min(16, Math.max(4, Math.round(num(input.durationWeeks, 8))));
+  }
+  if (input.targets && typeof input.targets === 'object') rev.targets = sanitizeTargets(input.targets);
+  if (input.schedule) rev.schedule = sanitizeSchedulePlan(input.schedule);
+  if (input.mealPlanDays) rev.mealPlanDays = sanitizeMealPlan({ days: input.mealPlanDays })?.days;
+  if (Array.isArray(input.weekdays)) {
+    const wd = [...new Set(input.weekdays.map((d) => Math.round(num(d, -1))).filter((d) => d >= 0 && d <= 6))].sort((a, b) => a - b);
+    if (wd.length > 0) rev.weekdays = wd;
+  }
+  if (!rev.reply && changes.length === 0) return undefined;
+  return rev;
+}
+
+/** The program with a revision laid over it. */
+export function applyRevision(p: ProgramPlan, rev: ProgramRevision): ProgramPlan {
+  const out: ProgramPlan = { ...p };
+  if (rev.summary) out.summary = rev.summary;
+  if (rev.durationWeeks) out.durationWeeks = rev.durationWeeks;
+  if (rev.targets) out.targets = rev.targets;
+  if (rev.schedule && p.schedule) out.schedule = { ...rev.schedule, summary: rev.schedule.summary ?? p.schedule.summary };
+  if (rev.mealPlanDays && rev.mealPlanDays.length > 0 && p.mealPlan) {
+    const days = new Map(p.mealPlan.days.map((d) => [d.weekday, d]));
+    for (const d of rev.mealPlanDays) days.set(d.weekday, d);
+    out.mealPlan = { ...p.mealPlan, days: [...days.values()].sort((a, b) => a.weekday - b.weekday) };
+  }
+  return out;
 }

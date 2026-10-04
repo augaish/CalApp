@@ -25,6 +25,8 @@ export default function Profile() {
   const theme = useTheme();
   const router = useRouter();
   const targets = useAppStore((s) => s.targets);
+  const planPrefs = useAppStore((s) => s.planPrefs);
+  const allergyCount = (planPrefs?.allergies?.length ?? 0) + (planPrefs?.allergyOther ? 1 : 0);
   const account = useAppStore((s) => s.account);
   const signOut = useAppStore((s) => s.signOut);
   const isGuest = !account?.email && account?.provider === 'guest';
@@ -116,7 +118,13 @@ export default function Profile() {
           value={targets ? `${targets.calories} ${t('common.kcal')}` : undefined}
           onPress={() => router.push('/edit-targets')}
         />
-        <SettingsRow icon="barbell-outline" title={t('profile.trainingPreferences')} onPress={() => router.push('/program')} last />
+        <SettingsRow
+          icon="options-outline"
+          title={t('profile.planPreferences')}
+          value={allergyCount > 0 ? t('profile.allergiesCount', { count: allergyCount }) : undefined}
+          onPress={() => router.push('/plan-preferences')}
+          last
+        />
       </RowGroup>
 
       <RowGroup>

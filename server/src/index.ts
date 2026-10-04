@@ -93,6 +93,9 @@ import {
   setCodeEarning,
   codeHasEarnings,
   codeEarningTotals,
+  createProgramDraft,
+  returnFreeChange,
+  takeFreeChange,
 } from './db.js';
 import {
   citationDomains,
@@ -101,15 +104,27 @@ import {
   isWebSearchDisabled,
   replyText,
   sanitizeEquipmentMuscles,
+  applyRevision,
   sanitizeProgram,
   sanitizeRecipe,
+  sanitizeRevision,
   sanitizeSchedulePlan,
   toBodyReadingAnalysis,
   toMealAnalysis,
   type CoachSchedulePlan,
   type FoodItem,
   type MealAnalysis,
+  type ProgramPlan,
 } from './parse.js';
+import {
+  fitProgram,
+  mealViolations,
+  sanitizeAnswers,
+  stripViolations,
+  violationsRequest,
+  type PlanAnswers,
+  type PlanScope,
+} from './program-rules.js';
 import { classifyAiError, describeAiError } from './ai-failure.js';
 import { withProviderFallback } from './provider-fallback.js';
 import { ACTION_TOOLS, coachScopeNote, scopeCoachTools, sanitizeCoachActions } from './coach-actions.js';
@@ -152,6 +167,7 @@ import {
   mealPrompt,
   programPrompt,
   recipePrompt,
+  tailorPrompt,
   refineMealPrompt,
   JSON_ONLY_REMINDER,
   textMealPrompt,
@@ -363,7 +379,7 @@ const PROGRAM_TOOL: Anthropic.Tool = {
                 weekday: { type: 'integer', minimum: 0, maximum: 6, description: '0 = Sunday … 6 = Saturday.' },
                 meals: {
                   type: 'array',
-                  minItems: 3,
+                  minItems: 2,
                   maxItems: 4,
                   items: {
                     type: 'object',
@@ -402,6 +418,59 @@ const PROGRAM_TOOL: Anthropic.Tool = {
     required: ['summary', 'durationWeeks', 'targets', 'schedule', 'mealPlan'],
   },
 };
+
+/**
+ * The program tool for what was asked: a training-only program has no meal
+ * plan to write, a food-only one no week of training — so the model is not
+ * made to spend thousands of tokens on a half that is then thrown away.
+ */
+function programTool(scope: PlanScope): Anthropic.Tool {
+  if (scope === 'both') return PROGRAM_TOOL;
+  const schema = PROGRAM_TOOL.input_schema as { properties: Record<string, unknown>; required: string[] };
+  const drop = scope === 'training' ? 'mealPlan' : 'schedule';
+  const properties = { ...schema.properties };
+  delete properties[drop];
+  return {
+    ...PROGRAM_TOOL,
+    description:
+      scope === 'training'
+        ? 'Design one complete program: calorie/macro targets plus a weekly training schedule.'
+        : 'Design one complete program: calorie/macro targets plus a weekly meal plan.',
+    input_schema: { type: 'object', properties, required: schema.required.filter((r) => r !== drop) },
+  };
+}
+
+/** One round of tailoring a draft: only the parts that change. */
+const REVISE_TOOL: Anthropic.Tool = (() => {
+  const props = (PROGRAM_TOOL.input_schema as { properties: Record<string, { properties?: Record<string, unknown> }> }).properties;
+  return {
+    name: 'revise_program',
+    description: 'Change a draft program as the person asked. Send only what changes.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        reply: { type: 'string', description: "One or two friendly sentences, in the user's language." },
+        changes: {
+          type: 'array',
+          maxItems: 8,
+          items: { type: 'string' },
+          description: "One short line per change, in the user's language. Empty when nothing changed.",
+        },
+        summary: { type: 'string', description: 'The new program summary, only if it should change.' },
+        durationWeeks: { type: 'integer', minimum: 4, maximum: 16 },
+        targets: props.targets,
+        schedule: props.schedule,
+        mealPlanDays: (props.mealPlan.properties as Record<string, unknown>).days,
+        weekdays: {
+          type: 'array',
+          items: { type: 'integer', minimum: 0, maximum: 6 },
+          description: 'The full new list of training weekdays (0 = Sunday), only when they asked to move training days.',
+        },
+      },
+      required: ['reply', 'changes'],
+    },
+  } as Anthropic.Tool;
+})();
 
 const app = new Hono();
 app.use('*', cors());
@@ -1635,6 +1704,105 @@ app.post('/api/coach-attachment', async (c) => {
 interface ProgramBody {
   language?: string;
   context?: unknown;
+  /** The questions answered before building; absent from older app builds. */
+  answers?: unknown;
+}
+
+interface TailorBody {
+  language?: string;
+  context?: unknown;
+  answers?: unknown;
+  /** The draft as the app holds it now. */
+  program?: unknown;
+  /** What they asked for. */
+  request?: string;
+  /** The chat so far on this draft, oldest first. */
+  history?: { role?: string; text?: string }[];
+  draftId?: string;
+}
+
+/** Free changes a new program draft comes with — paid for by the build. */
+const FREE_TAILOR_CHANGES = 2;
+
+/**
+ * One forced tool call on whichever provider this caller is on, metered
+ * under `kind`. Returns the tool's raw input (or JSON found in prose), for
+ * the caller to validate.
+ */
+async function programToolCall(opts: {
+  route: string;
+  access: Access;
+  context: unknown;
+  ref: string;
+  kind: string;
+  system: string;
+  user: string;
+  tool: Anthropic.Tool;
+  claudeTokens: number;
+  deepseekTokens: number;
+}): Promise<unknown> {
+  const { route, access, context, ref, kind, system, user, tool } = opts;
+  return withProviderFallback(route, await providerForContext(access, context), {
+    deepseek: async () => {
+      // On a reasoning model the chain-of-thought shares the budget with the
+      // answer, so DeepSeek gets far more headroom than Claude.
+      const ds = await withOneRetry(() =>
+        deepseekToolCall(
+          [
+            { role: 'system', content: system },
+            { role: 'user', content: user },
+          ],
+          [toDeepseekTool(tool)],
+          opts.deepseekTokens,
+          tool.name,
+        ),
+      );
+      await trackUsage({ ref, kind }, ds.model, { input_tokens: ds.inputTokens, output_tokens: ds.outputTokens });
+      const call = ds.toolCalls.find((t) => t.name === tool.name);
+      // Belt and braces: a model that ignores tool_choice and just writes the
+      // JSON as prose still produces something usable.
+      return call ? call.args : extractJson(ds.text);
+    },
+    claude: async () => {
+      const response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: opts.claudeTokens,
+        system,
+        messages: [{ role: 'user', content: user }],
+        tools: [tool],
+        tool_choice: { type: 'tool', name: tool.name },
+      });
+      await trackUsage({ ref, kind }, MODEL, response.usage);
+      const toolUse = response.content.find(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === tool.name,
+      );
+      return toolUse?.input;
+    },
+  }, undefined, { fallback: !hasWearableData(context) });
+}
+
+/**
+ * Hold a program to the answers: the chosen days, and no meal naming an
+ * allergen (or meat, for a vegetarian). A meal that breaks the rules is sent
+ * back once to be replaced; if the replacement breaks them too, the meal is
+ * dropped rather than shown.
+ */
+async function enforceAnswers(
+  program: ProgramPlan,
+  answers: PlanAnswers,
+  call: (request: string, program: ProgramPlan) => Promise<unknown>,
+): Promise<ProgramPlan> {
+  let out = fitProgram(program, answers);
+  const bad = mealViolations(out.mealPlan, answers);
+  if (bad.length > 0) {
+    try {
+      const rev = sanitizeRevision(await call(violationsRequest(bad), out));
+      if (rev?.mealPlanDays) out = fitProgram(applyRevision(out, { ...rev, schedule: undefined, targets: undefined }), answers);
+    } catch (err) {
+      console.warn('allergen repair failed:', err instanceof Error ? err.message : err);
+    }
+  }
+  return { ...out, mealPlan: stripViolations(out.mealPlan, answers) };
 }
 
 interface RecipeBody {
@@ -1714,68 +1882,143 @@ app.post('/api/generate-recipe', async (c) => {
 app.post('/api/generate-program', async (c) => {
   const body = await c.req.json<ProgramBody>().catch(() => ({}) as ProgramBody);
   const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const answers = sanitizeAnswers(body.answers);
+  const scope: PlanScope = answers?.scope ?? 'both';
   const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'program');
   if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   const claim = await reserve(ref, access, 'program');
   // 'cap' is the month's programme designs used up, not the allowance.
   if (!claim.ok) return claim.reason === 'cap' ? c.json(featureLocked(access), 403) : c.json(quotaError(access), 402);
-  const system = programPrompt(language, contextText(body.context));
+  const context = contextText(body.context);
+  const system = programPrompt(language, context, answers);
   try {
-    const program = await withProviderFallback('/api/generate-program', await providerForContext(access, body.context), {
-      deepseek: async () => {
-        // Far more headroom than Claude's 9000: on a reasoning model the
-        // chain-of-thought shares this budget with the answer, and the answer
-        // here is a week of training plus a week of named meals with macros.
-        const ds = await withOneRetry(() =>
-          deepseekToolCall(
-            [
-              { role: 'system', content: system },
-              { role: 'user', content: 'Design my program.' },
-            ],
-            [toDeepseekTool(PROGRAM_TOOL)],
-            20000,
-            'propose_program',
-          ),
-        );
-        await trackUsage({ ref, kind: 'program' }, ds.model, {
-          input_tokens: ds.inputTokens,
-          output_tokens: ds.outputTokens,
-        });
-        const call = ds.toolCalls.find((t) => t.name === 'propose_program');
-        // Belt and braces: a model that ignores tool_choice and just writes the
-        // JSON as prose still produces a usable program, and costs nothing to
-        // try before giving up.
-        return sanitizeProgram(call ? call.args : extractJson(ds.text));
-      },
-      claude: async () => {
-        const response = await anthropic.messages.create({
-          model: MODEL,
-          // A full week's schedule AND a full week of named meals with macros
-          // alongside targets and a real summary — a 7-day meal plan alone is
-          // ~4k tokens of tool JSON, so this needs far more room than a coach
-          // reply. Cut off mid-JSON and the whole tool call is unusable.
-          max_tokens: 9000,
-          system,
-          messages: [{ role: 'user', content: 'Design my program.' }],
-          tools: [PROGRAM_TOOL],
-          tool_choice: { type: 'tool', name: 'propose_program' },
-        });
-        await trackUsage({ ref, kind: 'program' }, MODEL, response.usage);
-        const toolUse = response.content.find(
-          (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'propose_program',
-        );
-        return toolUse ? sanitizeProgram(toolUse.input) : undefined;
-      },
-    }, undefined, { fallback: !hasWearableData(body.context) });
+    const raw = await programToolCall({
+      route: '/api/generate-program',
+      access,
+      context: body.context,
+      ref,
+      kind: 'program',
+      system,
+      user: 'Design my program.',
+      tool: programTool(scope),
+      // A full week's schedule AND a full week of named meals with macros
+      // alongside targets and a real summary — a 7-day meal plan alone is
+      // ~4k tokens of tool JSON. Cut off mid-JSON and the call is unusable.
+      claudeTokens: scope === 'training' ? 4000 : 10000,
+      deepseekTokens: 20000,
+    });
+    let program = sanitizeProgram(raw, scope);
+    if (program && answers) {
+      program = await enforceAnswers(program, answers, (request, current) =>
+        programToolCall({
+          route: '/api/generate-program',
+          access,
+          context: body.context,
+          ref,
+          kind: 'program',
+          system: tailorPrompt(language, JSON.stringify(current), answers),
+          user: request,
+          tool: REVISE_TOOL,
+          claudeTokens: 6000,
+          deepseekTokens: 12000,
+        }),
+      );
+      if (scope === 'food' && !program.mealPlan) program = undefined;
+    }
     if (!program) {
       await release(ref, 'program');
       return c.json({ error: 'analysis_failed' }, 502);
     }
-    return c.json(program);
+    // The draft's two free changes are remembered here, not trusted from the app.
+    const draftId = crypto.randomUUID();
+    await createProgramDraft(draftId, ref, FREE_TAILOR_CHANGES).catch((err) => console.warn('draft record failed:', err));
+    return c.json({ ...program, draftId, freeChanges: FREE_TAILOR_CHANGES });
   } catch (err) {
     console.error('generate-program failed:', err);
     await release(ref, 'program');
+    return aiFailure(c, err, 'analysis_failed');
+  }
+});
+
+/**
+ * Tailor a draft program in conversation. The first two changes to a draft
+ * are covered by its build; after that each costs one action. A reply that
+ * changes nothing (a question answered) costs nothing.
+ */
+app.post('/api/tailor-program', async (c) => {
+  const body = await c.req.json<TailorBody>().catch(() => ({}) as TailorBody);
+  const language: Language = body.language === 'ar' ? 'ar' : 'en';
+  const request = (body.request ?? '').trim().slice(0, 500);
+  if (request.length < 2) return c.json({ error: 'invalid_request' }, 400);
+  const answers = sanitizeAnswers(body.answers);
+  const scope: PlanScope = answers?.scope ?? 'both';
+  const program = sanitizeProgram(body.program, scope);
+  if (!program) return c.json({ error: 'invalid_request' }, 400);
+  const ref = (await callerRef(c))!;
+  const access = await checkAccess(ref, 'program', 'tailor');
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
+
+  const draftId = typeof body.draftId === 'string' ? body.draftId.slice(0, 64) : '';
+  // Only a draft this caller really built can be tailored: otherwise a
+  // hand-made "program" could be redesigned whole at a change's price.
+  const take = draftId ? await takeFreeChange(draftId, ref) : null;
+  if (!take) return c.json({ error: 'no_draft' }, 404);
+  const free = take.free;
+  if (!free) {
+    const claim = await reserve(ref, access, 'tailor');
+    if (!claim.ok) return c.json(quotaError(access), 402);
+  }
+  const refund = async () => {
+    if (free) await returnFreeChange(draftId, ref).catch(() => {});
+    else await release(ref, 'tailor');
+  };
+
+  const history = (Array.isArray(body.history) ? body.history : [])
+    .slice(-6)
+    .map((m) => `${m?.role === 'assistant' ? 'Coach' : 'Them'}: ${String(m?.text ?? '').slice(0, 400)}`)
+    .join('\n');
+  const call = (user: string, current: ProgramPlan, withHistory: boolean) =>
+    programToolCall({
+      route: '/api/tailor-program',
+      access,
+      context: body.context,
+      ref,
+      kind: 'tailor',
+      system:
+        tailorPrompt(language, JSON.stringify(current), answers, contextText(body.context)) +
+        (withHistory && history ? `\n\nEarlier in this chat:\n${history}` : ''),
+      user,
+      tool: REVISE_TOOL,
+      claudeTokens: 6000,
+      deepseekTokens: 12000,
+    });
+  try {
+    const rev = sanitizeRevision(await call(request, program, true));
+    if (!rev) {
+      await refund();
+      return c.json({ error: 'analysis_failed' }, 502);
+    }
+    // Moving training days in the chat changes the chosen days from then on.
+    const nextAnswers: PlanAnswers | undefined =
+      answers && rev.weekdays && scope !== 'food' ? { ...answers, weekdays: rev.weekdays, days: rev.weekdays.length } : answers;
+    let next = applyRevision(program, rev);
+    if (nextAnswers) next = await enforceAnswers(next, nextAnswers, (req, current) => call(req, current, false));
+    const changed = rev.changes.length > 0 || JSON.stringify(next) !== JSON.stringify(program);
+    if (!changed) await refund();
+    const left = free ? take.left : 0;
+    return c.json({
+      program: next,
+      answers: nextAnswers ?? null,
+      reply: rev.reply,
+      changes: rev.changes,
+      // What this change cost: nothing (free or no change) or one action.
+      charged: changed && !free,
+      freeLeft: changed ? left : free ? left + 1 : left,
+    });
+  } catch (err) {
+    console.error('tailor-program failed:', err);
+    await refund();
     return aiFailure(c, err, 'analysis_failed');
   }
 });

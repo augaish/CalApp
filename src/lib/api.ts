@@ -12,6 +12,7 @@ import type {
   EquipmentAnalysis,
   FoodItem,
   GeneratedProgram,
+  PlanAnswers,
   Language,
   MealAnalysis,
   Recipe,
@@ -106,6 +107,7 @@ const AI_PATHS = new Set([
   '/api/coach-attachment',
   '/api/coach',
   '/api/generate-program',
+  '/api/tailor-program',
   '/api/generate-recipe',
 ]);
 
@@ -676,13 +678,44 @@ export async function coachChat(
   return post<CoachReply>('/api/coach', { messages, language, context });
 }
 
-/** One-shot AI program: calorie/macro targets plus a weekly schedule, designed together. */
+/**
+ * One AI program: calorie/macro targets plus a weekly schedule and/or meal
+ * plan, designed together from the answers given just before. Comes back as
+ * a draft with the server's id for its free tailoring changes.
+ */
 export async function generateProgram(
   language: Language,
   context?: unknown,
+  answers?: PlanAnswers | null,
 ): Promise<GeneratedProgram> {
-  if (isMockMode) return mockProgram(language);
-  return post<GeneratedProgram>('/api/generate-program', { language, context });
+  if (isMockMode) return mockProgram(language, answers);
+  return post<GeneratedProgram>('/api/generate-program', { language, context, answers: answers ?? undefined });
+}
+
+export interface TailorResult {
+  program: GeneratedProgram;
+  /** The answers after this change (training days move when asked to). */
+  answers: PlanAnswers | null;
+  reply: string;
+  changes: string[];
+  /** Whether this change used an AI action — false for a free one, or no change. */
+  charged: boolean;
+  freeLeft: number;
+}
+
+/** Change a draft program in conversation; only what changed comes back merged in. */
+export async function tailorProgram(input: {
+  language: Language;
+  context?: unknown;
+  answers: PlanAnswers | null;
+  program: GeneratedProgram;
+  request: string;
+  history: { role: 'user' | 'assistant'; text: string }[];
+  draftId?: string;
+}): Promise<TailorResult> {
+  if (isMockMode) return mockTailor(input.program, input.answers, input.request, input.language);
+  const { draftId: _d, freeChanges: _f, ...program } = input.program;
+  return post<TailorResult>('/api/tailor-program', { ...input, program, answers: input.answers ?? undefined });
 }
 
 /**
@@ -819,35 +852,65 @@ async function mockRecipe(
   };
 }
 
-async function mockProgram(language: Language): Promise<GeneratedProgram> {
+async function mockProgram(language: Language, answers?: PlanAnswers | null): Promise<GeneratedProgram> {
   await delay(1800);
-  return language === 'ar'
-    ? {
-        summary: 'برنامج تجريبي — اربط الخادم للحصول على برنامج مبني على بياناتك. هدف افتراضي: 2200 سعرة، 4 أيام تمرين أسبوعياً.',
-        durationWeeks: 8,
-        targets: { calories: 2200, proteinG: 150, carbsG: 220, fatG: 73 },
-        schedule: {
-          summary: 'تقسيم دفع/سحب/أرجل، 4 أيام',
-          days: [
-            { weekday: 0, title: 'دفع', exercises: [{ name: 'ضغط بار', sets: 4, reps: '8-10' }] },
-            { weekday: 2, title: 'سحب', exercises: [{ name: 'سحب علوي', sets: 4, reps: '8-10' }] },
-            { weekday: 4, title: 'أرجل', exercises: [{ name: 'سكوات بار', sets: 4, reps: '8-10' }] },
-          ],
-        },
-      }
-    : {
-        summary: 'Demo program — connect the AI server for one built from your real data. Default goal: 2,200 kcal, 4 training days a week.',
-        durationWeeks: 8,
-        targets: { calories: 2200, proteinG: 150, carbsG: 220, fatG: 73 },
-        schedule: {
-          summary: 'Push/pull/legs split, 4 days',
-          days: [
-            { weekday: 0, title: 'Push', exercises: [{ name: 'Bench Press', sets: 4, reps: '8-10' }] },
-            { weekday: 2, title: 'Pull', exercises: [{ name: 'Lat Pulldown', sets: 4, reps: '8-10' }] },
-            { weekday: 4, title: 'Legs', exercises: [{ name: 'Barbell Squat', sets: 4, reps: '8-10' }] },
-          ],
-        },
-      };
+  const ar = language === 'ar';
+  const scope = answers?.scope ?? 'both';
+  const weekdays = answers?.weekdays?.length ? answers.weekdays : [0, 2, 4];
+  const titles = ar ? ['دفع', 'سحب', 'أرجل', 'جسم كامل', 'أعلى', 'أسفل'] : ['Push', 'Pull', 'Legs', 'Full body', 'Upper', 'Lower'];
+  const lifts = ar ? ['ضغط بار', 'سحب علوي', 'سكوات بار', 'رفعة ميتة', 'ضغط كتف', 'طعنات'] : ['Bench Press', 'Lat Pulldown', 'Barbell Squat', 'Deadlift', 'Shoulder Press', 'Lunges'];
+  const meal = (slot: 'breakfast' | 'lunch' | 'dinner' | 'snack', name: string, calories: number) => ({
+    slot,
+    name,
+    items: [{ name, portion: ar ? 'طبق' : '1 plate', calories, proteinG: Math.round(calories / 16), carbsG: Math.round(calories / 9), fatG: Math.round(calories / 36) }],
+  });
+  const dishes = ar
+    ? { b: 'بيض مع خبز بر', l: 'دجاج مشوي مع رز', d: 'سلمون مع خضار', s: 'زبادي يوناني' }
+    : { b: 'Eggs on wholegrain toast', l: 'Grilled chicken and rice', d: 'Salmon with vegetables', s: 'Greek yogurt' };
+  return {
+    summary: ar
+      ? 'برنامج تجريبي — اربط الخادم للحصول على برنامج مبني على بياناتك.'
+      : 'Demo program — connect the AI server for one built from your real data.',
+    durationWeeks: 8,
+    targets: { calories: 2200, proteinG: 150, carbsG: 220, fatG: 73 },
+    schedule:
+      scope === 'food'
+        ? undefined
+        : {
+            summary: ar ? `${weekdays.length} أيام تمرين` : `${weekdays.length} training days`,
+            days: weekdays.map((weekday, i) => ({ weekday, title: titles[i % titles.length], exercises: [{ name: lifts[i % lifts.length], sets: 4, reps: '8-10' }] })),
+          },
+    mealPlan:
+      scope === 'training'
+        ? undefined
+        : {
+            days: [0, 1, 2, 3, 4, 5, 6].map((weekday) => ({
+              weekday,
+              meals: [meal('breakfast', dishes.b, 450), meal('lunch', dishes.l, 700), meal('dinner', dishes.d, 650), meal('snack', dishes.s, 200)],
+            })),
+          },
+    draftId: `mock-${Date.now().toString(36)}`,
+    freeChanges: 2,
+  };
+}
+
+const mockFree = new Map<string, number>();
+async function mockTailor(program: GeneratedProgram, answers: PlanAnswers | null, request: string, language: Language): Promise<TailorResult> {
+  await delay(1200);
+  const key = program.draftId ?? 'mock';
+  const left = mockFree.get(key) ?? program.freeChanges ?? 2;
+  const free = left > 0;
+  mockFree.set(key, Math.max(0, left - 1));
+  const ar = language === 'ar';
+  const next: GeneratedProgram = { ...program, summary: `${program.summary} (${request.slice(0, 40)})` };
+  return {
+    program: next,
+    answers,
+    reply: ar ? 'تم — غيّرت الملخص كتجربة.' : 'Done — I changed the summary as a demo.',
+    changes: [ar ? `الملخص: أضفت «${request.slice(0, 30)}»` : `Summary: added “${request.slice(0, 30)}”`],
+    charged: !free,
+    freeLeft: free ? left - 1 : 0,
+  };
 }
 
 async function mockBodyReading(language: Language): Promise<BodyReadingAnalysis> {
