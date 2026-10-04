@@ -31,10 +31,18 @@ jobs:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
       - run: npm ci
-      # No --no-wait: waiting lets EAS print the installable APK URL at the end.
+      # No --no-wait: waiting lets EAS hand back the finished build. --json
+      # gives its page and APK link, posted as notes on the run so they can
+      # be read without opening the log.
       - run: >-
           eas build
           --platform android
           --profile ${{ github.event.inputs.profile || 'preview' }}
           --non-interactive
-      - run: echo "::notice::Open the build URL above in the run log, then share the APK link with your Android tester."
+          --json > build.json
+      - run: |
+          page="https://expo.dev/accounts/$(jq -r '.[0].project.ownerAccount.name // "augaishb"' build.json)/projects/calapp/builds/$(jq -r '.[0].id' build.json)"
+          apk=$(jq -r '.[0].artifacts.buildUrl // .[0].artifacts.applicationArchiveUrl // empty' build.json)
+          echo "::notice title=Build page::$page"
+          [ -n "$apk" ] && echo "::notice title=APK download::$apk"
+          echo "Share the build page with your Android tester: open it on the phone and tap Install."
