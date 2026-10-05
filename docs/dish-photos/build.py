@@ -305,7 +305,7 @@ def build():
     }
     with open(os.path.join(HERE, "prompts.txt"), "w", encoding="utf-8") as f:
         for key, cont, subject, _en, _ar in ROWS:
-            f.write(f"{key}.png | Square 1:1 food photo, 1024×1024. {subject}, {containers[cont]}, "
+            f.write(f"{key}.jpg | Square 1:1 food photo, 512×512. {subject}, {containers[cont]}, "
                     "centered and filling about 75% of the frame, seen from a 45-degree angle, on a soft light-lavender linen tablecloth. "
                     "Soft natural daylight from the upper left, gentle soft shadows, realistic home-style portion, appetizing, true colours. "
                     "No text, no logos, no watermark, no hands, no people, no other dishes, no cutlery, plain uncluttered background.\n")

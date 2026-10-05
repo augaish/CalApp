@@ -6,8 +6,10 @@ The app shows a dish photo next to a logged meal or recipe when there is no phot
 
 ## What to send back
 
-- One **ZIP** with all files, named exactly as in `prompts.txt`, for example `rice_chicken.png`.
-- **Square 1:1**, at least **1024 × 1024**, PNG or JPG. I resize them to 384 × 384 WebP, about 25 KB each, about 3 MB in all.
+- One **ZIP** with all files, named exactly as in `prompts.txt`, for example `rice_chicken.jpg`.
+- **Small files:** square **512 × 512**, **JPG at about 80% quality**, so each is about **40–70 KB** and all 121 come to about 5–8 MB in the ZIP. I shrink them again for the app (to about 20 KB each).
+  - If the tool can only make large images, that's fine too. Export or resize to 512 × 512 JPG before zipping; any photo editor or website such as squoosh.app does this in bulk.
+  - Don't go below 384 × 384, or the photos look soft on large phones.
 - If one comes out wrong (text in the picture, the wrong dish, hands, a busy background), regenerate that one. A missing file is fine; that dish keeps today's icon.
 
 ## Keep every photo in the same style
