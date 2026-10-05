@@ -87,6 +87,7 @@ export const en = {
     invalidWeight: 'Weight must be between 30 and 300 kg.',
   },
   home: {
+    showWeek: 'Show the week',
     previousDay: 'Previous day',
     nextDay: 'Next day',
     today: 'Today',
@@ -346,6 +347,7 @@ export const en = {
     undo: 'Undo',
     restTimer: 'Rest timer',
     lastTime: 'Last time',
+    lastTimeHint: 'Tap a set to use it',
     noLastTime: 'First time on this exercise · tap a rep count or type a weight',
     finishWorkout: 'Finish workout',
     sessionBest: 'Top set',
@@ -486,6 +488,10 @@ export const en = {
     shareDay: 'Share this day',
     shareDayHint: 'Send the meals you logged as text',
     chooseDay: 'Choose a day',
+    logFood: 'Log food',
+    plan: 'Plan',
+    thisWeek: 'This week',
+    addedTo: 'Added to {{meal}}',
   },
   shopping: {
     title: 'Shopping list',
@@ -2449,6 +2455,13 @@ export const en = {
     keepEditing: 'Keep editing',
     discard: 'Discard',
     setN: 'Set {{n}}',
+  },
+  hero: {
+    next: 'Your next workout',
+    inProgress: 'In progress',
+    doneToday: 'Done today',
+    restDay: 'Rest day',
+    viewWorkout: 'View workout',
   },
   mealPlan: {
     planned: 'Planned',

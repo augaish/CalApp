@@ -48,7 +48,7 @@ export function ExerciseNotesCard(props: Props) {
   const setWord = (n: number) => t('notes.setN', { n });
 
   return (
-    <View style={[styles.card, { borderColor: theme.border }]}>
+    <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
       <View style={styles.head}>
         <Icon name="create-outline" size={17} color={theme.primary} />
         <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15, flex: 1 }}>{t('notes.title')}</Text>
@@ -188,7 +188,7 @@ function NotesSheet({
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderRadius: Radius.md, padding: Spacing.ms, marginTop: Spacing.md },
+  card: { borderRadius: Radius.module, padding: Spacing.ms, marginTop: Spacing.sm },
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   prev: { borderRadius: 12, paddingVertical: 8, paddingHorizontal: 10, marginTop: Spacing.sm },
   today: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm, marginTop: Spacing.sm },

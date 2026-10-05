@@ -448,7 +448,7 @@ export default function SessionScreen() {
           {keyboardShown ? (
             <Button label={t('common.done')} variant="secondary" icon="chevron-down" onPress={() => Keyboard.dismiss()} />
           ) : (
-            <Button label={t('session.finishWorkout')} variant="secondary" onPress={() => setFinishing(true)} />
+            <Button label={t('session.finishWorkout')} variant="ghost" onPress={() => setFinishing(true)} />
           )}
         </View>
       }
@@ -514,7 +514,7 @@ export default function SessionScreen() {
         </View>
       )}
 
-      <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+      <View style={styles.titleBlock}>
         <Text style={[styles.exerciseName, { color: theme.text }]}>{ex ? exerciseName(ex, lang) : exId}</Text>
         <View style={styles.setLine}>
           <Text style={{ color: theme.textSecondary, fontSize: 16 }}>
@@ -542,105 +542,117 @@ export default function SessionScreen() {
             </View>
           )}
         </View>
+      </View>
 
-        {/* Target and Best: two different facts, two tiles. No target past the plan. */}
-        <View style={styles.refRow}>
-          {target && (
-            <Pressable
-              style={[styles.ref, { backgroundColor: theme.surfaceTint }]}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('session.target')} ${label(target)} · ${t('session.edit')}`}
-              onPress={() => router.push(`/schedule-plan?weekday=${day.getDay()}&id=${encodeURIComponent(exId ?? '')}`)}
-            >
-              <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('session.target')}</Text>
-              <Text style={[styles.refValue, { color: theme.text }]}>{label(target)}</Text>
-              <Text style={{ color: theme.primaryDark, fontSize: 12, fontWeight: '600' }}>
-                {t('session.weeklyPlan')} · {t('session.edit')}
+      {/* Resting comes first: it is what the next minute is about. */}
+      {restRemaining > 0 && (
+        <View style={[styles.restCard, { backgroundColor: theme.surfaceTint }]} accessibilityLiveRegion="polite">
+          <View style={styles.restRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('session.rest')}</Text>
+              <Text style={[styles.restTime, { color: theme.primary }]}>
+                {Math.floor(restRemaining / 60)}:{String(restRemaining % 60).padStart(2, '0')}
               </Text>
-            </Pressable>
-          )}
-          <View style={[styles.ref, { backgroundColor: theme.surfaceTint }]}>
-            <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('session.best')}</Text>
-            <Text style={[styles.refValue, { color: theme.text }]}>{label(best?.set)}</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{best ? shortDate(best.at) : t('session.noBestYet')}</Text>
+            </View>
+            {([
+              [-15_000, 'session.restMinus', 'session.restMinusA11y'],
+              [15_000, 'session.restPlus', 'session.restPlusA11y'],
+            ] as const).map(([delta, label, a11y]) => (
+              <Pressable
+                key={label}
+                onPress={() => {
+                  selectionHaptic();
+                  if (session.restEndsAt) updateSession({ restEndsAt: shiftRest(session.restEndsAt, delta) });
+                }}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={t(a11y)}
+                style={({ pressed }) => [styles.restStep, { backgroundColor: theme.card }, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={{ color: theme.primaryDark, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{t(label)}</Text>
+              </Pressable>
+            ))}
+            <ActionButton label={t('session.skipRest')} variant="secondary" onPress={() => updateSession({ restEndsAt: null })} />
+          </View>
+          <View style={[styles.restTrack, { backgroundColor: theme.border }]}>
+            <View style={[styles.restFill, { backgroundColor: theme.primary, width: `${Math.max(2, Math.min(100, Math.round((restRemaining / Math.max(1, session.restSeconds)) * 100)))}%` }]} />
           </View>
         </View>
+      )}
 
-        {restRemaining > 0 && (
-          <View style={[styles.restCard, { backgroundColor: theme.surfaceTint }]}>
-            <View style={styles.restRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{t('session.rest')}</Text>
-                <Text style={[styles.restTime, { color: theme.primary }]}>
-                  {Math.floor(restRemaining / 60)}:{String(restRemaining % 60).padStart(2, '0')}
-                </Text>
-              </View>
-              {([
-                [-15_000, 'session.restMinus', 'session.restMinusA11y'],
-                [15_000, 'session.restPlus', 'session.restPlusA11y'],
-              ] as const).map(([delta, label, a11y]) => (
-                <Pressable
-                  key={label}
-                  onPress={() => {
-                    selectionHaptic();
-                    if (session.restEndsAt) updateSession({ restEndsAt: shiftRest(session.restEndsAt, delta) });
-                  }}
-                  hitSlop={6}
-                  accessibilityRole="button"
-                  accessibilityLabel={t(a11y)}
-                  style={({ pressed }) => [styles.restStep, { backgroundColor: theme.card }, pressed && { opacity: 0.7 }]}
-                >
-                  <Text style={{ color: theme.primaryDark, fontSize: 13, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{t(label)}</Text>
-                </Pressable>
-              ))}
-              <ActionButton label={t('session.skipRest')} variant="secondary" onPress={() => updateSession({ restEndsAt: null })} />
-            </View>
-            <View style={[styles.restTrack, { backgroundColor: theme.border }]}>
-              <View style={[styles.restFill, { backgroundColor: theme.primary, width: `${Math.max(2, Math.min(100, Math.round((restRemaining / Math.max(1, session.restSeconds)) * 100)))}%` }]} />
-            </View>
-          </View>
+      {/* Target and Best: two different facts, two tiles. No target past the plan. */}
+      <View style={styles.refRow}>
+        {target && (
+          <Pressable
+            style={[styles.ref, { backgroundColor: theme.surfaceTint }]}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('session.target')} ${label(target)} · ${t('session.edit')}`}
+            onPress={() => router.push(`/schedule-plan?weekday=${day.getDay()}&id=${encodeURIComponent(exId ?? '')}`)}
+          >
+            <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('session.target')}</Text>
+            <Text style={[styles.refValue, { color: theme.text }]}>{label(target)}</Text>
+            <Text style={{ color: theme.primaryDark, fontSize: 12, fontWeight: '600' }}>
+              {t('session.weeklyPlan')} · {t('session.edit')}
+            </Text>
+          </Pressable>
         )}
+        <View style={[styles.ref, { backgroundColor: theme.surfaceTint }]}>
+          <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('session.best')}</Text>
+          <Text style={[styles.refValue, { color: theme.text }]}>{label(best?.set)}</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{best ? shortDate(best.at) : t('session.noBestYet')}</Text>
+        </View>
+      </View>
 
-        {/* Last time, set by set, one tap away. The set matching this set
-            number is emphasised; the whole session is there because the
-            question mid-workout is "what did I do last time", not one row. */}
-        {!continuous && (
-          <View style={styles.lastTime}>
-            <View style={styles.lastTimeHead}>
-              <Icon name="time-outline" size={14} color={theme.textSecondary} />
-              <Text style={[Type.caption, { color: theme.textSecondary, flex: 1 }]}>
-                {lastSession ? `${t('session.lastTime')} · ${whenLabel(lastSession.at)}` : t('session.noLastTime')}
-              </Text>
-            </View>
-            {lastSession && (
-              <View style={styles.lastTimeRow}>
-                {lastSession.sets.map((s, i) => {
-                  const current = i === setNo;
-                  return (
-                    <Pressable
-                      key={i}
-                      onPress={() => fillFromLast(s)}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${t('session.lastTime')} ${i + 1}: ${label(s)}`}
-                      style={({ pressed }) => [
-                        styles.lastChip,
-                        current ? { backgroundColor: theme.primary } : { backgroundColor: theme.surfaceTint },
-                        pressed && { opacity: 0.7 },
-                      ]}
-                    >
-                      <Text style={{ color: current ? theme.onPrimary : theme.textSecondary, fontSize: 11, fontWeight: '700' }}>{i + 1}</Text>
-                      <Text style={{ color: current ? theme.onPrimary : theme.text, fontSize: 13, fontWeight: '700' }}>{label(s)}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-            )}
+      {/* Last time, set by set, one tap away: a tap puts that set in the
+          boxes and Complete logs it. Sets already done today show ticked,
+          the one for this set is lit. The whole session is here because the
+          question mid-workout is "what did I do last time", not one row. */}
+      {!continuous && (
+        <View style={[styles.block, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <View style={styles.lastTimeHead}>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14, flex: 1 }} numberOfLines={1}>
+              {lastSession ? `${t('session.lastTime')} · ${whenLabel(lastSession.at)}` : t('session.noLastTime')}
+            </Text>
+            {lastSession && <Text style={{ color: theme.textSecondary, fontSize: 12 }}>{t('session.lastTimeHint')}</Text>}
           </View>
-        )}
+          {lastSession && (
+            <View style={styles.lastTimeRow}>
+              {lastSession.sets.map((s, i) => {
+                const current = i === setNo;
+                const doneHere = i < setNo;
+                return (
+                  <Pressable
+                    key={i}
+                    onPress={() => fillFromLast(s)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: current }}
+                    accessibilityLabel={`${t('session.lastTime')} ${i + 1}: ${label(s)}${doneHere ? ` · ${t('mealPlan.logged')}` : ''}`}
+                    style={({ pressed }) => [
+                      styles.lastChip,
+                      current
+                        ? { backgroundColor: theme.primary }
+                        : doneHere
+                          ? { backgroundColor: theme.success + '22' }
+                          : { backgroundColor: theme.surfaceTint },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Text style={{ color: current ? theme.onPrimary : theme.textSecondary, fontSize: 11, fontWeight: '700' }}>{i + 1}</Text>
+                    <Text style={{ color: current ? theme.onPrimary : theme.text, fontSize: 13, fontWeight: '700' }}>{label(s)}</Text>
+                    {doneHere && <Icon name="checkmark" size={13} color={theme.successText} />}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        </View>
+      )}
 
+      {/* What this set will log: the boxes, then the usual rep counts. */}
+      <View style={[styles.block, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
         {(type === 'time' || type === 'distance_time') && <Stopwatch value={seconds} onChange={(v) => edit({ seconds: v })} compact />}
         {/* Weight and reps share a row so both stay above the keyboard. */}
-        <View style={styles.steppers}>
+        <View style={[styles.steppers, { marginTop: 0 }]}>
           {type === 'weight_reps' && <Stepper label={`${t('track.weight')} (${kg})`} value={weight} onChange={(v) => edit({ weightKg: v })} step={2.5} decimals={1} />}
           {(type === 'weight_reps' || type === 'bodyweight_reps') && <Stepper label={t('track.reps')} value={reps} onChange={(v) => edit({ reps: v })} step={1} />}
           {(type === 'time' || type === 'distance_time') && <Stepper label={t('track.seconds')} value={seconds} onChange={(v) => edit({ seconds: v })} step={5} />}
@@ -670,13 +682,15 @@ export default function SessionScreen() {
             ))}
           </View>
         )}
+      </View>
 
-        {/* Notes for this exercise: the last one from an earlier workout, and today's. */}
-        {exId && dayKeyStr && (
-          <ExerciseNotesCard exerciseId={exId} exerciseName={ex ? exerciseName(ex, lang) : exId} dayKey={dayKeyStr} at={session.startedAt} />
-        )}
+      {/* Notes for this exercise: the last one from an earlier workout, and today's. */}
+      {exId && dayKeyStr && (
+        <ExerciseNotesCard exerciseId={exId} exerciseName={ex ? exerciseName(ex, lang) : exId} dayKey={dayKeyStr} at={session.startedAt} />
+      )}
 
-        <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>{t('session.restTimer')}</Text>
+      <View style={[styles.card, { backgroundColor: theme.card, marginTop: Spacing.md }, cardShadow(theme.shadow)]}>
+        <Text style={[Type.caption, { color: theme.textSecondary, marginBottom: 6 }]}>{t('session.restTimer')}</Text>
         <View style={styles.restPick}>
           {REST_OPTIONS.map((s) => (
             <Chip key={s} label={`${s} ${t('common.secondsShort')}`} selected={session.restSeconds === s} onPress={() => updateSession({ restSeconds: s })} />
@@ -746,7 +760,7 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5 },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
   exerciseName: { fontSize: 24, fontWeight: '800', letterSpacing: tracking(-0.4) },
-  refRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
+  refRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
   ref: { flex: 1, borderRadius: Radius.control, padding: Spacing.ms, gap: 2, minHeight: 78 },
   refValue: { fontSize: 20, fontWeight: '800' },
   movedBanner: {
@@ -757,15 +771,16 @@ const styles = StyleSheet.create({
     padding: Spacing.ms,
     marginBottom: Spacing.sm,
   },
-  restCard: { borderRadius: Radius.control, padding: Spacing.ms, marginTop: Spacing.md, gap: Spacing.sm },
+  restCard: { borderRadius: Radius.control, padding: Spacing.ms, marginTop: Spacing.sm, gap: Spacing.sm },
   restRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   restStep: { minWidth: 48, height: 36, paddingHorizontal: 8, borderRadius: Radius.control, alignItems: 'center', justifyContent: 'center' },
   restTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
   restFill: { height: 6, borderRadius: 3 },
   restTime: { fontSize: 30, fontWeight: '800', fontVariant: ['tabular-nums'] },
   steppers: { flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md },
-  lastTime: { marginTop: Spacing.md, gap: 6 },
-  lastTimeHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  titleBlock: { marginBottom: Spacing.xs },
+  block: { borderRadius: Radius.module, padding: Spacing.ms, marginTop: Spacing.sm },
+  lastTimeHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   lastTimeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   lastChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.control, paddingHorizontal: 10, minHeight: 36 },
   quickReps: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },

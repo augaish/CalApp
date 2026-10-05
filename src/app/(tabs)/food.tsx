@@ -1,5 +1,5 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -23,7 +23,6 @@ import {
   Segmented,
   SettingsRow,
   StatusPill,
-  Tile,
 } from '@/components/system';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
@@ -216,6 +215,37 @@ export default function Food() {
     successHaptic();
   };
 
+  // Back on Food after logging something elsewhere (scan, search, quick add):
+  // say where it went, light the row up, and offer Undo for a few seconds.
+  // Only one new meal counts, so a sync bringing in several stays quiet.
+  const [added, setAdded] = useState<{ mealId: string; slot: MealType } | null>(null);
+  const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const seenIds = useRef<Set<string> | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      const before = seenIds.current;
+      const now = useAppStore.getState().meals;
+      if (before) {
+        const fresh = now.filter((m) => !before.has(m.id));
+        if (fresh.length === 1) {
+          setAdded({ mealId: fresh[0].id, slot: fresh[0].mealType ?? 'snack' });
+          if (addedTimer.current) clearTimeout(addedTimer.current);
+          addedTimer.current = setTimeout(() => setAdded(null), 6000);
+        }
+      }
+      return () => {
+        seenIds.current = new Set(useAppStore.getState().meals.map((m) => m.id));
+      };
+    }, []),
+  );
+  const undoAdded = () => {
+    if (!added) return;
+    removeMeal(added.mealId);
+    setAdded(null);
+    if (addedTimer.current) clearTimeout(addedTimer.current);
+    lightHaptic();
+  };
+
   const openLog = (slot: MealType) => {
     usePending.getState().setMealTypeHint(slot);
     router.push('/add-menu?scope=food');
@@ -314,10 +344,14 @@ export default function Food() {
       ) : (
         <>
           {/* Eaten today — actual records only. */}
-          <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-            <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', marginBottom: 4 }}>
-              {selectedIsToday ? t('food.eatenToday') : t('food.eatenOn', { day: shortDate })}
-            </Text>
+          <View
+            style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}
+            accessibilityLabel={selectedIsToday ? t('food.eatenToday') : undefined}
+          >
+            {/* Today needs no heading: the tab and date already say so. */}
+            {!selectedIsToday && (
+              <Text style={{ color: theme.text, fontSize: 16, fontWeight: '800', marginBottom: 4 }}>{t('food.eatenOn', { day: shortDate })}</Text>
+            )}
             <View style={styles.kcalRow}>
               <Text style={{ color: theme.text }}>
                 <Text style={{ fontSize: 26, fontWeight: '800' }}>{kcalIncomplete ? '≥' : ''}{num(totals.calories)}</Text>
@@ -347,23 +381,6 @@ export default function Food() {
                 <Text style={{ color: theme.textSecondary, fontSize: 12, flex: 1, lineHeight: 17 }}>{t('food.incompleteNote')}</Text>
               </View>
             )}
-          </View>
-
-          {/* Cooking, shopping and reviewing the week: each tile reports its state. */}
-          <View style={styles.tiles} {...tilesTarget.bind}>
-            <Tile
-              icon="restaurant-outline"
-              title={t('recipes.title')}
-              subtitle={recipes.length > 0 ? t('food.recipesSaved', { n: recipes.length }) : t('food.recipesNone')}
-              onPress={() => router.push('/recipes')}
-            />
-            <Tile
-              icon="cart-outline"
-              title={t('shopping.title')}
-              subtitle={shopping ? t('food.shoppingOpen') : t('food.shoppingFromPlan')}
-              onPress={() => router.push('/shopping')}
-            />
-            <Tile icon="stats-chart-outline" title={t('review.title')} subtitle={t('food.reviewNote')} onPress={() => router.push('/review')} />
           </View>
 
           <SectionTitle
@@ -447,27 +464,37 @@ export default function Food() {
               return (
                 <View key={type} style={[styles.rowCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
                   <IconTile icon="restaurant-outline" size={56} color={theme.textTertiary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{slotLabel}</Text>
-                    <Text style={{ color: theme.textTertiary, fontSize: 13, marginTop: 2 }}>{t('food.nothingLogged')}</Text>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[Type.eyebrow, { color: theme.textSecondary }]} numberOfLines={1}>
+                      {slotLabel}
+                    </Text>
+                    <Text style={{ color: theme.textTertiary, fontSize: 13, marginTop: 2 }} numberOfLines={1}>
+                      {t('food.nothingLogged')}
+                    </Text>
                   </View>
-                  <Pressable
-                    onPress={() => router.push(`/recipes?day=${key}&slot=${type}`)}
-                    accessibilityRole="button"
-                    hitSlop={6}
-                    style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.7 }]}
-                  >
-                    <Icon name="add" size={16} color={theme.primary} />
-                    <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }}>{t('food.planSlot', { meal: slotLabel })}</Text>
-                  </Pressable>
+                  {/* Log is the main thing to do with an empty meal; planning it is the quieter link. */}
                   <Pressable
                     onPress={() => openLog(type)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${t('today.log')} · ${slotLabel}`}
-                    hitSlop={6}
-                    style={({ pressed }) => [styles.roundBtn, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
+                    accessibilityLabel={`${t('food.logFood')} · ${slotLabel}`}
+                    hitSlop={4}
+                    style={({ pressed }) => [styles.logBtn, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
                   >
-                    <Icon name="add" size={18} color={theme.primary} />
+                    <Icon name="add" size={16} color={theme.primary} />
+                    <Text style={{ color: theme.primary, fontWeight: '800', fontSize: 13 }} numberOfLines={1}>
+                      {t('food.logFood')}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => router.push(`/recipes?day=${key}&slot=${type}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('food.planSlot', { meal: slotLabel })}
+                    hitSlop={6}
+                    style={({ pressed }) => [styles.linkBtn, pressed && { opacity: 0.7 }]}
+                  >
+                    <Text style={{ color: theme.primary, fontWeight: '700', fontSize: 13 }} numberOfLines={1}>
+                      {t('food.plan')}
+                    </Text>
                   </Pressable>
                 </View>
               );
@@ -517,10 +544,12 @@ export default function Food() {
                         style={({ pressed }) => [
                           styles.mealRow,
                           !first && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: theme.border },
+                          added?.mealId === meal.id && { backgroundColor: theme.surfaceTint, borderRadius: 14, paddingHorizontal: 8 },
                           pressed && { opacity: 0.7 },
                         ]}
                       >
-                        <PhotoFallback uri={rec?.photoUri} illustration={illustrationFor(item.name)} size={56} />
+                        {/* The person's own photo first (a scan, or the recipe's), then the dish icon. */}
+                        <PhotoFallback uri={meal.photoUri ?? rec?.photoUri} illustration={illustrationFor(item.name)} size={56} />
                         <View style={{ flex: 1 }}>
                           <Text style={[Type.eyebrow, { color: theme.textSecondary }]} numberOfLines={1}>
                             {first ? slotLabel : new Date(meal.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
@@ -563,6 +592,31 @@ export default function Food() {
             );
           })}
 
+          {/* Cooking, shopping and the week's review: one compact row, each saying where it stands. */}
+          <View style={[styles.links, { backgroundColor: theme.card }, cardShadow(theme.shadow)]} {...tilesTarget.bind}>
+            {[
+              { icon: 'restaurant-outline' as const, title: t('recipes.title'), sub: recipes.length > 0 ? t('food.recipesSaved', { n: recipes.length }) : t('food.recipesNone'), to: '/recipes' as const },
+              { icon: 'cart-outline' as const, title: t('shopping.title'), sub: shopping ? t('food.shoppingOpen') : t('food.shoppingFromPlan'), to: '/shopping' as const },
+              { icon: 'stats-chart-outline' as const, title: t('food.thisWeek'), sub: t('food.reviewNote'), to: '/review' as const },
+            ].map((l, i) => (
+              <Pressable
+                key={l.to}
+                onPress={() => router.push(l.to)}
+                accessibilityRole="button"
+                accessibilityLabel={`${l.title}. ${l.sub}`}
+                style={({ pressed }) => [styles.link, i > 0 && { borderStartWidth: StyleSheet.hairlineWidth, borderStartColor: theme.border }, pressed && { opacity: 0.7 }]}
+              >
+                <Icon name={l.icon} size={19} color={theme.primary} />
+                <Text style={{ color: theme.text, fontWeight: '800', fontSize: 13, textAlign: 'center' }} numberOfLines={1}>
+                  {l.title}
+                </Text>
+                <Text style={{ color: theme.textSecondary, fontSize: 11, textAlign: 'center' }} numberOfLines={1}>
+                  {l.sub}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
           {/* Food utilities (S02): fasting stays here, labelled; sharing the day. */}
           <RowGroup title={t('food.utilities')} style={{ marginTop: Spacing.md }}>
             <SettingsRow icon="timer-outline" title={t('fasting.title')} subtitle={fastingCardLabel(activeFast, t)} onPress={() => router.push('/fasting')} />
@@ -578,6 +632,17 @@ export default function Food() {
         </>
       )}
     </CollapsingScreen>
+    {added && !deleted && (
+      <View style={[styles.undoBar, { backgroundColor: theme.text }]} accessibilityLiveRegion="polite">
+        <Icon name="checkmark-circle" size={18} color={theme.background} />
+        <Text style={{ color: theme.background, fontWeight: '600', flex: 1 }} numberOfLines={1}>
+          {t('food.addedTo', { meal: t(`home.mealTypes.${added.slot}`) })}
+        </Text>
+        <Pressable accessibilityRole="button" onPress={undoAdded} hitSlop={10}>
+          <Text style={{ color: theme.background, fontWeight: '800' }}>{t('mealPlan.undo')}</Text>
+        </Pressable>
+      </View>
+    )}
     {deleted && (
       <View style={[styles.undoBar, { backgroundColor: theme.text }]} accessibilityLiveRegion="polite">
         <Text style={{ color: theme.background, fontWeight: '600', flex: 1 }} numberOfLines={1}>
@@ -821,7 +886,6 @@ const styles = StyleSheet.create({
   rowTop: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 2 },
   kcalRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 8 },
-  tiles: { flexDirection: 'row', gap: Spacing.sm },
   actions: { flexDirection: 'row', gap: 8 },
   actionStack: { gap: 8 },
   dateRow: { flexDirection: 'row', alignItems: 'center', marginTop: Spacing.sm },
@@ -829,7 +893,9 @@ const styles = StyleSheet.create({
   mealRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, paddingVertical: Spacing.ms },
   addMore: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderTopWidth: StyleSheet.hairlineWidth, minHeight: 44 },
   linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, minHeight: 44 },
-  roundBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  logBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, borderRadius: Radius.full, paddingHorizontal: 12, minHeight: 36, flexShrink: 0 },
+  links: { flexDirection: 'row', borderRadius: Radius.module, paddingVertical: Spacing.ms, marginTop: Spacing.xs, marginBottom: Spacing.ms },
+  link: { flex: 1, alignItems: 'center', gap: 3, paddingHorizontal: 6, minHeight: 44 },
   swapList: { gap: 6, marginTop: Spacing.sm },
   swapRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderWidth: 1, borderRadius: Radius.control, paddingVertical: 8, paddingHorizontal: 10 },
 });

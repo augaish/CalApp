@@ -41,8 +41,10 @@ for (const lang of ['en', 'ar']) {
   // Read as Western digits: in Arabic the boxes show ٠–٩ (checked separately below).
   const shown = () => page.$$eval('input', (els) => els.map((e) => e.value));
   const inputs = async () => (await shown()).map((x) => x.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))));
-  const chipsOn = () => page.$$eval('[aria-selected="true"]', (els) => els.map((e) => e.textContent));
-  const chip = (item, label) => page.getByText(label, { exact: true }).nth(item);
+  // Chip labels show Arabic-Indic digits in Arabic (١½); compared in Western digits.
+  const toAr = (x) => (lang === 'ar' ? x.replace(/[0-9]/g, (d) => '٠١٢٣٤٥٦٧٨٩'[Number(d)]) : x);
+  const chipsOn = () => page.$$eval('[aria-selected="true"]', (els) => els.map((e) => e.textContent.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))));
+  const chip = (item, label) => page.getByText(toAr(label), { exact: true }).nth(item);
 
   await open();
   if (lang === 'ar') {

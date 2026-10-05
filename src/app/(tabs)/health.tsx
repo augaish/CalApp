@@ -110,11 +110,12 @@ export default function Health() {
             onPress={() => router.push(latestSeg ? '/measurements?metric=muscle' : '/body-reading')}
             accessibilityRole="button"
             accessibilityLabel={t('health.composition')}
-            style={({ pressed }) => [styles.heroMap, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [latestSeg ? styles.heroMap : styles.heroMapSmall, pressed && { opacity: 0.8 }]}
           >
-            <BodyMap view="front" zoneIntensity={zoneIntensity} zoneStatus={zoneStatus} size={92} />
+            {/* Full size only when a scan coloured it; an empty figure stays small so the numbers lead. */}
+            <BodyMap view="front" zoneIntensity={zoneIntensity} zoneStatus={zoneStatus} size={latestSeg ? 92 : 34} />
           </Pressable>
-          <View style={styles.heroStats}>
+          <View style={[styles.heroStats, !latestSeg && stats && styles.heroStatsGrid]}>
             {stats ? (
               <>
                 <HeroStat label={t('health.weight')} value={formatWeight(stats.weightKg, units, t)} delta={stats.weightDelta != null ? formatWeightDelta(stats.weightDelta, units, t) : undefined} color={trendColor(stats.weightTrend)} />
@@ -279,8 +280,10 @@ const styles = StyleSheet.create({
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginBottom: Spacing.md },
   hero: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, marginTop: Spacing.sm },
   heroMap: { width: 100, alignItems: 'center' },
+  heroMapSmall: { width: 44, alignItems: 'center', alignSelf: 'flex-start' },
+  heroStatsGrid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 8 },
   heroStats: { flex: 1, gap: 6 },
-  heroStat: { gap: 1 },
+  heroStat: { gap: 1, minWidth: '48%' },
   rangePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, minHeight: 40, borderRadius: Radius.control, borderWidth: 1 },
   ranges: { flexDirection: 'row', gap: 6, marginBottom: Spacing.md, flexWrap: 'wrap' },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },

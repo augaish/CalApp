@@ -73,6 +73,8 @@ for (const route of ROUTES) {
       if (cs.visibility === 'hidden' || parseFloat(cs.opacity) < 0.3) continue;
       const fg = parse(cs.color);
       const px = r.x + Math.min(r.width, 12) / 2, py = r.y + r.height / 2;
+      // Its middle is off the bottom of the screen: nothing there to sample.
+      if (py >= innerHeight) continue;
       // Covered by something else (under the tab bar, behind a sheet): not on show.
       const top = document.elementFromPoint(px, py);
       if (top && top !== el && !el.contains(top) && !top.contains(el)) continue;

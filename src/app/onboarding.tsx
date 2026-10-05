@@ -36,7 +36,7 @@ const ACTIVITY_LEVELS: { key: ActivityLevel; emoji: string }[] = [
 ];
 
 export default function Onboarding() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const storedLanguage = useAppStore((s) => s.language);
   const setLanguage = useAppStore((s) => s.setLanguage);
@@ -260,7 +260,7 @@ export default function Onboarding() {
       {targets && (
         <>
           <View style={[styles.heroCard, { backgroundColor: theme.primary }, cardShadow(theme.shadow)]}>
-            <Text style={[Type.display, { color: theme.onPrimary }]}>{targets.calories}</Text>
+            <Text style={[Type.display, { color: theme.onPrimary }]}>{Math.round(targets.calories).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en')}</Text>
             <Text style={[Type.caption, { color: theme.onPrimary, opacity: 0.85 }]}>
               {t('onboarding.dailyCalories')} · {t('common.kcal')}
             </Text>

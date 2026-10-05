@@ -105,7 +105,7 @@ for (const lang of ['en', 'ar']) {
     check('welcome: three rows of what it unlocks', /Snap a meal, get the macros/.test(b) && /Your plan, rest timer and records/.test(b) && /Ask your coach anything/.test(b));
     check('welcome: a motivational line and the trial reminder note', /“.+”/.test(b) && /remind you 2 days before the trial ends/.test(b));
   } else {
-    check('welcome AR: Arabic greeting, plan and button', /أهلاً بك يا Bader/.test(b) && /هيا نبدأ/.test(b) && /تجربتك المجانية لمدة 14 يوماً/.test(b), b.slice(0, 80));
+    check('welcome AR: Arabic greeting, plan and button', /أهلاً بك يا Bader/.test(b) && /هيا نبدأ/.test(b) && /تجربتك المجانية لمدة (14|١٤) يوماً/.test(b), b.slice(0, 80));
   }
   await page.screenshot({ path: `${OUT}/welcome-${lang}.png` });
   if (lang === 'en') {

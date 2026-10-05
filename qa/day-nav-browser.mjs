@@ -1,4 +1,4 @@
-// Overview's week strip turns whole pages instead of sliding a day per tap,
+// Overview's week strip (opened from the calendar button) turns whole pages instead of sliding a day per tap,
 // and a "Today" button brings you back from any other day (Overview and
 // Training).
 import { chromium } from '/opt/node22/lib/node_modules/playwright/index.mjs';
@@ -24,6 +24,9 @@ await ctx.addInitScript((s) => { if (!localStorage.getItem('calapp-store')) loca
 const page = await ctx.newPage();
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle' });
 await page.waitForTimeout(1200);
+// The strip is folded away under the calendar button since the redesign.
+await page.getByRole('button', { name: 'Show the week' }).click();
+await page.waitForTimeout(300);
 
 const strip = () => page.evaluate((labels) => labels.filter((l) => document.querySelector(`[aria-label="${l}"]`)), Array.from({ length: 28 }, (_, i) => {
   const d = new Date(); d.setDate(d.getDate() - i); return d.toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' });

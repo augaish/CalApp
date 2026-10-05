@@ -151,7 +151,8 @@ const n = await arInputs.count();
 await arInputs.nth(2).fill('١٢٠٫٥');
 await arInputs.nth(3).fill('٠');
 await page.waitForTimeout(400);
-check('3d Arabic-Indic digits + decimal normalised in the calorie field', (await arInputs.nth(2).inputValue()) === '120.5', await arInputs.nth(2).inputValue());
+// The box shows Arabic-Indic digits in Arabic (١٢٠٫٥); what is saved is checked in 3e.
+check('3d Arabic-Indic digits + decimal kept in the calorie field', ['120.5', '١٢٠٫٥'].includes(await arInputs.nth(2).inputValue()), await arInputs.nth(2).inputValue());
 b = await body(page); await shot(page, '3-food-edit-ar');
 check('3d Arabic blank note lists carbs and fat', /تُرك فارغاً: الكربوهيدرات، الدهون/.test(b) || /تُرك فارغاً:/.test(b), b.match(/تُرك فارغاً.{0,40}/)?.[0]);
 await page.getByText('إضافة الطعام', { exact: true }).last().click(); await page.waitForTimeout(1200);

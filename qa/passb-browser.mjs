@@ -44,7 +44,7 @@ console.log('=== B1 Health hero ===');
 let { ctx, page } = await open(base(), '/health');
 let b = await body(page); await shot(page, 'b1-health');
 check('B1 hero shows weight, body fat, muscle, BMI with deltas', /78\.4 kg.?−0\.9 kg/.test(b) && /20\.6%.?−0\.8 pt/.test(b) && /35\.2 kg.?\+0\.4 kg/.test(b) && /BMI ?24\.7/.test(b), b.match(/Body composition.{0,160}/)?.[0]);
-check('B1 date and source on the hero', /Sep \d+ · Scanned · InBody 270/.test(b));
+check('B1 date and source on the hero', /[A-Z][a-z]{2} \d+ · Scanned · InBody 270/.test(b));
 check('B1 body map rendered (svg)', (await page.locator('svg').count()) > 0);
 check('B1 no page errors', page.errors.length === 0, page.errors.join(' | '));
 await ctx.close();
@@ -62,8 +62,9 @@ await page.goto(`${BASE}/`, { waitUntil: 'networkidle' }); await page.waitForTim
 await page.getByLabel('Latest weight · Health').click(); await page.waitForTimeout(900);
 check('A3 Latest weight card opens Health', /\/health/.test(page.url()), page.url().replace(BASE, ''));
 await page.goto(`${BASE}/`, { waitUntil: 'networkidle' }); await page.waitForTimeout(1200);
-await page.getByLabel('Training · Training').click(); await page.waitForTimeout(900);
-check('A3 Training step card opens Training', /\/training/.test(page.url()), page.url().replace(BASE, ''));
+// The workout card leads Overview since the redesign; tapping it (not its button) opens Training.
+await page.getByRole('button', { name: /^(Your next workout|In progress|Done today|Rest day) · / }).first().click(); await page.waitForTimeout(900);
+check('A3 workout card opens Training', /\/training/.test(page.url()), page.url().replace(BASE, ''));
 await ctx.close();
 
 // ═══ B2/B3 AI Support: layout + a seeded reply with actions and chips ═══

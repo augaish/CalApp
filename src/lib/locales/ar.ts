@@ -89,6 +89,7 @@ export const ar: TranslationSchema = {
     invalidWeight: 'يجب أن يكون الوزن بين 30 و300 كجم.',
   },
   home: {
+    showWeek: 'عرض الأسبوع',
     previousDay: 'اليوم السابق',
     nextDay: 'اليوم التالي',
     today: 'اليوم',
@@ -348,6 +349,7 @@ export const ar: TranslationSchema = {
     undo: 'تراجع',
     restTimer: 'مؤقت الراحة',
     lastTime: 'المرة السابقة',
+    lastTimeHint: 'اضغط مجموعة لاستخدامها',
     noLastTime: 'أول مرة في هذا التمرين · اختر عدد التكرارات أو اكتب الوزن',
     finishWorkout: 'إنهاء التمرين',
     sessionBest: 'أفضل مجموعة',
@@ -488,6 +490,10 @@ export const ar: TranslationSchema = {
     shareDay: 'مشاركة هذا اليوم',
     shareDayHint: 'أرسل الوجبات التي سجّلتها كنص',
     chooseDay: 'اختر يومًا',
+    logFood: 'سجّل طعاماً',
+    plan: 'خطّط',
+    thisWeek: 'هذا الأسبوع',
+    addedTo: 'أُضيف إلى {{meal}}',
   },
   shopping: {
     title: 'قائمة التسوق',
@@ -2445,6 +2451,13 @@ export const ar: TranslationSchema = {
     keepEditing: 'متابعة التعديل',
     discard: 'تجاهل',
     setN: 'المجموعة {{n}}',
+  },
+  hero: {
+    next: 'تمرينك القادم',
+    inProgress: 'قيد التنفيذ',
+    doneToday: 'أنجزته اليوم',
+    restDay: 'يوم راحة',
+    viewWorkout: 'عرض التمرين',
   },
   mealPlan: {
     planned: 'مخطط',

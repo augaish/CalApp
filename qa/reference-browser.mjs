@@ -101,7 +101,7 @@ console.log('\n=== Last time, set by set, one tap away ===');
 // The same-reps box is gone; last week's whole session is the reference.
 check('the same-reps box is gone', !/-rep set/.test(body), body.match(/.{0,10}-rep set.{0,20}/)?.[0]);
 check('last time is dated a week back', /Last time · 7 days ago/.test(body), body.match(/Last time.{0,20}/)?.[0]);
-check('  and lists all three of its sets in order', /1\s*25 kg × 10\s*2\s*25 kg × 8\s*3\s*25 kg × 7/.test(body), body.match(/Last time[^]{0,80}/)?.[0]);
+check('  and lists all three of its sets in order', /1\s*25 kg × 10\D*2\s*25 kg × 8\D*3\s*25 kg × 7/.test(body), body.match(/Last time[^]{0,80}/)?.[0]);
 const inputVal = async (i) => page.locator('input').nth(i).inputValue();
 check('the steppers open on the set just finished (20 × 9)', (await inputVal(0)) === '20' && (await inputVal(1)) === '9', `${await inputVal(0)} × ${await inputVal(1)}`);
 // Tap the third chip: both fields follow.

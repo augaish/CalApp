@@ -22,7 +22,7 @@ import { useAppStore } from '@/lib/store';
  * the gear. Goal rows open editors; nothing here rewrites diary history.
  */
 export default function Profile() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const targets = useAppStore((s) => s.targets);
@@ -116,7 +116,7 @@ export default function Profile() {
         <SettingsRow
           icon="restaurant-outline"
           title={t('profile.foodTargets')}
-          value={targets ? `${targets.calories} ${t('common.kcal')}` : undefined}
+          value={targets ? `${Math.round(targets.calories).toLocaleString(i18n.language === 'ar' ? 'ar' : 'en')} ${t('common.kcal')}` : undefined}
           onPress={() => router.push('/edit-targets')}
         />
         <SettingsRow

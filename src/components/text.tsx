@@ -1,4 +1,4 @@
-import { Children, isValidElement, type ReactNode } from 'react';
+import { Children, isValidElement, useSyncExternalStore, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Text as RNText,
@@ -20,7 +20,13 @@ import { normalizeDigits } from '@/lib/numbers';
 /** The native input, for refs (`useRef<TextInputHandle>`). */
 export type TextInputHandle = RNTextInput;
 
-const arabic = () => i18n.language === 'ar';
+const onLanguage = (cb: () => void) => {
+  i18n.on('languageChanged', cb);
+  return () => i18n.off('languageChanged', cb);
+};
+/** Subscribed, so a number-only label (memoised, its props never change)
+ * still turns Arabic when the saved language loads after the first draw. */
+const useArabic = () => useSyncExternalStore(onLanguage, () => i18n.language === 'ar', () => i18n.language === 'ar');
 
 function localize(children: ReactNode): ReactNode {
   if (typeof children === 'string') return toArabicDigits(children);
@@ -30,7 +36,8 @@ function localize(children: ReactNode): ReactNode {
 }
 
 export function Text({ latinDigits, children, ...props }: TextProps & { latinDigits?: boolean; ref?: React.Ref<RNText> }) {
-  return <RNText {...props}>{!latinDigits && arabic() ? localize(children) : children}</RNText>;
+  const arabic = useArabic();
+  return <RNText {...props}>{!latinDigits && arabic ? localize(children) : children}</RNText>;
 }
 
 const NUMERIC = new Set(['numeric', 'number-pad', 'decimal-pad', 'phone-pad']);
