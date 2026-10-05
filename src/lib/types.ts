@@ -678,6 +678,24 @@ export interface PlannedSet {
   distanceM?: number;
 }
 
+/**
+ * A note written during a workout about one exercise ("Keep elbows close"),
+ * shown the next time that exercise comes up. One per exercise per workout
+ * day; tied to the exercise's id, so renaming or switching language keeps it.
+ */
+export interface ExerciseNote {
+  id: string;
+  exerciseId: string;
+  /** The name when written, for history and export. */
+  exerciseName: string;
+  /** The workout day it belongs to (store dateKey). */
+  dayKey: string;
+  /** When that workout happened — what the history shows, never changed by an edit. */
+  at: string;
+  text: string;
+  updatedAt: string;
+}
+
 export interface WorkoutSet {
   weightKg?: number;
   reps?: number;

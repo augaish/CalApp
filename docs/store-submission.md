@@ -459,6 +459,7 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - **Start** does it all at once: the program's week becomes a new saved schedule and the active one, and the targets and meal plan switch over. The week you had is saved in Schedules first ("Before AI program · date"), so you can switch back any time.
   - The server holds the AI to your answers: training only on the days you picked, and no meal that names one of your allergies (or meat, for vegetarian).
 - **Plan preferences** replaces "Training preferences" on Profile: your saved answers, allergies included. Meal scans and recipes now show "May contain: Nuts" when a name mentions one of your allergies.
+- **Exercise notes.** During a workout, each exercise has a notes card: the last note from an earlier workout, and today's ("Keep elbows close. Try 65 kg next time."). Tap to write; the rest timer keeps running. History shows every earlier note, dated, plus old set comments. Notes follow the exercise into any routine, stay on the phone and in your own backup and export, and never go to the AI.
 - **Fixes from the 5 October test report.**
   - Recipe cards say "protein unknown" instead of "0 g", and This week's protein average says "at least" when a food had no protein value.
   - "Edit today's plan" is now **Edit weekly schedule**, with "Changes apply to every Monday".

@@ -6,6 +6,7 @@ import { Keyboard, Linking, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { PageHeader } from '@/components/brand-header';
+import { ExerciseNotesCard } from '@/components/exercise-notes';
 import { RestAlertAsk } from '@/components/rest-alert-ask';
 import { Stopwatch } from '@/components/stopwatch';
 import { ActionButton, Chip, IconTile } from '@/components/system';
@@ -668,6 +669,11 @@ export default function SessionScreen() {
               </Pressable>
             ))}
           </View>
+        )}
+
+        {/* Notes for this exercise: the last one from an earlier workout, and today's. */}
+        {exId && dayKeyStr && (
+          <ExerciseNotesCard exerciseId={exId} exerciseName={ex ? exerciseName(ex, lang) : exId} dayKey={dayKeyStr} at={session.startedAt} />
         )}
 
         <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>{t('session.restTimer')}</Text>

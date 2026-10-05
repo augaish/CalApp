@@ -30,6 +30,7 @@ export function buildExport(): string {
       occurrences: s.occurrences,
       activeProgram: s.activeProgram,
       planPrefs: s.planPrefs,
+      exerciseNotes: s.exerciseNotes,
       fastingHistory: s.fastingHistory,
       shopping: s.shopping,
     },

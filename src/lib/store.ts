@@ -22,6 +22,7 @@ import type {
   WorkoutOccurrence,
   DailyTargets,
   Exercise,
+  ExerciseNote,
   ExerciseType,
   FastingProtocol,
   FastingSession,
@@ -255,6 +256,8 @@ export interface AppState {
   occurrences: Record<string, WorkoutOccurrence>;
   /** Favourites of bundled Calgym recipes are references, never copies (AT45). */
   favoriteIds: string[];
+  /** Notes written about an exercise during a workout, newest edits anywhere. */
+  exerciseNotes: ExerciseNote[];
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -440,6 +443,12 @@ export interface AppState {
   applyOccurrenceMoves: (moves: OccurrenceMove[], expected: Record<string, number>, opId: string) => boolean;
   /** Reverses one operation while its occurrences are unchanged and unstarted; false when nothing could be reversed. */
   undoOccurrenceOp: (opId: string) => boolean;
+  /**
+   * Save (or, with empty text, remove) the note for one exercise on one
+   * workout day. Saving again edits the same note; another day's note is
+   * never touched.
+   */
+  saveExerciseNote: (input: { exerciseId: string; exerciseName: string; dayKey: string; at: string; text: string }) => void;
   toggleFavoriteId: (id: string) => void;
   updateSession: (patch: Partial<ActiveSession>) => void;
   endSession: () => void;
@@ -506,6 +515,7 @@ export interface AppState {
     mealPlanRecipes?: AppState['mealPlanRecipes'];
     mealPlanSwaps?: AppState['mealPlanSwaps'];
     planPrefs?: AppState['planPrefs'];
+    exerciseNotes?: AppState['exerciseNotes'];
     shopping?: AppState['shopping'];
     fastingHistory?: AppState['fastingHistory'];
     favoriteIds?: AppState['favoriteIds'];
@@ -522,6 +532,9 @@ export function mealTypeForNow(): MealType {
   if (h < 22) return 'dinner';
   return 'snack';
 }
+
+/** Longest exercise note, in characters (the editor says so before this). */
+export const NOTE_MAX = 2000;
 
 function id(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -675,6 +688,7 @@ export const useAppStore = create<AppState>()(
       activeSession: null,
       occurrences: {},
       favoriteIds: [],
+      exerciseNotes: [],
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -717,6 +731,7 @@ export const useAppStore = create<AppState>()(
           activeSession: null,
           occurrences: {},
           favoriteIds: [],
+          exerciseNotes: [],
           notifySnooze: {},
           notifyHandled: [],
           planSwitch: null,
@@ -1396,6 +1411,18 @@ export const useAppStore = create<AppState>()(
         set({ occurrences: next });
         return true;
       },
+      saveExerciseNote: ({ exerciseId, exerciseName, dayKey, at, text }) =>
+        set((s) => {
+          const body = text.trim().slice(0, NOTE_MAX);
+          const existing = s.exerciseNotes.find((n) => n.exerciseId === exerciseId && n.dayKey === dayKey);
+          if (!body) return existing ? { exerciseNotes: s.exerciseNotes.filter((n) => n !== existing) } : {};
+          const now = new Date().toISOString();
+          if (existing) {
+            if (existing.text === body) return {};
+            return { exerciseNotes: s.exerciseNotes.map((n) => (n === existing ? { ...n, text: body, exerciseName, updatedAt: now } : n)) };
+          }
+          return { exerciseNotes: [...s.exerciseNotes, { id: `note:${id()}`, exerciseId, exerciseName, dayKey, at, text: body, updatedAt: now }] };
+        }),
       toggleFavoriteId: (recipeId) =>
         set((s) => ({ favoriteIds: s.favoriteIds.includes(recipeId) ? s.favoriteIds.filter((x) => x !== recipeId) : [...s.favoriteIds, recipeId] })),
       undoOccurrenceOp: (opId) => {
@@ -1476,12 +1503,12 @@ export const useAppStore = create<AppState>()(
       applySnapshot: (snap) => {
         const {
           savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
-          mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs,
+          mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs, exerciseNotes,
         } = snap;
         const plans = Object.fromEntries(
           Object.entries({
             savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
-            mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs,
+            mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs, exerciseNotes,
           }).filter(([, v]) => v !== undefined),
         ) as Partial<AppState>;
         set({
@@ -1536,6 +1563,7 @@ export const useAppStore = create<AppState>()(
           coachReferenceDocs: [],
           activeFast: null,
           fastingHistory: [],
+          exerciseNotes: [],
         }),
     })),
     {
@@ -1599,6 +1627,7 @@ export const useAppStore = create<AppState>()(
         activeSession,
         occurrences,
         favoriteIds,
+        exerciseNotes,
       }) => ({
         account,
         language,
@@ -1655,6 +1684,7 @@ export const useAppStore = create<AppState>()(
         activeSession,
         occurrences,
         favoriteIds,
+        exerciseNotes,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },
