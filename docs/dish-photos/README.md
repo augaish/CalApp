@@ -1,6 +1,6 @@
 # Calgym dish photos: brief for the image generator
 
-**121 photos**, together covering about **1,370 dish names** in English and Arabic. Similar dishes share one photo: Kabsa, Mandi, Machboos, Madfoon, Mathbi and Bukhari rice all use `rice_chicken.png`.
+**121 photos**, together covering about **1,370 dish names** in English and Arabic. Similar dishes share one photo: Kabsa, Mandi, Machboos, Madfoon, Mathbi and Bukhari rice all use `rice_chicken.jpg`.
 
 The app shows a dish photo next to a logged meal or recipe when there is no photo of your own. Your own scanned photo always comes first.
 
