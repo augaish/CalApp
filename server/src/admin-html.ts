@@ -165,6 +165,7 @@ export const ADMIN_HTML = `<!doctype html>
         <div class="metric peach"><div class="label">Active this month</div><div class="value" id="s_active">—</div><div class="note">of <span id="s_users">—</span> users in total</div></div>
         <div class="metric"><div class="label muted">AI cost this month</div><div class="value" id="s_cost">—</div><div class="note muted">SAR (est.) · <span id="s_actions">—</span> AI actions</div></div>
       </div>
+      <p class="sub" id="whoop_line" style="margin:12px 0 0">WHOOP: <b id="s_whoop">—</b> of <span id="s_whoop_limit">—</span> members connected</p>
       <div class="chart-head" style="margin:22px 0 0">
         <h3 style="margin:0">Activity</h3>
         <div class="chips" role="group" aria-label="Date range">
@@ -606,6 +607,13 @@ export const ADMIN_HTML = `<!doctype html>
     document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     document.getElementById('s_cost').textContent =
       (s.costUsdThisMonth * USD_TO_SAR).toFixed(2);
+    // WHOOP lets only so many members connect; from 80% it is time to ask WHOOP for more.
+    var wl = data.whoopLimit || 100, wc = s.whoopConnected || 0;
+    document.getElementById('s_whoop').textContent = wc;
+    document.getElementById('s_whoop_limit').textContent = wl;
+    var near = wc >= wl * 0.8;
+    document.getElementById('whoop_line').style.color = near ? '#9A5B00' : '';
+    document.getElementById('whoop_line').title = near ? 'Close to the WHOOP limit: ask WHOOP for more in the Developer Dashboard. One person on two devices can count twice.' : 'One person on two devices can count twice.';
     document.getElementById('lim_free').value = data.limits.free;
     document.getElementById('lim_ess').value = data.limits.essentials != null ? data.limits.essentials : '';
     document.getElementById('lim_pro').value = data.limits.pro;

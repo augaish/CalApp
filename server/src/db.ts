@@ -1439,11 +1439,14 @@ export interface AdminStats {
   actionsThisMonth: number;
   /** Estimated USD cost of every AI call this period, across all users. */
   costUsdThisMonth: number;
+  /** WHOOP connections on file. WHOOP limits how many members may connect;
+   * one person on two devices can count twice, so this is an upper bound. */
+  whoopConnected: number;
 }
 
 export async function adminStats(): Promise<AdminStats> {
   if (!pool) {
-    return { totalUsers: 0, proUsers: 0, activeThisMonth: 0, actionsThisMonth: 0, costUsdThisMonth: 0 };
+    return { totalUsers: 0, proUsers: 0, activeThisMonth: 0, actionsThisMonth: 0, costUsdThisMonth: 0, whoopConnected: 0 };
   }
   const period = currentPeriod();
   const res = await pool.query(
@@ -1454,7 +1457,8 @@ export async function adminStats(): Promise<AdminStats> {
             OR (promo_plan IS NOT NULL AND promo_until > now())) AS pro_users,
        (SELECT COUNT(DISTINCT ref)::int FROM usage_counters WHERE period = $1) AS active_month,
        (SELECT COALESCE(SUM(count), 0)::int FROM usage_counters WHERE period = $1) AS actions_month,
-       (SELECT COALESCE(SUM(cost_usd), 0)::numeric FROM usage_counters WHERE period = $1) AS cost_month`,
+       (SELECT COALESCE(SUM(cost_usd), 0)::numeric FROM usage_counters WHERE period = $1) AS cost_month,
+       (SELECT COUNT(*)::int FROM whoop_connections) AS whoop_connected`,
     [period],
   );
   const r = res.rows[0];
@@ -1464,6 +1468,7 @@ export async function adminStats(): Promise<AdminStats> {
     activeThisMonth: r.active_month,
     actionsThisMonth: r.actions_month,
     costUsdThisMonth: Number(r.cost_month),
+    whoopConnected: r.whoop_connected,
   };
 }
 

@@ -2800,6 +2800,9 @@ app.get('/admin/api/data', async (c) => {
     ]);
   return c.json({
     stats,
+    // WHOOP's member limit for Calgym (100 since 5 Oct 2026); raise the env
+    // value when WHOOP approves more.
+    whoopLimit: Number(process.env.WHOOP_MEMBER_LIMIT) || 100,
     users,
     limits,
     planLocks: locks,

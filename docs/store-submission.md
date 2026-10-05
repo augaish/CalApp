@@ -573,9 +573,9 @@ On each of the four base plans: **Add offer**:
 
 ---
 
-# Part C — WHOOP approval (lifts the 10-member limit)
+# Part C — WHOOP approval ✅ (100 members since 5 Oct 2026)
 
-Until WHOOP approves Calgym, only **10 WHOOP members** can connect. Number 11 gets an error from WHOOP. WHOOP reviews requests about once a month, and some developers report waiting two months or more, so send it early.
+**Approved on 5 October 2026: up to 100 WHOOP members** can connect (it was 10). Nothing changes in the app; the limit lives on WHOOP's side. Member 101 gets an error from WHOOP when connecting, so watch the count (Step 32).
 
 ## Step 28 ⬜ Test with your own WHOOP
 1. On your iPhone: **Health → Connections → WHOOP → Connect**, then sign in to WHOOP and allow.
@@ -606,8 +606,15 @@ Nothing to change. Calgym writes "WHOOP" as plain text and doesn't use the WHOOP
    > Calgym is a food and training tracker for iPhone and Android (English and Arabic), live on the App Store. Members connect WHOOP with OAuth so the calories they really burned (from WHOOP workouts) replace our estimates next to the meals and training they log. If the member separately allows it, our AI coach uses their recovery, sleep and strain to shape training advice. That data goes only to Anthropic (Claude) under its commercial API terms, is never used to train models, and is never sold or shared. We store only the OAuth tokens on our server. The WHOOP figures stay on the member's phone and in their own private backup. Disconnecting revokes access through WHOOP's revoke endpoint and deletes the tokens and the WHOOP data. Deleting the account does the same. Privacy policy: https://calapp-production-ab20.up.railway.app/privacy
 
 3. If they want to try it themselves: new Calgym users get a 14-day free trial that includes WHOOP. For longer access, give them a code from **admin → Codes**.
-4. Once approved there's nothing to change in the app. The limit lifts on WHOOP's side.
-5. **When Apple approves:** reply to WHOOP with the App Store link. Our form said it was coming.
+4. Approved on 5 October 2026 for 100 members. Nothing to change in the app.
+5. **When Apple approves:** reply to WHOOP with the App Store link. Our form said it was coming, and it helps when asking for more members later.
+
+## Step 32 ⬜ Watch the WHOOP count and ask for more in time
+1. **Admin → Overview** shows **WHOOP: N of 100 members connected**. It turns amber from 80.
+2. The count can be a little high: one person who connected from two phones counts twice. WHOOP's own count is the one that matters.
+3. From about 80, ask WHOOP for more: **Developer Dashboard → your app → request a rate/member limit increase**, with a short reason (how many members use Calgym, how many have WHOOP, growth since launch). It can take weeks, so ask early.
+4. When WHOOP raises it, set **`WHOOP_MEMBER_LIMIT`** on Railway to the new number so Admin shows it. Nothing else changes.
+5. Keep to WHOOP's rules (API Terms of Use and Design Guidelines, see Step 30): "WHOOP" in plain text, WHOOP figures labelled as WHOOP's, no WHOOP logo unless the official one is used as they say.
 
 # Reference
 
