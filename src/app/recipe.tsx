@@ -183,7 +183,7 @@ export default function RecipeScreen() {
               {recipe.name}
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }}>
-              {minutes > 0 ? `${t('recipes.minutes', { n: minutes })} · ` : ''}
+              {minutes > 0 ? `${t('recipes.minutes', { count: minutes })} · ` : ''}
               {t('recipe.makesServings', { count: recipe.servings })}
             </Text>
             <View style={styles.pills}>

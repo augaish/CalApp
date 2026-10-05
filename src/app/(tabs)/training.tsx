@@ -457,7 +457,7 @@ export default function Training() {
           <Text style={[styles.planTitle, { color: theme.text }]}>{plan?.title || t('training.todaysWorkout')}</Text>
           <Text style={{ color: theme.textSecondary, fontSize: 14, marginTop: 2 }}>
             {t('training.exerciseCount', { count: visiblePlanIds.length })}
-            {doneCount > 0 ? ` · ${t('today.doneOf', { done: doneCount, total: visiblePlanIds.length })}` : ` · ${t('training.aboutMinutes', { n: estimateMinutes(visiblePlanIds.length, plannedSetsTotal) })}`}
+            {doneCount > 0 ? ` · ${t('today.doneOf', { done: doneCount, total: visiblePlanIds.length })}` : ` · ${t('training.aboutMinutes', { count: estimateMinutes(visiblePlanIds.length, plannedSetsTotal) })}`}
           </Text>
 
           <View style={{ marginTop: Spacing.ms }}>

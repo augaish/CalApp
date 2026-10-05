@@ -235,7 +235,7 @@ export default function Recipes() {
                 {r.name}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }} numberOfLines={1}>
-                {mins > 0 ? `${t('recipes.minutes', { n: mins })} · ` : ''}
+                {mins > 0 ? `${t('recipes.minutes', { count: mins })} · ` : ''}
                 {t('recipes.servingsCount', { count: r.servings })}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }} numberOfLines={2}>

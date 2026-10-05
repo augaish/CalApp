@@ -74,7 +74,7 @@ export default function ScheduleActivate() {
   const summary = (d?: { exerciseIds: string[]; plans?: Record<string, unknown[]> }) => {
     if (!d || d.exerciseIds.length === 0) return t('today.restDay');
     const sets = d.exerciseIds.reduce((sum, ex) => sum + ((d.plans?.[ex]?.length as number | undefined) ?? 0), 0);
-    return `${t('training.aboutMinutes', { n: estimateMinutes(d.exerciseIds.length, sets) })} · ${t('training.exerciseCount', { count: d.exerciseIds.length })}`;
+    return `${t('training.aboutMinutes', { count: estimateMinutes(d.exerciseIds.length, sets) })} · ${t('training.exerciseCount', { count: d.exerciseIds.length })}`;
   };
   const selectedDay = dayOf(target.days, selected);
   const rangeLabel = `${week[0].toLocaleDateString(locale, { day: 'numeric' })}–${week[6].toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`;

@@ -234,8 +234,8 @@ export default function SessionScreen() {
     const days = calendarDaysBetween(iso, day);
     if (days <= 0) return t('session.whenToday');
     if (days === 1) return t('session.whenYesterday');
-    if (days < 14) return t('session.whenDaysAgo', { days });
-    if (days < 60) return t('session.whenWeeksAgo', { weeks: Math.round(days / 7) });
+    if (days < 14) return t('session.whenDaysAgo', { count: days });
+    if (days < 60) return t('session.whenWeeksAgo', { count: Math.round(days / 7) });
     return new Date(iso).toLocaleDateString(lang, { day: 'numeric', month: 'short', year: 'numeric' });
   };
   const shortDate = (iso: string) => new Date(iso).toLocaleDateString(lang, { day: 'numeric', month: 'short' });
