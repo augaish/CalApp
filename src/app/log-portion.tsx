@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
-import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { PhotoFallback } from '@/components/photo-fallback';
 import { Text } from '@/components/text';
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -27,6 +27,7 @@ import {
   knownLabel,
   recipeUnknownNutrients,
 } from '@/lib/recipes';
+import { markConfirmed } from '@/lib/confirmed-meals';
 import { dateKey, mealTypeForNow, plannedMealFor, useAppStore } from '@/lib/store';
 import { ensureRecipeInStore, useAllRecipes } from '@/lib/use-recipes';
 import type { MealType, NutrientKey } from '@/lib/types';
@@ -108,6 +109,8 @@ export default function LogPortion() {
     logMeal([item], undefined, slot, timestampFor(day));
     const newest = useAppStore.getState().meals[0];
     setLoggedId(newest?.id ?? null);
+    // This screen confirms with its own Undo; Food need not say it again.
+    if (newest) markConfirmed(newest.id);
     // A starter becomes a private copy the moment it is logged.
     ensureRecipeInStore(recipe.id, locale);
     updateRecipe(recipe.id, { lastCookedAt: new Date().toISOString() });
@@ -152,7 +155,7 @@ export default function LogPortion() {
           {t(`home.mealTypes.${slot}`)} · {dayLabel}
         </Text>
         <View style={styles.head}>
-          <PhotoFallback uri={recipe.photoUri} illustration={illustrationFor(recipe.name)} size={96} />
+          <PhotoFallback uri={recipe.photoUri} name={recipe.name} size={96} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 18 }} numberOfLines={2}>
               {recipe.name}

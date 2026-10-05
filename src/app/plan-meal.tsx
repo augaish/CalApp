@@ -5,7 +5,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
-import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { PhotoFallback } from '@/components/photo-fallback';
 import { weekdayLabel } from '@/components/schedule-plan-card';
 import { Chip, DeltaRows, IconTile } from '@/components/system';
 import { Text } from '@/components/text';
@@ -181,7 +181,7 @@ export default function PlanMeal() {
         </Text>
         <View style={[styles.dish, { backgroundColor: theme.surfaceTint }]}>
           {current ? (
-            <PhotoFallback uri={currentRecipe?.photoUri} illustration={illustrationFor(current.name)} size={56} />
+            <PhotoFallback uri={currentRecipe?.photoUri} name={current.name} size={56} />
           ) : (
             <IconTile icon="restaurant-outline" size={56} color={theme.textTertiary} />
           )}
@@ -209,7 +209,7 @@ export default function PlanMeal() {
           {t('planMeal.after')} <Text style={{ color: theme.textSecondary, fontWeight: '500' }}>{t('planMeal.afterNew')}</Text>
         </Text>
         <View style={[styles.dish, { backgroundColor: theme.surfaceTint, borderWidth: 1, borderColor: theme.primary }]}>
-          <PhotoFallback uri={recipe.photoUri} illustration={illustrationFor(recipe.name)} size={56} />
+          <PhotoFallback uri={recipe.photoUri} name={recipe.name} size={56} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }} numberOfLines={2}>
               {recipe.name}

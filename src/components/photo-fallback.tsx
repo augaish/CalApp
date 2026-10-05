@@ -6,6 +6,8 @@ import { StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import { Radius } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { DISH_IMAGES } from '@/lib/dish-images';
+import { dishKeyFor } from '@/lib/dish-match';
 
 export type FoodIllustration = 'bowl' | 'plate' | 'sandwich' | 'drink' | 'fruit' | 'packaged' | 'fish' | 'egg' | 'pizza' | 'generic';
 
@@ -41,19 +43,23 @@ export function illustrationFor(name: string | undefined): FoodIllustration {
 }
 
 /**
- * A photo when there is one, a bundled category illustration when there is
- * not (C09). Same geometry either way, so a list never reflows when an image
+ * The person's own photo when there is one; otherwise a bundled photo of
+ * that dish, matched by name in English or Arabic (kabsa, hummus, karak…);
+ * otherwise a bundled category illustration (C09). Same geometry either way, so a list never reflows when an image
  * fails or was never attached, and no blank hole, broken-image badge or
  * prompt to buy a picture. Never triggers an image request of its own: this
  * is decoration, and nutrition does not depend on it.
  */
 export function PhotoFallback({
   uri,
-  illustration = 'generic',
+  name,
+  illustration = illustrationFor(name),
   size = 56,
   accessibilityLabel,
 }: {
   uri?: string;
+  /** The dish's name, for the bundled dish photo and the icon. */
+  name?: string;
   illustration?: FoodIllustration;
   size?: number;
   /** Omit when the dish name sits beside the image; a reader would hear it twice. */
@@ -62,6 +68,8 @@ export function PhotoFallback({
   const theme = useTheme();
   const [failed, setFailed] = useState(false);
   const showImage = !!uri && !failed;
+  const dishKey = dishKeyFor(name);
+  const dish = dishKey ? DISH_IMAGES[dishKey] : undefined;
   return (
     <View
       style={[styles.box, { width: size, height: size, backgroundColor: theme.cardSubtle }]}
@@ -76,6 +84,8 @@ export function PhotoFallback({
           contentFit="cover"
           onError={() => setFailed(true)}
         />
+      ) : dish ? (
+        <Image source={dish} style={{ width: size, height: size }} contentFit="cover" />
       ) : (
         <Icon name={GLYPH[illustration]} size={Math.round(size * 0.42)} color={theme.primary} />
       )}

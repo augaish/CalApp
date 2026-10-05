@@ -2,7 +2,8 @@
 // Overview leads with the workout card and keeps Next meal and the rest;
 // Food has the calories card first, Log food / Plan on empty meals, the
 // Recipes · Shopping · This week row, and "Added to Lunch · Undo" after a
-// meal is logged elsewhere; the workout keeps Target and Best, then Last
+// meal is logged elsewhere (once: not after a screen that already said
+// it), with dish photos; the workout keeps Target and Best, then Last
 // time with every set one tap away; Health's empty figure is small;
 // Profile's calories have separators. Saves screenshots to $SHOTS.
 // Needs the web build on :8099 (the API is not needed).
@@ -90,15 +91,31 @@ for (const lang of ['en', 'ar']) {
   await page.waitForTimeout(1500);
   check(`${lang}: Done returns to Food`, /\/food/.test(page.url()), page.url());
   b = await body(page);
-  check(`${lang}: back on Food: "Added to Lunch" with Undo`, b.includes(L('Added to Lunch', 'أُضيف إلى الغداء')) && b.includes(L('Undo', 'تراجع')), b.slice(-300));
-  await page.screenshot({ path: `${SHOTS}/food-added-${lang}.png` });
+  b = await body(page);
+  // The portion screen already said "Added to Lunch" with its own Undo: Food doesn't repeat it.
+  check(`${lang}: no second "Added to Lunch" on Food`, !b.includes(L('Added to Lunch', 'أُضيف إلى الغداء')), b.slice(-200));
   let s = await store(page);
-  const lunch = s.meals.filter((m) => m.mealType === 'lunch');
-  check(`${lang}: lunch logged once`, lunch.length === 1);
+  check(`${lang}: lunch logged once`, s.meals.filter((m) => m.mealType === 'lunch').length === 1);
+  check(`${lang}: the kabsa row shows the kabsa photo`, (await page.$$eval('img', (els) => els.map((e) => e.getAttribute('src') ?? ''))).some((x) => /rice_chicken/.test(x)));
+  await page.screenshot({ path: `${SHOTS}/food-photos-${lang}.png`, fullPage: true });
+
+  // Entered by hand: nothing confirmed it yet, so Food says it, with Undo.
+  await page.getByRole('button', { name: `${L('Log food', 'سجّل طعاماً')} · ${L('Breakfast', 'الفطور')}` }).click();
+  await page.waitForTimeout(900);
+  await page.getByText(L('Enter food manually', 'إدخال طعام يدوياً'), { exact: true }).click();
+  await page.waitForTimeout(900);
+  await page.getByLabel(L('Food name', 'اسم الطعام'), { exact: true }).fill(L('Hummus', 'حمص'));
+  await page.getByLabel(L('Calories', 'السعرات'), { exact: true }).fill('250');
+  await page.getByText(L('Add food', 'إضافة الطعام'), { exact: true }).last().click();
+  await page.waitForTimeout(1500);
+  b = await body(page);
+  check(`${lang}: back on Food: "Added to Breakfast" with Undo`, b.includes(L('Added to Breakfast', 'أُضيف إلى الفطور')) && b.includes(L('Undo', 'تراجع')), page.url());
+  check(`${lang}: the hummus row shows the hummus photo`, (await page.$$eval('img', (els) => els.map((e) => e.getAttribute('src') ?? ''))).some((x) => /hummus/.test(x)));
+  await page.screenshot({ path: `${SHOTS}/food-added-${lang}.png` });
   await page.getByText(L('Undo', 'تراجع'), { exact: true }).last().click();
   await page.waitForTimeout(500);
   s = await store(page);
-  check(`${lang}: Undo removes it again`, s.meals.filter((m) => m.mealType === 'lunch').length === 0 && s.meals.length === 1);
+  check(`${lang}: Undo removes the hummus again`, s.meals.length === 2 && !s.meals.some((m) => m.mealType === 'breakfast'), JSON.stringify(s.meals.map((m) => m.mealType)));
   await ctx.close();
 
   // ── Workout ──

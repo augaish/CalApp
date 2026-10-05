@@ -6,7 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { BrandHeader } from '@/components/brand-header';
-import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, EmptyState, SearchField, StatusPill } from '@/components/system';
 import { Text, TextInput } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
@@ -229,7 +229,7 @@ export default function Recipes() {
             accessibilityLabel={r.name}
             style={({ pressed }) => [styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.8 }]}
           >
-            <PhotoFallback uri={r.photoUri} illustration={illustrationFor(r.name)} size={88} />
+            <PhotoFallback uri={r.photoUri} name={r.name} size={88} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '800', fontSize: 17 }} numberOfLines={2}>
                 {r.name}

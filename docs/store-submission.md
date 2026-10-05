@@ -466,6 +466,8 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - Workout: the rest timer sits at the top, then Target and Best, then **Last time** with every set one tap away (sets done today are ticked), then weight and reps, then notes. Finish workout is a quiet link under Complete set.
   - Health: without a per-limb scan the body figure is small and the numbers lead. With a scan nothing changes.
   - Calories show separators (2,525 kcal).
+  - **Dish photos:** 121 real photos (kabsa, hummus, shawarma, karak…) next to logged meals, plans and recipes, matched by name in English or Arabic. Your own photo still comes first; a dish with no match keeps its icon.
+  - "Added to Lunch · Undo" shows once: not again on Food when the portion screen already said it.
 - **Fixes from the 5 October test report.**
   - Recipe cards say "protein unknown" instead of "0 g", and This week's protein average says "at least" when a food had no protein value.
   - "Edit today's plan" is now **Edit weekly schedule**, with "Changes apply to every Monday".

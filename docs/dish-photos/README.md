@@ -1,5 +1,7 @@
 # Calgym dish photos: brief for the image generator
 
+**Status (5 Oct 2026):** all 121 received and in the app as `assets/dishes/*.webp` (384 × 384, about 20 KB each, 2.4 MB in all). `build.py` also writes `src/lib/dish-names.ts` and `src/lib/dish-images.ts`; the app matches names in `src/lib/dish-match.ts`. To add a dish: add a row in `build.py`, put `<key>.webp` in `assets/dishes/`, run `python3 docs/dish-photos/build.py`.
+
 **121 photos**, together covering about **1,370 dish names** in English and Arabic. Similar dishes share one photo: Kabsa, Mandi, Machboos, Madfoon, Mathbi and Bukhari rice all use `rice_chicken.jpg`.
 
 The app shows a dish photo next to a logged meal or recipe when there is no photo of your own. Your own scanned photo always comes first.

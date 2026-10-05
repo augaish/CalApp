@@ -8,7 +8,7 @@ import { AllergyBanner } from '@/components/allergy-banner';
 import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
-import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, IconTile, InfoLine, StatusPill } from '@/components/system';
 import { Text, TextInput } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
@@ -177,7 +177,7 @@ export default function RecipeScreen() {
       {/* 1. What it is — photo or category illustration, same geometry (C09). */}
       <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
         <View style={styles.head}>
-          <PhotoFallback uri={recipe.photoUri} illustration={illustrationFor(recipe.name)} size={112} />
+          <PhotoFallback uri={recipe.photoUri} name={recipe.name} size={112} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20, letterSpacing: tracking(-0.3) }} numberOfLines={3}>
               {recipe.name}

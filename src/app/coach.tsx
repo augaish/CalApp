@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
-import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
 import { Text, TextInput } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
@@ -418,7 +418,7 @@ export default function Coach() {
                     {r ? (
                       <>
                         <View style={styles.draftHead}>
-                          <PhotoFallback uri={r.photoUri} illustration={illustrationFor(r.name)} size={64} />
+                          <PhotoFallback uri={r.photoUri} name={r.name} size={64} />
                           <View style={{ flex: 1 }}>
                             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{r.name}</Text>
                             <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18 }} numberOfLines={3}>

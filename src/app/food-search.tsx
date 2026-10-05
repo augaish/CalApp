@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
-import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { PhotoFallback } from '@/components/photo-fallback';
 import { EmptyState, IconTile, InfoLine, SearchField, StatusPill } from '@/components/system';
 import { Text } from '@/components/text';
 import { Screen } from '@/components/ui';
@@ -105,7 +105,7 @@ export default function FoodSearch() {
             accessibilityLabel={r.name}
             style={({ pressed }) => [styles.row, { backgroundColor: theme.card }, cardShadow(theme.shadow), pressed && { opacity: 0.7 }]}
           >
-            <PhotoFallback uri={r.photoUri} illustration={illustrationFor(r.name)} size={40} />
+            <PhotoFallback uri={r.photoUri} name={r.name} size={40} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }} numberOfLines={1}>
                 {r.name}

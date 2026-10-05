@@ -9,7 +9,7 @@ import { ModuleBanner } from '@/components/plan-status';
 import { alertDestructive } from '@/lib/alerts';
 import { HeaderPill } from '@/components/brand-header';
 import { CollapsingScreen } from '@/components/collapsing-screen';
-import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
+import { PhotoFallback } from '@/components/photo-fallback';
 import { weekdayLabel } from '@/components/schedule-plan-card';
 import {
   ActionButton,
@@ -29,6 +29,7 @@ import { Button } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { timestampFor, useViewDay } from '@/lib/day';
+import { wasConfirmed } from '@/lib/confirmed-meals';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { shareMeals } from '@/lib/meal-share';
 import { usePending } from '@/lib/pending';
@@ -218,7 +219,7 @@ export default function Food() {
   // Back on Food after logging something elsewhere (scan, search, quick add):
   // say where it went, light the row up, and offer Undo for a few seconds.
   // Only one new meal counts, so a sync bringing in several stays quiet.
-  const [added, setAdded] = useState<{ mealId: string; slot: MealType } | null>(null);
+  const [added, setAdded] = useState<{ mealId: string; slot: MealType; confirmed: boolean } | null>(null);
   const addedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const seenIds = useRef<Set<string> | null>(null);
   useFocusEffect(
@@ -227,8 +228,10 @@ export default function Food() {
       const now = useAppStore.getState().meals;
       if (before) {
         const fresh = now.filter((m) => !before.has(m.id));
+        // A screen that already confirmed it with its own Undo (logging a
+        // recipe portion) has said it; the row still lights up.
         if (fresh.length === 1) {
-          setAdded({ mealId: fresh[0].id, slot: fresh[0].mealType ?? 'snack' });
+          setAdded({ mealId: fresh[0].id, slot: fresh[0].mealType ?? 'snack', confirmed: wasConfirmed(fresh[0].id) });
           if (addedTimer.current) clearTimeout(addedTimer.current);
           addedTimer.current = setTimeout(() => setAdded(null), 6000);
         }
@@ -405,7 +408,7 @@ export default function Food() {
               return (
                 <View key={type} style={[styles.plannedCard, { backgroundColor: theme.surfaceTint }]}>
                   <View style={styles.rowTop}>
-                    <PhotoFallback uri={plannedRecipe?.photoUri} illustration={illustrationFor(planned.name)} size={64} />
+                    <PhotoFallback uri={plannedRecipe?.photoUri} name={planned.name} size={64} />
                     <View style={{ flex: 1 }}>
                       <View style={styles.eyebrowRow}>
                         <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{slotLabel}</Text>
@@ -549,7 +552,7 @@ export default function Food() {
                         ]}
                       >
                         {/* The person's own photo first (a scan, or the recipe's), then the dish icon. */}
-                        <PhotoFallback uri={meal.photoUri ?? rec?.photoUri} illustration={illustrationFor(item.name)} size={56} />
+                        <PhotoFallback uri={meal.photoUri ?? rec?.photoUri} name={item.name} size={56} />
                         <View style={{ flex: 1 }}>
                           <Text style={[Type.eyebrow, { color: theme.textSecondary }]} numberOfLines={1}>
                             {first ? slotLabel : new Date(meal.at).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
@@ -632,7 +635,7 @@ export default function Food() {
         </>
       )}
     </CollapsingScreen>
-    {added && !deleted && (
+    {added && !added.confirmed && !deleted && (
       <View style={[styles.undoBar, { backgroundColor: theme.text }]} accessibilityLiveRegion="polite">
         <Icon name="checkmark-circle" size={18} color={theme.background} />
         <Text style={{ color: theme.background, fontWeight: '600', flex: 1 }} numberOfLines={1}>
@@ -748,7 +751,7 @@ function PlanDay({
           <View key={slot} style={[styles.groupCard, { backgroundColor: theme.card, paddingVertical: Spacing.ms }, cardShadow(theme.shadow)]}>
             <View style={styles.rowTop}>
               {meal ? (
-                <PhotoFallback uri={rec?.photoUri} illustration={illustrationFor(meal.name)} size={64} />
+                <PhotoFallback uri={rec?.photoUri} name={meal.name} size={64} />
               ) : (
                 <IconTile icon="restaurant-outline" size={64} color={theme.textTertiary} />
               )}
