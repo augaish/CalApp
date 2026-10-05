@@ -1,0 +1,315 @@
+"""
+The dish-photo library: one row per photo. Builds dishes.csv (the table the
+app matches meal names against) and prompts.txt (one ready prompt per photo
+for the image generator). Run: python3 docs/dish-photos/build.py
+
+Similar dishes share one photo: their names are aliases of the same row.
+The app picks the row whose alias is the LONGEST match inside a meal's name,
+so "chicken shawarma wrap" finds shawarma_wrap, not grilled_chicken.
+"""
+import csv, os
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+# key, container, subject (what to draw), English names, Arabic names
+ROWS = [
+  # ── Gulf rice dishes ──
+  ("rice_chicken", "plate", "Gulf chicken kabsa: long-grain spiced orange-tinted rice topped with roasted chicken pieces, fried onions, raisins and toasted almonds",
+   "kabsa|kabsah|chicken kabsa|machboos|majboos|chicken machboos|mandi|chicken mandi|madfoon|madhbi|mathbi|mandi rice|bukhari rice|bukhari|chicken and rice|chicken rice", "كبسة|كبسة دجاج|مجبوس|مجبوس دجاج|مكبوس|مندي|مندي دجاج|مدفون|مظبي|مضبي|رز بخاري|بخاري|رز ودجاج|دجاج ورز"),
+  ("rice_lamb", "plate", "Gulf lamb kabsa: spiced long-grain rice topped with tender roasted lamb pieces on the bone, fried onions and toasted nuts",
+   "lamb kabsa|meat kabsa|lamb mandi|meat mandi|lamb machboos|meat machboos|ouzi|quzi|oozi|haneeth|haneeth lamb|lamb and rice|meat and rice|mutton rice", "كبسة لحم|مندي لحم|مجبوس لحم|قوزي|أوزي|حنيذ|لحم ورز|رز ولحم"),
+  ("rice_fish", "plate", "Gulf fish machboos: spiced yellow rice topped with a fried whole fish fillet and fried onions",
+   "fish machboos|machboos samak|fish kabsa|fish and rice|sayadieh|sayadiyah|fish rice", "مجبوس سمك|كبسة سمك|صيادية|سمك ورز|رز وسمك"),
+  ("rice_shrimp", "plate", "Gulf shrimp machboos: spiced orange rice mixed with sautéed shrimp, herbs and fried onions",
+   "shrimp machboos|prawn machboos|shrimp rice|prawn rice|shrimp kabsa|prawn biryani|shrimp biryani", "مجبوس روبيان|مجبوس ربيان|رز روبيان|كبسة روبيان|برياني روبيان"),
+  ("biryani", "plate", "Chicken biryani: layered long-grain basmati rice in white, yellow and orange, with spiced chicken, fried onions, mint and a boiled egg half",
+   "biryani|biriyani|chicken biryani|mutton biryani|lamb biryani|hyderabadi biryani|dum biryani", "برياني|برياني دجاج|برياني لحم"),
+  ("mansaf", "plate", "Jordanian mansaf: lamb pieces on yellow rice over thin bread, with white jameed yogurt sauce and toasted pine nuts",
+   "mansaf", "منسف"),
+  ("maqluba", "plate", "Maqluba: upside-down rice cake with fried eggplant, cauliflower, potato and chicken, topped with toasted almonds",
+   "maqluba|maqlouba|makloubeh|upside down rice", "مقلوبة"),
+  ("rice_white", "bowl", "a bowl of plain cooked white basmati rice, fluffy separate grains",
+   "rice|white rice|basmati rice|basmati|steamed rice|plain rice|cooked rice|jasmine rice", "رز|أرز|رز أبيض|أرز أبيض|رز بسمتي|أرز بسمتي|رز مطبوخ"),
+  ("rice_brown", "bowl", "a bowl of plain cooked brown rice",
+   "brown rice|wild rice", "رز بني|أرز بني"),
+  ("rice_fried", "plate", "Asian egg fried rice with peas, carrot, spring onion and scrambled egg",
+   "fried rice|egg fried rice|chicken fried rice|nasi goreng", "رز مقلي|أرز مقلي"),
+  ("quinoa", "bowl", "a bowl of cooked quinoa with a few cherry tomatoes and parsley",
+   "quinoa", "كينوا"),
+
+  # ── Gulf & Arabic stews, porridges, breads ──
+  ("harees", "bowl", "Gulf harees: smooth creamy wheat and meat porridge with a pool of melted ghee and a sprinkle of cinnamon",
+   "harees|harissa wheat|hareesa|jareesh|jarish|crushed wheat", "هريس|هريسة|جريش"),
+  ("thareed", "bowl", "Gulf thareed: thin regag bread pieces soaked in a tomato meat and vegetable stew with zucchini and potato",
+   "thareed|tharid|thareed bread", "ثريد|ثريدة"),
+  ("saloona", "bowl", "Gulf saloona: tomato-based stew with chicken pieces, potatoes, carrots and zucchini",
+   "saloona|salona|stew|chicken stew|meat stew|vegetable stew|maraq|tashreeb|margoog|marqooq", "صالونة|مرق|مرقة|تشريب|مرقوق|مطفي|يخنة"),
+  ("okra_stew", "bowl", "okra stew (bamia): okra and lamb pieces in rich tomato sauce",
+   "okra|bamia|bamya|okra stew", "بامية|بامية باللحم"),
+  ("molokhia", "bowl", "Egyptian molokhia: green jute-leaf soup with garlic, served in a bowl",
+   "molokhia|mulukhiyah|molokhiya|jute leaves", "ملوخية"),
+  ("beans_stew", "bowl", "white bean stew (fasolia) with tomato sauce and small meat pieces",
+   "fasolia|fasoulia|bean stew|white beans|baked beans", "فاصوليا|فاصوليا بيضاء|فاصولياء"),
+  ("lentil_soup", "bowl", "smooth orange red-lentil soup with a lemon wedge on the side and a drizzle of olive oil",
+   "lentil soup|lentil|lentils|shorbat adas|dal|daal|dhal|adas", "شوربة عدس|عدس|شوربة|دال"),
+  ("chicken_soup", "bowl", "clear chicken soup with shredded chicken, vermicelli noodles, carrot and parsley",
+   "chicken soup|chicken noodle soup|vermicelli soup|shorba|soup", "شوربة دجاج|شوربة شعيرية|شوربة الدجاج"),
+  ("veg_soup", "bowl", "vegetable soup with carrots, potato, zucchini and peas in tomato broth",
+   "vegetable soup|veggie soup|minestrone|tomato soup", "شوربة خضار|شوربة طماطم"),
+  ("cream_soup", "bowl", "creamy mushroom soup with a swirl of cream and herbs",
+   "mushroom soup|cream soup|cream of mushroom|corn soup|cream of chicken", "شوربة فطر|شوربة كريمة|شوربة مشروم|شوربة ذرة"),
+  ("khubz", "board", "a stack of round Arabic flatbreads (khubz / pita)",
+   "bread|arabic bread|pita|pita bread|khubz|khobz|flatbread|tannour bread|tanoor|lebanese bread", "خبز|خبز عربي|خبزة|خبز لبناني|خبز تنور|تنور|عيش|رغيف"),
+  ("bread_loaf", "board", "slices of wholegrain sliced bread",
+   "toast bread|sliced bread|white bread|brown bread|wholegrain bread|whole wheat bread|multigrain bread|sandwich bread", "توست|خبز توست|خبز أسمر|خبز بر|خبز أبيض"),
+  ("samoon", "board", "two golden samoon / baguette-style rolls",
+   "samoon|samoli|bun|roll|bread roll|baguette|hot dog bun", "صامولي|صمون|باجيت|خبز صمون"),
+  ("regag", "board", "Emirati regag: paper-thin crispy flatbread folded with egg and cheese",
+   "regag|regaag|rigag|chebab|chabab|khameer|mahyawa bread", "رقاق|خبز رقاق|جباب|خمير|خبز خمير|خبز مهياوة"),
+  ("manakish", "board", "Lebanese manakish: round flatbread topped with za'atar and olive oil, cut in quarters",
+   "manakish|manakeesh|manaeesh|zaatar manakish|zaatar bread|cheese manakish|fatayer", "مناقيش|منقوشة|منقوشة زعتر|منقوشة جبنة|فطائر|فطاير"),
+
+  # ── Grills & meat plates ──
+  ("grilled_chicken", "plate", "grilled chicken breast fillet, sliced, with grill marks, a lemon wedge and a little green salad",
+   "chicken|grilled chicken|chicken breast|grilled chicken breast|chicken fillet|roast chicken|baked chicken|chicken thigh|chicken thighs|boiled chicken", "دجاج|دجاج مشوي|صدر دجاج|صدور دجاج|فيليه دجاج|فخذ دجاج|دجاج مسلوق|دجاج بالفرن"),
+  ("whole_chicken", "plate", "half a rotisserie charcoal-grilled chicken with garlic sauce and pickles",
+   "rotisserie chicken|half chicken|whole chicken|charcoal chicken|grilled half chicken|faham chicken|dajaj mashwi", "دجاج فحم|نص دجاجة|دجاجة كاملة|دجاج شواية|فروج مشوي|فروج"),
+  ("shish_tawook", "plate", "shish tawook: grilled marinated chicken cubes on skewers with garlic sauce and grilled tomato",
+   "shish tawook|shish taouk|tawook|chicken tikka|chicken skewers|chicken kebab|tikka", "شيش طاووق|طاووق|تكة دجاج|تكا|أسياخ دجاج|كباب دجاج"),
+  ("kebab", "plate", "grilled minced-lamb kebab (kofta) skewers on flatbread with grilled tomato, onion and parsley",
+   "kebab|kabab|kofta|kofte|lamb kebab|adana|seekh kebab|meat skewers|kabab meat", "كباب|كفتة|كفته|كباب لحم|أسياخ لحم"),
+  ("mixed_grill", "plate", "Arabic mixed grill platter: lamb chops, kofta, shish tawook and grilled vegetables",
+   "mixed grill|grill platter|bbq platter|mashawi|lamb chops|ribs", "مشاوي مشكلة|مشاوي|ريش|ريش غنم|مشكل مشاوي"),
+  ("steak", "plate", "grilled beef steak, sliced medium, with a few roasted potatoes and green beans",
+   "steak|beef steak|ribeye|sirloin|tenderloin|t-bone|beef|grilled beef|roast beef", "ستيك|لحم بقري|ستيك لحم|تندرلوين|ريب آي"),
+  ("lamb_meat", "plate", "slow-cooked tender lamb pieces on the bone with gravy",
+   "lamb|mutton|goat|meat|lamb shank|camel meat|boiled meat|lahm", "لحم|لحم غنم|لحم ضأن|لحم خروف|موزة لحم|لحم حاشي|لحم مسلوق"),
+  ("minced_meat", "plate", "sautéed minced beef with onions and peppers",
+   "minced meat|ground beef|mince|keema|minced beef|qeema", "لحم مفروم|مفروم|قيمة|كيما"),
+  ("liver", "plate", "pan-fried liver cubes with onions, peppers and a lemon wedge",
+   "liver|kibda|chicken liver|beef liver", "كبدة|كبد|كبدة دجاج"),
+  ("burger", "plate", "a beef burger in a sesame bun with cheese, lettuce and tomato",
+   "burger|hamburger|cheeseburger|beef burger|chicken burger|smash burger|zinger", "برجر|برغر|همبرجر|تشيز برجر|برجر دجاج|زنجر"),
+  ("fried_chicken", "plate", "crispy golden fried chicken pieces (broast)",
+   "fried chicken|broast|broasted chicken|crispy chicken|chicken strips|chicken tenders|kfc|al baik|albaik", "بروستد|دجاج مقلي|دجاج كرسبي|ستربس|البيك"),
+  ("nuggets", "plate", "chicken nuggets with a small cup of ketchup",
+   "nuggets|chicken nuggets|chicken popcorn|popcorn chicken", "ناجتس|ناجت|بوب كورن دجاج"),
+  ("hot_dog", "plate", "a hot dog sausage in a bun with mustard",
+   "hot dog|hotdog|sausage|sausages|frankfurter", "هوت دوج|نقانق|سجق"),
+
+  # ── Sandwiches & wraps ──
+  ("shawarma_wrap", "wrap", "a chicken shawarma wrap in thin Arabic bread, cut in half showing chicken, garlic sauce, pickles and fries, wrapped in paper",
+   "shawarma|chicken shawarma|shawarma wrap|shawarma sandwich|meat shawarma|beef shawarma|doner|doner kebab|gyro|gyros|wrap", "شاورما|شاورما دجاج|شاورما لحم|ساندويتش شاورما|شاورمة|لفافة|راب"),
+  ("shawarma_plate", "plate", "Arabic shawarma plate: sliced chicken shawarma with fries, garlic sauce, pickles and flatbread",
+   "shawarma plate|shawarma platter|arabi shawarma|shawarma arabi|chicken shawarma plate", "صحن شاورما|شاورما عربي|وجبة شاورما"),
+  ("falafel", "plate", "falafel balls with tahini dip, tomato, pickles and parsley",
+   "falafel|felafel|taameya|ta'ameya|falafel sandwich|falafel wrap", "فلافل|طعمية|ساندويتش فلافل"),
+  ("sandwich", "plate", "a club sandwich cut in triangles with chicken, lettuce, tomato and cheese",
+   "sandwich|club sandwich|chicken sandwich|turkey sandwich|tuna sandwich|cheese sandwich|sub|panini|toastie", "ساندويتش|سندويتش|ساندوتش|كلوب ساندويتش|ساندويتش دجاج|ساندويتش تونة|ساندويتش جبن|شطيرة"),
+  ("burrito", "plate", "a burrito cut in half showing rice, beans, chicken and salsa",
+   "burrito|quesadilla|tortilla wrap|tacos|taco|fajita", "بوريتو|كاساديا|تاكو|فاهيتا"),
+  ("croissant", "plate", "a golden butter croissant",
+   "croissant|pain au chocolat|zaatar croissant|cheese croissant", "كرواسون|كرواسان|كروسان"),
+  ("pizza", "plate", "a slice and a half of margherita pizza with melted cheese and basil",
+   "pizza|margherita|pepperoni pizza|chicken pizza|veggie pizza|pizza slice", "بيتزا|بيتزا مارغريتا|بيتزا ببروني|بيتزا دجاج|بيتزا خضار"),
+
+  # ── Pasta & noodles ──
+  ("pasta_red", "plate", "spaghetti in tomato sauce with minced beef (bolognese) and grated parmesan",
+   "pasta|spaghetti|bolognese|spaghetti bolognese|macaroni|penne|lasagna|lasagne|tomato pasta|arrabbiata|macarona bechamel|bechamel pasta", "مكرونة|معكرونة|باستا|سباغيتي|سباجيتي|مكرونة بالبشاميل|لازانيا|معكرونة بالصلصة|بينيه"),
+  ("pasta_white", "plate", "fettuccine alfredo in creamy white sauce with grilled chicken slices",
+   "alfredo|fettuccine|creamy pasta|white sauce pasta|carbonara|chicken alfredo|mac and cheese|mac n cheese", "ألفريدو|الفريدو|فيتوتشيني|مكرونة بالكريمة|معكرونة بالصلصة البيضاء|كاربونارا|ماك اند تشيز"),
+  ("noodles", "bowl", "stir-fried noodles with vegetables and chicken",
+   "noodles|stir fry|stir fried noodles|chow mein|indomie|instant noodles|ramen|pad thai|udon", "نودلز|إندومي|اندومي|نودلز مقلية|رامن"),
+
+  # ── Asian & Indian ──
+  ("curry_rice", "plate", "chicken curry in golden sauce next to white rice",
+   "curry|chicken curry|butter chicken|tikka masala|chicken tikka masala|korma|massala|masala|meat curry|thai curry|green curry|red curry", "كاري|كاري دجاج|دجاج بالزبدة|تكا ماسالا|ماسالا|قورمة|كورما"),
+  ("sushi", "plate", "a set of salmon and tuna sushi rolls and nigiri with ginger and wasabi",
+   "sushi|maki|nigiri|california roll|sashimi|poke|poke bowl", "سوشي|ساشيمي|بوكي"),
+  ("samosa", "plate", "golden fried sambousa / samosa triangles",
+   "samosa|sambousa|sambusa|sambosa|spring roll|spring rolls|egg roll", "سمبوسة|سمبوسك|سنبوسة|سنبوسك|سبرينق رول|سبرينغ رول"),
+
+  # ── Levantine & Egyptian plates ──
+  ("hummus", "plate", "a plate of hummus with olive oil, paprika and whole chickpeas",
+   "hummus|houmous|humus|hummus beiruti|chickpea dip", "حمص|حمص بطحينة|حمص بيروتي"),
+  ("mutabbal", "plate", "mutabbal / baba ghanoush: smoky eggplant dip with olive oil and pomegranate seeds",
+   "mutabbal|moutabal|baba ghanoush|baba ganoush|eggplant dip", "متبل|بابا غنوج|بابا غنوش"),
+  ("foul", "bowl", "foul medames: mashed fava beans with olive oil, cumin, tomato and parsley",
+   "foul|ful|foul medames|ful medames|fava beans|fool", "فول|فول مدمس|فول بالزيت"),
+  ("mezze", "plate", "mezze platter: hummus, falafel, tabbouleh, pickles and olives",
+   "mezze|mezza|meze|appetizers|starters|cold mezze", "مقبلات|مزة|مازة|مشكل مقبلات"),
+  ("tabbouleh", "plate", "tabbouleh: finely chopped parsley salad with tomato, bulgur and lemon",
+   "tabbouleh|tabouleh|tabouli|tabbouli", "تبولة|تبولي"),
+  ("fattoush", "plate", "fattoush salad with crispy bread pieces, cucumber, tomato, radish and sumac",
+   "fattoush|fatoush", "فتوش"),
+  ("kibbeh", "plate", "fried kibbeh: golden bulgur and meat croquettes",
+   "kibbeh|kubba|kubbeh|kibbe", "كبة|كبه|كبة مقلية"),
+  ("grape_leaves", "plate", "stuffed grape leaves (warak enab) rolled neatly with lemon slices",
+   "warak enab|grape leaves|vine leaves|dolma|dolmas|yalanji|mahshi|stuffed vegetables|stuffed zucchini", "ورق عنب|دولمة|يالنجي|محشي|محشي كوسا|محاشي"),
+  ("fatteh", "bowl", "fatteh: crispy bread layered with chickpeas, garlic yogurt, pine nuts and paprika butter",
+   "fatteh|fatta|fattah|fatteh hummus", "فتة|فته|فتة حمص|فتة دجاج"),
+  ("koshari", "plate", "Egyptian koshari: rice, lentils, macaroni, chickpeas, tomato sauce and crispy fried onions",
+   "koshari|kushari|koshary", "كشري|كشرى"),
+  ("shakshuka", "plate", "shakshuka: eggs poached in spiced tomato and pepper sauce, in a small pan",
+   "shakshuka|shakshouka|eggs in tomato|menemen", "شكشوكة|شكشوكه|بيض بالطماطم|منمن"),
+
+  # ── Fish & seafood ──
+  ("fish_grilled", "plate", "grilled white fish fillet (hammour) with a lemon wedge and a little rice",
+   "fish|grilled fish|hammour|hamour|white fish|fish fillet|tilapia|sea bream|sea bass|kingfish|safi|shaari|zubaidi|cod", "سمك|سمك مشوي|هامور|فيليه سمك|بلطي|دنيس|قاروص|كنعد|صافي|شعري|زبيدي"),
+  ("fish_fried", "plate", "crispy fried fish fillets with lemon and tartar sauce",
+   "fried fish|fish and chips|fish fingers|battered fish", "سمك مقلي|سمك وبطاطس|أصابع سمك"),
+  ("salmon", "plate", "pan-seared salmon fillet with roasted vegetables",
+   "salmon|grilled salmon|baked salmon|salmon fillet|smoked salmon", "سلمون|سالمون|سلمون مشوي|سلمون مدخن"),
+  ("shrimp", "plate", "garlic butter sautéed shrimp with lemon and parsley",
+   "shrimp|prawn|prawns|shrimps|grilled shrimp|fried shrimp|calamari|squid|seafood", "روبيان|ربيان|جمبري|روبيان مقلي|حبار|كاليماري|مأكولات بحرية"),
+  ("tuna", "bowl", "canned tuna flakes in a small bowl with sweetcorn and a lemon wedge",
+   "tuna|canned tuna|tuna salad|tuna in water|tuna in oil", "تونة|تونا|تونة معلبة|سلطة تونة"),
+
+  # ── Eggs & breakfast ──
+  ("eggs_boiled", "plate", "two halved boiled eggs with a pinch of salt and pepper",
+   "boiled egg|boiled eggs|hard boiled egg|egg|eggs|egg white|egg whites", "بيض مسلوق|بيضة|بيض|بيضة مسلوقة|بياض بيض|بيضتين"),
+  ("eggs_fried", "plate", "two sunny-side-up fried eggs",
+   "fried egg|fried eggs|sunny side up|eggs sunny side|scrambled eggs|scrambled egg", "بيض مقلي|بيض عيون|بيض مخفوق|بيض مقلي بالزيت"),
+  ("omelette", "plate", "a folded vegetable omelette with peppers, onion and herbs",
+   "omelette|omelet|veggie omelette|cheese omelette|frittata|egg sandwich", "أومليت|اومليت|عجة|عجه|أومليت جبن"),
+  ("oats", "bowl", "a bowl of oatmeal porridge topped with banana slices, berries and honey",
+   "oats|oatmeal|porridge|overnight oats|oat|quaker", "شوفان|شوفان بالحليب|عصيدة شوفان|كويكر"),
+  ("granola", "bowl", "a bowl of yogurt with granola and mixed berries",
+   "granola|muesli|cereal|cornflakes|corn flakes|granola bowl|yogurt bowl|acai bowl|smoothie bowl", "جرانولا|غرانولا|موسلي|حبوب الإفطار|كورن فليكس|كورن فلكس"),
+  ("pancakes", "plate", "a stack of fluffy pancakes with honey and berries",
+   "pancake|pancakes|crepe|crepes|waffle|waffles|french toast", "بان كيك|بانكيك|كريب|وافل|فرنش توست"),
+  ("balaleet", "plate", "Emirati balaleet: sweet saffron vermicelli topped with a thin omelette",
+   "balaleet|balalit|sweet vermicelli", "بلاليط|بلاليط بالبيض"),
+  ("labneh_plate", "plate", "breakfast plate: labneh with olive oil, olives, cucumber and tomato slices",
+   "labneh|labne|labneh plate|arabic breakfast|breakfast plate", "لبنة|لبنه|فطور عربي|صحن لبنة"),
+  ("cheese", "plate", "a few slices of white cheese and yellow cheese with olives",
+   "cheese|white cheese|feta|halloumi|cheddar|mozzarella|akkawi|cottage cheese|cream cheese|kiri|processed cheese", "جبن|جبنة|جبنة بيضاء|حلوم|حلومي|شيدر|موزاريلا|عكاوي|جبنة قريش|جبن كريمي|كيري|جبنة مثلثات"),
+  ("avocado_toast", "plate", "avocado toast topped with a poached egg and chili flakes",
+   "avocado toast|avocado|toast|peanut butter toast|toast with jam", "توست أفوكادو|أفوكادو|افوكادو|توست بزبدة الفول السوداني"),
+  ("cheese_toast", "plate", "golden grilled cheese toast sandwich",
+   "grilled cheese|cheese toast|toasted sandwich|halloumi sandwich", "توست جبن|ساندويتش جبن محمص|ساندويتش حلوم"),
+
+  # ── Salads & vegetables ──
+  ("salad_green", "bowl", "fresh green salad with lettuce, cucumber, tomato and a light dressing",
+   "salad|green salad|garden salad|mixed salad|arabic salad|house salad|side salad|lettuce", "سلطة|سلطة خضراء|سلطة خضار|سلطة عربية|خس"),
+  ("caesar_salad", "bowl", "chicken caesar salad with croutons and parmesan shavings",
+   "caesar salad|caesar|chicken caesar|chicken salad", "سلطة سيزر|سيزر|سلطة دجاج"),
+  ("greek_salad", "bowl", "greek salad with feta cubes, olives, tomato, cucumber and red onion",
+   "greek salad|feta salad|halloumi salad", "سلطة يونانية|سلطة جبنة فيتا|سلطة حلوم"),
+  ("veg_roasted", "plate", "roasted mixed vegetables: zucchini, peppers, carrots and broccoli",
+   "vegetables|veggies|mixed vegetables|roasted vegetables|steamed vegetables|broccoli|green beans|zucchini|spinach", "خضار|خضروات|خضار مشكلة|خضار مشوية|بروكلي|فاصوليا خضراء|كوسا|سبانخ"),
+  ("potato_fries", "plate", "a portion of golden french fries",
+   "fries|french fries|chips|potato fries|wedges|potato wedges|curly fries", "بطاطس|بطاطس مقلية|بطاطا مقلية|بطاطس ودجز|فرايز|بطاطا"),
+  ("potato_baked", "plate", "a baked potato with butter and chives, and mashed potato",
+   "baked potato|potato|potatoes|mashed potato|mashed potatoes|boiled potato|sweet potato", "بطاطس مشوية|بطاطس مهروسة|بطاطس مسلوقة|بطاطا حلوة"),
+  ("corn", "plate", "a cob of grilled sweetcorn",
+   "corn|sweetcorn|corn on the cob|boiled corn|grilled corn", "ذرة|ذرة مشوية|ذرة مسلوقة|عرنوس ذرة"),
+  ("chickpeas", "bowl", "a bowl of boiled chickpeas (balila) with cumin and lemon",
+   "chickpeas|chickpea|balila|nakhi|garbanzo|chana", "حمص حب|بليلة|نخي|حمص مسلوق"),
+
+  # ── Fruit ──
+  ("dates", "plate", "a small plate of fresh dates",
+   "dates|date|tamr|khalas|sukkari|ajwa|medjool", "تمر|تمرة|تمور|خلاص|سكري|عجوة|مجدول|رطب"),
+  ("banana", "plate", "a ripe banana",
+   "banana|bananas", "موز|موزة"),
+  ("apple", "plate", "a red apple",
+   "apple|apples|green apple|pear", "تفاح|تفاحة|إجاص|كمثرى"),
+  ("orange", "plate", "an orange and an orange cut in half",
+   "orange|oranges|mandarin|clementine|tangerine|grapefruit", "برتقال|برتقالة|يوسفي|كلمنتينا|جريب فروت"),
+  ("berries", "bowl", "a bowl of mixed berries: strawberries, blueberries and raspberries",
+   "berries|strawberries|strawberry|blueberries|blueberry|raspberries|mixed berries|cherries|grapes", "فراولة|توت|توت أزرق|فواكه حمراء|كرز|عنب"),
+  ("watermelon", "plate", "watermelon slices",
+   "watermelon|melon|cantaloupe|honeydew", "بطيخ|بطيخة|شمام|جح"),
+  ("mango", "plate", "mango cut in hedgehog cubes",
+   "mango|mangoes|pineapple|papaya|kiwi", "مانجو|مانجا|أناناس|بابايا|كيوي"),
+  ("fruit_mixed", "bowl", "a bowl of mixed fruit salad",
+   "fruit|fruits|fruit salad|mixed fruit|fruit bowl", "فواكه|فاكهة|سلطة فواكه|فواكه مشكلة"),
+
+  # ── Dairy ──
+  ("yogurt", "bowl", "a bowl of plain thick yogurt",
+   "yogurt|yoghurt|greek yogurt|plain yogurt|curd|skyr", "زبادي|لبن زبادي|روب|زبادي يوناني"),
+  ("laban", "glass", "a glass of laban / ayran (cold yogurt drink)",
+   "laban|ayran|buttermilk|lassi|doogh|kefir", "لبن|لبن عيران|عيران|شنينة|لبن رائب"),
+  ("milk", "glass", "a glass of milk",
+   "milk|whole milk|skimmed milk|low fat milk|almond milk|oat milk|soy milk|chocolate milk", "حليب|حليب كامل الدسم|حليب قليل الدسم|حليب لوز|حليب شوفان|حليب شوكولاتة"),
+
+  # ── Sweets & desserts ──
+  ("luqaimat", "plate", "luqaimat: small golden fried dough balls drizzled with date syrup and sesame",
+   "luqaimat|lugaimat|loukoumades|awamat|zalabia|zalabya", "لقيمات|لقيمات بالدبس|عوامة|زلابية"),
+  ("kunafa", "plate", "a square of kunafa with crispy orange shredded pastry, melted cheese and pistachio",
+   "kunafa|kunefe|knafeh|kanafeh|konafa", "كنافة|كنافه|كنافة نابلسية"),
+  ("baklava", "plate", "pieces of baklava with pistachio",
+   "baklava|baklawa|basbousa|basboosa|harissa cake|qatayef|maamoul|ma'amoul", "بقلاوة|بسبوسة|هريسة حلوى|قطايف|معمول"),
+  ("umm_ali", "bowl", "umm ali: warm bread pudding with milk, nuts and raisins, golden on top",
+   "umm ali|om ali|bread pudding|rice pudding|muhalabia|mahalabia|custard", "أم علي|ام علي|مهلبية|رز بحليب|أرز بالحليب|كاسترد"),
+  ("cake", "plate", "a slice of chocolate cake",
+   "cake|chocolate cake|cheesecake|cupcake|muffin|brownie|tiramisu|red velvet", "كيك|كيكة|كيك شوكولاتة|تشيز كيك|كب كيك|مافن|براوني|تيراميسو"),
+  ("cookies", "plate", "three chocolate chip cookies",
+   "cookie|cookies|biscuit|biscuits|digestive|oreo", "كوكيز|كوكيز شوكولاتة|بسكويت|بسكوت|أوريو"),
+  ("donut", "plate", "a glazed donut",
+   "donut|doughnut|donuts|krispy kreme", "دونات|دونتس"),
+  ("ice_cream", "bowl", "two scoops of ice cream in a small bowl",
+   "ice cream|gelato|frozen yogurt|sorbet|booza", "آيس كريم|ايس كريم|بوظة|جيلاتو|فروزن يوغرت"),
+  ("chocolate", "plate", "a few squares of chocolate bar",
+   "chocolate|chocolate bar|dark chocolate|kitkat|snickers|mars|galaxy|candy", "شوكولاتة|شوكولاته|شوكلاته|كيت كات|سنيكرز|حلوى"),
+
+  # ── Snacks ──
+  ("nuts", "bowl", "a small bowl of mixed nuts: almonds, cashews and pistachios",
+   "nuts|mixed nuts|almonds|cashews|pistachios|walnuts|peanuts|seeds|trail mix", "مكسرات|لوز|كاجو|فستق|جوز|عين الجمل|فول سوداني|بذور"),
+  ("chips_bag", "plate", "a handful of potato chips (crisps)",
+   "potato chips|crisps|chips bag|lays|doritos|pringles|popcorn|nachos", "شيبس|بطاطس شيبس|ليز|دوريتوس|برينجلز|فشار|ناتشوز"),
+  ("protein_bar", "plate", "a protein bar unwrapped, cut to show the inside",
+   "protein bar|granola bar|energy bar|cereal bar|bar|quest bar", "بروتين بار|لوح بروتين|بار بروتين|جرانولا بار|لوح طاقة"),
+  ("crackers", "plate", "rice cakes and crackers with a little peanut butter",
+   "rice cake|rice cakes|crackers|crispbread|peanut butter|hummus and crackers", "كيك أرز|رايس كيك|كراكرز|زبدة الفول السوداني|زبدة فول سوداني"),
+
+  # ── Drinks ──
+  ("arabic_coffee", "cup", "Arabic coffee (gahwa) in a small handleless cup next to a dallah pot and two dates",
+   "arabic coffee|gahwa|qahwa|saudi coffee|emirati coffee", "قهوة عربية|قهوة|قهوة سعودية|قهوة إماراتية|دلة"),
+  ("coffee", "cup", "a cup of black coffee / americano",
+   "coffee|black coffee|americano|espresso|filter coffee|drip coffee|turkish coffee|v60", "قهوة سوداء|أمريكانو|اسبريسو|إسبريسو|قهوة تركية|قهوة مقطرة|في ستين"),
+  ("latte", "cup", "a latte / cappuccino with latte art",
+   "latte|cappuccino|flat white|cortado|mocha|spanish latte|iced latte|frappuccino|macchiato", "لاتيه|كابتشينو|فلات وايت|كورتادو|موكا|سبانش لاتيه|ايس لاتيه|فرابتشينو|ماكياتو"),
+  ("karak", "cup", "karak chai: milky spiced tea in a small glass cup",
+   "karak|karak chai|chai|chai latte|milk tea|tea with milk", "كرك|شاي كرك|شاي بالحليب|شاي حليب"),
+  ("tea", "cup", "a glass cup of red tea with mint leaves",
+   "tea|black tea|green tea|mint tea|herbal tea|chamomile", "شاي|شاي أحمر|شاي أخضر|شاي بالنعناع|بابونج|أعشاب"),
+  ("juice_orange", "glass", "a glass of fresh orange juice",
+   "juice|orange juice|fresh juice|apple juice|mango juice|carrot juice|cocktail juice", "عصير|عصير برتقال|عصير طازج|عصير تفاح|عصير مانجو|عصير جزر|كوكتيل"),
+  ("lemon_mint", "glass", "a glass of lemon mint juice (limonana), green, with ice",
+   "lemon mint|lemonade|limonana|lemon juice|mojito", "ليمون نعناع|ليمون بالنعناع|ليموناضة|عصير ليمون|موهيتو"),
+  ("smoothie", "glass", "a glass of berry smoothie",
+   "smoothie|milkshake|shake|banana shake|strawberry shake|date shake|avocado juice", "سموذي|ميلك شيك|شيك|شيك موز|شيك تمر|عصير أفوكادو|كوكتيل أفوكادو"),
+  ("protein_shake", "glass", "a shaker bottle with a chocolate protein shake",
+   "protein shake|protein|whey|whey protein|mass gainer|protein drink|casein", "بروتين|بروتين شيك|واي بروتين|مشروب بروتين|ماس قينر|جينر"),
+  ("soft_drink", "glass", "a glass of cola with ice and a can",
+   "soda|cola|coke|pepsi|soft drink|sprite|7up|fizzy drink|diet coke|energy drink|red bull", "مشروب غازي|كولا|بيبسي|كوكاكولا|سبرايت|سفن أب|ديت|مشروب طاقة|ريد بول"),
+]
+
+FIELDS = ["key", "container", "subject", "names_en", "names_ar"]
+
+def build():
+    keys = [r[0] for r in ROWS]
+    assert len(keys) == len(set(keys)), "duplicate key"
+    with open(os.path.join(HERE, "dishes.csv"), "w", newline="", encoding="utf-8") as f:
+        w = csv.writer(f)
+        w.writerow(FIELDS)
+        w.writerows(ROWS)
+    containers = {
+        "plate": "served on a plain round matte off-white ceramic plate",
+        "bowl": "served in a plain round matte off-white ceramic bowl",
+        "glass": "in a plain clear drinking glass",
+        "cup": "in a plain cup",
+        "board": "on a light natural wooden board",
+        "wrap": "on a plain round matte off-white ceramic plate",
+    }
+    with open(os.path.join(HERE, "prompts.txt"), "w", encoding="utf-8") as f:
+        for key, cont, subject, _en, _ar in ROWS:
+            f.write(f"{key}.png | Square 1:1 food photo, 1024×1024. {subject}, {containers[cont]}, "
+                    "centered and filling about 75% of the frame, seen from a 45-degree angle, on a soft light-lavender linen tablecloth. "
+                    "Soft natural daylight from the upper left, gentle soft shadows, realistic home-style portion, appetizing, true colours. "
+                    "No text, no logos, no watermark, no hands, no people, no other dishes, no cutlery, plain uncluttered background.\n")
+    print(f"{len(ROWS)} photos")
+
+if __name__ == "__main__":
+    build()
