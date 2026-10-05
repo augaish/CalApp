@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { Text } from '@/components/text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -287,9 +288,7 @@ const styles = StyleSheet.create({
   handle: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, marginBottom: Spacing.md },
   monthRow: {
     flexDirection: 'row',
-    // Fixed LTR order: RN auto-mirrors 'row' for RTL, but the chevron
-    // glyphs are static and don't flip with it. See Overview headerCenter.
-    direction: 'ltr',
+    // Mirrors in Arabic like the grid below it; the Icon flips the chevrons.
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: Spacing.md,

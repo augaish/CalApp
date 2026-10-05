@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 import i18n from './i18n';
-import { notifications, REST_ALERT_ID, requestPermission } from './reminders';
+import { notifications, REST_ALERT_ID } from './reminders';
 import { nativeRestAlerts } from './rest-live-activity';
 import { useAppStore } from './store';
 
@@ -21,7 +21,6 @@ import { useAppStore } from './store';
 
 const CHANNEL = 'rest-timer';
 let channelReady = false;
-let askedThisLaunch = false;
 let last: string | null | undefined;
 // Changes are applied in order: a quick skip-then-log must not let an older
 // schedule land after a newer cancel.
@@ -36,13 +35,12 @@ async function apply(endsAt: string | null, next: string | undefined): Promise<v
     const date = new Date(endsAt);
     if (Number.isNaN(date.getTime()) || date.getTime() <= Date.now() + 1000) return;
 
+    // Never asks here: the question used to pop up over the first rest
+    // countdown. It is asked once at the start of a workout instead
+    // (components/rest-alert-ask.tsx); without permission the on-screen
+    // timer still runs, there is just no alert.
     const perm = await mod.getPermissionsAsync();
-    if (!perm.granted) {
-      // Asked once, the first time a rest starts — the moment it is obviously useful.
-      if (askedThisLaunch) return;
-      askedThisLaunch = true;
-      if (!(await requestPermission(mod))) return;
-    }
+    if (!perm.granted) return;
     // The Android countdown turns into the alert itself (rest-live-activity.ts).
     if (nativeRestAlerts) return;
     if (Platform.OS === 'android' && !channelReady) {

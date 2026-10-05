@@ -1,4 +1,4 @@
-import { Platform, type TextStyle, type ViewStyle } from 'react-native';
+import { I18nManager, Platform, type TextStyle, type ViewStyle } from 'react-native';
 
 /**
  * Design system — 60/30/10 color rule:
@@ -75,18 +75,29 @@ export const Colors = {
 export type ThemeColors = Record<keyof typeof Colors.light, string>;
 
 /**
+ * Letter spacing for display text — none in Arabic. Arabic letters join, and
+ * spacing them apart breaks the joins; on Android it also mis-measures the
+ * line, which cut tab titles to "الطع…". Read once at start: switching
+ * language restarts the app to change direction anyway.
+ */
+const ARABIC_LAYOUT = Platform.OS !== 'web' && I18nManager.isRTL;
+export function tracking(value: number): number {
+  return ARABIC_LAYOUT ? 0 : value;
+}
+
+/**
  * Handoff v1.1 hierarchy: main title 28, section 20, body 16, secondary 14,
  * supporting 12. Weight and opacity do the rest; no further sizes.
  */
 export const Type = {
-  display: { fontSize: 40, fontWeight: '800', letterSpacing: -1 } as TextStyle,
-  title: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 } as TextStyle,
-  section: { fontSize: 20, fontWeight: '800', letterSpacing: -0.3 } as TextStyle,
+  display: { fontSize: 40, fontWeight: '800', letterSpacing: tracking(-1) } as TextStyle,
+  title: { fontSize: 28, fontWeight: '800', letterSpacing: tracking(-0.5) } as TextStyle,
+  section: { fontSize: 20, fontWeight: '800', letterSpacing: tracking(-0.3) } as TextStyle,
   body: { fontSize: 16, fontWeight: '400' } as TextStyle,
   secondary: { fontSize: 14, fontWeight: '500' } as TextStyle,
   caption: { fontSize: 13, fontWeight: '600' } as TextStyle,
   /** Small uppercase eyebrow above a card title ("TRAINING", "PLANNED LUNCH"). */
-  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' } as TextStyle,
+  eyebrow: { fontSize: 11, fontWeight: '700', letterSpacing: tracking(0.6), textTransform: 'uppercase' } as TextStyle,
 };
 
 /** Standard transitions (ms); reduced motion should skip them entirely. */

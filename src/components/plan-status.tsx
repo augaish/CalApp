@@ -1,9 +1,10 @@
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { ActionButton, ProgressTrack } from '@/components/system';
+import { Text } from '@/components/text';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';

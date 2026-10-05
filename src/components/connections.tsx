@@ -3,9 +3,10 @@ import { useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { Text } from '@/components/text';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { Spacing } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';

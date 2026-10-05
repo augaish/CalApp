@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { MembershipCard } from '@/components/plan-status';
 import { PageHeader } from '@/components/brand-header';
 import { RowGroup, SettingsRow } from '@/components/system';
+import { Text } from '@/components/text';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

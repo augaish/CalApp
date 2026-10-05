@@ -6,8 +6,6 @@ import {
   Pressable,
   Share,
   StyleSheet,
-  Text,
-  TextInput,
   View,
   type ScrollView,
 } from 'react-native';
@@ -16,6 +14,7 @@ import Sortable from 'react-native-sortables';
 
 import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
+import { Text, TextInput } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

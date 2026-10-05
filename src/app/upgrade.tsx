@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PlanPicker, usePlanAction } from '@/components/plan-picker';
 import { MembershipCard, UsageBreakdown } from '@/components/plan-status';
+import { Text } from '@/components/text';
 import { Button, Card, Screen } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -19,7 +20,7 @@ import { reasonText, useStoreOffer } from '@/lib/use-store-offer';
  * or restoring a subscription.
  */
 export default function Upgrade() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const { reason } = useLocalSearchParams<{ reason?: string }>();
@@ -87,7 +88,7 @@ export default function Upgrade() {
       >
         <Icon name="pricetag-outline" size={18} color={theme.primary} />
         <Text style={{ color: theme.primary, fontWeight: '700', flex: 1 }}>{t('upgrade.haveCode')}</Text>
-        <Icon name={i18n.dir?.() === 'rtl' ? 'chevron-back' : 'chevron-forward'} size={16} color={theme.textTertiary} />
+        <Icon name="chevron-forward" size={16} color={theme.textTertiary} />
       </Pressable>
 
       <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: Spacing.sm, lineHeight: 17 }}>{t('plans.keepsNote')}</Text>

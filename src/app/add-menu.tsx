@@ -2,12 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { RowGroup, SettingsRow } from '@/components/system';
+import { Text } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';
 import type { Gate } from '@/lib/plan-gates';

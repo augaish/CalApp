@@ -1,7 +1,8 @@
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Defs, Mask, Rect } from 'react-native-svg';
 
+import { Text } from '@/components/text';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 

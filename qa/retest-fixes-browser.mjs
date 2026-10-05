@@ -171,7 +171,8 @@ console.log('\n=== 4. Arabic ===');
 {
   const { ctx, page } = await open({ ...base('ar'), meals: [{ id: 'm1', at: at(0, 8), mealType: 'breakfast', items: [{ name: 'بيض', calories: 300, proteinG: 24, carbsG: 2, fatG: 20, portion: '3' }] }] }, '/', 'ar');
   const b = await body(page);
-  check('ar: Overview grams are "غ", not Latin g', /126 غ/.test(b) && !/126 g/.test(b), b.match(/.{0,10}126.{0,10}/)?.[0]);
+  // Arabic numbers are Arabic-Indic since the 5 October fixes: ١٢٦ غ.
+  check('ar: Overview grams are "غ", not Latin g', /١٢٦ غ/.test(b) && !/126 g|١٢٦ g/.test(b), b.match(/.{0,10}(126|١٢٦).{0,10}/)?.[0]);
   await ctx.close();
 }
 for (const [path, title] of [['/food', 'الطعام'], ['/', 'نظرة عامة'], ['/training', 'التمرين']]) {

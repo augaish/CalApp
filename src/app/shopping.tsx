@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { ActionButton, Chip, EmptyState, IconTile, Segmented, SettingsRow } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useGatedScreen } from '@/hooks/use-plan-gate';

@@ -304,6 +304,22 @@ export function incompleteFlags(unknown: NutrientKey[]): Pick<FoodItem, 'nutriti
 }
 
 /**
+ * One serving's calories and protein for a recipe card, honest about gaps:
+ * a total that is only a known subtotal reads "≥n", and protein that is not
+ * known at all is null so the card can say "protein unknown" rather than
+ * "0 g" (a measured zero stays 0). The same rule as the recipe page.
+ */
+export function servingSummary(recipe: Recipe): { calories: string; protein: string | null } {
+  const m = roundMacros(perServing(recipe));
+  const unknown = recipeUnknownNutrients(recipe);
+  const proteinUnknown = unknown.includes('proteinG');
+  return {
+    calories: knownLabel(m.calories, unknown.includes('calories')),
+    protein: proteinUnknown && m.proteinG <= 0 ? null : knownLabel(m.proteinG, proteinUnknown),
+  };
+}
+
+/**
  * A figure for display when part of it may be unknown: the number when the
  * total is complete, "≥number" for a known subtotal, and a dash when nothing
  * at all is known (section 7: missing is unknown, not zero).

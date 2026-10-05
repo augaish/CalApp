@@ -1,11 +1,12 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
 import { FoodQuestions, TrainingQuestions } from '@/components/plan-questions';
 import { RowGroup, SectionTitle, SettingsRow } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

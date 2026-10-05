@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View, type ScrollView } from 'react-native';
+import { Alert, Pressable, StyleSheet, View, type ScrollView } from 'react-native';
 import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
@@ -11,8 +11,9 @@ import { ModuleBanner } from '@/components/plan-status';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
-import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchWhoopDayBurn, fetchWhoopHistory } from '@/lib/api';
 import { useCelebrate } from '@/lib/celebrate';
@@ -340,7 +341,7 @@ export default function Training() {
           </Text>
         </View>
         {!selectedIsToday && <TodayPill onPress={() => setDay(new Date())} />}
-        <View style={[styles.arrows, { direction: 'ltr' }]}>
+        <View style={styles.arrows}>
           <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
             <Icon name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
           </Pressable>
@@ -614,7 +615,11 @@ export default function Training() {
             style={({ pressed }) => [styles.editPlan, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.8 }]}
           >
             <Icon name="pencil-outline" size={16} color={theme.primary} />
-            <Text style={{ color: theme.primaryDark, fontWeight: '700', flex: 1 }}>{t('training.editTodaysPlan')}</Text>
+            {/* It edits the weekly template, so it says so — and which weekday it touches. */}
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: theme.primaryDark, fontWeight: '700' }}>{t('training.editWeeklySchedule')}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, marginTop: 1 }}>{t('training.editWeeklyHint', { day: weekdayLabel(planWeekday, locale) })}</Text>
+            </View>
             <Icon name="chevron-forward" size={16} color={theme.primary} />
           </Pressable>
 
@@ -643,7 +648,7 @@ export default function Training() {
           title={selectedIsToday ? t('training.restDay') : t('training.nothingLogged')}
           body={t('training.restDayHint')}
           action={{ label: t('training.addExercise'), icon: 'add', onPress: () => router.push('/exercise-library') }}
-          secondary={{ label: t('training.editTodaysPlan'), icon: 'pencil-outline', onPress: () => router.push(`/schedule?weekday=${planWeekday}`) }}
+          secondary={{ label: t('training.editWeeklySchedule'), icon: 'pencil-outline', onPress: () => router.push(`/schedule?weekday=${planWeekday}`) }}
         />
       )}
       </View>
@@ -714,7 +719,7 @@ const styles = StyleSheet.create({
   schedulePill: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.ms, minHeight: 44 },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
   rowCard: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
-  planTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  planTitle: { fontSize: 22, fontWeight: '800', letterSpacing: tracking(-0.3) },
   undoBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.ms, minHeight: 44, marginTop: Spacing.xs, marginBottom: Spacing.sm },
   doneBar: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: Radius.control, paddingHorizontal: Spacing.md, minHeight: 48 },
   list: { marginTop: Spacing.ms, borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.control, paddingHorizontal: Spacing.sm },

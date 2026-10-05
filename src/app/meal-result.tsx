@@ -2,13 +2,14 @@ import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 
 import { AllergyBanner } from '@/components/allergy-banner';
 import { Icon } from '@/components/icon';
 import { PortionControl } from '@/components/portion-control';
 import { RefineBox } from '@/components/refine-box';
+import { Text, TextInput } from '@/components/text';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

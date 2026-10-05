@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { AllergyBanner } from '@/components/allergy-banner';
 import { Icon } from '@/components/icon';
@@ -10,8 +10,9 @@ import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, IconTile, InfoLine, StatusPill } from '@/components/system';
+import { Text, TextInput } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
-import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic, lightHaptic } from '@/lib/feedback';
 import {
@@ -178,7 +179,7 @@ export default function RecipeScreen() {
         <View style={styles.head}>
           <PhotoFallback uri={recipe.photoUri} illustration={illustrationFor(recipe.name)} size={112} />
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20, letterSpacing: -0.3 }} numberOfLines={3}>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 20, letterSpacing: tracking(-0.3) }} numberOfLines={3}>
               {recipe.name}
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }}>

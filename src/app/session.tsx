@@ -1,15 +1,17 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Keyboard, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { PageHeader } from '@/components/brand-header';
+import { RestAlertAsk } from '@/components/rest-alert-ask';
 import { Stopwatch } from '@/components/stopwatch';
 import { ActionButton, Chip, IconTile } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button, Screen, Stepper } from '@/components/ui';
-import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { dayExerciseIds } from '@/lib/day-plan';
 import { resolvePlan } from '@/lib/occurrences';
@@ -450,6 +452,7 @@ export default function SessionScreen() {
         </View>
       }
     >
+      <RestAlertAsk />
       {/* The day's exercises in their live order: where you are, what is
           done, and a tap to jump. This is the same list as the Training
           card, so a reorder made there is what shows here. */}
@@ -736,7 +739,7 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', gap: 5 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   card: { borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.md },
-  exerciseName: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  exerciseName: { fontSize: 24, fontWeight: '800', letterSpacing: tracking(-0.4) },
   refRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md },
   ref: { flex: 1, borderRadius: Radius.control, padding: Spacing.ms, gap: 2, minHeight: 78 },
   refValue: { fontSize: 20, fontWeight: '800' },

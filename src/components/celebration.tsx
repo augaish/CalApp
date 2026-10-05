@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, StyleSheet, Text, type TextStyle } from 'react-native';
+import { AccessibilityInfo, Animated, StyleSheet, type TextStyle } from 'react-native';
 
+import { Text } from '@/components/text';
 import { Radius, Spacing, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';

@@ -1,7 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import {
   BodyMap,
@@ -19,6 +19,7 @@ import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { MetricTrend } from '@/components/charts';
 import { ActionButton, Chip, EmptyState, InfoLine, SectionTitle } from '@/components/system';
+import { Text } from '@/components/text';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

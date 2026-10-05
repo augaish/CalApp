@@ -2,11 +2,12 @@ import { Image } from 'expo-image';
 import * as Updates from 'expo-updates';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { alertProblem } from '@/lib/alerts';
 import { DatePickerModal } from '@/components/date-picker';
 import { GoalScenarioCards } from '@/components/goal-scenario-cards';
+import { Text } from '@/components/text';
 import { Button, Card, Field, OptionRow, Screen, StepDots, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

@@ -1,4 +1,5 @@
-import type { DailyTargets, Goal, LoggedMeal, LoggedWorkout, WeightEntry } from './types';
+import { itemUnknownNutrients } from './recipes';
+import type { DailyTargets, Goal, LoggedMeal, LoggedWorkout, NutrientKey, WeightEntry } from './types';
 
 /**
  * What actually happened over a stretch of days, and what to do about it.
@@ -15,6 +16,8 @@ export interface DaySummary {
   /** Null when nothing at all was logged — NOT zero. */
   calories: number | null;
   proteinG: number | null;
+  /** Nutrients that day's figures only know a part of (an entry had them unknown). */
+  unknown: NutrientKey[];
   /** Exercises completed that day. */
   setsDone: number;
   trained: boolean;
@@ -30,6 +33,9 @@ export interface WeeklyReview {
   /** Null when nothing was logged at all — there is no honest average. */
   avgCalories: number | null;
   avgProteinG: number | null;
+  /** The average is only a known lower bound: some logged entry had it unknown. */
+  caloriesIncomplete: boolean;
+  proteinIncomplete: boolean;
   targetCalories: number | null;
   targetProteinG: number | null;
   /** Weight at the start and end of the range, when both exist. */
@@ -63,10 +69,13 @@ export function buildWeeklyReview(
     // A day with no meals is unknown, not zero — the distinction is the whole
     // point of this file.
     const logged = dayMeals.length > 0;
+    const unknown = new Set<NutrientKey>();
+    for (const m of dayMeals) for (const i of m.items) for (const k of itemUnknownNutrients(i)) unknown.add(k);
     return {
       dateKey: key(day),
       calories: logged ? dayMeals.reduce((n, m) => n + m.items.reduce((x, i) => x + i.calories, 0), 0) : null,
       proteinG: logged ? dayMeals.reduce((n, m) => n + m.items.reduce((x, i) => x + i.proteinG, 0), 0) : null,
+      unknown: [...unknown],
       setsDone,
       trained: setsDone > 0,
     };
@@ -92,6 +101,8 @@ export function buildWeeklyReview(
     daysTrained: summaries.filter((d) => d.trained).length,
     avgCalories: avg((d) => d.calories),
     avgProteinG: avg((d) => d.proteinG),
+    caloriesIncomplete: loggedDays.some((d) => d.unknown.includes('calories')),
+    proteinIncomplete: loggedDays.some((d) => d.unknown.includes('proteinG')),
     targetCalories: targets?.calories ?? null,
     targetProteinG: targets?.proteinG ?? null,
     weightStartKg,
@@ -143,7 +154,8 @@ export function reviewSuggestions(review: WeeklyReview, goal: Goal | undefined):
   if (avgCalories != null && targetCalories) {
     const diff = avgCalories - targetCalories;
     const off = Math.abs(diff) / targetCalories;
-    if (off > 0.12) {
+    // A known lower bound under target says nothing about eating too little.
+    if (off > 0.12 && !(diff < 0 && review.caloriesIncomplete)) {
       const wrongWay =
         review.weightDeltaKg != null &&
         ((goal === 'lose' && review.weightDeltaKg > 0.2) || (goal === 'gain' && review.weightDeltaKg < -0.2));
@@ -158,7 +170,8 @@ export function reviewSuggestions(review: WeeklyReview, goal: Goal | undefined):
     }
   }
 
-  if (avgProteinG != null && targetProteinG && avgProteinG < targetProteinG * 0.85) {
+  // Same for protein: "at least 40 g" is not "too little".
+  if (avgProteinG != null && targetProteinG && !review.proteinIncomplete && avgProteinG < targetProteinG * 0.85) {
     out.push({
       kind: 'proteinLow',
       values: { avg: Math.round(avgProteinG), target: Math.round(targetProteinG) },

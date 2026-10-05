@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { MealPlanCard } from '@/components/meal-plan-card';
 import { SchedulePlanCard } from '@/components/schedule-plan-card';
+import { Text } from '@/components/text';
 import { Card } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

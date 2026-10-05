@@ -2,11 +2,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { DayStrip, IconTile } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -166,7 +167,13 @@ export default function Review() {
           subtitle={incompleteDays > 0 ? t('review.incompleteDays', { count: incompleteDays }) : t('review.averageOnLogged')}
           big={{
             value: `${incompleteDays > 0 ? '≥' : ''}${num(review.avgCalories)} ${t('common.kcal')}`,
-            sub: `${num(review.avgProteinG ?? 0)} ${t('common.grams')} ${t('home.protein').toLowerCase()}`,
+            // Protein carries its own completeness: an entry with unknown
+            // protein makes the average a lower bound, or unknown outright.
+            sub: !review.proteinIncomplete
+              ? `${num(review.avgProteinG ?? 0)} ${t('common.grams')} ${t('home.protein').toLowerCase()}`
+              : (review.avgProteinG ?? 0) > 0
+                ? t('review.proteinAtLeast', { n: num(review.avgProteinG ?? 0) })
+                : t('review.proteinUnknown'),
           }}
           onPress={() => router.push('/(tabs)/food')}
         />

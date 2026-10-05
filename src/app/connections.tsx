@@ -1,9 +1,10 @@
 import { useTranslation } from 'react-i18next';
-import { Platform, Text, View } from 'react-native';
+import { Platform, View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
 import { ConnectionRow, WhoopConnectionRow, connectionStyles } from '@/components/connections';
 import { InfoLine } from '@/components/system';
+import { Text } from '@/components/text';
 import { Card, Screen } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

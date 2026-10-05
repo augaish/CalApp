@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { TodayPill } from '@/components/brand-header';
 import { Icon } from '@/components/icon';
@@ -11,7 +11,8 @@ import { SponsorCard } from '@/components/sponsor-card';
 import { PlanStatusCard } from '@/components/plan-status';
 import { ActionButton, DayStrip, IconTile, IllustrationTile, MacroRow, StatTile, ProgressTrack, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
-import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { Text } from '@/components/text';
+import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
 import { estimateMinutes } from '@/lib/session-flow';
@@ -276,7 +277,7 @@ export default function Overview() {
           ) : (
             <TodayPill onPress={() => setDay(new Date())} />
           )}
-          <View style={[styles.arrows, { direction: 'ltr' }]}>
+          <View style={styles.arrows}>
             <Pressable onPress={() => shift(-1)} hitSlop={10} accessibilityRole="button" accessibilityLabel={t('home.previousDay')} style={styles.arrow}>
               <Icon name="chevron-back" size={20} color="rgba(255,255,255,0.95)" />
             </Pressable>
@@ -653,7 +654,7 @@ const styles = StyleSheet.create({
   linkTitle: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   stepCard: { flexDirection: 'row', gap: Spacing.ms, borderRadius: Radius.module, padding: Spacing.md, marginBottom: Spacing.ms },
   eyebrowRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  stepTitle: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3 },
+  stepTitle: { fontSize: 19, fontWeight: '800', letterSpacing: tracking(-0.3) },
   stepAction: { marginTop: Spacing.ms, alignSelf: 'stretch' },
   doneRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: Radius.control, minHeight: 44 },
   kcalRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 8 },

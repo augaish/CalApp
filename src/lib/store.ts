@@ -207,7 +207,14 @@ export interface AppState {
    * Workouts are Food, Water and Training): the main switch, quiet hours and
    * the daily maximum. Absent = the defaults in notify/planner.ts.
    */
-  notifyPrefs?: { enabled?: boolean; quietStart?: number; quietEnd?: number; maxPerDay?: number };
+  notifyPrefs?: {
+    enabled?: boolean;
+    quietStart?: number;
+    quietEnd?: number;
+    maxPerDay?: number;
+    /** The one-time "Alert me when rest ends?" card was answered (either way). */
+    restAlertAsked?: boolean;
+  };
   /** A move from Pro to Essentials chosen in the app, which the store applies when the current period (or trial) ends. */
   planSwitch?: { module: 'food' | 'training'; at: string | null } | null;
   /** Messages put off with a notification's "Later" button: note id → ISO time to come back. */

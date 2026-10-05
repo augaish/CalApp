@@ -1,19 +1,20 @@
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { EmptyState, IconTile, InfoLine, SearchField, StatusPill } from '@/components/system';
+import { Text } from '@/components/text';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { pastFoods, suggestFoods } from '@/lib/food-history';
 import { usePending } from '@/lib/pending';
-import { perServing } from '@/lib/recipes';
+import { servingSummary } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
 import { useAllRecipes } from '@/lib/use-recipes';
 
@@ -92,7 +93,7 @@ export default function FoodSearch() {
         <Text style={[Type.caption, { color: theme.textSecondary, marginTop: Spacing.md, marginBottom: 6 }]}>{t('foodSearch.recipes')}</Text>
       )}
       {matchedRecipes.map((r) => {
-        const ps = perServing(r);
+        const ps = servingSummary(r);
         return (
           <Pressable
             key={r.id}
@@ -110,7 +111,7 @@ export default function FoodSearch() {
                 {r.name}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13 }} numberOfLines={1}>
-                {Math.round(ps.calories).toLocaleString(locale)} {t('common.kcal')} · {t('recipe.perServing')}
+                {ps.calories} {t('common.kcal')} · {t('recipe.perServing')}
               </Text>
             </View>
             {r.source === 'calgym' && <StatusPill label={t('recipes.calgymLabel')} tone="planned" />}

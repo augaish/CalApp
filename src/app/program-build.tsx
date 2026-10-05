@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
 import { AnswersSummary, FoodQuestions, GoalQuestions, ScopeQuestion, TrainingQuestions } from '@/components/plan-questions';
 import { ProgramThinking, type ThinkingStep } from '@/components/program-thinking';
 import { InfoLine } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
 import { Spacing, Type } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';

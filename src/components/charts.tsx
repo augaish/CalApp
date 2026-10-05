@@ -1,7 +1,8 @@
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import Svg, { Circle, Polyline } from 'react-native-svg';
 
+import { Text } from '@/components/text';
 import { useTheme } from '@/hooks/use-theme';
 
 const CHART_H = 96;

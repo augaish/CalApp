@@ -3,11 +3,12 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
+import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

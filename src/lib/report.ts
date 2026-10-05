@@ -329,7 +329,7 @@ export function buildReportHtml(s: State, t: Translate, lang: Language, now: Dat
     d.food && d.targets
       ? card(t('report.avgProtein'), `${n(d.food.avgProtein)} <small>/ ${n(d.targets.protein)} ${esc(t('common.grams'))}</small>`, esc(t('report.proteinDays', { n: d.food.proteinDays })), C.protein)
       : '',
-    card(t('report.workouts'), n(d.training.sessions), esc(t('report.setsTotal', { n: d.training.sets })), C.success),
+    card(t('report.workouts'), n(d.training.sessions), esc(t('report.setsTotal', { count: d.training.sets })), C.success),
     card(t('report.daysLogged'), `${d.food?.loggedDays ?? 0} <small>/ ${d.days.length}</small>`, esc(t('report.streaks', { food: d.logStreak, training: d.workoutStreak }))),
     d.waterAvgMl > 0 ? card(t('report.water'), `${(d.waterAvgMl / 1000).toFixed(1)} <small>L</small>`, d.targets?.waterMl ? esc(t('report.waterTarget', { l: (d.targets.waterMl / 1000).toFixed(1) })) : '', C.water) : '',
     body.first && body.last && body.first !== body.last

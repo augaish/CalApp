@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
 import { Icon } from '@/components/icon';
@@ -8,6 +8,7 @@ import { MealPlanCard } from '@/components/meal-plan-card';
 import { ProgramBody } from '@/components/program-body';
 import { SchedulePlanCard } from '@/components/schedule-plan-card';
 import { InfoLine, StatusPill } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button, Card, MacroTile, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';

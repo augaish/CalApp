@@ -1,13 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { BrandHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, EmptyState, SearchField, StatusPill } from '@/components/system';
+import { Text, TextInput } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';
@@ -17,7 +18,7 @@ import { aiFailureAction } from '@/lib/api-errors';
 import { useEntitlement } from '@/lib/entitlement';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { resolveIngredientKey } from '@/lib/ingredients';
-import { perServing, roundMacros } from '@/lib/recipes';
+import { servingSummary } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
 import type { Recipe } from '@/lib/types';
 import { isStarterId } from '@/lib/starter-recipes';
@@ -218,7 +219,7 @@ export default function Recipes() {
       )}
 
       {shown.map((r) => {
-        const m = roundMacros(perServing(r));
+        const serving = servingSummary(r);
         const mins = minutes(r);
         return (
           <Pressable
@@ -238,7 +239,10 @@ export default function Recipes() {
                 {t('recipes.servingsCount', { count: r.servings })}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }} numberOfLines={2}>
-                {r.description || t('recipes.perServingShort', { kcal: m.calories, protein: m.proteinG })}
+                {r.description ||
+                  (serving.protein === null
+                    ? t('recipes.perServingProteinUnknown', { kcal: serving.calories })
+                    : t('recipes.perServingShort', { kcal: serving.calories, protein: serving.protein }))}
               </Text>
               <View style={styles.pills}>
                 {r.source === 'calgym' && <StatusPill label={t('recipes.calgymLabel')} tone="neutral" />}

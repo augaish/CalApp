@@ -459,6 +459,12 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - **Start** does it all at once: the program's week becomes a new saved schedule and the active one, and the targets and meal plan switch over. The week you had is saved in Schedules first ("Before AI program · date"), so you can switch back any time.
   - The server holds the AI to your answers: training only on the days you picked, and no meal that names one of your allergies (or meat, for vegetarian).
 - **Plan preferences** replaces "Training preferences" on Profile: your saved answers, allergies included. Meal scans and recipes now show "May contain: Nuts" when a name mentions one of your allergies.
+- **Fixes from the 5 October test report.**
+  - Recipe cards say "protein unknown" instead of "0 g", and This week's protein average says "at least" when a food had no protein value.
+  - "Edit today's plan" is now **Edit weekly schedule**, with "Changes apply to every Monday".
+  - Arabic: arrows point the Arabic way, titles are no longer cut off (AI Support shows as an icon), plurals are correct everywhere (مجموعتان, ١٠ تكرارات), and all numbers use Arabic-Indic digits (٠–٩).
+  - No notification pop-up during a rest: "Alert me when rest ends?" is asked once at the start of a workout, only while notifications are off.
+  - The AI usage bar is empty at 0.
 
 Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, keeping WHOOP data away from DeepSeek, the WHOOP sign-in page fix, account deletion that only deletes the sign-in token's own account, and "give plan by email" matching only the email Supabase verified. Also live: the server side of the new AI program (questions, the day and allergy checks, the 2 free changes); phones on the current version keep using the old one-tap build, which still works.
 

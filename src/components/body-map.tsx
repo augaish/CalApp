@@ -1,8 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
 
 import { BACK_PARTS, FRONT_PARTS, type MusclePath } from '@/components/body-map-parts';
+import { Text } from '@/components/text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MUSCLE_COLORS, MUSCLE_ID_COLORS } from '@/lib/exercises';

@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { SteakIcon } from '@/components/steak-icon';
+import { Text, TextInput } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { selectionHaptic } from '@/lib/feedback';
@@ -447,9 +448,12 @@ export function ProgressTrack({ value, max, color, height = 12, approx = false }
   const percent = Math.round(pct * 100);
   return (
     <View style={[styles.track, { backgroundColor: theme.surfaceTint, height, borderRadius: height / 2 }]} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: percent }}>
-      <View style={[styles.fill, { backgroundColor: color ?? theme.primary, width: `${percent}%`, height, borderRadius: height / 2 }]}>
-        {pct > 0.18 && <Text maxFontSizeMultiplier={1.3} style={styles.trackLabel}>{approx ? '≥' : ''}{percent}%</Text>}
-      </View>
+      {/* Nothing at 0: the label's padding used to leave a dot of colour. */}
+      {pct > 0 && (
+        <View style={[styles.fill, { backgroundColor: color ?? theme.primary, width: `${percent}%`, height, borderRadius: height / 2 }, pct > 0.18 && { paddingEnd: 6 }]}>
+          {pct > 0.18 && <Text maxFontSizeMultiplier={1.3} style={styles.trackLabel}>{approx ? '≥' : ''}{percent}%</Text>}
+        </View>
+      )}
     </View>
   );
 }
@@ -670,7 +674,7 @@ const styles = StyleSheet.create({
   search: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderWidth: 1, borderRadius: Radius.control, paddingHorizontal: Spacing.ms, minHeight: TOUCH },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 10, textAlign: 'left' },
   track: { overflow: 'hidden', width: '100%' },
-  fill: { alignItems: 'flex-end', justifyContent: 'center', paddingEnd: 6 },
+  fill: { alignItems: 'flex-end', justifyContent: 'center' },
   trackLabel: { color: '#FFFFFF', fontSize: 9, fontWeight: '800' },
   macroRow: { flexDirection: 'row', marginTop: Spacing.ms },
   macroCol: { flex: 1, paddingHorizontal: 8 },

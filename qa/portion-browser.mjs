@@ -38,11 +38,18 @@ for (const lang of ['en', 'ar']) {
     await page.waitForTimeout(1500);
   };
   // Every text box in order: per item, the grams box (weighed foods only) then kcal, protein, carbs, fat.
-  const inputs = () => page.$$eval('input', (els) => els.map((e) => e.value));
+  // Read as Western digits: in Arabic the boxes show ٠–٩ (checked separately below).
+  const shown = () => page.$$eval('input', (els) => els.map((e) => e.value));
+  const inputs = async () => (await shown()).map((x) => x.replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))));
   const chipsOn = () => page.$$eval('[aria-selected="true"]', (els) => els.map((e) => e.textContent));
   const chip = (item, label) => page.getByText(label, { exact: true }).nth(item);
 
   await open();
+  if (lang === 'ar') {
+    const raw = await shown();
+    const numbers = raw.filter((x) => /^[0-9٠-٩]+$/.test(x));
+    check('ar: number boxes show Arabic-Indic digits', numbers.length > 0 && numbers.every((x) => !/[0-9]/.test(x)), raw.join(','));
+  }
   let v = await inputs();
   // [name, grams, 4 macros] rice · [name, grams, 4] tuna · [name, 4] coffee
   check(`${lang}: rice reopens at ½ = 200 g, 262 kcal`, v[1] === '200' && v[2] === '262', v.join(','));
@@ -84,7 +91,7 @@ for (const lang of ['en', 'ar']) {
   check(`${lang}: saved tuna 93 g`, saved[1].gramsEaten === 93 && saved[1].portion === '93 g');
   if (OUT) await page.screenshot({ path: `${OUT}/food-${lang}.png` });
   const listText = await page.evaluate(() => document.body.innerText);
-  check(`${lang}: Food list shows the ½ label`, listText.includes(lang === 'ar' ? '½ صحن كبير (~200 غ)' : '½ large plate (~200 g)'));
+  check(`${lang}: Food list shows the ½ label`, listText.includes(lang === 'ar' ? '½ صحن كبير (~٢٠٠ غ)' : '½ large plate (~200 g)'));
 
   await open();
   v = await inputs();

@@ -8,8 +8,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -18,6 +16,7 @@ import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
 import { Stopwatch } from '@/components/stopwatch';
+import { Text, TextInput, type TextInputHandle } from '@/components/text';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -174,7 +173,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [note, setNote] = useState('');
   const scrollRef = useRef<ScrollView>(null);
-  const noteInputRef = useRef<TextInput>(null);
+  const noteInputRef = useRef<TextInputHandle>(null);
   const [mapView, setMapView] = useState(() =>
     initialBodyView(exercise?.primaryMuscles, exercise?.category),
   );
@@ -549,7 +548,7 @@ function TrackTab({
    * doesn't reach it once a KeyboardAvoidingView is in the ancestry (see
    * scroll-to-input.ts). */
   scrollRef: React.RefObject<ScrollView | null>;
-  noteInputRef: React.RefObject<TextInput | null>;
+  noteInputRef: React.RefObject<TextInputHandle | null>;
   /** This exercise's own calories for today — WHOOP's real number when a
    * WHOOP-detected workout overlaps this session's logged time, else the
    * set/rep formula estimate (see `fromWhoop`). */

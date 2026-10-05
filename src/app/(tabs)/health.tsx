@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { BodyMap, zoneIntensityFromSegmental, zoneStatusFromSegmental } from '@/components/body-map';
@@ -9,8 +9,9 @@ import { MetricTrend } from '@/components/charts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { useWhoopStatus } from '@/components/connections';
 import { Chip, IconTile, RowGroup, SettingsRow } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
-import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatWeight, formatWeightDelta, kgToDisplay, weightUnit } from '@/lib/units';
 import { chooseExport } from '@/lib/export';
@@ -286,6 +287,6 @@ const styles = StyleSheet.create({
   rowHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   deltaPill: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: Radius.control },
   addPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: Radius.control },
-  big: { fontSize: 34, fontWeight: '800', letterSpacing: -0.5 },
+  big: { fontSize: 34, fontWeight: '800', letterSpacing: tracking(-0.5) },
   historyLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, minHeight: 32 },
 });

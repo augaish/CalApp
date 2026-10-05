@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
 import { ProgramBody } from '@/components/program-body';
 import { Icon } from '@/components/icon';
 import { Chip, InfoLine } from '@/components/system';
+import { Text, TextInput } from '@/components/text';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

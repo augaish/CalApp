@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
 import { PlanPicker, usePlanAction } from '@/components/plan-picker';
+import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -20,7 +21,7 @@ import { reasonText, useStoreOffer } from '@/lib/use-store-offer';
  * onboarding, when a plan doesn't cover something, and from Profile.
  */
 export default function Membership() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -33,7 +34,8 @@ export default function Membership() {
   // Opened by a link with nothing behind it, closing lands on Overview.
   const close = () => (router.canGoBack() ? router.back() : router.replace('/'));
   const action = usePlanAction(offer, close);
-  const forward = i18n.dir?.() === 'rtl' ? 'chevron-back' : 'chevron-forward';
+  // The icon itself turns this round in Arabic.
+  const forward = 'chevron-forward';
 
   return (
     <View style={styles.backdrop}>

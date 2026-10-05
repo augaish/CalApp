@@ -6,12 +6,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { Text, TextInput, type TextInputHandle } from '@/components/text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { AiConsentDeclinedError, ApiError, FeatureLockedError, QuotaError, refineMeal } from '@/lib/api';
@@ -43,7 +42,7 @@ export function RefineBox({
   const { t, i18n } = useTranslation();
   const theme = useTheme();
   const router = useRouter();
-  const inputRef = useRef<TextInput>(null);
+  const inputRef = useRef<TextInputHandle>(null);
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -1,13 +1,14 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PageHeader } from '@/components/brand-header';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { weekdayLabel } from '@/components/schedule-plan-card';
 import { Chip, DeltaRows, IconTile } from '@/components/system';
+import { Text } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useGatedScreen } from '@/hooks/use-plan-gate';

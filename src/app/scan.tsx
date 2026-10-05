@@ -8,7 +8,6 @@ import {
   Alert,
   Pressable,
   StyleSheet,
-  Text,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { PhotoProgress } from '@/components/photo-progress';
+import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

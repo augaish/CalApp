@@ -1,11 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import {Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
 import { EmptyState, InfoLine, RowGroup, SettingsRow } from '@/components/system';
+import { Text } from '@/components/text';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';

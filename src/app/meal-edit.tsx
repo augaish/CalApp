@@ -1,11 +1,12 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { PortionControl } from '@/components/portion-control';
 import { RefineBox } from '@/components/refine-box';
+import { Text, TextInput } from '@/components/text';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -333,7 +334,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
     marginBottom: Spacing.md,
-    direction: 'ltr',
   },
   arrow: { padding: 4 },
   removeItemBtn: { padding: 2 },

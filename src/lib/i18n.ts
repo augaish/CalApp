@@ -4,12 +4,16 @@ import { getLocales } from 'expo-localization';
 import { I18nManager, Platform } from 'react-native';
 
 import { en } from './locales/en';
+import { ensurePluralRules } from './plural-rules';
 import { ar } from './locales/ar';
 import type { Language } from './types';
 
 export function deviceLanguage(): Language {
   return getLocales()[0]?.languageCode === 'ar' ? 'ar' : 'en';
 }
+
+// Before i18next reads them: the phone's engine has no Arabic plural rules.
+ensurePluralRules();
 
 /** Initialized once at module load; language switches happen via setI18nLanguage. */
 // eslint-disable-next-line import/no-named-as-default-member

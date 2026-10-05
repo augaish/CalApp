@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AppState, Linking, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { AppState, Linking, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { PageHeader } from '@/components/brand-header';
 import { Icon } from '@/components/icon';
 import { EmptyState, InfoLine, RowGroup, Segmented, SettingsRow } from '@/components/system';
+import { Text } from '@/components/text';
 import { Screen } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';

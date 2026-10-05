@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { requireOptionalNativeModule } from 'expo';
 import type { SFSymbol } from 'expo-symbols';
 import type { ComponentProps, ComponentType } from 'react';
-import { Platform, type ColorValue, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+import { I18nManager, Platform, type ColorValue, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
+
+import i18n from '@/lib/i18n';
 
 /**
  * One icon component for the whole app.
@@ -173,17 +175,48 @@ const SymbolView: SymbolViewType | null = symbolsAvailable
     (require('expo-symbols') as { SymbolView: SymbolViewType }).SymbolView
   : null;
 
+/**
+ * Arrows that mean "forward" or "back" point the other way in Arabic. Screens
+ * keep saying chevron-forward for "go on" and chevron-back for "go back"; the
+ * icon flips them when the layout runs right to left. (The SF names above are
+ * the fixed chevron.right / chevron.left, which never flip by themselves.)
+ */
+const MIRRORED: Partial<Record<string, IconName>> = {
+  'chevron-forward': 'chevron-back',
+  'chevron-back': 'chevron-forward',
+  'chevron-forward-outline': 'chevron-back-outline',
+  'chevron-back-outline': 'chevron-forward-outline',
+  'arrow-forward': 'arrow-back',
+  'arrow-back': 'arrow-forward',
+  'caret-forward': 'caret-back',
+  'caret-back': 'caret-forward',
+  'play-forward': 'play-back',
+  'play-back': 'play-forward',
+};
+
+/** Whether the app is laid out right to left (Arabic). */
+export function layoutIsRTL(): boolean {
+  // On the web the page turns right-to-left with the language, at once; a
+  // phone only after the restart the language switch asks for.
+  if (Platform.OS === 'web') return i18n.language === 'ar';
+  return I18nManager.isRTL;
+}
+
 export function Icon({
-  name,
+  name: requested,
   size = 20,
   color,
   style,
+  noMirror,
 }: {
   name: IconName;
   size?: number;
   color?: ColorValue;
   style?: StyleProp<TextStyle>;
+  /** Keep the arrow as drawn in Arabic too (a physical direction, not forward/back). */
+  noMirror?: boolean;
 }) {
+  const name = (!noMirror && layoutIsRTL() && MIRRORED[requested as string]) || requested;
   const fallback = <Ionicons name={name} size={size} color={color} style={style} />;
   const sf = SF[name as string];
   if (!SymbolView || !sf) return fallback;

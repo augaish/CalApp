@@ -4,11 +4,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type LayoutChangeEvent, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { GlassBacking } from '@/components/glass';
-import { Icon } from '@/components/icon';
+import { Icon, layoutIsRTL } from '@/components/icon';
+import { Text } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -106,7 +107,9 @@ export function BrandRow({
   const lead = onBack || showLogo ? size + Spacing.sm : 0;
   // Row gaps: after the logo, either side of the spacer, before the avatar (and after Food's pill).
   const fixed = lead + size + 3 * Spacing.sm + (extra ? w.extra + Spacing.sm : 0);
-  const aiIconOnly = right === 'ai' && w.row > 0 && w.title + w.pill + fixed > w.row;
+  // In Arabic it is always the icon alone (the label is long and the titles
+  // are what people read); in English only when the row runs out of room.
+  const aiIconOnly = right === 'ai' && (layoutIsRTL() || (w.row > 0 && w.title + w.pill + fixed > w.row));
   return (
     <View style={[styles.row, compact && { minHeight: 40 }]} onLayout={measure('row')}>
       {/* Invisible copies, only to know how wide the full name and label are. */}

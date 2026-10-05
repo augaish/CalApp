@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ProgressBar } from '@/components/progress-bar';
+import { Text } from '@/components/text';
 import { Spacing } from '@/constants/theme';
 
 /**

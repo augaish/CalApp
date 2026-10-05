@@ -12,8 +12,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +21,7 @@ import { alertDestructive } from '@/lib/alerts';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { illustrationFor, PhotoFallback } from '@/components/photo-fallback';
 import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
+import { Text, TextInput } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';
 import { useTheme } from '@/hooks/use-theme';
@@ -35,7 +34,7 @@ import { useCelebrate } from '@/lib/celebrate';
 import { documentPickerAvailable, pickReportBase64 } from '@/lib/document-picker';
 import { successHaptic } from '@/lib/feedback';
 import { useEntitlement } from '@/lib/entitlement';
-import { perServing } from '@/lib/recipes';
+import { servingSummary } from '@/lib/recipes';
 import { MAX_COACH_REFERENCE_DOCS, useAppStore } from '@/lib/store';
 import type { ChatMessage, CoachAction, CoachFocus, CoachSchedulePlan } from '@/lib/types';
 import { formatWeight } from '@/lib/units';
@@ -423,7 +422,7 @@ export default function Coach() {
                           <View style={{ flex: 1 }}>
                             <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>{r.name}</Text>
                             <Text style={{ color: theme.textSecondary, fontSize: 13, lineHeight: 18 }} numberOfLines={3}>
-                              {r.description || t('coach.recipeDraftBody', { kcal: Math.round(perServing(r).calories), servings: r.servings })}
+                              {r.description || t('coach.recipeDraftBody', { kcal: servingSummary(r).calories, servings: r.servings })}
                             </Text>
                             <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
                               <StatusPill label={r.reviewStatus === 'ready' ? t('coach.recipeReady') : t('coach.recipeDraft')} tone={r.reviewStatus === 'ready' ? 'logged' : 'review'} />

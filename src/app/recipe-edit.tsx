@@ -1,10 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import {Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
+import { Text, TextInput } from '@/components/text';
 import { Button, Card, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
 import { useGatedScreen } from '@/hooks/use-plan-gate';

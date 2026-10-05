@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
@@ -11,6 +11,7 @@ import { DatePickerModal } from '@/components/date-picker';
 import { ProgressBar } from '@/components/progress-bar';
 import { IconTile, InfoLine, Segmented } from '@/components/system';
 import { TargetUpdateModal } from '@/components/target-update-modal';
+import { Text, TextInput } from '@/components/text';
 import { Button, Field, Screen } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';

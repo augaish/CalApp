@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, type BodyMapView } from '@/components/body-map';
+import { Text, TextInput } from '@/components/text';
 import { Button, Card, Screen } from '@/components/ui';
-import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { allExercises, exerciseIcon, exerciseName, MUSCLE_COLORS, MUSCLE_GROUPS } from '@/lib/exercises';
@@ -335,7 +336,7 @@ const styles = StyleSheet.create({
   },
   groupTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6, marginTop: Spacing.xs },
   groupDot: { width: 9, height: 9, borderRadius: 4.5 },
-  groupTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  groupTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: tracking(0.4) },
   groupCard: { borderRadius: Radius.md, overflow: 'hidden' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
   rowIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },

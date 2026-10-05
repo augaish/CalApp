@@ -3,12 +3,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
-import { Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
 import { MOTTO_COUNT, scheduleWelcomeNudge, welcomeContent, type WelcomeFocus, type WelcomeTier } from '@/lib/plan-welcome';
@@ -156,7 +157,7 @@ const styles = StyleSheet.create({
   logo: { width: 108, height: 108, borderRadius: 26, borderWidth: 3, borderColor: 'rgba(255,255,255,0.55)' },
   pill: { marginTop: Spacing.md, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 99, backgroundColor: 'rgba(255,255,255,0.22)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.4)' },
   pillText: { color: '#FFFFFF', fontWeight: '700', fontSize: 14 },
-  title: { marginTop: Spacing.ms, color: '#FFFFFF', fontSize: 32, fontWeight: '800', textAlign: 'center', letterSpacing: -0.5 },
+  title: { marginTop: Spacing.ms, color: '#FFFFFF', fontSize: 32, fontWeight: '800', textAlign: 'center', letterSpacing: tracking(-0.5) },
   lead: { marginTop: Spacing.xs, color: '#FFFFFF', opacity: 0.95, fontSize: 16, textAlign: 'center', lineHeight: 22 },
   rows: { marginTop: Spacing.lg, alignSelf: 'stretch', borderRadius: Radius.lg, paddingHorizontal: Spacing.md, paddingVertical: 4, backgroundColor: 'rgba(255,255,255,0.16)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.ms, paddingVertical: 12 },
