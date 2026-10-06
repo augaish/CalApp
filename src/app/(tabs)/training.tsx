@@ -139,6 +139,7 @@ export default function Training() {
   const setDay = useViewDay((s) => s.setDay);
 
   const occurrences = useAppStore((s) => s.occurrences);
+  const scheduleSince = useAppStore((s) => s.scheduleSince);
   const applyOccurrenceMoves = useAppStore((s) => s.applyOccurrenceMoves);
   const undoOccurrenceOp = useAppStore((s) => s.undoOccurrenceOp);
   const lastOp = usePending((s) => s.lastOccurrenceOp);
@@ -150,7 +151,7 @@ export default function Training() {
   const plan = dayList.plan;
   const planWeekday = dayList.weekday;
   const ownOccurrence = occurrences[dateKey(selected)];
-  const pending = pendingOccurrences(schedule, occurrences, workouts, skips, new Date());
+  const pending = pendingOccurrences(schedule, occurrences, workouts, skips, new Date(), 7, scheduleSince);
   const nextPending = pending[0];
   const skippedPlanIds = dayList.skippedPlanIds;
   const scheduledIds = plan ? plan.exerciseIds.filter((id) => !skippedPlanIds.includes(id)) : [];

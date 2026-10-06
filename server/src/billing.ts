@@ -385,6 +385,22 @@ export async function release(ref: string, kind: string): Promise<void> {
   await refundUsage(ref, kind, await weightFor(kind));
 }
 
+/**
+ * Re-price an action already reserved as `from` as `to` instead — a coach
+ * reply that turned out to be a whole recipe costs what a recipe costs. The
+ * `from` charge counts toward the room needed (it is handed back right
+ * after), so a member with exactly enough left is not refused. Charged once;
+ * false (and nothing changed) when the allowance or the feature's ration
+ * cannot cover it.
+ */
+export async function reprice(ref: string, access: Access, from: string, to: string): Promise<boolean> {
+  const [fromWeight, toWeight] = await Promise.all([weightFor(from), weightFor(to)]);
+  const claim = await reserveUsage(ref, to, access.limit + fromWeight, kindCap(access.spec, to, toWeight), toWeight);
+  if (!claim.ok) return false;
+  await refundUsage(ref, from, fromWeight);
+  return true;
+}
+
 /** 403 body: the plan does not include this feature. */
 export function featureLocked(a: Access) {
   return { error: 'feature_locked', feature: true, what: a.feature, need: a.need ?? null, plan: a.plan, used: a.used, limit: a.limit };

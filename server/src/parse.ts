@@ -664,6 +664,8 @@ export interface RecipePlan {
   servings: number;
   prepMinutes?: number;
   cookMinutes?: number;
+  /** Hands-off waiting (chilling, marinating, rising), apart from prep and cooking. */
+  waitMinutes?: number;
   cookedYieldG?: number;
   ingredients: RecipeIngredientPlan[];
   steps: string[];
@@ -676,6 +678,30 @@ export interface RecipePlan {
  * is not a recipe. Nutrition is clamped rather than rejected — a wrong number
  * the user can correct beats no recipe at all.
  */
+/**
+ * Hands-off waiting the steps ask for, in minutes: "refrigerate for at least
+ * 4 hours" is 240, "overnight" 480, in English or Arabic. The longest wait
+ * named wins; none is undefined. Hours only: a few minutes' rest is part of
+ * cooking, not a wait worth announcing.
+ */
+export function waitInSteps(steps: string[]): number | undefined {
+  let best = 0;
+  const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+  for (const raw of steps) {
+    const text = raw.toLowerCase().replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)));
+    // A step's own number of hours is the wait ("at least 4 hours, or
+    // overnight" is 4); overnight counts only where no number is given.
+    let step = 0;
+    for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(?:(?:-|–|to|إلى|الى)\s*\d+(?:\.\d+)?\s*)?(?:hours?|hrs?|h\b|ساعات|ساعة)/g)) {
+      step = Math.max(step, Math.round(Number(m[1]) * 60));
+    }
+    if (!step && /ساعتين|ساعتان/.test(text)) step = 120;
+    if (!step && /overnight|طوال الليل|ليلة كاملة|حتى الصباح/.test(text)) step = 480;
+    best = Math.max(best, step);
+  }
+  return best > 0 ? Math.min(best, 2880) : undefined;
+}
+
 export function sanitizeRecipe(raw: unknown): RecipePlan | undefined {
   if (!raw || typeof raw !== 'object') return undefined;
   const input = raw as Record<string, unknown>;
@@ -735,6 +761,8 @@ export function sanitizeRecipe(raw: unknown): RecipePlan | undefined {
     servings: Math.min(12, Math.max(1, Math.round(num(input.servings, 2)))),
     prepMinutes: minutes(input.prepMinutes, 240),
     cookMinutes: minutes(input.cookMinutes, 480),
+    // What the AI says, else what the steps say ("chill 4 hours", "overnight").
+    waitMinutes: minutes(input.waitMinutes, 2880) ?? waitInSteps(steps),
     cookedYieldG: yieldG > 0 && yieldG <= 20000 ? yieldG : undefined,
     ingredients,
     steps,

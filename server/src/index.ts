@@ -17,6 +17,7 @@ import {
   planPrices,
   quotaError,
   release,
+  reprice,
   reserve,
   trialLimit,
   type Access,
@@ -277,6 +278,13 @@ const RECIPE_TOOL: Anthropic.Tool = {
       },
       prepMinutes: { type: 'integer', minimum: 0, maximum: 240 },
       cookMinutes: { type: 'integer', minimum: 0, maximum: 480 },
+      waitMinutes: {
+        type: 'integer',
+        minimum: 0,
+        maximum: 2880,
+        description:
+          'Hands-off waiting the steps need besides prep and cooking: chilling, setting, marinating, rising, soaking (e.g. 240 for "refrigerate at least 4 hours", 480 for overnight). 0 when there is none. Must agree with the steps.',
+      },
       cookedYieldG: {
         type: 'integer',
         description:
@@ -1592,12 +1600,14 @@ app.post('/api/coach', async (c) => {
       const call = ds.toolCalls.find((t) => t.name === 'propose_weekly_schedule');
       const plan = call ? sanitizeSchedulePlan(call.args) : undefined;
       const recipeCall = ds.toolCalls.find((t) => t.name === 'write_recipe');
-      const recipeDraft = recipeCall ? sanitizeRecipe(recipeCall.args) : undefined;
+      const written = recipeCall ? sanitizeRecipe(recipeCall.args) : undefined;
+      const recipe = await chargeChatRecipe(ref, access, written, language);
+      const recipeDraft = recipe.draft;
       const { actions, suggestions } = sanitizeCoachActions(ds.toolCalls);
       // A tool-only reply has no prose; the app shows the card alone, but a
       // blank bubble above it reads as a glitch, so borrow the plan's own
       // one-line summary the way the Claude path's fallbackIntro does.
-      const reply = ds.text || (plan ? (plan.summary ?? '') : recipeDraft ? recipeDraft.name : (actions[0]?.note ?? ''));
+      const reply = (ds.text || (plan ? (plan.summary ?? '') : recipeDraft ? recipeDraft.name : (actions[0]?.note ?? ''))) + recipe.note;
       return c.json({ reply, schedulePlan: plan, recipeDraft, actions, suggestions });
     }
     const response = await anthropic.messages.create({
@@ -1622,18 +1632,42 @@ app.post('/api/coach', async (c) => {
     const recipeUse = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use' && b.name === 'write_recipe',
     );
-    const recipeDraft = recipeUse ? sanitizeRecipe(recipeUse.input) : undefined;
+    const recipe = await chargeChatRecipe(ref, access, recipeUse ? sanitizeRecipe(recipeUse.input) : undefined, language);
+    const recipeDraft = recipe.draft;
     // Proposed edits and follow-up chips: cards the app applies only on a tap.
     const { actions, suggestions } = sanitizeCoachActions(
       response.content.filter((b): b is Anthropic.ToolUseBlock => b.type === 'tool_use').map((b) => ({ name: b.name, args: b.input })),
     );
-    return c.json({ reply: reply || actions[0]?.note || '', schedulePlan, recipeDraft, actions, suggestions });
+    return c.json({ reply: (reply || actions[0]?.note || '') + recipe.note, schedulePlan, recipeDraft, actions, suggestions });
   } catch (err) {
     console.error('coach failed:', err);
     await release(ref, 'coach');
     return aiFailure(c, err, 'coach_failed');
   }
 });
+
+/**
+ * A recipe written in chat costs what the recipe generator charges (2), not
+ * a coach message (1): the message's charge becomes a recipe charge, once.
+ * If the allowance cannot cover the difference, the reply still comes back
+ * but without the recipe, saying why — nothing is saved for free.
+ */
+async function chargeChatRecipe(
+  ref: string,
+  access: Access,
+  draft: ReturnType<typeof sanitizeRecipe> | undefined,
+  language: Language,
+): Promise<{ draft: ReturnType<typeof sanitizeRecipe> | undefined; note: string }> {
+  if (!draft) return { draft: undefined, note: '' };
+  if (await reprice(ref, access, 'coach', 'recipe')) return { draft, note: '' };
+  return {
+    draft: undefined,
+    note:
+      language === 'ar'
+        ? '\n\nكتابة وصفة كاملة تحتاج إجراءين من إجراءات الذكاء الاصطناعي، ولا يكفي المتبقي هذا الشهر، لذلك لم تُحفظ الوصفة.'
+        : "\n\nWriting a full recipe takes 2 AI actions, and there isn't enough left this month, so the recipe wasn't saved.",
+  };
+}
 
 /** The coach's tools for this member (see scopeCoachTools). */
 function coachToolsFor(access: Access): Anthropic.Tool[] {

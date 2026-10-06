@@ -157,7 +157,7 @@ export default function Login() {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior="padding">
       <LinearGradient
         colors={[theme.gradientStart, theme.gradientEnd]}
         start={{ x: 0, y: 0.4 }}

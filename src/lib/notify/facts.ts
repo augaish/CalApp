@@ -174,7 +174,7 @@ type State = Pick<
   AppState,
   | 'meals' | 'water' | 'workouts' | 'weights' | 'schedule' | 'occurrences' | 'skips' | 'exercises' | 'targets' | 'profile'
   | 'activeFast' | 'activeProgram' | 'whoopBurnByDay' | 'whoopWorkoutsByDay' | 'remindMeals' | 'remindWater' | 'remindWorkouts'
-> & { notifyPrefs?: Partial<NotifyPrefs>; notifySnooze?: Record<string, string> };
+> & { notifyPrefs?: Partial<NotifyPrefs>; notifySnooze?: Record<string, string>; scheduleSince?: AppState['scheduleSince'] };
 
 function dayFacts(s: State, date: Date, now: Date): DayFacts {
   const meals = Array.isArray(s.meals) ? s.meals : [];
@@ -198,7 +198,7 @@ function dayFacts(s: State, date: Date, now: Date): DayFacts {
     if (!lead.name) lead = undefined;
   }
   const yesterday = new Date(date.getTime() - DAY_MS);
-  const missed = pendingOccurrences(s.schedule ?? {}, s.occurrences ?? {}, workouts, s.skips ?? {}, date, 1).find(
+  const missed = pendingOccurrences(s.schedule ?? {}, s.occurrences ?? {}, workouts, s.skips ?? {}, date, 1, s.scheduleSince ?? {}).find(
     (p) => p.scheduledDate === dateKey(yesterday),
   );
   const lastSet = dayWorkouts.map((w) => new Date(w.updatedAt ?? w.at)).sort((a, b) => b.getTime() - a.getTime())[0];

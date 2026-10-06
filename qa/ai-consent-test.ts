@@ -27,10 +27,10 @@ for (const [, name, body] of aiFns) {
 check('the gate runs before anything is fetched', /if \(AI_PATHS\.has\(path\) && !\(await ensureAiConsent\(\)\)\) throw new AiConsentDeclinedError\(\);\s*const res = await fetch/.test(api));
 
 // Every screen that calls an AI function stops quietly on a decline.
-const callers = ['src/app/photo-analyze.tsx', 'src/app/describe.tsx', 'src/app/body-reading.tsx', 'src/components/refine-box.tsx', 'src/app/scan.tsx', 'src/app/inbody-web.tsx', 'src/app/exercise-edit.tsx', 'src/app/recipes.tsx', 'src/app/program.tsx', 'src/app/coach.tsx'];
+const callers = ['src/app/photo-analyze.tsx', 'src/app/describe.tsx', 'src/app/body-reading.tsx', 'src/components/refine-box.tsx', 'src/app/scan.tsx', 'src/app/inbody-web.tsx', 'src/app/exercise-edit.tsx', 'src/app/recipes.tsx', 'src/app/program-build.tsx', 'src/app/program-tailor.tsx', 'src/app/coach.tsx'];
 for (const f of callers) {
   const src = fs.readFileSync(`/home/user/CalApp/${f}`, 'utf8');
-  check(`${f} handles a decline`, src.includes('AiConsentDeclinedError') || src.includes("action.kind === 'none'"));
+  check(`${f} handles a decline`, src.includes('AiConsentDeclinedError') || /action\.kind [!=]== 'none'/.test(src));
 }
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

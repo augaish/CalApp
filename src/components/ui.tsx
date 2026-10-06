@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -60,11 +59,15 @@ export function Screen({
     // Without this, nothing on a Screen-based page shifted for the keyboard —
     // a focused input near the bottom (a note field, a chat-style correction
     // box) just sat behind it, out of reach, taking any text selection/paste
-    // popup down with it. `padding` on iOS grows the bottom inset to clear
-    // the keyboard; Android already resizes the window on its own.
+    // popup down with it. `padding` grows the bottom inset to clear the
+    // keyboard. Android too: drawn edge to edge (Android 15+, and always in
+    // this React Native), the window no longer shrinks for the keyboard, so a
+    // footer button (Add set, Complete set, Save) sat under it. Where the
+    // window does still shrink, the measured overlap is zero and this adds
+    // nothing.
     <KeyboardAvoidingView
       style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior="padding"
     >
       <View style={{ flex: 1, backgroundColor: t.background }}>
         {header}

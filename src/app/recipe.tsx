@@ -27,6 +27,7 @@ import {
   withIngredientAmount,
   knownLabel,
   recipeUnknownNutrients,
+  recipeTimes,
 } from '@/lib/recipes';
 import { isStarterId } from '@/lib/starter-recipes';
 import { useAppStore } from '@/lib/store';
@@ -90,7 +91,8 @@ export default function RecipeScreen() {
   const ready = isReady(recipe);
   const unknown = unknownNutritionCount(recipe);
   const visibleIngredients = showAll || ingredients.length <= COLLAPSED_INGREDIENTS + 1 ? ingredients : ingredients.slice(0, COLLAPSED_INGREDIENTS);
-  const minutes = (recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0);
+  const times = recipeTimes(recipe);
+  const minutes = times.active;
 
   const goPlan = () =>
     router.push(`/plan-meal?${new URLSearchParams({ recipeId: recipe.id, day: day ?? '', slot: slotParam ?? '', from: 'picker' }).toString()}`);
@@ -150,7 +152,8 @@ export default function RecipeScreen() {
       header={
         <PageHeader
           title={t('recipe.title')}
-          backLabel={t('recipes.title')}
+          // Neutral: this screen opens from Recipes, AI Support, Food and the plan,
+          // and Back returns to whichever it was.
           right={
             <Pressable onPress={toggleFavorite} hitSlop={8} accessibilityRole="button" accessibilityLabel={t(recipe.favorite ? 'recipes.unfavorite' : 'recipes.favorite')} accessibilityState={{ selected: !!recipe.favorite }} style={styles.heart}>
               <Icon name={recipe.favorite ? 'heart' : 'heart-outline'} size={24} color={theme.onGradient} />
@@ -184,6 +187,7 @@ export default function RecipeScreen() {
             </Text>
             <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }}>
               {minutes > 0 ? `${t('recipes.minutes', { count: minutes })} · ` : ''}
+              {times.readyHours ? `${t('recipes.readyIn', { count: times.readyHours })} · ` : ''}
               {t('recipe.makesServings', { count: recipe.servings })}
             </Text>
             <View style={styles.pills}>

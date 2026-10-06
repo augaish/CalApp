@@ -98,7 +98,7 @@ try {
     const { ctx, page } = await openApp('/', TRAIN);
     const b = await body(page);
     check('Essentials Training: Overview has no nutrition card', !/Nutrition today/.test(b));
-    check('Essentials Training: Overview keeps training, weight and water', /Your next steps/.test(b) && /Latest weight/i.test(b) && /Water/.test(b));
+    check('Essentials Training: Overview keeps training, weight and water', /(Your next workout|Rest day|In progress|Done today)/i.test(b) && /Latest weight/i.test(b) && /Water/.test(b));
     await ctx.close();
   }
   {
@@ -116,7 +116,7 @@ try {
   }
   {
     const { ctx, page } = await openApp('/schedules', TRAIN);
-    await clickText(page, 'Save this week');
+    await clickText(page, 'Save and use');
     const naming = await page.locator('input[placeholder^="Name it"]').count();
     check('Essentials Training: saving a schedule is allowed', !page.url().includes('/membership') && naming > 0, page.url());
     await ctx.close();
@@ -170,7 +170,7 @@ try {
     check('server: an Essentials Food trial opens Pro features', hook.result === 'grant' && m.plan === 'essentials' && m.trial === true && m.scope === 'all' && m.features.coachDocs === true, JSON.stringify({ hook, plan: m.plan, trial: m.trial, scope: m.scope }));
     const { ctx, page } = await openApp('/', TRIAL);
     const b = await body(page);
-    check('trial: Overview shows Food and Training', /Nutrition today/.test(b) && /Your next steps/.test(b));
+    check('trial: Overview shows Food and Training', /Nutrition today/.test(b) && /(Your next workout|Rest day|In progress|Done today)/i.test(b));
     await ctx.close();
   }
   {
@@ -201,7 +201,7 @@ try {
   {
     const { ctx, page } = await openApp('/', PRO);
     const b = await body(page);
-    check('Pro: Overview shows both', /Nutrition today/.test(b) && /Your next steps/.test(b));
+    check('Pro: Overview shows both', /Nutrition today/.test(b) && /(Your next workout|Rest day|In progress|Done today)/i.test(b));
     await ctx.close();
   }
   {

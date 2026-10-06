@@ -53,6 +53,13 @@ const MAIN_MEALS: MealType[] = ['breakfast', 'lunch', 'dinner'];
  * clock is past dinner (or every main meal is in) there's nothing to chase,
  * and the card offers a snack instead.
  */
+/** "Breakfast and lunch" / "Breakfast, lunch and dinner"; in Arabic "الفطور والغداء". */
+function listOf(items: string[], arabic: boolean): string {
+  if (arabic) return items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join('، ')} و${items[items.length - 1]}`;
+  const lower = items.map((x, i) => (i === 0 ? x : x.toLowerCase()));
+  return lower.length <= 1 ? (lower[0] ?? '') : `${lower.slice(0, -1).join(', ')} and ${lower[lower.length - 1]}`;
+}
+
 function nextMealSlot(logged: Set<MealType>): MealType | null {
   const now = mealTypeForNow();
   if (now === 'snack') return null;
@@ -187,6 +194,11 @@ export default function Overview() {
   const sessionIsToday = activeSession?.dayKey === dateKey(new Date());
   const mealsLogged = mealTypesLogged(meals, selected);
   const nextMeal = nextMealSlot(mealsLogged);
+  // With nothing left to suggest (past dinner time), only say "all logged"
+  // when all three really are; otherwise say what is in and what is not.
+  const mealsMissing = MAIN_MEALS.filter((m) => !mealsLogged.has(m));
+  const mealsIn = MAIN_MEALS.filter((m) => mealsLogged.has(m));
+  const mealList = (slots: MealType[]) => listOf(slots.map((m) => t(`home.mealTypes.${m}`)), i18n.language === 'ar');
   const nextPlanned = nextMeal
     ? plannedMealFor(activeProgram?.mealPlan, selected, nextMeal, mealPlanSwaps, mealPlanRecipes, recipes, activeProgram?.id)
     : undefined;
@@ -405,14 +417,24 @@ export default function Overview() {
                   <Icon name="chevron-forward" size={13} color={theme.textTertiary} />
                 </View>
                 <Text style={[styles.stepTitle, { color: theme.text }]} numberOfLines={2}>
-                  {nextMeal ? (nextPlanned ? nextPlanned.name : t(`home.mealTypes.${nextMeal}`)) : t('today.allLogged')}
+                  {nextMeal
+                    ? nextPlanned
+                      ? nextPlanned.name
+                      : t(`home.mealTypes.${nextMeal}`)
+                    : mealsMissing.length === 0
+                      ? t('today.allLogged')
+                      : mealsIn.length > 0
+                        ? t('today.mealsLogged', { meals: mealList(mealsIn) })
+                        : t('today.noMealsYet')}
                 </Text>
                 <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }} numberOfLines={2}>
                   {nextPlanned
                     ? `${nextPlannedPortion ? `${nextPlannedPortion} · ` : ''}${num(nextPlannedKcal)} ${t('common.kcal')}`
                     : nextMeal
-                      ? t('today.doneOf', { done: MAIN_MEALS.filter((m) => mealsLogged.has(m)).length, total: MAIN_MEALS.length })
-                      : t('today.allLoggedHint')}
+                      ? t('today.doneOf', { done: mealsIn.length, total: MAIN_MEALS.length })
+                      : mealsMissing.length === 0
+                        ? t('today.allLoggedHint')
+                        : t('today.mealsMissingHint', { meals: mealList(mealsMissing), count: mealsMissing.length })}
                 </Text>
                 <View style={styles.stepAction}>
                   {nextMeal && nextPlanned?.items[0]?.recipeId ? (
@@ -438,6 +460,13 @@ export default function Overview() {
                       />
                       <ActionButton label={t('today.log')} icon="add" variant="secondary" onPress={() => openMealEntry(nextMeal, 'menu')} style={{ flex: 1 }} />
                     </View>
+                  ) : mealsMissing.length > 0 ? (
+                    <ActionButton
+                      label={t('today.logSlot', { meal: i18n.language === 'ar' ? t(`home.mealTypes.${mealsMissing[0]}`) : t(`home.mealTypes.${mealsMissing[0]}`).toLowerCase() })}
+                      icon="add"
+                      variant="secondary"
+                      onPress={() => openMealEntry(mealsMissing[0], 'menu')}
+                    />
                   ) : (
                     <ActionButton label={t('today.addSnack')} icon="add" variant="secondary" onPress={() => openMealEntry('snack', 'menu')} />
                   )}

@@ -412,6 +412,8 @@ export interface Recipe {
   servings: number;
   prepMinutes?: number;
   cookMinutes?: number;
+  /** Hands-off waiting besides prep and cooking (chilling, marinating, rising). */
+  waitMinutes?: number;
   ingredients: RecipeIngredient[];
   steps: string[];
   /**

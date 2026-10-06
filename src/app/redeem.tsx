@@ -84,7 +84,7 @@ export default function Redeem() {
   const usable = code.replace(/[\s._-]/g, '').length >= 3;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <Screen
         footer={
           <View>

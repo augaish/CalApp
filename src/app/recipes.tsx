@@ -18,7 +18,7 @@ import { aiFailureAction } from '@/lib/api-errors';
 import { useEntitlement } from '@/lib/entitlement';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { resolveIngredientKey } from '@/lib/ingredients';
-import { servingSummary } from '@/lib/recipes';
+import { recipeTimes, servingSummary } from '@/lib/recipes';
 import { useAppStore } from '@/lib/store';
 import type { Recipe } from '@/lib/types';
 import { isStarterId } from '@/lib/starter-recipes';
@@ -150,7 +150,7 @@ export default function Recipes() {
     lightHaptic();
   };
 
-  const minutes = (r: Recipe) => (r.prepMinutes ?? 0) + (r.cookMinutes ?? 0);
+
   const filters: { key: Filter; label: string }[] = [
     { key: 'all', label: t('recipes.filterAll') },
     { key: 'calgym', label: t('recipes.filterCalgym') },
@@ -220,7 +220,7 @@ export default function Recipes() {
 
       {shown.map((r) => {
         const serving = servingSummary(r);
-        const mins = minutes(r);
+        const { active: mins, readyHours } = recipeTimes(r);
         return (
           <Pressable
             key={r.id}
@@ -236,6 +236,7 @@ export default function Recipes() {
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }} numberOfLines={1}>
                 {mins > 0 ? `${t('recipes.minutes', { count: mins })} · ` : ''}
+                {readyHours ? `${t('recipes.readyIn', { count: readyHours })} · ` : ''}
                 {t('recipes.servingsCount', { count: r.servings })}
               </Text>
               <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 4 }} numberOfLines={2}>

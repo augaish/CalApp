@@ -329,3 +329,38 @@ export function knownLabel(value: number | string, unknown: boolean, dash = '—
   const n = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.-]/g, ''));
   return n > 0 ? `≥${value}` : dash;
 }
+
+/**
+ * Hands-off waiting the steps ask for, in minutes ("refrigerate for at least
+ * 4 hours" is 240, "overnight" 480), English or Arabic; the longest wins.
+ * For recipes saved before the AI reported a wait. Same rule as the server.
+ */
+export function waitInSteps(steps: string[]): number | undefined {
+  let best = 0;
+  const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
+  for (const raw of steps) {
+    const text = raw.toLowerCase().replace(/[٠-٩]/g, (d) => String(AR_DIGITS.indexOf(d)));
+    // A step's own number of hours is the wait ("at least 4 hours, or
+    // overnight" is 4); overnight counts only where no number is given.
+    let step = 0;
+    for (const m of text.matchAll(/(\d+(?:\.\d+)?)\s*(?:(?:-|–|to|إلى|الى)\s*\d+(?:\.\d+)?\s*)?(?:hours?|hrs?|h\b|ساعات|ساعة)/g)) {
+      step = Math.max(step, Math.round(Number(m[1]) * 60));
+    }
+    if (!step && /ساعتين|ساعتان/.test(text)) step = 120;
+    if (!step && /overnight|طوال الليل|ليلة كاملة|حتى الصباح/.test(text)) step = 480;
+    best = Math.max(best, step);
+  }
+  return best > 0 ? Math.min(best, 2880) : undefined;
+}
+
+/**
+ * Hands-on time and, when the recipe has to wait (chill, marinate, rise),
+ * how long until it is ready — so "13 min" never hides a 4-hour fridge step.
+ */
+export function recipeTimes(recipe: Pick<Recipe, 'prepMinutes' | 'cookMinutes' | 'waitMinutes' | 'steps'>): { active: number; readyHours: number | null } {
+  const active = (recipe.prepMinutes ?? 0) + (recipe.cookMinutes ?? 0);
+  const wait = recipe.waitMinutes ?? waitInSteps(recipe.steps ?? []) ?? 0;
+  if (wait < 60) return { active: active + wait, readyHours: null };
+  // Whole hours, never rounded below the wait itself.
+  return { active, readyHours: Math.max(1, Math.round((active + wait) / 60)) };
+}

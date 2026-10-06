@@ -87,7 +87,7 @@ console.log('=== Admin console ===');
   await page.waitForTimeout(700);
 
   const rowText = squash(await page.textContent('#pc_rows'));
-  check('admin: the table lists the codes with what they give', rowText.includes(`${FREE}`) && rowText.includes('Pro free for 90 days') && rowText.includes('50% off Pro'), rowText.slice(0, 200));
+  check('admin: the table lists the codes with what they give', rowText.includes(`${FREE}`) && rowText.includes('Pro free for 3 months') && rowText.includes('50% off Pro'), rowText.slice(0, 200));
   check('admin: a new code reads 0 / limit used, and live', new RegExp(`${FREE}.*?0 / 2.*?live`).test(rowText));
   check('admin: no page errors', page.errors.length === 0, page.errors.join(' | '));
   await page.screenshot({ path: `${OUT}/admin-codes.png`, fullPage: false });
@@ -155,7 +155,7 @@ console.log('\n=== App (Arabic): percent and limits ===');
   await page.getByText('استخدام', { exact: true }).click();
   await page.waitForTimeout(1500);
   let b = await body(page);
-  check('ar redeem: a percent code shows the discount', /خصم 50٪ على كالجيم برو/.test(b), b.slice(0, 200));
+  check('ar redeem: a percent code shows the discount', /خصم (50|٥٠)٪ على كالجيم برو/.test(b), b.slice(0, 200));
   check('ar redeem: and hands over to the store (no plan granted here)', /المتابعة إلى App Store|المتابعة إلى Google Play/.test(b));
   await page.screenshot({ path: `${OUT}/redeem-percent-ar.png` });
   const m = await me(installId);
@@ -173,7 +173,7 @@ console.log('\n=== App (Arabic): percent and limits ===');
   await page.getByText('استخدام', { exact: true }).click();
   await page.waitForTimeout(1200);
   b = await body(page);
-  check('ar redeem: asking again for an unused discount shows it again', /خصم 50٪/.test(b));
+  check('ar redeem: asking again for an unused discount shows it again', /خصم (50|٥٠)٪/.test(b));
 
   await page.goto(`${APP}/redeem?code=${ONE}`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(900);

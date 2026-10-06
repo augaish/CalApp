@@ -215,11 +215,13 @@ export default function SessionScreen() {
   const button = completeLabel(setNo + 1, goal);
   const loggedContinuous = continuous && (todayWorkout?.sets.length ?? 0) > 0;
 
-  const label = (s: SetShape | undefined): string => {
+  /** A set in its exercise's own terms: the summary lists every exercise, not just the one on screen. */
+  const label = (s: SetShape | undefined, as: ExerciseType = type): string => {
     if (!s) return t('session.none');
-    switch (type) {
+    switch (as) {
       case 'weight_reps':
-        return `${s.weightKg ?? 0} ${kg} × ${s.reps ?? 0}`;
+        // No weight means bodyweight: "10 reps", never "0 kg × 10".
+        return s.weightKg ? `${s.weightKg} ${kg} × ${s.reps ?? 0}` : `${s.reps ?? 0} ${t('session.reps')}`;
       case 'bodyweight_reps':
         return `${s.reps ?? 0} ${t('session.reps')}`;
       case 'time':
@@ -421,7 +423,7 @@ export default function SessionScreen() {
                     {r.e ? exerciseName(r.e, lang) : r.id}
                   </Text>
                   <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                    {r.done.length > 0 ? `${t('track.setsSummary', { count: r.done.length })} · ${t('session.sessionBest')} ${label(r.done[bestIdx])}` : t('session.notStarted')}
+                    {r.done.length > 0 ? `${t('track.setsSummary', { count: r.done.length })} · ${t('session.sessionBest')} ${label(r.done[bestIdx], r.w!.type)}` : t('session.notStarted')}
                   </Text>
                 </View>
                 <Icon name={r.done.length > 0 ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={r.done.length > 0 ? theme.successText : theme.textTertiary} />

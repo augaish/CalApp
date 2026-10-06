@@ -59,6 +59,24 @@ export function performedOn(workouts: LoggedWorkout[], key: string, exerciseIds:
   return workouts.some((w) => dateKey(new Date(w.at)) === key && exerciseIds.includes(w.exerciseId) && w.sets.some((s) => s.done));
 }
 
+/**
+ * Per weekday, the day (dateKey) it last gained an exercise it did not have:
+ * a schedule activated, a day added, an import. Workouts only count as
+ * missed from then on.
+ */
+export type ScheduleSince = Partial<Record<number, string>>;
+
+/** The schedule start dates after a change from `prev` to `next` on `today`. */
+export function sinceAfter(prev: Schedule, next: Schedule, since: ScheduleSince, today: Date): ScheduleSince {
+  let out = since;
+  for (let wd = 0; wd < 7; wd++) {
+    const before = prev[wd]?.exerciseIds ?? [];
+    const gained = (next[wd]?.exerciseIds ?? []).some((id) => !before.includes(id));
+    if (gained && out[wd] !== dateKey(today)) out = { ...out, [wd]: dateKey(today) };
+  }
+  return out;
+}
+
 export interface PendingOccurrence {
   originalDate: string;
   /** Where it currently sits (its original date unless moved). */
@@ -80,6 +98,7 @@ export function pendingOccurrences(
   skips: Record<string, string[]>,
   today: Date,
   lookbackDays = 7,
+  since: ScheduleSince = {},
 ): PendingOccurrence[] {
   const out: PendingOccurrence[] = [];
   for (let i = 1; i <= lookbackDays; i++) {
@@ -87,6 +106,10 @@ export function pendingOccurrences(
     const key = dateKey(date);
     const plan = resolvePlan(schedule, occurrences, date);
     if (!plan) continue;
+    // Not missed if that weekday only got this workout later: a schedule
+    // made on Tuesday never manufactures a missed Sunday before it.
+    const from = since[plan.weekday];
+    if (from && keyToDate(plan.originalDate).getTime() < keyToDate(from).getTime()) continue;
     const skipped = skips[key] ?? [];
     const exerciseIds = plan.day.exerciseIds.filter((id) => !skipped.includes(id));
     if (exerciseIds.length === 0) continue;

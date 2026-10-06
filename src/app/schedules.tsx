@@ -194,6 +194,9 @@ export default function Schedules() {
               )}
             </View>
 
+            {isActive && drifted && (
+              <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: Spacing.sm }}>{t('schedules.unsavedChanges')}</Text>
+            )}
             <View style={styles.tools}>
               {isActive && drifted && (
                 <Pressable onPress={() => { updateSavedSchedule(s.id); successHaptic(); }} accessibilityRole="button" hitSlop={6} style={styles.tool}>

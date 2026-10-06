@@ -5,7 +5,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { categoryForMuscles, exactExerciseMatch, findExercise, guessCategory, matchExerciseByName } from './exercises';
 import { incompleteFlags, perServing, recipeUnknownNutrients, roundMacros, scaleMacros, servingCountLabel } from './recipes';
 import type { PlannedRecipeMeal } from './shopping';
-import { applyMoves, resolvePlan, undoOp, type OccurrenceMove } from './occurrences';
+import { applyMoves, resolvePlan, sinceAfter, undoOp, type OccurrenceMove, type ScheduleSince } from './occurrences';
 import type { MembershipPromptState } from './membership-prompt';
 import { dailyTargets } from './tdee';
 import { resolveCoachSchedule } from './coach-schedule';
@@ -258,6 +258,8 @@ export interface AppState {
   favoriteIds: string[];
   /** Notes written about an exercise during a workout, newest edits anywhere. */
   exerciseNotes: ExerciseNote[];
+  /** Per weekday, when it last gained an exercise: missed workouts count from then (see occurrences.ts). */
+  scheduleSince: ScheduleSince;
   hydrated: boolean;
 
   setAccount: (account: Account | null) => void;
@@ -619,6 +621,27 @@ export function setWriteGuard(fn: ((area: WriteArea) => boolean) | null): void {
 }
 
 /** Wrap the listed actions so a write the plan doesn't cover does nothing. */
+type SetState = (
+  partial: AppState | Partial<AppState> | ((s: AppState) => AppState | Partial<AppState>),
+  replace?: false,
+) => void;
+
+/**
+ * The store's `set`, plus one rule: whenever a change gives a weekday an
+ * exercise it did not have (a schedule activated, a day added, an import,
+ * a program started), that weekday's start date becomes today, so a
+ * workout before it is never offered as missed. A write that names
+ * scheduleSince itself (restore, reset) is taken as it is.
+ */
+function trackScheduleSince(set: SetState): SetState {
+  return (partial) =>
+    set((s) => {
+      const p = typeof partial === 'function' ? partial(s) : partial;
+      if (!p || !('schedule' in p) || !p.schedule || p.schedule === s.schedule || 'scheduleSince' in p) return p;
+      return { ...p, scheduleSince: sinceAfter(s.schedule, p.schedule, s.scheduleSince ?? {}, new Date()) };
+    });
+}
+
 function guardWrites<A extends unknown[]>(creator: (...args: A) => AppState): (...args: A) => AppState {
   return (...args: A) => {
     const state = creator(...args);
@@ -638,7 +661,9 @@ function guardWrites<A extends unknown[]>(creator: (...args: A) => AppState): (.
 
 export const useAppStore = create<AppState>()(
   persist(
-    guardWrites((set, get) => ({
+    guardWrites((rawSet, get) => {
+      const set = trackScheduleSince(rawSet);
+      return {
       account: null,
       language: null,
       units: 'metric',
@@ -689,6 +714,7 @@ export const useAppStore = create<AppState>()(
       occurrences: {},
       favoriteIds: [],
       exerciseNotes: [],
+      scheduleSince: {},
       hydrated: false,
 
       setAccount: (account) => set({ account }),
@@ -1524,6 +1550,8 @@ export const useAppStore = create<AppState>()(
           weights: snap.weights,
           activeProgram: snap.activeProgram,
           ...plans,
+          // A restore is not a new schedule: keep this device's start dates.
+          scheduleSince: get().scheduleSince,
         });
       },
       resetAll: () =>
@@ -1564,8 +1592,10 @@ export const useAppStore = create<AppState>()(
           activeFast: null,
           fastingHistory: [],
           exerciseNotes: [],
+          scheduleSince: {},
         }),
-    })),
+      };
+    }),
     {
       name: 'calapp-store',
       version: 16,
@@ -1628,6 +1658,7 @@ export const useAppStore = create<AppState>()(
         occurrences,
         favoriteIds,
         exerciseNotes,
+        scheduleSince,
       }) => ({
         account,
         language,
@@ -1685,6 +1716,7 @@ export const useAppStore = create<AppState>()(
         occurrences,
         favoriteIds,
         exerciseNotes,
+        scheduleSince,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),
     },

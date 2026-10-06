@@ -468,6 +468,14 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - Calories show separators (2,525 kcal).
   - **Dish photos:** 121 real photos (kabsa, hummus, shawarma, karak…) next to logged meals, plans and recipes, matched by name in English or Arabic. Your own photo still comes first; a dish with no match keeps its icon.
   - "Added to Lunch · Undo" shows once: not again on Food when the portion screen already said it.
+- **Fixes from the 6 October Android retest.**
+  - Overview never says "All meals logged" unless breakfast, lunch and dinner all are. Otherwise "Dinner logged · Breakfast and lunch aren't logged", with Log breakfast.
+  - The keyboard no longer covers the bottom button on Android 15 (Add set, Complete set, Add food, Save).
+  - A schedule made or changed today never offers an earlier day as a missed workout. Workouts that really were missed still offer Do today / Move / Skip.
+  - A recipe written in AI Support costs 2 AI actions, like the recipe generator (shown in Membership). Without 2 left, the reply says so and doesn't save the recipe.
+  - Recipes that chill or marinate say "13 min · ready in about 4 h".
+  - "Save this week" is now "Save and use"; an edited schedule says it has unsaved changes and offers "Save changes to this schedule".
+  - The workout summary shows push-ups as "10 reps", not "0 kg × 10". The recipe screen's back button says Back.
 - **Fixes from the 5 October test report.**
   - Recipe cards say "protein unknown" instead of "0 g", and This week's protein average says "at least" when a food had no protein value.
   - "Edit today's plan" is now **Edit weekly schedule**, with "Changes apply to every Monday".

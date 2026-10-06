@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -347,7 +346,7 @@ export default function Coach() {
   const chips = busy ? [] : messages.length === 0 ? STARTERS.map((k) => t(`coach.starter.${k}`)) : last?.role === 'assistant' ? (last.suggestions ?? []) : [];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior="padding" keyboardVerticalOffset={0}>
       {/* One thin brand strip carries everything the two old rows did: the
           brand, Back, the screen name with its allowance, shared context and
           a new conversation — so the thread gets the height back. */}
