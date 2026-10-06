@@ -177,7 +177,7 @@ App Store Connect → your app → **App Information** → **App Store Server No
 
 Then check **admin → Overview → Launch checklist**. Everything except "First store event received" should be ticked.
 
-**Sign-in emails** (the 6-digit codes) are sent by **Supabase through Resend**: Supabase → Authentication → Emails → SMTP Settings, host `smtp.resend.com`, domain calgym.org. Nothing in the app or server code sends email. Keep Resend's DNS records (`resend._domainkey` and the `send` subdomain's MX and TXT); removing them stops sign-in emails. MailerSend is not used: emails from MailerSend about calgym.org can be ignored.
+**Sign-in emails** (the 6-digit codes) are sent by **Supabase through Resend**: Supabase → Authentication → Emails → SMTP Settings, host `smtp.resend.com`, domain calgym.org. Nothing in the app or server code sends email. Keep Resend's DNS records (`resend._domainkey` and the `send` subdomain's MX and TXT); removing them stops sign-in emails. MailerSend is not used by Calgym (it belongs to another project): don't add MailerSend records to calgym.org.
 
 ## 7. ⬜ Admin page (…/admin)
 - **Membership → Membership prices:** Essentials `19.99` / year `149.99`, Pro `24.99` / year `199.99`, currency `SAR` (Pro+ `49.99` stays for later). These are only shown until the store is live; after that, the store's own price shows.
