@@ -426,6 +426,7 @@ Apple puts the app version, the subscription group and the subscriptions into **
    - Don't create anything under **Monetization → In-App Purchases** (that is for one-off purchases).
 4. Open the submission (the banner at the top, or **App Review** in the sidebar). It should list: **iOS 1.0**, the **subscription group** and the **four subscriptions** → **Submit for Review**.
 5. Apple usually answers within 24–48 hours. If it's rejected, send me the message and I'll prepare the reply or the fix.
+6. **Status (7 Oct 2026):** still "Waiting for Review" since 30 September, all agreements active. Asked App Review about it on 7 October: **case ID 102988933506**. Use that number for any follow-up, and don't cancel and resubmit (it goes back to the end of the queue).
 
 ## Step 18 ⬜ Launch day (after "Pending Developer Release")
 1. Check your testers have their plan (admin → Users; granted in step 10). The `FOUNDERS` offer code from step 10 works for anyone new.
