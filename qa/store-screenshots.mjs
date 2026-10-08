@@ -19,7 +19,9 @@ const DEFAULT_OUT = { '6.9': './docs/store-screenshots', '6.5': './docs/store-sc
 const OUT = process.env.SHOTS_OUT ?? DEFAULT_OUT[SIZE];
 const VIEW = VIEWS[SIZE];
 
-const now = new Date();
+// A fixed early evening, so the screens don't depend on when this runs:
+// breakfast and lunch logged, dinner next, a workout under way.
+const now = new Date(); now.setHours(18, 20, 0, 0);
 const key = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 const at = (daysAgo, h, m = 0) => { const d = new Date(now); d.setDate(d.getDate() - daysAgo); d.setHours(h, m, 0, 0); return d.toISOString(); };
 const today = now.getDay();
@@ -52,10 +54,12 @@ function data(lang, withSession = false) {
   };
   const item = (en, a, kcal, p, c, f, portion) => ({ name: L(en, a), calories: kcal, proteinG: p, carbsG: c, fatG: f, portion });
   const meals = [
-    { id: 'm1', at: at(0, 8, 10), mealType: 'breakfast', items: [item('Eggs', 'بيض', 210, 18, 2, 14, L('3 eggs', '٣ بيضات')), item('Wholegrain toast', 'توست أسمر', 160, 7, 28, 2, L('2 slices', 'شريحتان')), item('Greek yogurt', 'زبادي يوناني', 130, 17, 6, 4, L('170 g', '١٧٠ غ'))] },
+    { id: 'm1', at: at(0, 8, 10), mealType: 'breakfast', items: [item('Shakshuka', 'شكشوكة', 370, 25, 30, 16, L('1 pan', 'مقلاة واحدة'))] },
+    { id: 'm3', at: at(0, 10, 30), mealType: 'snack', items: [item('Greek yogurt', 'زبادي يوناني', 130, 17, 6, 4, L('170 g', '١٧٠ غ'))] },
     { id: 'm2', at: at(0, 13, 20), mealType: 'lunch', items: [item('Grilled chicken salad', 'سلطة دجاج مشوي', 414, 53, 5, 20, L('1 serving', 'حصة واحدة'))] },
   ];
-  const sched = { title: L('Push', 'دفع'), exerciseIds: ['builtin:bench-press', 'builtin:incline-bench', 'builtin:shoulder-press', 'builtin:tricep-pushdown'] };
+  const sched = { title: L('Push', 'دفع'), exerciseIds: ['builtin:bench-press', 'builtin:incline-bench', 'builtin:shoulder-press', 'builtin:tricep-pushdown'],
+    plans: { 'builtin:bench-press': [{ weightKg: 72.5, reps: 8 }, { weightKg: 72.5, reps: 8 }, { weightKg: 75, reps: 6 }] } };
   const pull = { title: L('Pull', 'سحب'), exerciseIds: ['builtin:lat-pulldown', 'builtin:seated-row', 'builtin:barbell-curl'] };
   const legs = { title: L('Legs', 'أرجل'), exerciseIds: ['builtin:squat', 'builtin:leg-press', 'builtin:leg-curl', 'builtin:calf-raise'] };
   // Push today, Legs in two days, Pull in four: the past days that fall on
@@ -73,6 +77,8 @@ function data(lang, withSession = false) {
   ];
   // Newest first, as the app keeps them.
   const weights = Array.from({ length: 9 }, (_, i) => ({ at: at((8 - i) * 7, 7), kg: +(86.2 - i * 0.55).toFixed(1), bodyFatPercent: +(24.1 - i * 0.35).toFixed(1), skeletalMuscleMassKg: +(35.2 + i * 0.08).toFixed(1) })).reverse();
+  // The latest reading came from a scanned report with per-limb lean mass, so the figure is coloured.
+  Object.assign(weights[0], { source: 'scan', reportLabel: 'InBody 270', segmentalLeanMassKg: { leftArm: 2.6, rightArm: 2.7, trunk: 21.9, leftLeg: 7.9, rightLeg: 8.0 }, segmentalLeanMassStatus: { leftArm: 'normal', rightArm: 'normal', trunk: 'normal', leftLeg: 'high', rightLeg: 'high' } });
   const water = [{ at: at(0, 9), ml: 500 }, { at: at(0, 12), ml: 330 }, { at: at(0, 15), ml: 500 }];
   const coachMessages = [
     { role: 'user', content: L('How am I doing on protein this week?', 'كيف مستوى البروتين عندي هذا الأسبوع؟'), at: at(0, 14) },
@@ -85,7 +91,7 @@ function data(lang, withSession = false) {
     schedule, savedSchedules: [{ id: 's-ppl', name: L('Push · Pull · Legs', 'دفع · سحب · أرجل'), days: schedule, createdAt: at(30, 9), activatedAt: at(30, 9) }], activeScheduleId: 's-ppl', workouts, exercises: [], meals, weights, water,
     recipes: [kabsa, salad, bowl], mealPlanRecipes: { [key(now)]: { breakfast: { recipeId: 'r-bowl', servings: 1 }, lunch: { recipeId: 'r-salad', servings: 1 }, dinner: { recipeId: 'r-kabsa', servings: 1 } } }, mealPlanSwaps: {},
     shopping: null, coachMessages, fastingHistory: [], skips: {}, dayOrder: {}, whoopBurnByDay: {}, whoopWorkoutsByDay: {}, occurrences: {},
-    activeSession: !withSession ? null : { startedAt: at(0, 17, 50), dayKey: key(now), exerciseIds: sched.exerciseIds, index: 0, currentId: 'builtin:bench-press', restEndsAt: new Date(Date.now() + 75_000).toISOString(), restNext: L('Next: set 2 of 3 · Barbell Bench Press', 'التالي: المجموعة ٢ من ٣ · ضغط بار مسطح'), restSeconds: 90 },
+    activeSession: !withSession ? null : { startedAt: at(0, 17, 50), dayKey: key(now), exerciseIds: sched.exerciseIds, index: 0, currentId: 'builtin:bench-press', restEndsAt: new Date(now.getTime() + 75_000).toISOString(), restNext: L('Next: set 2 of 3 · Barbell Bench Press', 'التالي: المجموعة ٢ من ٣ · ضغط بار مسطح'), restSeconds: 90 },
     membershipPrompt: { firstSeenAt: new Date().toISOString(), introShown: true, lastShownAt: new Date().toISOString() },
     remindersInitialized: true, aiConsent: true,
   };
@@ -110,8 +116,9 @@ for (const lang of ['en', 'ar']) {
   fs.mkdirSync(`${OUT}/${lang}`, { recursive: true });
   for (const [name, path, extra] of SHOTS) {
     const ctx = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 3, colorScheme: 'light', locale: lang === 'ar' ? 'ar-SA' : 'en-US' });
-    await ctx.addInitScript((s) => localStorage.setItem('calapp-store', JSON.stringify(s)), { state: { ...data(lang, path === '/session'), ...(extra ?? {}) }, version: 15 });
+    await ctx.addInitScript((s) => localStorage.setItem('calapp-store', JSON.stringify(s)), { state: { ...data(lang, path === '/session'), ...(extra ?? {}) }, version: 16 });
     const page = await ctx.newPage();
+    await page.clock.install({ time: now });
     await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' });
     await page.waitForTimeout(path.startsWith('/plan-welcome') ? 4200 : 1800);
     await page.screenshot({ path: `${OUT}/${lang}/${name}.png` });

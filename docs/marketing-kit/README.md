@@ -1,6 +1,6 @@
 # Calgym marketing kit
 
-Everything to present Calgym: logos, screenshots, store graphics, social posts, copy and the brand guide. English and Arabic throughout. Made 30 September 2026 from the current app (build 19 plus the latest updates).
+Everything to present Calgym: logos, screenshots, store graphics, social posts, copy and the brand guide. English and Arabic throughout. Made 30 September 2026; screenshots, store graphics, social images and the brand guide's screens updated 8 October 2026 with the redesign (workout card, dish photos, new workout screen).
 
 Start with **calgym-brand-guide.pdf**: it shows the whole brand on 11 pages.
 
