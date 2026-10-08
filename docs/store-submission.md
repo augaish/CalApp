@@ -547,7 +547,7 @@ The AI providers and RevenueCat work on your behalf, which Google does not count
 - Add Arabic with **Manage translations → Add your own translation → Arabic**.
 
 ## Step 24 ⬜ First upload (internal testing)
-1. Tell me **"run the Android production build"**. It makes the `.aab` file Play needs; the APKs we have been testing are for direct install only.
+1. The Play file is built (8 Oct 2026, build `9c582e4d`, version 1.0.0 with everything up to the 6 October retest fixes): https://expo.dev/artifacts/eas/cW__BZG-nn3I2-joTT168E5TKLuZJP8IhKh0I0stajw.aab (build page: https://expo.dev/accounts/augaishb/projects/calapp/builds/9c582e4d-0038-4714-b2c3-cb99e00f4f0e). Download it on a computer. The APKs we have been testing are for direct install only.
 2. **Test and release → Testing → Internal testing → Create new release** → upload the `.aab` → accept Play App Signing → release name `1.0.0` → **Save → Review → Start rollout**.
 3. **Testers tab:** add your Gmail and open the opt-in link on your phone.
 4. **Permissions Play will list:** notifications, camera, microphone and **"Schedule exact alarms"**. The last is for the rest timer's alert. It is the ordinary user-granted permission, not the restricted one, so no form is needed. If Play asks, answer: `A workout rest timer the user starts, which alerts when the rest ends.`
