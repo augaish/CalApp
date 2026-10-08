@@ -29,13 +29,17 @@ const STYLE = `
   .ar { direction:rtl; text-align:right; }
 `;
 
+// Google (Play Console, Search Console) can ask to prove the site is ours
+// with a meta tag; set its content in GOOGLE_SITE_VERIFICATION, no code change.
+const SITE_VERIFICATION = (process.env.GOOGLE_SITE_VERIFICATION ?? '').replace(/[^A-Za-z0-9_-]/g, '');
+
 function page(title: string, body: string): string {
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>${title} · Calgym</title>
+${SITE_VERIFICATION ? `<meta name="google-site-verification" content="${SITE_VERIFICATION}" />\n` : ''}<title>${title} · Calgym</title>
 <style>${STYLE}</style>
 </head>
 <body><div class="wrap">${body}</div></body>
@@ -248,6 +252,61 @@ export const TERMS_HTML = page(
 
 <h2>للتواصل</h2>
 <p><a href="mailto:${CONTACT}">${CONTACT}</a></p>
+</div>`,
+);
+
+/** calgym.org itself: what Calgym is, and the pages the stores and members need. */
+export const HOME_HTML = page(
+  'Food and training, in one place',
+  `<h1>Calgym</h1>
+<div class="updated">Food and training tracking, in English and Arabic.</div>
+
+<p>Snap a meal to see its calories and macros, follow your workouts set by set with a rest timer, and watch your weight and body measurements change over time. An AI coach that sees your food and training helps you adjust as you go.</p>
+
+<h2>Features</h2>
+<ul>
+  <li>Meal photos, barcodes and plain-language entries turned into calories, protein, carbs and fat.</li>
+  <li>Weekly training schedules, sets and personal bests, and a rest timer with alerts.</li>
+  <li>Recipes, meal plans and a shopping list built from your week.</li>
+  <li>Weight, body readings and trends; optional WHOOP connection.</li>
+  <li>An AI program built from your goals, schedule and allergies, which you review before anything is applied.</li>
+</ul>
+
+<h2>Get Calgym</h2>
+<p>Coming soon to the App Store and Google Play.</p>
+
+<h2>Help and your data</h2>
+<ul>
+  <li><a href="/support">Support</a> · <a href="mailto:${CONTACT}">${CONTACT}</a></li>
+  <li><a href="/privacy">Privacy Policy</a> · <a href="/terms">Terms of Use</a></li>
+  <li><a href="/account-deletion">Delete your account</a></li>
+</ul>
+
+<hr />
+
+<div class="ar">
+<h1>كالجيم</h1>
+<div class="updated">تتبّع الطعام والتمرين، بالعربية والإنجليزية.</div>
+<p>صوّر وجبتك لتعرف سعراتها وعناصرها الغذائية، وتابع تمارينك مجموعةً بمجموعة مع مؤقت للراحة، وراقب تغيّر وزنك وقياسات جسمك مع الوقت. ومساعد ذكي يرى طعامك وتمرينك يساعدك على التعديل أولاً بأول.</p>
+
+<h2>المزايا</h2>
+<ul>
+  <li>صور الوجبات والباركود والوصف المكتوب تتحوّل إلى سعرات وبروتين وكربوهيدرات ودهون.</li>
+  <li>جداول تمرين أسبوعية ومجموعات وأرقام قياسية، ومؤقت راحة مع تنبيهات.</li>
+  <li>وصفات وخطط وجبات وقائمة تسوّق مبنية من أسبوعك.</li>
+  <li>الوزن وقراءات الجسم والاتجاهات، مع ربط اختياري بـ WHOOP.</li>
+  <li>برنامج ذكي مبني على أهدافك وجدولك وحساسيتك الغذائية، تراجعه قبل تطبيق أي شيء.</li>
+</ul>
+
+<h2>احصل على كالجيم</h2>
+<p>قريباً على App Store وGoogle Play.</p>
+
+<h2>المساعدة وبياناتك</h2>
+<ul>
+  <li><a href="/support">الدعم</a> · <a href="mailto:${CONTACT}">${CONTACT}</a></li>
+  <li><a href="/privacy">سياسة الخصوصية</a> · <a href="/terms">شروط الاستخدام</a></li>
+  <li><a href="/account-deletion">حذف حسابك</a></li>
+</ul>
 </div>`,
 );
 

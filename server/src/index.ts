@@ -4,7 +4,7 @@ import { Hono, type Context } from 'hono';
 import { cors } from 'hono/cors';
 
 import { ADMIN_HTML } from './admin-html.js';
-import { PRIVACY_HTML, SUPPORT_HTML, TERMS_HTML, WHOOP_INTEGRATION_HTML, WHOOP_SHOTS, accountDeletionHtml } from './legal-html.js';
+import { HOME_HTML, PRIVACY_HTML, SUPPORT_HTML, TERMS_HTML, WHOOP_INTEGRATION_HTML, WHOOP_SHOTS, accountDeletionHtml } from './legal-html.js';
 import {
   actionWeights,
   aiProviders,
@@ -2455,6 +2455,8 @@ app.delete('/api/me', async (c) => {
   }
 });
 
+// calgym.org's front page (the same server answers on the Railway address).
+app.get('/', (c) => c.html(HOME_HTML));
 app.get('/privacy', (c) => c.html(PRIVACY_HTML));
 // A public page showing WHOOP how the integration looks and handles data
 // (their app-approval form asks for a link to screenshots).
