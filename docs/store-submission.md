@@ -490,10 +490,12 @@ Already live (server changes go live on push): the updated privacy policy, cance
 
 # Part B — Google Play
 
+**Website (8 Oct 2026):** https://www.calgym.org is live (Railway custom domain; DNS at IONOS: `www` CNAME to Railway, and `calgym.org` forwards to `https://www.calgym.org`). It serves the same pages as the Railway address: `/`, `/support`, `/privacy`, `/terms`, `/account-deletion`. Use these in Google Play. Apple and WHOOP keep the Railway links, which still work.
+
 ## Step 19 ⬜ Developer account (Organization, chosen 8 Oct 2026)
 Organization: the company publishes it, and there is no 12-tester, 14-day closed test (that rule is for Personal accounts).
 1. **D-U-N-S number** for the company: developer.apple.com/enroll/duns-lookup (free, about 5 working days; Google uses the same number). Legal name and address **exactly as on the CR**: Google matches the name on the D-U-N-S record, the account and the payments profile.
-2. Have ready: the CR, a company email you can receive at (e.g. support@calgym.org), a company phone, the website (`https://calapp-production-ab20.up.railway.app/support` if calgym.org has no site yet), and your own ID.
+2. Have ready: the CR, a company email you can receive at (e.g. support@calgym.org), a company phone, the website (`https://www.calgym.org`), and your own ID.
 3. **play.google.com/console** → **An organization or business** → new **organization** payments profile with the CR name and address → D-U-N-S → contact email and phone (both verified) → $25. Google then verifies the organization, usually within a few days.
 4. **Payments profile → bank account in the company's name.**
 5. Apps with subscriptions show the organization's address and contact email on the Play listing.
@@ -508,14 +510,14 @@ Answer each card:
 
 | Card | Answer |
 |---|---|
-| Privacy policy | `https://calapp-production-ab20.up.railway.app/privacy` |
+| Privacy policy | `https://www.calgym.org/privacy` |
 | Ads | **No** (Yes only while the Sponsor slot in admin → Content is switched on) |
 | App access | "All or some functionality is restricted" → add instructions: `No login needed: tap "Continue as guest". Features beyond viewing need a subscription: Profile → Membership → start the 14-day free trial (every feature included) with a license-test account.` |
 | Content rating | Start the questionnaire → category **Reference, News, or Educational**; answer No to violence, sex, gambling and similar; Yes to "users can interact with AI" if asked |
 | Target audience | **13 and over**; not designed for children |
 | Health apps | Tick **Nutrition and weight management** and **Activity and fitness**; not a medical device |
 | Data safety | see step 22 |
-| Account deletion | **Yes**, users can create an account. Web link `https://calapp-production-ab20.up.railway.app/account-deletion` |
+| Account deletion | **Yes**, users can create an account. Web link `https://www.calgym.org/account-deletion` |
 | Government apps, financial features, news | **No** |
 
 ## Step 22 ⬜ Data safety
