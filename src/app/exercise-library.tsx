@@ -11,7 +11,9 @@ import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { lightHaptic } from '@/lib/feedback';
 import { allExercises, exerciseIcon, exerciseName, MUSCLE_COLORS, MUSCLE_GROUPS } from '@/lib/exercises';
-import { useAppStore } from '@/lib/store';
+import { dayExerciseIds } from '@/lib/day-plan';
+import { keyToDate } from '@/lib/occurrences';
+import { isSameDay, useAppStore } from '@/lib/store';
 import type { Exercise, MuscleGroup, MuscleId } from '@/lib/types';
 
 /** Groups with more than one distinct muscle worth separating out. Groups
@@ -35,17 +37,39 @@ export default function ExerciseLibrary() {
   const removeFromSchedule = useAppStore((s) => s.removeFromSchedule);
   const schedule = useAppStore((s) => s.schedule);
 
-  const { pick, weekday } = useLocalSearchParams<{ pick?: string; weekday?: string }>();
+  const { pick, weekday, date } = useLocalSearchParams<{ pick?: string; weekday?: string; date?: string }>();
   const pickForSchedule = pick === 'schedule';
+  // Adding to one day's list (Training's "Add exercise"): nothing is logged,
+  // the weekly schedule is untouched.
+  const pickForDay = pick === 'day' && !!date;
+  const picking = pickForSchedule || pickForDay;
   const wd = Number(weekday);
-  const picked = pickForSchedule ? (schedule[wd]?.exerciseIds ?? []) : [];
+  const day = useMemo(() => (date ? keyToDate(date) : new Date()), [date]);
+  const occurrences = useAppStore((s) => s.occurrences);
+  const workouts = useAppStore((s) => s.workouts);
+  const skips = useAppStore((s) => s.skips);
+  const dayOrder = useAppStore((s) => s.dayOrder);
+  const dayExtras = useAppStore((s) => s.dayExtras);
+  const addToDay = useAppStore((s) => s.addToDay);
+  const removeFromDay = useAppStore((s) => s.removeFromDay);
+  const skipPlanToday = useAppStore((s) => s.skipPlanToday);
+  const dayList = pickForDay ? dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder, dayExtras }, day) : null;
+  const picked = pickForSchedule ? (schedule[wd]?.exerciseIds ?? []) : (dayList?.ids ?? []);
+  // Already logged that day: it stays on the list (delete the sets to remove it).
+  const locked = dayList ? dayList.unplannedIds : [];
 
-  // In schedule pick-mode, tapping toggles the exercise in/out of that day and
-  // KEEPS you here so you can add several in a row. Tap Done to go back.
+  // In pick modes, tapping toggles the exercise in/out of that day and KEEPS
+  // you here so you can add several in a row. Tap Done to go back.
   const onPickExercise = (ex: Exercise) => {
     if (pickForSchedule) {
       if (picked.includes(ex.id)) removeFromSchedule(wd, ex.id);
       else addToSchedule(wd, ex.id);
+      lightHaptic();
+    } else if (pickForDay && dayList) {
+      if (locked.includes(ex.id)) return;
+      if (dayList.addedIds.includes(ex.id)) removeFromDay(day, ex.id);
+      else if (picked.includes(ex.id)) skipPlanToday(day, ex.id); // on the plan: off for this day only
+      else addToDay(day, ex.id);
       lightHaptic();
     } else {
       router.push(`/exercise-detail?id=${encodeURIComponent(ex.id)}`);
@@ -94,9 +118,12 @@ export default function ExerciseLibrary() {
   return (
     <Screen
       footer={
-        pickForSchedule ? (
+        picking ? (
           <View style={{ gap: Spacing.xs }}>
-            <Button label={t('exercises.doneAdding', { count: picked.length })} onPress={() => router.back()} />
+            <Button
+              label={pickForDay ? t('exercises.doneDay', { n: picked.length }) : t('exercises.doneAdding', { count: picked.length })}
+              onPress={() => router.back()}
+            />
             <Button
               label={t('exercises.newExercise')}
               icon="add"
@@ -120,6 +147,13 @@ export default function ExerciseLibrary() {
           <Icon name="close" size={24} color={theme.textSecondary} />
         </Pressable>
       </View>
+      {pickForDay && (
+        <Text style={{ color: theme.textSecondary, fontSize: 14, marginBottom: Spacing.sm }}>
+          {isSameDay(new Date().toISOString(), day)
+            ? t('exercises.dayHintToday')
+            : t('exercises.dayHint', { day: day.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'short' }) })}
+        </Text>
+      )}
 
       {/* Search */}
       <View style={[styles.search, { backgroundColor: theme.card, borderColor: theme.border }, cardShadow(theme.shadow)]}>
@@ -257,6 +291,7 @@ export default function ExerciseLibrary() {
               {g.items.map((ex, i) => (
                 <Pressable accessibilityRole="button"
                   key={ex.id}
+                  accessibilityState={picking ? { selected: picked.includes(ex.id), disabled: locked.includes(ex.id) } : undefined}
                   onPress={() => onPickExercise(ex)}
                   style={({ pressed }) => [
                     styles.row,
@@ -270,9 +305,9 @@ export default function ExerciseLibrary() {
                   <Text style={{ color: theme.text, fontWeight: '600', flex: 1 }} numberOfLines={1}>
                     {exerciseName(ex, lang)}
                   </Text>
-                  {pickForSchedule ? (
+                  {picking ? (
                     <Icon
-                      name={picked.includes(ex.id) ? 'checkmark-circle' : 'add-circle-outline'}
+                      name={locked.includes(ex.id) ? 'checkmark-done' : picked.includes(ex.id) ? 'checkmark-circle' : 'add-circle-outline'}
                       size={22}
                       color={picked.includes(ex.id) ? theme.primary : theme.textTertiary}
                     />

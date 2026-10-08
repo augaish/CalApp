@@ -8,6 +8,8 @@ export interface DayPlanInput {
   workouts: LoggedWorkout[];
   skips: Record<string, string[]>;
   dayOrder: Record<string, string[]>;
+  /** Exercises added to a date's list without logging (store.dayExtras). */
+  dayExtras?: Record<string, string[]>;
 }
 
 export interface DayPlan {
@@ -20,6 +22,8 @@ export interface DayPlan {
   skippedPlanIds: string[];
   /** Logged on this day without being on the plan — scanned, picked, duplicated. */
   unplannedIds: string[];
+  /** Added to this day's list by hand and not logged yet. */
+  addedIds: string[];
   /** When the day is an occurrence moved here from another date, that date's key. */
   movedFrom?: string;
 }
@@ -42,8 +46,11 @@ export function dayExerciseIds(s: DayPlanInput, day: Date): DayPlan {
   const skippedPlanIds = plan ? plan.exerciseIds.filter((id) => skipped.includes(id)) : [];
   const logged = s.workouts.filter((w) => isSameDay(w.at, day));
   const unplannedIds = [...new Set(logged.map((w) => w.exerciseId))].filter((id) => !scheduledIds.includes(id));
+  // Added to this day only, not logged yet (once logged they are unplanned ones).
+  const addedIds = (s.dayExtras?.[key] ?? []).filter((id) => !scheduledIds.includes(id) && !unplannedIds.includes(id) && !skipped.includes(id));
   return {
-    ids: applyOrder([...scheduledIds, ...unplannedIds], s.dayOrder[key]),
+    ids: applyOrder([...scheduledIds, ...unplannedIds, ...addedIds], s.dayOrder[key]),
+    addedIds,
     plan,
     weekday,
     skippedPlanIds,

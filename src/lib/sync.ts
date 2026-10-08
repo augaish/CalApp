@@ -37,6 +37,7 @@ export interface Snapshot {
   schedule: ReturnType<typeof useAppStore.getState>['schedule'];
   skips: Record<string, string[]>;
   dayOrder: Record<string, string[]>;
+  dayExtras?: Record<string, string[]>;
   workouts: LoggedWorkout[];
   water: WaterEntry[];
   weights: WeightEntry[];
@@ -72,6 +73,7 @@ export function snapshot(): Snapshot {
     schedule: s.schedule,
     skips: s.skips,
     dayOrder: s.dayOrder,
+    dayExtras: s.dayExtras,
     workouts: s.workouts,
     water: s.water,
     weights: s.weights,
@@ -151,6 +153,7 @@ function apply(snap: Snapshot, updatedAt: string) {
       schedule: snap.schedule ?? {},
       skips: snap.skips ?? {},
       dayOrder: snap.dayOrder ?? {},
+      dayExtras: snap.dayExtras ?? {},
       workouts: snap.workouts ?? [],
       water: snap.water ?? [],
       weights: snap.weights ?? [],

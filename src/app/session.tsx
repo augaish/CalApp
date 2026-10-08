@@ -84,6 +84,7 @@ export default function SessionScreen() {
   const schedule = useAppStore((s) => s.schedule);
   const occurrences = useAppStore((s) => s.occurrences);
   const skips = useAppStore((s) => s.skips);
+  const dayExtras = useAppStore((s) => s.dayExtras);
   const dayOrder = useAppStore((s) => s.dayOrder);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
@@ -109,7 +110,7 @@ export default function SessionScreen() {
   // added to since Start — not the copy taken at Start. The exercise being
   // trained is found by identity, so a reorder moves the list, not the
   // person; only if it was skipped does the position stand in.
-  const liveIds = session ? dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder }, day).ids : [];
+  const liveIds = session ? dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder, dayExtras }, day).ids : [];
   const ids = liveIds.length ? liveIds : (session?.exerciseIds ?? []);
   const wantedId = session?.currentId ?? session?.exerciseIds[session.index];
   const foundIndex = wantedId ? ids.indexOf(wantedId) : -1;

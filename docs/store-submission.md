@@ -477,6 +477,7 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - Recipes that chill or marinate say "13 min · ready in about 4 h".
   - "Save this week" is now "Save and use"; an edited schedule says it has unsaved changes and offers "Save changes to this schedule".
   - The workout summary shows push-ups as "10 reps", not "0 kg × 10". The recipe screen's back button says Back.
+- **Add exercise only adds it.** Add exercise (Training, and the rest-day card on Overview) opens the library in a list mode: tap exercises to add or remove them from that day, then Done. Nothing is logged until you train it. ✕ on an added exercise takes it off the day.
 - **Fixes from the 5 October test report.**
   - Recipe cards say "protein unknown" instead of "0 g", and This week's protein average says "at least" when a food had no protein value.
   - "Edit today's plan" is now **Edit weekly schedule**, with "Changes apply to every Monday".

@@ -130,6 +130,8 @@ export default function Training() {
   const removeWorkout = useAppStore((s) => s.removeWorkout);
   const setWorkoutTrained = useAppStore((s) => s.setWorkoutTrained);
   const skips = useAppStore((s) => s.skips);
+  const dayExtras = useAppStore((s) => s.dayExtras);
+  const removeFromDay = useAppStore((s) => s.removeFromDay);
   const activeSession = useAppStore((s) => s.activeSession);
   const startSession = useAppStore((s) => s.startSession);
   const skipPlanToday = useAppStore((s) => s.skipPlanToday);
@@ -147,7 +149,7 @@ export default function Training() {
   // S42: the dated occurrence layer over the weekly template. The same
   // reading the live workout uses, so what is reordered or skipped here is
   // what the session trains.
-  const dayList = dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder }, selected);
+  const dayList = dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder, dayExtras }, selected);
   const plan = dayList.plan;
   const planWeekday = dayList.weekday;
   const ownOccurrence = occurrences[dateKey(selected)];
@@ -584,7 +586,7 @@ export default function Training() {
                       <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
                     </Pressable>
                     <Pressable
-                      onPress={() => (scheduledIds.includes(exId) ? skipPlanToday(selected, exId) : wToday && confirmDeleteWorkout(wToday.id))}
+                      onPress={() => (scheduledIds.includes(exId) ? skipPlanToday(selected, exId) : dayList.addedIds.includes(exId) ? removeFromDay(selected, exId) : wToday && confirmDeleteWorkout(wToday.id))}
                       hitSlop={8}
                       accessibilityRole="button"
                       accessibilityLabel={t('common.delete')}
@@ -648,7 +650,7 @@ export default function Training() {
           icon="bed-outline"
           title={selectedIsToday ? t('training.restDay') : t('training.nothingLogged')}
           body={t('training.restDayHint')}
-          action={{ label: t('training.addExercise'), icon: 'add', onPress: () => router.push('/exercise-library') }}
+          action={{ label: t('training.addExercise'), icon: 'add', onPress: () => router.push(`/exercise-library?pick=day&date=${dateKey(selected)}`) }}
           secondary={{ label: t('training.editWeeklySchedule'), icon: 'pencil-outline', onPress: () => router.push(`/schedule?weekday=${planWeekday}`) }}
         />
       )}
@@ -657,7 +659,7 @@ export default function Training() {
       {/* Secondary ways in, as a slim row under the day rather than a pinned
           footer that took a fifth of the screen from the workout itself. */}
       <View style={styles.quickRow}>
-        <ActionButton label={t('training.addExercise')} icon="add" variant="secondary" onPress={() => router.push('/exercise-library')} style={{ flex: 1 }} />
+        <ActionButton label={t('training.addExercise')} icon="add" variant="secondary" onPress={() => router.push(`/exercise-library?pick=day&date=${dateKey(selected)}`)} style={{ flex: 1 }} />
         <ActionButton label={t('training.scanCta')} icon="scan-outline" variant="secondary" onPress={() => router.push('/scan?mode=gym')} style={{ flex: 1 }} />
       </View>
 

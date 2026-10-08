@@ -158,6 +158,12 @@ export interface AppState {
    */
   dayOrder: Record<string, string[]>;
   /**
+   * Exercises added to one date's list without logging anything yet
+   * (dateKey → exerciseIds). The weekly schedule is untouched; they show in
+   * that day's list and workout like planned ones until removed.
+   */
+  dayExtras: Record<string, string[]>;
+  /**
    * A day's real burn straight from a connected WHOOP, keyed like `dayOrder`.
    * Calgym has no whole-session concept (exercises are checked off one at a
    * time), so this stands in for the whole day's `burnedForDay` total rather
@@ -348,6 +354,10 @@ export interface AppState {
   setScheduleTitle: (weekday: number, title: string) => void;
   /** Set (or clear, with []) the planned target sets for a scheduled exercise. */
   setPlannedSets: (weekday: number, exerciseId: string, sets: PlannedSet[]) => void;
+  /** Add an exercise to one day's list without logging a set (the weekly schedule is untouched). */
+  addToDay: (day: Date, exerciseId: string) => void;
+  /** Take an exercise added with addToDay back off that day's list. */
+  removeFromDay: (day: Date, exerciseId: string) => void;
   /** Hide a plan exercise for one day only (kept in the weekly schedule). */
   skipPlanToday: (day: Date, exerciseId: string) => void;
   /** Undo a same-day skip. */
@@ -505,6 +515,7 @@ export interface AppState {
     schedule: AppState['schedule'];
     skips: Record<string, string[]>;
     dayOrder: Record<string, string[]>;
+    dayExtras?: Record<string, string[]>;
     workouts: LoggedWorkout[];
     water: WaterEntry[];
     weights: WeightEntry[];
@@ -589,6 +600,7 @@ const WRITE_AREAS: Partial<Record<keyof AppState, WriteArea | ((...args: unknown
   reorderSchedule: 'training',
   saveDayToSchedule: 'training',
   addToSchedule: 'training',
+  addToDay: 'training',
   setScheduleTitle: 'training',
   setPlannedSets: 'training',
   skipPlanToday: 'training',
@@ -681,6 +693,7 @@ export const useAppStore = create<AppState>()(
       syncedAt: null,
       dataOwner: null,
       dayOrder: {},
+      dayExtras: {},
       whoopBurnByDay: {},
       whoopWorkoutsByDay: {},
       whoopBackfilledAt: null,
@@ -735,6 +748,7 @@ export const useAppStore = create<AppState>()(
           activeScheduleId: null,
           skips: {},
           dayOrder: {},
+          dayExtras: {},
           whoopBurnByDay: {},
           whoopWorkoutsByDay: {},
           whoopBackfilledAt: null,
@@ -1161,6 +1175,33 @@ export const useAppStore = create<AppState>()(
           else plans[exerciseId] = sets;
           return { schedule: { ...s.schedule, [weekday]: { ...cur, plans } } };
         }),
+      addToDay: (day, exerciseId) =>
+        set((s) => {
+          const key = dateKey(day);
+          const cur = s.dayExtras[key] ?? [];
+          if (cur.includes(exerciseId)) return {};
+          // Added back after being skipped for the day: bring it back instead.
+          const skipped = s.skips[key] ?? [];
+          if (skipped.includes(exerciseId)) {
+            const rest = skipped.filter((x) => x !== exerciseId);
+            const skips = { ...s.skips };
+            if (rest.length) skips[key] = rest;
+            else delete skips[key];
+            return { skips };
+          }
+          return { dayExtras: { ...s.dayExtras, [key]: [...cur, exerciseId] } };
+        }),
+      removeFromDay: (day, exerciseId) =>
+        set((s) => {
+          const key = dateKey(day);
+          const cur = s.dayExtras[key];
+          if (!cur?.includes(exerciseId)) return {};
+          const next = cur.filter((x) => x !== exerciseId);
+          const dayExtras = { ...s.dayExtras };
+          if (next.length) dayExtras[key] = next;
+          else delete dayExtras[key];
+          return { dayExtras };
+        }),
       skipPlanToday: (day, exerciseId) =>
         set((s) => {
           const key = dateKey(day);
@@ -1545,6 +1586,7 @@ export const useAppStore = create<AppState>()(
           schedule: snap.schedule,
           skips: snap.skips,
           dayOrder: snap.dayOrder,
+          dayExtras: snap.dayExtras ?? {},
           workouts: snap.workouts,
           water: snap.water,
           weights: snap.weights,
@@ -1562,6 +1604,7 @@ export const useAppStore = create<AppState>()(
           linkedRef: null,
           syncedAt: null,
           dayOrder: {},
+          dayExtras: {},
           whoopBurnByDay: {},
           whoopWorkoutsByDay: {},
           whoopBackfilledAt: null,
@@ -1624,6 +1667,7 @@ export const useAppStore = create<AppState>()(
         syncedAt,
         dataOwner,
         dayOrder,
+        dayExtras,
         whoopBurnByDay,
         whoopWorkoutsByDay,
         whoopBackfilledAt,
@@ -1682,6 +1726,7 @@ export const useAppStore = create<AppState>()(
         syncedAt,
         dataOwner,
         dayOrder,
+        dayExtras,
         whoopBurnByDay,
         whoopWorkoutsByDay,
         whoopBackfilledAt,
@@ -1782,7 +1827,7 @@ export const useAppStore = create<AppState>()(
  * uncapped numbers don't linger.
  */
 /** The slice of state a merge touches — the store's, or a persisted snapshot's. */
-type MergeSlice = Pick<AppState, 'workouts' | 'schedule' | 'skips' | 'dayOrder' | 'activeSession' | 'exercises' | 'savedSchedules'> & {
+type MergeSlice = Pick<AppState, 'workouts' | 'schedule' | 'skips' | 'dayOrder' | 'dayExtras' | 'activeSession' | 'exercises' | 'savedSchedules'> & {
   profile: { weightKg?: number } | null;
 };
 
@@ -1847,6 +1892,7 @@ export function mergeExerciseState(s: MergeSlice, fromId: string, intoId: string
     savedSchedules: (s.savedSchedules ?? []).map((sc) => ({ ...sc, days: mergeDays(sc.days ?? {}) })),
     skips: remap(s.skips),
     dayOrder: remap(s.dayOrder),
+    dayExtras: remap(s.dayExtras),
     activeSession: s.activeSession
       ? {
           ...s.activeSession,
@@ -2061,6 +2107,7 @@ export function migrateStore(persisted: unknown, version: number): unknown {
       savedSchedules: Array.isArray(state.savedSchedules) ? (state.savedSchedules as AppState['savedSchedules']) : [],
       skips: (state.skips ?? {}) as Record<string, string[]>,
       dayOrder: (state.dayOrder ?? {}) as Record<string, string[]>,
+      dayExtras: (state.dayExtras ?? {}) as Record<string, string[]>,
       activeSession: (state.activeSession ?? null) as AppState['activeSession'],
       exercises: state.exercises as Exercise[],
       profile: (state.profile ?? null) as { weightKg?: number } | null,

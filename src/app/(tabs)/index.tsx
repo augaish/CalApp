@@ -97,6 +97,7 @@ export default function Overview() {
   const savedSchedules = useAppStore((s) => s.savedSchedules);
   const activeScheduleId = useAppStore((s) => s.activeScheduleId);
   const skips = useAppStore((s) => s.skips);
+  const dayExtras = useAppStore((s) => s.dayExtras);
   const dayOrder = useAppStore((s) => s.dayOrder);
   const activeSession = useAppStore((s) => s.activeSession);
   const startSession = useAppStore((s) => s.startSession);
@@ -185,7 +186,9 @@ export default function Overview() {
   // day) — two roots must never disagree about whether you trained.
   const scheduledIds = todayPlan ? todayPlan.exerciseIds.filter((id) => !todaySkips.includes(id)) : [];
   const unplannedDoneIds = [...todayDoneIds].filter((id) => !scheduledIds.includes(id));
-  const todayIds = applyOrder([...scheduledIds, ...unplannedDoneIds], dayOrder[dateKey(selected)]);
+  // Added to today's list by hand (Training → Add exercise), not trained yet.
+  const addedIds = (dayExtras[dateKey(selected)] ?? []).filter((id) => !scheduledIds.includes(id) && !todayDoneIds.has(id) && !todaySkips.includes(id));
+  const todayIds = applyOrder([...scheduledIds, ...unplannedDoneIds, ...addedIds], dayOrder[dateKey(selected)]);
   const todayDoneCount = todayIds.filter((id) => todayDoneIds.has(id)).length;
   // The workout card leads (its button is the filled one) while there is
   // a session to resume or a workout left to start.
@@ -348,7 +351,7 @@ export default function Overview() {
             onOpen={() => router.push('/training')}
             onAction={() => {
               if (activeSession) return router.push('/session');
-              if (todayIds.length === 0) return router.push('/exercise-library');
+              if (todayIds.length === 0) return router.push(`/exercise-library?pick=day&date=${dateKey(selected)}`);
               if (todayDoneCount >= todayIds.length) return router.push('/training');
               startSession(selected, todayIds);
               router.push('/session');
