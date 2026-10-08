@@ -490,10 +490,13 @@ Already live (server changes go live on push): the updated privacy policy, cance
 
 # Part B — Google Play
 
-## Step 19 ⬜ Developer account
-1. **play.google.com/console** → create an account. Choose **Organization** if you publish as a company (needs a D-U-N-S number) or **Personal** otherwise. The fee is $25.
-2. **Personal accounts:** Google requires a closed test with **12 testers for 14 days** before production. Organization accounts don't.
-3. **Setup → Payments profile:** add the bank account.
+## Step 19 ⬜ Developer account (Organization, chosen 8 Oct 2026)
+Organization: the company publishes it, and there is no 12-tester, 14-day closed test (that rule is for Personal accounts).
+1. **D-U-N-S number** for the company: developer.apple.com/enroll/duns-lookup (free, about 5 working days; Google uses the same number). Legal name and address **exactly as on the CR**: Google matches the name on the D-U-N-S record, the account and the payments profile.
+2. Have ready: the CR, a company email you can receive at (e.g. support@calgym.org), a company phone, the website (`https://calapp-production-ab20.up.railway.app/support` if calgym.org has no site yet), and your own ID.
+3. **play.google.com/console** → **An organization or business** → new **organization** payments profile with the CR name and address → D-U-N-S → contact email and phone (both verified) → $25. Google then verifies the organization, usually within a few days.
+4. **Payments profile → bank account in the company's name.**
+5. Apps with subscriptions show the organization's address and contact email on the Play listing.
 
 ## Step 20 ⬜ Create the app
 **All apps → Create app:**
