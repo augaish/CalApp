@@ -31,6 +31,7 @@ export function buildExport(): string {
       activeProgram: s.activeProgram,
       planPrefs: s.planPrefs,
       exerciseNotes: s.exerciseNotes,
+      exerciseSetups: s.exerciseSetups,
       fastingHistory: s.fastingHistory,
       shopping: s.shopping,
     },

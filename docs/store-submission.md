@@ -477,6 +477,7 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - Recipes that chill or marinate say "13 min · ready in about 4 h".
   - "Save this week" is now "Save and use"; an edited schedule says it has unsaved changes and offers "Save changes to this schedule".
   - The workout summary shows push-ups as "10 reps", not "0 kg × 10". The recipe screen's back button says Back.
+- **My setup for machines.** Under the exercise name in a workout: seat, pads, safety, pulley height, handle, bench angle and so on, saved once per exercise and shown every time until you change it ("Same since Oct 5"). Machines, cables, benches and racks offer "Add my setup" up front; other exercises have a link lower down. History shows each workout's setup and marks changes ("Setup changed: Seat 5 → 4"). Kept on the phone, in the backup and the export; never sent to the AI.
 - **Add exercise only adds it.** Add exercise (Training, and the rest-day card on Overview) opens the library in a list mode: tap exercises to add or remove them from that day, then Done. Nothing is logged until you train it. ✕ on an added exercise takes it off the day.
 - **Fixes from the 5 October test report.**
   - Recipe cards say "protein unknown" instead of "0 g", and This week's protein average says "at least" when a food had no protein value.

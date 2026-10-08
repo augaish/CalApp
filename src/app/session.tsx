@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { PageHeader } from '@/components/brand-header';
 import { ExerciseNotesCard } from '@/components/exercise-notes';
+import { ExerciseSetupCard, SetupAddLink } from '@/components/exercise-setup';
 import { RestAlertAsk } from '@/components/rest-alert-ask';
 import { Stopwatch } from '@/components/stopwatch';
 import { ActionButton, Chip, IconTile } from '@/components/system';
@@ -18,6 +19,7 @@ import { dayExerciseIds } from '@/lib/day-plan';
 import { resolvePlan } from '@/lib/occurrences';
 import { useCelebrate } from '@/lib/celebrate';
 import { calendarDaysBetween, timestampFor } from '@/lib/day';
+import { setupKindFor } from '@/lib/exercise-setup';
 import { exerciseName, findExercise, logStyleFor } from '@/lib/exercises';
 import { lightHaptic, recordHaptic, selectionHaptic, successHaptic } from '@/lib/feedback';
 import { afterSet, completeLabel, setGoal } from '@/lib/session-flow';
@@ -547,6 +549,9 @@ export default function SessionScreen() {
         </View>
       </View>
 
+      {/* How the machine is set up, before you sit down: the same every time until edited. */}
+      {exId && ex && <ExerciseSetupCard key={exId} exerciseId={exId} exerciseName={exerciseName(ex, lang)} kind={setupKindFor(ex)} />}
+
       {/* Resting comes first: it is what the next minute is about. */}
       {restRemaining > 0 && (
         <View style={[styles.restCard, { backgroundColor: theme.surfaceTint }]} accessibilityLiveRegion="polite">
@@ -719,6 +724,8 @@ export default function SessionScreen() {
             </View>
           </>
         )}
+
+        {exId && ex && !setupKindFor(ex) && <SetupAddLink key={exId} exerciseId={exId} exerciseName={exerciseName(ex, lang)} />}
 
         <Pressable onPress={() => setShowGuidance((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showGuidance }} style={[styles.guidanceHead, { borderColor: theme.border }]}>
           <IconTile icon="document-text-outline" size={32} />

@@ -698,6 +698,29 @@ export interface ExerciseNote {
   updatedAt: string;
 }
 
+/**
+ * One setting of a machine as the person sets it up: "Seat 4", "Handle
+ * V-bar", "Feet high, wide". `key` names a suggested setting (shown in the
+ * app's language) or is 'other', when `label` is the person's own name.
+ */
+export interface SetupField {
+  key: string;
+  label?: string;
+  value: string;
+}
+
+/**
+ * How an exercise's machine was set up from a given day on ("My setup").
+ * An exercise keeps its versions oldest first; the last is the current one,
+ * and each logged workout is read against the version in force that day.
+ * An empty `fields` means the setup was cleared from that day.
+ */
+export interface SetupVersion {
+  /** When it was saved; the version applies from that calendar day. */
+  at: string;
+  fields: SetupField[];
+}
+
 export interface WorkoutSet {
   weightKg?: number;
   reps?: number;

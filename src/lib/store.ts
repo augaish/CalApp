@@ -10,6 +10,7 @@ import type { MembershipPromptState } from './membership-prompt';
 import { dailyTargets } from './tdee';
 import { resolveCoachSchedule } from './coach-schedule';
 import { paceForAnswers } from './plan-answers';
+import { withSetup } from './exercise-setup';
 import type {
   AppearancePref,
   ActiveSession,
@@ -23,6 +24,8 @@ import type {
   DailyTargets,
   Exercise,
   ExerciseNote,
+  SetupField,
+  SetupVersion,
   ExerciseType,
   FastingProtocol,
   FastingSession,
@@ -264,6 +267,8 @@ export interface AppState {
   favoriteIds: string[];
   /** Notes written about an exercise during a workout, newest edits anywhere. */
   exerciseNotes: ExerciseNote[];
+  /** "My setup" per exercise id: dated versions, oldest first (see exercise-setup.ts). */
+  exerciseSetups: Record<string, SetupVersion[]>;
   /** Per weekday, when it last gained an exercise: missed workouts count from then (see occurrences.ts). */
   scheduleSince: ScheduleSince;
   hydrated: boolean;
@@ -461,6 +466,8 @@ export interface AppState {
    * never touched.
    */
   saveExerciseNote: (input: { exerciseId: string; exerciseName: string; dayKey: string; at: string; text: string }) => void;
+  /** Save an exercise's machine setup; empty fields clear it. History keeps what it was. */
+  saveExerciseSetup: (exerciseId: string, fields: SetupField[]) => void;
   toggleFavoriteId: (id: string) => void;
   updateSession: (patch: Partial<ActiveSession>) => void;
   endSession: () => void;
@@ -529,6 +536,7 @@ export interface AppState {
     mealPlanSwaps?: AppState['mealPlanSwaps'];
     planPrefs?: AppState['planPrefs'];
     exerciseNotes?: AppState['exerciseNotes'];
+    exerciseSetups?: AppState['exerciseSetups'];
     shopping?: AppState['shopping'];
     fastingHistory?: AppState['fastingHistory'];
     favoriteIds?: AppState['favoriteIds'];
@@ -727,6 +735,7 @@ export const useAppStore = create<AppState>()(
       occurrences: {},
       favoriteIds: [],
       exerciseNotes: [],
+      exerciseSetups: {},
       scheduleSince: {},
       hydrated: false,
 
@@ -772,6 +781,7 @@ export const useAppStore = create<AppState>()(
           occurrences: {},
           favoriteIds: [],
           exerciseNotes: [],
+          exerciseSetups: {},
           notifySnooze: {},
           notifyHandled: [],
           planSwitch: null,
@@ -896,7 +906,18 @@ export const useAppStore = create<AppState>()(
       updateRecipe: (rid, patch) =>
         set((s) => ({ recipes: s.recipes.map((r) => (r.id === rid ? { ...r, ...patch } : r)) })),
       removeRecipe: (rid) => set((s) => ({ recipes: s.recipes.filter((r) => r.id !== rid) })),
-      mergeExercise: (fromId, intoId) => set((s) => mergeExerciseState(s, fromId, intoId) ?? {}),
+      mergeExercise: (fromId, intoId) =>
+        set((s) => {
+          const patch = mergeExerciseState(s, fromId, intoId);
+          if (!patch) return {};
+          // The setup follows the exercise, unless the one merged into has its own.
+          const from = s.exerciseSetups[fromId];
+          if (!from) return patch;
+          const exerciseSetups = { ...s.exerciseSetups };
+          if (!exerciseSetups[intoId]) exerciseSetups[intoId] = from;
+          delete exerciseSetups[fromId];
+          return { ...patch, exerciseSetups };
+        }),
       logSet: (exercise, newSet, at) =>
         set((s) => {
           const when = at ?? new Date().toISOString();
@@ -1490,6 +1511,15 @@ export const useAppStore = create<AppState>()(
           }
           return { exerciseNotes: [...s.exerciseNotes, { id: `note:${id()}`, exerciseId, exerciseName, dayKey, at, text: body, updatedAt: now }] };
         }),
+      saveExerciseSetup: (exerciseId, fields) =>
+        set((s) => {
+          const next = withSetup(s.exerciseSetups[exerciseId], fields, new Date().toISOString());
+          if (!next) return {};
+          const exerciseSetups = { ...s.exerciseSetups };
+          if (next.length) exerciseSetups[exerciseId] = next;
+          else delete exerciseSetups[exerciseId];
+          return { exerciseSetups };
+        }),
       toggleFavoriteId: (recipeId) =>
         set((s) => ({ favoriteIds: s.favoriteIds.includes(recipeId) ? s.favoriteIds.filter((x) => x !== recipeId) : [...s.favoriteIds, recipeId] })),
       undoOccurrenceOp: (opId) => {
@@ -1570,12 +1600,12 @@ export const useAppStore = create<AppState>()(
       applySnapshot: (snap) => {
         const {
           savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
-          mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs, exerciseNotes,
+          mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs, exerciseNotes, exerciseSetups,
         } = snap;
         const plans = Object.fromEntries(
           Object.entries({
             savedSchedules, activeScheduleId, occurrences, recipes, mealPlanRecipes,
-            mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs, exerciseNotes,
+            mealPlanSwaps, shopping, fastingHistory, favoriteIds, planPrefs, exerciseNotes, exerciseSetups,
           }).filter(([, v]) => v !== undefined),
         ) as Partial<AppState>;
         set({
@@ -1635,6 +1665,7 @@ export const useAppStore = create<AppState>()(
           activeFast: null,
           fastingHistory: [],
           exerciseNotes: [],
+          exerciseSetups: {},
           scheduleSince: {},
         }),
       };
@@ -1702,6 +1733,7 @@ export const useAppStore = create<AppState>()(
         occurrences,
         favoriteIds,
         exerciseNotes,
+        exerciseSetups,
         scheduleSince,
       }) => ({
         account,
@@ -1761,6 +1793,7 @@ export const useAppStore = create<AppState>()(
         occurrences,
         favoriteIds,
         exerciseNotes,
+        exerciseSetups,
         scheduleSince,
       }),
       onRehydrateStorage: () => (state) => state?.setHydrated(),

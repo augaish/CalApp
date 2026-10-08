@@ -57,6 +57,7 @@ export interface Snapshot {
   /** Answers given before a program build, allergies included. */
   planPrefs?: State['planPrefs'];
   exerciseNotes?: State['exerciseNotes'];
+  exerciseSetups?: State['exerciseSetups'];
 }
 
 type State = ReturnType<typeof useAppStore.getState>;
@@ -89,6 +90,7 @@ export function snapshot(): Snapshot {
     favoriteIds: s.favoriteIds,
     planPrefs: s.planPrefs,
     exerciseNotes: s.exerciseNotes,
+    exerciseSetups: s.exerciseSetups,
   };
 }
 
@@ -169,6 +171,7 @@ function apply(snap: Snapshot, updatedAt: string) {
       favoriteIds: snap.favoriteIds,
       planPrefs: snap.planPrefs,
       exerciseNotes: snap.exerciseNotes,
+      exerciseSetups: snap.exerciseSetups,
     });
     useAppStore.getState().setSyncedAt(updatedAt);
   } finally {

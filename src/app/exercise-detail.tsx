@@ -15,6 +15,7 @@ import {
 import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, groupsForCategory, initialBodyView } from '@/components/body-map';
 import { TrendLine } from '@/components/charts';
+import { setupFieldName, setupFieldValue, setupSummary } from '@/components/exercise-setup';
 import { Stopwatch } from '@/components/stopwatch';
 import { Text, TextInput, type TextInputHandle } from '@/components/text';
 import { Button, Card, Screen, Stepper } from '@/components/ui';
@@ -22,6 +23,7 @@ import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
+import { setupChanges, setupOn } from '@/lib/exercise-setup';
 import { exerciseName, findExercise, logStyleFor, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { scrollInputIntoView } from '@/lib/scroll-to-input';
@@ -39,7 +41,7 @@ import {
   isAssistedExercise,
   isAssistedWorkout,
 } from '@/lib/store';
-import type { ExerciseType, LoggedWorkout, WorkoutSet } from '@/lib/types';
+import type { ExerciseType, LoggedWorkout, SetupVersion, WorkoutSet } from '@/lib/types';
 
 type Tab = 'track' | 'history' | 'graph';
 
@@ -104,6 +106,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
 
   const custom = useAppStore((s) => s.exercises);
   const workouts = useAppStore((s) => s.workouts);
+  const setups = useAppStore((s) => s.exerciseSetups[exerciseId]);
   const whoopBurnByDay = useAppStore((s) => s.whoopBurnByDay);
   const whoopWorkoutsByDay = useAppStore((s) => s.whoopWorkoutsByDay);
   const logSet = useAppStore((s) => s.logSet);
@@ -400,7 +403,7 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
         />
       )}
 
-      {tab === 'history' && <HistoryTab sessions={history} type={type} locale={locale} />}
+      {tab === 'history' && <HistoryTab sessions={history} type={type} locale={locale} setups={setups} />}
 
       {tab === 'graph' && (
         <GraphTab sessions={history} type={type} width={width - Spacing.md * 2 - Spacing.md * 2} locale={locale} />
@@ -745,7 +748,7 @@ function TrackTab({
   );
 }
 
-function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; type: ExerciseType; locale: string }) {
+function HistoryTab({ sessions, type, locale, setups }: { sessions: LoggedWorkout[]; type: ExerciseType; locale: string; setups?: SetupVersion[] }) {
   const { t } = useTranslation();
   const theme = useTheme();
   const kg = t('progress.kg');
@@ -759,41 +762,66 @@ function HistoryTab({ sessions, type, locale }: { sessions: LoggedWorkout[]; typ
   }
   return (
     <View>
-      {sessions.map((w) => (
-        <Card key={w.id}>
-          <View style={styles.histHead}>
-            <Text style={{ color: theme.text, fontWeight: '700', flex: 1 }}>
-              {isSameDay(w.at, new Date())
-                ? t('track.today')
-                : new Date(w.at).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}
-            </Text>
-            <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '600' }}>
-              {t('track.setsSummary', { count: w.sets.length })}
-            </Text>
-          </View>
-          {w.sets.map((s, i) => (
-            <View key={i} style={styles.histSet}>
-              <Text style={{ color: theme.textSecondary, fontSize: 13, width: 22 }}>{i + 1}.</Text>
-              <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
-                  {setLabel(s, type, kg, t('track.min'))}
-                </Text>
-                {s.comment ? (
-                  <Text style={{ color: theme.textTertiary, fontSize: 12 }} numberOfLines={1}>
-                    {s.comment}
+      {sessions.map((w, idx) => {
+        // The setup this workout was done with, and what changed since the one before it.
+        const setup = setupOn(setups, w.at);
+        const before = sessions[idx + 1] ? setupOn(setups, sessions[idx + 1].at) : undefined;
+        const changes = setup && before && setup !== before ? setupChanges(before.fields, setup.fields) : [];
+        const changeText = changes
+          .map((c) => {
+            const name = setupFieldName(c.field, t);
+            const val = (v: string) => setupFieldValue({ ...c.field, value: v }, t);
+            if (c.from !== undefined && c.to !== undefined) return `${name} ${val(c.from)} → ${val(c.to)}`;
+            return c.to !== undefined ? t('setup.added', { name, value: val(c.to) }) : t('setup.removed', { name });
+          })
+          .join(locale === 'ar' ? '، ' : ', ');
+        return (
+          <Card key={w.id}>
+            <View style={styles.histHead}>
+              <Text style={{ color: theme.text, fontWeight: '700', flex: 1 }}>
+                {isSameDay(w.at, new Date())
+                  ? t('track.today')
+                  : new Date(w.at).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}
+              </Text>
+              <Text style={{ color: theme.textTertiary, fontSize: 12, fontWeight: '600' }}>
+                {t('track.setsSummary', { count: w.sets.length })}
+              </Text>
+            </View>
+            {setup && (
+              <Text style={{ color: theme.textSecondary, fontSize: 12, marginBottom: 4 }} numberOfLines={2}>
+                {setupSummary(setup.fields, t)}
+              </Text>
+            )}
+            {changeText ? (
+              <View style={[styles.setupChange, { backgroundColor: theme.warning + '22' }]}>
+                <Icon name="build-outline" size={12} color={theme.warningText} />
+                <Text style={{ color: theme.warningText, fontSize: 12, fontWeight: '700', flexShrink: 1 }}>{t('setup.changed', { changes: changeText })}</Text>
+              </View>
+            ) : null}
+            {w.sets.map((s, i) => (
+              <View key={i} style={styles.histSet}>
+                <Text style={{ color: theme.textSecondary, fontSize: 13, width: 22 }}>{i + 1}.</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.text, fontSize: 14, fontWeight: '600' }}>
+                    {setLabel(s, type, kg, t('track.min'))}
+                  </Text>
+                  {s.comment ? (
+                    <Text style={{ color: theme.textTertiary, fontSize: 12 }} numberOfLines={1}>
+                      {s.comment}
+                    </Text>
+                  ) : null}
+                </View>
+                {i === bestSetIndex(w.sets, w.type, isAssistedWorkout(w)) && <Icon name="trophy" size={13} color={theme.carbs} />}
+                {type === 'weight_reps' && (s.weightKg ?? 0) > 0 && (s.reps ?? 0) > 0 ? (
+                  <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
+                    {t('track.est1rm')} {est1RM(s.weightKg ?? 0, s.reps ?? 0)}
                   </Text>
                 ) : null}
               </View>
-              {i === bestSetIndex(w.sets, w.type, isAssistedWorkout(w)) && <Icon name="trophy" size={13} color={theme.carbs} />}
-              {type === 'weight_reps' && (s.weightKg ?? 0) > 0 && (s.reps ?? 0) > 0 ? (
-                <Text style={{ color: theme.textTertiary, fontSize: 12 }}>
-                  {t('track.est1rm')} {est1RM(s.weightKg ?? 0, s.reps ?? 0)}
-                </Text>
-              ) : null}
-            </View>
-          ))}
-        </Card>
-      ))}
+            ))}
+          </Card>
+        );
+      })}
     </View>
   );
 }
@@ -836,6 +864,7 @@ function GraphTab({
 }
 
 const styles = StyleSheet.create({
+  setupChange: { flexDirection: 'row', alignItems: 'center', gap: 5, alignSelf: 'flex-start', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 3, marginBottom: 6 },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, marginBottom: Spacing.sm },
   headerBtn: { padding: 2 },
   metaRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },

@@ -44,6 +44,7 @@ const SF: Partial<Record<string, SFSymbol>> = {
   'bookmarks-outline': 'books.vertical',
   bulb: 'lightbulb.fill',
   'bulb-outline': 'lightbulb',
+  'build-outline': 'wrench.and.screwdriver',
   'calculator-outline': 'function',
   calendar: 'calendar',
   'calendar-outline': 'calendar',
