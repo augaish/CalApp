@@ -559,7 +559,7 @@ The AI providers and RevenueCat work on your behalf, which Google does not count
 - Add Arabic with **Manage translations → Add your own translation → Arabic**.
 
 ## Step 24 ⬜ First upload (internal testing)
-1. The Play file is built (9 Oct 2026, build `0d7f9ef1`, version 1.0.0 with everything up to My setup and Best in Last time): https://expo.dev/artifacts/eas/INsGwbXnB4Q34qs6N0Ey4xE2DAs0ZoWfYRPVWiZTIPM.aab (build page: https://expo.dev/accounts/augaishb/projects/calapp/builds/0d7f9ef1-1012-4246-8278-0568067757d6). The 8 Oct file is older; don't upload it. Download it on a computer. The APKs we have been testing are for direct install only.
+1. The Play file is built (9 Oct 2026, build `d2597d19`, version 1.0.0 with everything up to the review sign-in): https://expo.dev/artifacts/eas/5IEr1kT5tER_k4fEekZdeSuLWOdCohoeDImUI_K-SDs.aab (build page: https://expo.dev/accounts/augaishb/projects/calapp/builds/d2597d19-8376-4efe-849f-f5fa055aee45). Earlier files lack the review sign-in; don't upload them. Download it on a computer. The APKs we have been testing are for direct install only.
 2. **Test and release → Testing → Internal testing → Create new release** → upload the `.aab` → accept Play App Signing → release name `1.0.0` → **Save → Review → Start rollout**.
 3. **Testers tab:** add your Gmail and open the opt-in link on your phone.
 4. **Permissions Play will list:** notifications, camera, microphone and **"Schedule exact alarms"**. The last is for the rest timer's alert. It is the ordinary user-granted permission, not the restricted one, so no form is needed. If Play asks, answer: `A workout rest timer the user starts, which alerts when the rest ends.`
