@@ -588,7 +588,10 @@ export default function SessionScreen() {
         </View>
       )}
 
-      {/* Target and Best: two different facts, two tiles. No target past the plan. */}
+      {/* Target, from the plan; no target past it. Best lives in the Last
+          time box (one line, the record to beat), except for a continuous
+          log (a run, a ride), which has no Last time box. */}
+      {(target || continuous) && (
       <View style={styles.refRow}>
         {target && (
           <Pressable
@@ -604,12 +607,15 @@ export default function SessionScreen() {
             </Text>
           </Pressable>
         )}
-        <View style={[styles.ref, { backgroundColor: theme.surfaceTint }]}>
-          <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('session.best')}</Text>
-          <Text style={[styles.refValue, { color: theme.text }]}>{label(best?.set)}</Text>
-          <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{best ? shortDate(best.at) : t('session.noBestYet')}</Text>
-        </View>
+        {continuous && (
+          <View style={[styles.ref, { backgroundColor: theme.surfaceTint }]}>
+            <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('session.best')}</Text>
+            <Text style={[styles.refValue, { color: theme.text }]}>{label(best?.set)}</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{best ? shortDate(best.at) : t('session.noBestYet')}</Text>
+          </View>
+        )}
       </View>
+      )}
 
       {/* Last time, set by set, one tap away: a tap puts that set in the
           boxes and Complete logs it. Sets already done today show ticked,
@@ -651,6 +657,14 @@ export default function SessionScreen() {
                   </Pressable>
                 );
               })}
+            </View>
+          )}
+          {best && (
+            <View style={[styles.bestLine, { borderTopColor: theme.border }]} accessible accessibilityLabel={`${t('session.best')} ${label(best.set)} · ${shortDate(best.at)}`}>
+              <Icon name="trophy" size={14} color={theme.carbs} />
+              <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '700' }}>{t('session.best')}</Text>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: '800' }}>{label(best.set)}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{`· ${shortDate(best.at)}`}</Text>
             </View>
           )}
         </View>
@@ -792,6 +806,7 @@ const styles = StyleSheet.create({
   block: { borderRadius: Radius.module, padding: Spacing.ms, marginTop: Spacing.sm },
   lastTimeHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   lastTimeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  bestLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   lastChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.control, paddingHorizontal: 10, minHeight: 36 },
   quickReps: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },
   quickChip: { borderRadius: Radius.full, paddingHorizontal: 12, minHeight: 32, alignItems: 'center', justifyContent: 'center' },

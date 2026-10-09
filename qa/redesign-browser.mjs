@@ -3,7 +3,7 @@
 // Food has the calories card first, Log food / Plan on empty meals, the
 // Recipes · Shopping · This week row, and "Added to Lunch · Undo" after a
 // meal is logged elsewhere (once: not after a screen that already said
-// it), with dish photos; the workout keeps Target and Best, then Last
+// it), with dish photos; the workout keeps Target, then Last (Best inside it)
 // time with every set one tap away; Health's empty figure is small;
 // Profile's calories have separators. Saves screenshots to $SHOTS.
 // Needs the web build on :8099 (the API is not needed).
@@ -125,7 +125,8 @@ for (const lang of ['en', 'ar']) {
   const iTarget = b.search(L(/target/i, /الهدف/));
   const iBest = b.search(L(/best/i, /الأفضل/));
   const iLast = b.indexOf(L('Last time', 'المرة السابقة'));
-  check(`${lang}: order is rest, Target, Best, Last time`, iRest > -1 && iRest < iTarget && iTarget < iBest && iBest < iLast, `${iRest} ${iTarget} ${iBest} ${iLast}`);
+  // Best is one line inside the Last time box (8 Oct), not a tile of its own.
+  check(`${lang}: order is rest, Target, Last time, then Best inside it`, iRest > -1 && iRest < iTarget && iTarget < iLast && iLast < iBest, `${iRest} ${iTarget} ${iBest} ${iLast}`);
   check(`${lang}: Target 62.5 × 8 (set 3), Best 70 × 8`, /62\.5 \S+ × 8/.test(b) && /70 \S+ × 8/.test(b));
   check(`${lang}: all four sets from last time are buttons`, (await page.getByRole('button', { name: new RegExp(L('Last time', 'المرة السابقة')) }).count()) === 4);
   const done = await page.getByRole('button', { name: new RegExp(L('Logged', 'سُجّلت')) }).count();

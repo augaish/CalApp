@@ -94,8 +94,8 @@ check('no target is invented past the plan', !/Target/.test(body), body.match(/T
 check('THE FIX: the reference is now "Best"', /Best\s*25 kg × 10/.test(body), body.match(/Best.{0,22}/)?.[0]);
 check('  NOT the burnout set 25 kg × 7', !/(Last time|Best)\s*25 kg × 7/.test(body));
 const todayLabel = new Date().toLocaleDateString('en', { month: 'short', day: 'numeric' });
-check('  and it says when', new RegExp('Best\\s*25 kg × 10\\s*(today|' + todayLabel + ')').test(body), body.match(/Best.{0,28}/)?.[0]);
-check('the Best tile is the only reference tile', !/Last time\s*25 kg × 7/.test(body));
+check('  and it says when', new RegExp('Best\\s*25 kg × 10\\s*(· )?(today|' + todayLabel + ')').test(body), body.match(/Best.{0,28}/)?.[0]);
+check('Best is the only reference shown', !/Last time\s*25 kg × 7/.test(body));
 
 console.log('\n=== Last time, set by set, one tap away ===');
 // The same-reps box is gone; last week's whole session is the reference.
