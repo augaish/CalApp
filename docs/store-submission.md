@@ -525,8 +525,8 @@ Answer each card:
 
 **App access (Google reviews with sign-in details and won't start a free trial):**
 1. Supabase → **Authentication → Users → Add user → Create new user**: email `review@calgym.org`, a 6-digit password (digits only), **Auto Confirm User** ticked. The app treats this one address specially: its "code" is the password, and no email is sent.
-2. On your phone: Log out (or a fresh install) → Continue with email → `review@calgym.org` → the 6 digits. Then Log out again.
-3. Admin → Users → find `review@calgym.org` → grant **Pro** with no end date.
+2. Admin → **Give or remove a plan** → type `review@calgym.org` (it isn't in the list until it opens the app; Give looks it up in Supabase) → **Pro** → **Forever** → Give. No phone needed.
+3. Optional check on an Android phone: Continue with email → `review@calgym.org` → Send me a code → the 6 digits → it signs in with Pro.
 4. Play Console → App access → **Yes, restricted** → Add instructions: name `Review account`, username `review@calgym.org`, password the 6 digits, and the note: `On the first screen choose "Continue with email", enter review@calgym.org, tap Send code, then type the 6-digit password above as the code. The account has Pro, so every feature is open without a purchase or trial.`
 5. After the app is approved you can change the password in Supabase (and update it here before the next review).
 

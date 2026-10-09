@@ -938,9 +938,10 @@ export const ADMIN_HTML = `<!doctype html>
     if (users.length) return { email: raw, users: users };
     users = data.users.filter(function (u) { return u.ref.toLowerCase() === q; });
     if (users.length) return { ref: users[0].ref, users: users };
-    // The table holds the most recent 1000; beyond that, let the server look.
-    var partial = data.stats && data.stats.totalUsers > data.users.length;
-    return { email: q.indexOf('@') > 0 ? raw : null, users: [], lookup: partial && q.indexOf('@') > 0 };
+    // Not in the table (beyond the latest 1000, or never opened the app, like
+    // an account made in Supabase for store reviewers): the server looks the
+    // address up in Supabase Auth and says if there is no such account.
+    return { email: q.indexOf('@') > 0 ? raw : null, users: [], lookup: q.indexOf('@') > 0 };
   }
   function grantDays() {
     if (grant.len === 'custom') { var d = parseInt(document.getElementById('g_days').value, 10); return d > 0 ? d : null; }
@@ -975,7 +976,7 @@ export const ADMIN_HTML = `<!doctype html>
       var more = t.users.length > 1 ? ' (' + t.users.length + ' accounts)' : '';
       var now = u.plan === 'free' ? 'Free' : planName(u.plan, u.module) + ', ' + sourceName(u.planSource) + (u.planUntil ? ', until ' + fmtDate(u.planUntil) : '');
       found.innerHTML = '<span class="ok">✓ ' + esc(u.email || u.ref) + more + '</span> · now ' + esc(now);
-    } else if (t.lookup) found.innerHTML = '<span class="no">Not among the latest users shown. Give will look the email up.</span>';
+    } else if (t.lookup) found.innerHTML = '<span class="no">Not in the list (it never opened the app, or is older). Give looks the email up in sign-in accounts.</span>';
     else found.innerHTML = '<span class="no">No account with this email yet. They need to sign up in the app first, then it appears here.</span>';
     var days = grantDays();
     var can = !!(t && (u || t.lookup) && grant.plan && days !== null) && !grant.busy;
