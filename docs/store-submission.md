@@ -515,13 +515,20 @@ Answer each card:
 |---|---|
 | Privacy policy | `https://www.calgym.org/privacy` |
 | Ads | **No** (Yes only while the Sponsor slot in admin → Content is switched on) |
-| App access | "All or some functionality is restricted" → add instructions: `No login needed: tap "Continue as guest". Features beyond viewing need a subscription: Profile → Membership → start the 14-day free trial (every feature included) with a license-test account.` |
+| App access | **Yes, restricted** → the review account below |
 | Content rating | Start the questionnaire → category **Reference, News, or Educational**; answer No to violence, sex, gambling and similar; Yes to "users can interact with AI" if asked |
 | Target audience | **13 and over**; not designed for children |
 | Health apps | Tick **Nutrition and weight management** and **Activity and fitness**; not a medical device |
 | Data safety | see step 22 |
 | Account deletion | **Yes**, users can create an account. Web link `https://www.calgym.org/account-deletion` |
 | Government apps, financial features, news | **No** |
+
+**App access (Google reviews with sign-in details and won't start a free trial):**
+1. Supabase → **Authentication → Users → Add user → Create new user**: email `review@calgym.org`, a 6-digit password (digits only), **Auto Confirm User** ticked. The app treats this one address specially: its "code" is the password, and no email is sent.
+2. On your phone: Log out (or a fresh install) → Continue with email → `review@calgym.org` → the 6 digits. Then Log out again.
+3. Admin → Users → find `review@calgym.org` → grant **Pro** with no end date.
+4. Play Console → App access → **Yes, restricted** → Add instructions: name `Review account`, username `review@calgym.org`, password the 6 digits, and the note: `On the first screen choose "Continue with email", enter review@calgym.org, tap Send code, then type the 6-digit password above as the code. The account has Pro, so every feature is open without a purchase or trial.`
+5. After the app is approved you can change the password in Supabase (and update it here before the next review).
 
 ## Step 22 ⬜ Data safety
 1. Does your app collect or share user data? **Yes**. Is all data encrypted in transit? **Yes**. Can users request deletion? **Yes**.

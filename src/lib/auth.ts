@@ -14,11 +14,23 @@ if (authConfigured) {
 }
 
 /**
+ * The store reviewers' account. Google Play (and Apple) review with sign-in
+ * details they are given, and can neither receive the emailed code nor start
+ * a free trial. For this one address the "code" is the account's password,
+ * set in Supabase and handed to the reviewers only; its plan is granted from
+ * the admin console. Every other address signs in with the emailed code.
+ */
+export const REVIEW_EMAIL = 'review@calgym.org';
+const isReviewEmail = (email: string) => email.trim().toLowerCase() === REVIEW_EMAIL;
+
+/**
  * Email sign-in via a 6-digit one-time code. Chosen over magic links because a
  * code can be typed back into the app without depending on deep links working
  * from every mail client.
  */
 export async function sendEmailCode(email: string): Promise<void> {
+  // The review account has no inbox to read: its code is its password.
+  if (isReviewEmail(email)) return;
   await retryOnNetwork(async () => {
     const { error } = await getSupabase().auth.signInWithOtp({
       email: email.trim().toLowerCase(),
@@ -32,6 +44,11 @@ export async function sendEmailCode(email: string): Promise<void> {
 export async function verifyEmailCode(email: string, code: string): Promise<Account> {
   const sb = getSupabase();
   const verify = async () => {
+    if (isReviewEmail(email)) {
+      const { data, error } = await sb.auth.signInWithPassword({ email: REVIEW_EMAIL, password: code.trim() });
+      if (error) throw error;
+      return data.user;
+    }
     const { data, error } = await sb.auth.verifyOtp({
       email: email.trim().toLowerCase(),
       token: code.trim(),
