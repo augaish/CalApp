@@ -552,7 +552,7 @@ The AI providers and RevenueCat work on your behalf, which Google does not count
 - **Short description (80):**
   - EN: `Snap a meal for calories and macros, follow your workouts, see your progress.`
   - AR: `صوّر وجبتك لتعرف السعرات والعناصر، وتابع تمارينك وتقدمك.`
-- **Full description:** the same text as step 13.3 (English and Arabic). Replace "Apple ID" with "Google Play account", and "Settings → Apple ID → Subscriptions" with "Google Play → Payments & subscriptions".
+- **Full description:** the Play version (English and Arabic) is in `docs/google-play-listing.md`.
 - **App icon:** 512 × 512 PNG. **Feature graphic:** 1024 × 500.
 - **Phone screenshots:** 2–8, the same shots as for Apple.
 - **Category:** Health & Fitness. **Contact email:** support@calgym.org.
