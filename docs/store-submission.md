@@ -503,12 +503,12 @@ Organization: the company publishes it, and there is no 12-tester, 14-day closed
 4. **Payments profile → bank account in the company's name.**
 5. Apps with subscriptions show the organization's address and contact email on the Play listing.
 
-## Step 20 ⬜ Create the app
+## Step 20 ✅ Create the app
 **All apps → Create app:**
 - Name `Calgym`, default language English (United States).
 - **App**, **Free**. Tick the declarations.
 
-## Step 21 ⬜ App content (left menu → **Policy → App content**)
+## Step 21 ✅ App content (left menu → **Policy → App content**)
 Answer each card:
 
 | Card | Answer |
@@ -530,7 +530,7 @@ Answer each card:
 4. Play Console → App access → **Yes, restricted** → Add instructions: name `Review account`, username `review@calgym.org`, password the 6 digits, and the note: `On the first screen choose "Continue with email", enter review@calgym.org, tap Send code, then type the 6-digit password above as the code. The account has Pro, so every feature is open without a purchase or trial.`
 5. After the app is approved you can change the password in Supabase (and update it here before the next review).
 
-## Step 22 ⬜ Data safety
+## Step 22 ✅ Data safety
 1. Does your app collect or share user data? **Yes**. Is all data encrypted in transit? **Yes**. Can users request deletion? **Yes**.
 2. Tick these data types, and for each: **Collected: Yes, Shared: No**.
 
@@ -547,7 +547,7 @@ Answer each card:
 
 The AI providers and RevenueCat work on your behalf, which Google does not count as "sharing".
 
-## Step 23 ⬜ Store listing (Grow → Store presence → Main store listing)
+## Step 23 ✅ Store listing (Grow → Store presence → Main store listing)
 - **App name:** `Calgym`
 - **Short description (80):**
   - EN: `Snap a meal for calories and macros, follow your workouts, see your progress.`
@@ -558,13 +558,13 @@ The AI providers and RevenueCat work on your behalf, which Google does not count
 - **Category:** Health & Fitness. **Contact email:** support@calgym.org.
 - Add Arabic with **Manage translations → Add your own translation → Arabic**.
 
-## Step 24 ⬜ First upload (internal testing)
+## Step 24 ✅ First upload (internal testing)
 1. The Play file is built (9 Oct 2026, build `d2597d19`, version 1.0.0 with everything up to the review sign-in): https://expo.dev/artifacts/eas/5IEr1kT5tER_k4fEekZdeSuLWOdCohoeDImUI_K-SDs.aab (build page: https://expo.dev/accounts/augaishb/projects/calapp/builds/d2597d19-8376-4efe-849f-f5fa055aee45). Earlier files lack the review sign-in; don't upload them. Download it on a computer. The APKs we have been testing are for direct install only.
 2. **Test and release → Testing → Internal testing → Create new release** → upload the `.aab` → accept Play App Signing → release name `1.0.0` → **Save → Review → Start rollout**.
 3. **Testers tab:** add your Gmail and open the opt-in link on your phone.
 4. **Permissions Play will list:** notifications, camera, microphone and **"Schedule exact alarms"**. The last is for the rest timer's alert. It is the ordinary user-granted permission, not the restricted one, so no form is needed. If Play asks, answer: `A workout rest timer the user starts, which alerts when the rest ends.`
 
-## Step 25 ⬜ Subscriptions on Play (Monetize → Products → Subscriptions)
+## Step 25 ✅ Subscriptions on Play (Monetize → Products → Subscriptions)
 Create four sold subscriptions (and the two Pro+ ones, left inactive), with the **same product IDs** as Apple:
 
 | Product ID | Base plan ID | Period | Price (Saudi Arabia) |
@@ -582,7 +582,7 @@ On each of the four base plans: **Add offer**:
 - Phase **Free trial, 14 days**.
 - **Activate**.
 
-## Step 26 ⬜ RevenueCat for Android
+## Step 26 ✅ RevenueCat for Android
 1. RevenueCat → **Apps & providers → + Play Store app** → package `com.augaish.calapp`.
 2. **Service account credentials:** follow RevenueCat's "Google Play service credentials" guide.
    - Create a service account in Google Cloud.
@@ -593,9 +593,12 @@ On each of the four base plans: **Add offer**:
 5. Railway → Variables → `REVENUECAT_ANDROID_KEY` = the `goog_…` public key.
 6. Play Console → **Setup → License testing:** add your Gmail. Buy in the internal build; license testers aren't charged.
 
-## Step 27 ⬜ Production
-1. **Test and release → Production → Create new release** → add the same `.aab` → **Review release → Start rollout to Production**.
-2. The first review takes from a few days up to a week.
+## Step 27 ⏳ Production (sent for review 10 Oct 2026, 7:09 PM)
+1. Done: Production → 177 countries plus rest of world → release `1.0.0` (version code 4, added from the library) → **Send changes for review**. Status: **In review**.
+2. **Managed publishing is on:** when Google approves, it waits as **"Ready to publish"**. Press **Publishing overview → Publish** on launch day (planned together with the iPhone launch).
+3. The first review takes a few days, up to a week. If Google rejects or asks for something, paste the email or the Publishing overview message.
+4. Still to finish: the **payout bank account** (Play Console → Settings → Payments profile → Payment methods → add the company IBAN, then confirm the small test deposit). Sales work without it, but Google holds the money until it is verified.
+5. After launch: send WHOOP the Play link too (with the App Store link), and watch admin → Recent store events for the first Android purchase.
 
 ---
 
