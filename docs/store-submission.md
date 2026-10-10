@@ -570,9 +570,11 @@ Create four sold subscriptions (and the two Pro+ ones, left inactive), with the 
 | Product ID | Base plan ID | Period | Price (Saudi Arabia) |
 |---|---|---|---|
 | `calgym_essentials_monthly` | `monthly` | 1 month, auto-renewing | SAR 19.99 |
-| `calgym_essentials_yearly` | `yearly` | 1 year, auto-renewing | SAR 149.99 |
+| `calgym_essentials_yearly` | `annual` | 1 year, auto-renewing | SAR 149.99 |
 | `calgym_pro_monthly` | `monthly` | 1 month, auto-renewing | SAR 24.99 |
-| `calgym_pro_yearly` | `yearly` | 1 year, auto-renewing | SAR 199.99 |
+| `calgym_pro_yearly` | `annual` | 1 year, auto-renewing | SAR 199.99 |
+
+**Done 10 Oct 2026.** All four active, each with the `trial14` offer. Essentials Yearly also has an old **prepaid** base plan `yearly`, deactivated (made by mistake; prepaid plans can't have trials). Prices are **VAT-inclusive** in Saudi Arabia: set the Saudi row by hand after filling all countries, or Google adds 15% (19.99 became 22.99). Never pick **Prepaid**.
 
 On each of the four base plans: **Add offer**:
 - Offer ID `trial14`.
@@ -587,7 +589,7 @@ On each of the four base plans: **Add offer**:
    - In Play Console → **Users and permissions**, invite it with financial and order permissions.
    - Upload its JSON key to RevenueCat.
 3. **Real-time developer notifications:** copy the Pub/Sub topic RevenueCat shows into Play Console → **Monetization setup**.
-4. Add the four Play products in RevenueCat. Attach them to the same entitlements (step 7.4) and the same `default` offering packages (step 7.5).
+4. Add the four Play products in RevenueCat, as `subscription:baseplan`: `calgym_essentials_monthly:monthly`, `calgym_essentials_yearly:annual`, `calgym_pro_monthly:monthly`, `calgym_pro_yearly:annual` (or **Import** them once the credentials are valid). Attach them to the same entitlements (step 7.4) and the same `default` offering packages (step 7.5).
 5. Railway → Variables → `REVENUECAT_ANDROID_KEY` = the `goog_…` public key.
 6. Play Console → **Setup → License testing:** add your Gmail. Buy in the internal build; license testers aren't charged.
 
