@@ -100,7 +100,7 @@ AI-generated nutrition estimates may be inaccurate: review portions and ingredie
 From `docs/calgym-marketing-kit.zip` → `google-play/`:
 - App icon: 512 × 512 PNG
 - Feature graphic: 1024 × 500
-- Phone screenshots (Play takes up to 8): from `screenshots/captioned/google-play/en/` (and `ar/` for Arabic) upload 01-overview, 02-food, 03-recipe, 04-meal-plan, 05-training, 06-workout-rest, 07-health, 08-coach. Leave out 09-plans and 10-welcome.
+- Phone screenshots (Play takes up to 8, 1080 × 1920): everything Play needs is in `docs/google-play-upload.zip` (icon, both feature graphics, 8 English and 8 Arabic screenshots).
 
 ## App category and contact details (Store settings)
 - App or game: App · Category: **Health & Fitness** · Tags: Calorie counter, Fitness tracking, Nutrition, Workout (pick up to 5 that Play offers)

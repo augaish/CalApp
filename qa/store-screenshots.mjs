@@ -11,10 +11,10 @@ for (const lang of ['en', 'ar']) {
   await fetch(`${API}/admin/api/plan`, { method: 'POST', headers: { 'x-admin-token': 'e2e-admin', 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: `u_shots_${lang}`, plan: 'pro', days: 365 }) }).catch(() => {});
 }
 // SHOTS_SIZE: '6.9' (default, 1290 × 2796), '6.5' (Apple's 6.5", 1284 × 2778)
-// or 'play' (Google Play phone, 1080 × 2160: Play allows at most 2:1).
+// or 'play' (Google Play phone, 1080 × 1920: the Play Console asks for 9:16).
 // SHOTS_OUT overrides the folder.
 const SIZE = process.env.SHOTS_SIZE ?? '6.9';
-const VIEWS = { '6.9': { width: 430, height: 932 }, '6.5': { width: 428, height: 926 }, play: { width: 360, height: 720 } };
+const VIEWS = { '6.9': { width: 430, height: 932 }, '6.5': { width: 428, height: 926 }, play: { width: 360, height: 640 } };
 const DEFAULT_OUT = { '6.9': './docs/store-screenshots', '6.5': './docs/store-screenshots-6.5', play: './docs/play-screenshots' };
 const OUT = process.env.SHOTS_OUT ?? DEFAULT_OUT[SIZE];
 const VIEW = VIEWS[SIZE];
@@ -91,6 +91,8 @@ function data(lang, withSession = false) {
     schedule, savedSchedules: [{ id: 's-ppl', name: L('Push · Pull · Legs', 'دفع · سحب · أرجل'), days: schedule, createdAt: at(30, 9), activatedAt: at(30, 9) }], activeScheduleId: 's-ppl', workouts, exercises: [], meals, weights, water,
     recipes: [kabsa, salad, bowl], mealPlanRecipes: { [key(now)]: { breakfast: { recipeId: 'r-bowl', servings: 1 }, lunch: { recipeId: 'r-salad', servings: 1 }, dinner: { recipeId: 'r-kabsa', servings: 1 } } }, mealPlanSwaps: {},
     shopping: null, coachMessages, fastingHistory: [], skips: {}, dayOrder: {}, whoopBurnByDay: {}, whoopWorkoutsByDay: {}, occurrences: {},
+    // A saved machine setup, so the workout shows My setup filled in.
+    exerciseSetups: { 'builtin:bench-press': [{ at: at(21, 18), fields: [{ key: 'barHook', value: '7' }, { key: 'safety', value: '4' }, { key: 'other', label: L('Grip', 'القبضة'), value: L('one finger from the rings', 'إصبع واحد من العلامة') }] }] },
     activeSession: !withSession ? null : { startedAt: at(0, 17, 50), dayKey: key(now), exerciseIds: sched.exerciseIds, index: 0, currentId: 'builtin:bench-press', restEndsAt: new Date(now.getTime() + 75_000).toISOString(), restNext: L('Next: set 2 of 3 · Barbell Bench Press', 'التالي: المجموعة ٢ من ٣ · ضغط بار مسطح'), restSeconds: 90 },
     membershipPrompt: { firstSeenAt: new Date().toISOString(), introShown: true, lastShownAt: new Date().toISOString() },
     remindersInitialized: true, aiConsent: true,
