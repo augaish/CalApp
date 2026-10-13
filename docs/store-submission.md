@@ -478,6 +478,12 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - "Save this week" is now "Save and use"; an edited schedule says it has unsaved changes and offers "Save changes to this schedule".
   - The workout summary shows push-ups as "10 reps", not "0 kg × 10". The recipe screen's back button says Back.
 - **My setup for machines.** Under the exercise name in a workout: seat, pads, safety, pulley height, handle, bench angle and so on, saved once per exercise and shown every time until you change it ("Same since Oct 5"). Machines, cables, benches and racks offer "Add my setup" up front; other exercises have a link lower down. History shows each workout's setup and marks changes ("Setup changed: Seat 5 → 4"). Kept on the phone, in the backup and the export; never sent to the AI.
+- **Do another day's workout.** Today's card on Training has a button that lists the week (done, missed, upcoming, rest). Pick a day, then:
+  - from an upcoming day: **Swap them** (the two days trade places) or **Just replace today** (today does that workout this time; the day keeps its own). On a rest day: Swap (that day becomes rest) or **Just add it**.
+  - after a Swap: **Just this week** (default), **Update my weekly schedule**, or **Save as a new schedule** (the current one stays in Schedules).
+  - a missed day: the card now says **"Missed · Wednesday"** with **Do today** and **Skip**; Do today moves it to today and skips today's own workout this time. The old Move screen is gone.
+  - "Set it, start later" or start straight away; Undo for a few seconds after.
+- **Keep an added exercise?** When a workout included an exercise the plan didn't have, the summary asks: **Just today** (default), **Add it to every Push day**, or **Save as a new schedule**.
 - **Best inside Last time.** In a workout, Best is one line at the bottom of the Last time box (🏆 Best 150 kg × 8 · Oct 2) instead of its own square, so Exercise notes start higher up.
 - **Add exercise only adds it.** Add exercise (Training, and the rest-day card on Overview) opens the library in a list mode: tap exercises to add or remove them from that day, then Done. Nothing is logged until you train it. ✕ on an added exercise takes it off the day.
 - **Fixes from the 5 October test report.**

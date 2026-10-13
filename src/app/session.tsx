@@ -15,6 +15,7 @@ import { Text } from '@/components/text';
 import { Button, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { weekWithAdded } from '@/lib/bring-day';
 import { dayExerciseIds } from '@/lib/day-plan';
 import { resolvePlan } from '@/lib/occurrences';
 import { useCelebrate } from '@/lib/celebrate';
@@ -95,6 +96,11 @@ export default function SessionScreen() {
   const updateSet = useAppStore((s) => s.updateSet);
   const updateSession = useAppStore((s) => s.updateSession);
   const endSession = useAppStore((s) => s.endSession);
+  const savedSchedules = useAppStore((s) => s.savedSchedules);
+  const activeScheduleId = useAppStore((s) => s.activeScheduleId);
+  const applyWeekChange = useAppStore((s) => s.applyWeekChange);
+  /** After a workout with exercises the plan doesn't have: keep them just today, in the weekly plan, or in a new schedule. */
+  const [keepAdded, setKeepAdded] = useState<'today' | 'every' | 'new'>('today');
 
   const [finishing, setFinishing] = useState(false);
   /** After the last set moves the person on: where from, for the Back link. */
@@ -112,7 +118,11 @@ export default function SessionScreen() {
   // added to since Start — not the copy taken at Start. The exercise being
   // trained is found by identity, so a reorder moves the list, not the
   // person; only if it was skipped does the position stand in.
-  const liveIds = session ? dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder, dayExtras }, day).ids : [];
+  const liveDay = session ? dayExerciseIds({ schedule, occurrences, workouts, skips, dayOrder, dayExtras }, day) : null;
+  const liveIds = liveDay?.ids ?? [];
+  // Exercises trained today that the plan doesn't have (added from the
+  // library, scanned, picked): the summary asks whether to keep them.
+  const addedTrained = (liveDay?.unplannedIds ?? []).filter((id) => workoutFor(workouts, id, day)?.sets.some((st) => st.done));
   const ids = liveIds.length ? liveIds : (session?.exerciseIds ?? []);
   const wantedId = session?.currentId ?? session?.exerciseIds[session.index];
   const foundIndex = wantedId ? ids.indexOf(wantedId) : -1;
@@ -366,6 +376,13 @@ export default function SessionScreen() {
   const go = (delta: number) => jumpTo(Math.min(total - 1, Math.max(0, index + delta)));
 
   const finishAndSave = () => {
+    if (addedTrained.length > 0 && keepAdded !== 'today' && liveDay) {
+      const active = savedSchedules.find((x) => x.id === activeScheduleId);
+      const base = active ? active.name || t('schedules.defaultName') : t('today.myPlan');
+      const date = day.toLocaleDateString(lang, { day: 'numeric', month: 'short' });
+      const name = t('bring.newName', { name: base, date });
+      applyWeekChange(weekWithAdded(schedule, liveDay.weekday, addedTrained), keepAdded === 'every' ? 'update' : 'new', { name, previous: t('bring.previousName', { date }) });
+    }
     endSession();
     successHaptic();
     useCelebrate.getState().celebrate(t('celebrate.workoutDone'));
@@ -434,6 +451,52 @@ export default function SessionScreen() {
             );
           })}
         </View>
+        {addedTrained.length > 0 && liveDay && (
+          <View style={[styles.card, { backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.primary + '40' }, cardShadow(theme.shadow)]}>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 16 }}>
+              {t('bring.addedTitle', {
+                names: addedTrained
+                  .map((id) => {
+                    const e = findExercise(id, custom);
+                    return e ? exerciseName(e, lang) : id;
+                  })
+                  .join(lang === 'ar' ? '، ' : ', '),
+              })}
+            </Text>
+            <Text style={{ color: theme.textSecondary, fontSize: 13, marginTop: 2 }}>
+              {liveDay.plan ? t('bring.addedAsk', { name: liveDay.plan.title || t('training.todaysWorkout') }) : t('bring.addedAskRest', { day: day.toLocaleDateString(lang, { weekday: 'long' }) })}
+            </Text>
+            {(
+              [
+                ['today', t('bring.addedToday'), t('bring.addedTodayBody')],
+                [
+                  'every',
+                  liveDay.plan?.title ? t('bring.addedEvery', { name: liveDay.plan.title }) : t('bring.addedEveryRest', { day: new Date(2024, 0, 7 + liveDay.weekday).toLocaleDateString(lang, { weekday: 'long' }) }),
+                  t('bring.addedEveryBody', { day: new Date(2024, 0, 7 + liveDay.weekday).toLocaleDateString(lang, { weekday: 'long' }) }),
+                ],
+                ['new', t('bring.addedNew'), t('bring.addedNewBody')],
+              ] as const
+            ).map(([key, title, body]) => (
+              <Pressable
+                key={key}
+                onPress={() => {
+                  lightHaptic();
+                  setKeepAdded(key);
+                }}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: keepAdded === key }}
+                accessibilityLabel={`${title}. ${body}`}
+                style={[styles.keepOption, { borderColor: keepAdded === key ? theme.primary : theme.border, backgroundColor: keepAdded === key ? theme.surfaceTint : theme.card }]}
+              >
+                <Icon name={keepAdded === key ? 'radio-button-on' : 'radio-button-off'} size={20} color={theme.primary} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14.5 }}>{title}</Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: 12.5, marginTop: 2 }}>{body}</Text>
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
         <Text style={{ color: theme.textTertiary, fontSize: 12, textAlign: 'center' }}>{t('session.leaveHint')}</Text>
       </Screen>
     );
@@ -821,5 +884,6 @@ const styles = StyleSheet.create({
   stat: { flex: 1, borderRadius: Radius.module, padding: Spacing.md },
   statValue: { fontSize: 26, fontWeight: '800' },
   statUnit: { fontSize: 13, fontWeight: '600' },
+  keepOption: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderWidth: 1.5, borderRadius: Radius.control, padding: 11, marginTop: 8 },
   summaryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, paddingVertical: Spacing.sm },
 });

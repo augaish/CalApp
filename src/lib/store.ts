@@ -442,6 +442,13 @@ export interface AppState {
   saveScheduleAs: (name: string) => string;
   /** Capture the working schedule back into a saved one. */
   updateSavedSchedule: (id: string) => void;
+  /**
+   * Keep a change made from Training for good. 'update' rewrites the working
+   * week and the saved schedule it came from; 'new' keeps the current week in
+   * Schedules (saving it first under `names.previous` if it isn't saved as
+   * it is) and saves this one under `names.name` as the active schedule.
+   */
+  applyWeekChange: (week: AppState['schedule'], mode: 'update' | 'new', names: { name: string; previous: string }) => void;
   /** Load a saved schedule into the working schedule. History and any session
    * in progress are untouched. */
   activateSchedule: (id: string) => void;
@@ -617,6 +624,7 @@ const WRITE_AREAS: Partial<Record<keyof AppState, WriteArea | ((...args: unknown
   applyCoachSchedule: 'training',
   markExerciseDone: 'training',
   saveScheduleAs: 'training',
+  applyWeekChange: 'training',
   updateSavedSchedule: 'training',
   activateSchedule: 'training',
   startSession: 'training',
@@ -1448,6 +1456,27 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           savedSchedules: s.savedSchedules.map((x) => (x.id === sid ? { ...x, days: s.schedule } : x)),
         })),
+      applyWeekChange: (week, mode, names) =>
+        set((s) => {
+          const now = new Date().toISOString();
+          const activeSaved = s.savedSchedules.find((x) => x.id === s.activeScheduleId);
+          if (mode === 'update') {
+            return {
+              schedule: week,
+              savedSchedules: activeSaved ? s.savedSchedules.map((x) => (x.id === activeSaved.id ? { ...x, days: week } : x)) : s.savedSchedules,
+            };
+          }
+          const hasWeek = Object.values(s.schedule).some((d) => (d?.exerciseIds?.length ?? 0) > 0);
+          const alreadySaved = !!activeSaved && JSON.stringify(activeSaved.days) === JSON.stringify(s.schedule);
+          const kept: AppState['savedSchedules'] =
+            hasWeek && !alreadySaved ? [{ id: `sched:${id()}`, name: names.previous.trim(), days: s.schedule, createdAt: now }] : [];
+          const sid = `sched:${id()}`;
+          return {
+            schedule: week,
+            savedSchedules: [...s.savedSchedules, ...kept, { id: sid, name: names.name.trim(), days: week, createdAt: now, activatedAt: now }],
+            activeScheduleId: sid,
+          };
+        }),
       activateSchedule: (sid) =>
         set((s) => {
           const found = s.savedSchedules.find((x) => x.id === sid);

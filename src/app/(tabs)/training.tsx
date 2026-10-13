@@ -10,6 +10,7 @@ import { Icon } from '@/components/icon';
 import { ModuleBanner } from '@/components/plan-status';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
+import { BringDaySheet } from '@/components/bring-day';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
@@ -141,6 +142,8 @@ export default function Training() {
   const setDay = useViewDay((s) => s.setDay);
 
   const occurrences = useAppStore((s) => s.occurrences);
+  /** The "Do another day's workout" sheet; `date` opens it on that day's question. */
+  const [bring, setBring] = useState<{ date?: string } | null>(null);
   const scheduleSince = useAppStore((s) => s.scheduleSince);
   const applyOccurrenceMoves = useAppStore((s) => s.applyOccurrenceMoves);
   const undoOccurrenceOp = useAppStore((s) => s.undoOccurrenceOp);
@@ -395,30 +398,25 @@ export default function Training() {
         </View>
       )}
 
-      {/* S42: a pending past workout is a calm next step, never a failure. */}
+      {/* A missed workout, said plainly: do it today (the same flow as
+          "Do another day's workout", with that day picked) or skip it. */}
       {selectedIsToday && nextPending && !activeSession && (
-        <View style={[styles.card, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.ms }}>
-            <IconTile icon="time-outline" size={44} />
-            <View style={{ flex: 1 }}>
-              <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('reschedule.nextWorkout')}</Text>
-              <Text style={{ color: theme.text, fontWeight: '800', fontSize: 17 }}>{nextPending.day.title || t('training.todaysWorkout')}</Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>
-                {t('reschedule.plannedFor', { date: keyToDate(nextPending.scheduledDate).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' }) })} · {t('training.exerciseCount', { count: nextPending.exerciseIds.length })}
-              </Text>
-            </View>
-          </View>
-          {/* One filled button per screen: when today has its own workout to
-              start below, catching up on the missed one is the secondary path. */}
-          <ActionButton
-            label={t('reschedule.doToday')}
-            icon="play"
-            variant={visiblePlanIds.length > 0 && !allDone ? 'secondary' : 'primary'}
-            onPress={() => router.push(`/reschedule?date=${nextPending.originalDate}&to=${dateKey(new Date())}`)}
-            style={{ marginTop: Spacing.ms }}
-          />
-          <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm }}>
-            <ActionButton label={t('reschedule.move')} icon="calendar-outline" variant="secondary" onPress={() => router.push(`/reschedule?date=${nextPending.originalDate}`)} style={{ flex: 1 }} />
+        <View style={[styles.card, { backgroundColor: theme.warning + '14', borderWidth: 1.5, borderColor: theme.warning + '66' }]}>
+          <Text style={[Type.eyebrow, { color: theme.warningText }]}>
+            {t('bring.missedEyebrow', { day: keyToDate(nextPending.scheduledDate).toLocaleDateString(locale, { weekday: 'long' }) })}
+          </Text>
+          <Text style={{ color: theme.text, fontWeight: '800', fontSize: 17, marginTop: 4 }}>{nextPending.day.title || t('training.todaysWorkout')}</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('training.exerciseCount', { count: nextPending.exerciseIds.length })}</Text>
+          <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.ms }}>
+            {/* One filled button per screen: when today has its own workout to
+                start below, catching up on the missed one is the secondary path. */}
+            <ActionButton
+              label={t('reschedule.doToday')}
+              icon="play"
+              variant={visiblePlanIds.length > 0 && !allDone ? 'secondary' : 'primary'}
+              onPress={() => setBring({ date: nextPending.scheduledDate })}
+              style={{ flex: 1 }}
+            />
             <ActionButton
               label={t('reschedule.skip')}
               variant="secondary"
@@ -435,6 +433,11 @@ export default function Training() {
       )}
 
       <SectionTitle style={{ marginTop: Spacing.xs }}>{selectedIsToday ? t('home.today') : selected.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' })}</SectionTitle>
+      {dayList.standIn && (
+        <View style={{ marginBottom: Spacing.sm, alignSelf: 'flex-start' }}>
+          <StatusPill label={t('bring.standIn', { day: weekdayLabel(planWeekday, locale) })} tone="planned" icon="swap-horizontal" />
+        </View>
+      )}
       {dayList.movedFrom && (
         <View style={{ marginBottom: Spacing.sm, alignSelf: 'flex-start' }}>
           <StatusPill label={t('reschedule.movedFrom', { date: keyToDate(dayList.movedFrom).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'short' }) })} tone="planned" icon="swap-horizontal" />
@@ -497,6 +500,9 @@ export default function Training() {
                 }}
               />
             ) : null}
+            {selectedIsToday && !activeSession && !allDone && (
+              <ActionButton label={t('bring.open')} icon="swap-horizontal" variant="secondary" onPress={() => setBring({})} style={{ marginTop: Spacing.sm }} />
+            )}
           </View>
 
           <View style={[styles.list, { borderColor: theme.border }]}>
@@ -654,7 +660,11 @@ export default function Training() {
           secondary={{ label: t('training.editWeeklySchedule'), icon: 'pencil-outline', onPress: () => router.push(`/schedule?weekday=${planWeekday}`) }}
         />
       )}
+      {visiblePlanIds.length === 0 && selectedIsToday && !activeSession && (
+        <ActionButton label={t('bring.open')} icon="swap-horizontal" variant="secondary" onPress={() => setBring({})} style={{ marginTop: Spacing.sm }} />
+      )}
       </View>
+      {bring && <BringDaySheet date={bring.date} onClose={() => setBring(null)} />}
 
       {/* Secondary ways in, as a slim row under the day rather than a pinned
           footer that took a fifth of the screen from the workout itself. */}

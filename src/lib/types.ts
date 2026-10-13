@@ -796,13 +796,16 @@ export interface WorkoutOccurrence {
   id: string;
   /** dateKey of the date the template put it on. Never changes. */
   originalDate: string;
-  /** The template weekday it takes exercises and targets from. */
+  /** The template weekday it takes exercises and targets from. Usually its
+   * own date's weekday; another one when the date is a stand-in ("do
+   * Thursday's Leg day today, just this time"). */
   weekday: number;
   /** Where it sits now; null once skipped. */
   scheduledDate: string | null;
   state: 'scheduled' | 'skipped';
   revision: number;
-  moveHistory: { opId: string; from: string | null; to: string | null; at: string; revisionAfter: number }[];
+  /** `weekdayBefore`: the template weekday before this step, when the step changed it (a stand-in day). */
+  moveHistory: { opId: string; from: string | null; to: string | null; at: string; revisionAfter: number; weekdayBefore?: number }[];
 }
 
 /** One workout WHOOP detected on a given day (real heart-rate-based numbers, not an estimate). */

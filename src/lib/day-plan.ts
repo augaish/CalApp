@@ -26,6 +26,8 @@ export interface DayPlan {
   addedIds: string[];
   /** When the day is an occurrence moved here from another date, that date's key. */
   movedFrom?: string;
+  /** When the day stands in for another weekday's workout, this time only. */
+  standIn?: boolean;
 }
 
 /**
@@ -56,5 +58,6 @@ export function dayExerciseIds(s: DayPlanInput, day: Date): DayPlan {
     skippedPlanIds,
     unplannedIds,
     movedFrom: resolved?.movedFrom,
+    standIn: resolved?.standIn,
   };
 }

@@ -21,6 +21,8 @@ export interface ResolvedPlan {
   originalDate: string;
   /** Set when this plan sits on a date other than its original one. */
   movedFrom?: string;
+  /** Set when the date stands in for another weekday's workout, this time only. */
+  standIn?: boolean;
 }
 
 /** Same local-date key the store uses everywhere (`YYYY-M-D`, month index 0-based). */
@@ -49,9 +51,11 @@ export function resolvePlan(schedule: Schedule, occurrences: Occurrences, date: 
   }
   const own = occurrences[key];
   if (own && (own.state === 'skipped' || own.scheduledDate !== key)) return null;
-  const weekday = date.getDay();
+  // A date can stand in for another weekday's workout, this time only.
+  const weekday = own ? own.weekday : date.getDay();
   const day = schedule[weekday];
-  return day && day.exerciseIds.length > 0 ? { weekday, day, originalDate: key } : null;
+  if (!day || day.exerciseIds.length === 0) return null;
+  return weekday !== date.getDay() ? { weekday, day, originalDate: key, standIn: true } : { weekday, day, originalDate: key };
 }
 
 /** Any set actually completed on `key` for one of the plan's exercises. */
@@ -152,7 +156,10 @@ export function applyMoves(
       scheduledDate: m.to,
       state: m.to ? 'scheduled' : 'skipped',
       revision,
-      moveHistory: [...(cur?.moveHistory ?? []), { opId, from, to: m.to, at, revisionAfter: revision }],
+      moveHistory: [
+        ...(cur?.moveHistory ?? []),
+        { opId, from, to: m.to, at, revisionAfter: revision, ...(cur && cur.weekday !== m.weekday ? { weekdayBefore: cur.weekday } : {}) },
+      ],
     };
   }
   return next;
@@ -172,12 +179,14 @@ export function undoOp(occurrences: Occurrences, schedule: Schedule, workouts: L
     const exerciseIds = schedule[occ.weekday]?.exerciseIds ?? [];
     if (occ.scheduledDate && performedOn(workouts, occ.scheduledDate, exerciseIds)) continue;
     const history = occ.moveHistory.slice(0, -1);
-    if (history.length === 0 && last.from === occ.originalDate) {
+    const weekday = last.weekdayBefore ?? (history.length === 0 ? keyToDate(occ.originalDate).getDay() : occ.weekday);
+    if (history.length === 0 && last.from === occ.originalDate && weekday === keyToDate(occ.originalDate).getDay()) {
       // Back to the untouched template: the occurrence record is no longer needed.
       delete next[occ.originalDate];
     } else {
       next[occ.originalDate] = {
         ...occ,
+        weekday,
         scheduledDate: last.from,
         state: last.from ? 'scheduled' : 'skipped',
         revision: occ.revision + 1,
