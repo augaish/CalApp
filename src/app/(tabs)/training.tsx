@@ -11,6 +11,8 @@ import { ModuleBanner } from '@/components/plan-status';
 import { alertDestructive, alertProblem } from '@/lib/alerts';
 import { CollapsingScreen } from '@/components/collapsing-screen';
 import { BringDaySheet } from '@/components/bring-day';
+import { cardioLine, hasCardioSettings } from '@/lib/cardio';
+import i18n from '@/lib/i18n';
 import { ActionButton, Chip, EmptyState, IconTile, RowGroup, SectionTitle, SettingsRow, StatusPill } from '@/components/system';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
@@ -71,6 +73,7 @@ function syncedAgoLabel(iso: string, t: (key: string, options?: Record<string, u
 
 /** One set as it reads on the day's card: the number you are about to lift. */
 function setChipLabel(s: WorkoutSet, type: ExerciseType, kg: string, min: string): string {
+  if (hasCardioSettings(s)) return cardioLine(s, useAppStore.getState().units, i18n.t);
   if (type === 'weight_reps') return s.weightKg ? `${s.weightKg}${kg} × ${s.reps ?? 0}` : `× ${s.reps ?? 0}`;
   if (type === 'bodyweight_reps') return `× ${s.reps ?? 0}`;
   if (type === 'time') return `${s.seconds ?? 0}s`;

@@ -23,7 +23,9 @@ import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useCelebrate } from '@/lib/celebrate';
 import { timestampFor, useViewDay } from '@/lib/day';
+import { cardioLine, hasCardioSettings } from '@/lib/cardio';
 import { setupChanges, setupOn } from '@/lib/exercise-setup';
+import i18n from '@/lib/i18n';
 import { exerciseName, findExercise, logStyleFor, MUSCLE_COLORS } from '@/lib/exercises';
 import { lightHaptic, successHaptic } from '@/lib/feedback';
 import { scrollInputIntoView } from '@/lib/scroll-to-input';
@@ -486,6 +488,8 @@ function ExerciseDetailScreen({ exerciseId, initialTab }: { exerciseId: string; 
 
 /** Human-readable value(s) of a single set. */
 function setLabel(s: WorkoutSet, type: ExerciseType, kg: string, min = 'min'): string {
+  // Cardio reads the way the machine was set: "30 min · 10 km/h · 6% incline · 5.0 km".
+  if (type === 'distance_time' || hasCardioSettings(s)) return cardioLine(s, useAppStore.getState().units, i18n.t);
   if (type === 'weight_reps') return `${s.weightKg ?? 0} ${kg} × ${s.reps ?? 0}`;
   if (type === 'bodyweight_reps') return `× ${s.reps ?? 0}`;
   if (type === 'time') return `${s.seconds ?? 0}s`;

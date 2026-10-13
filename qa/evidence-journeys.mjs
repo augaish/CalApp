@@ -200,7 +200,8 @@ const week = {
 };
 ({ ctx, page } = await open({ ...base(), schedule: week }, '/training', 'E7-missed-workout'));
 b = await body(page); await shot(page, 'E7-pending-card');
-check('E7 a pending Lower body from yesterday is offered calmly', /Next workout/.test(b) && /Lower body/.test(b) && /Do today/.test(b) && /Move/.test(b) && /Skip/.test(b));
+// Since 13 Oct: "Missed · <day>" with Do today and Skip (Move became "Do another day's workout").
+check('E7 a pending Lower body from yesterday is offered calmly', /missed ·/i.test(b) && /Lower body/.test(b) && /Do today/.test(b) && /Skip/.test(b));
 await page.getByText('Do today', { exact: true }).click(); await page.waitForTimeout(1500);
 b = await body(page); await shot(page, 'E7-preview-collision');
 check('E7 the preview shows the collision with today’s Upper body', /already has Upper body/.test(b));

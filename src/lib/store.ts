@@ -11,6 +11,7 @@ import { dailyTargets } from './tdee';
 import { resolveCoachSchedule } from './coach-schedule';
 import { paceForAnswers } from './plan-answers';
 import { withSetup } from './exercise-setup';
+import { inclineGrade } from './cardio';
 import type {
   AppearancePref,
   ActiveSession,
@@ -2349,12 +2350,16 @@ export function elapsedMinutes(atIso: string, updatedAtIso?: string): number | u
  * running costs about twice as much oxygen per metre. This is what stops a
  * 45-minute stroll out-scoring a 15-minute run over the same distance.
  */
-export function paceMet(meters: number, seconds: number): number | null {
+export function paceMet(meters: number, seconds: number, grade = 0): number | null {
   if (meters <= 0 || seconds <= 0) return null;
   const metresPerMin = meters / (seconds / 60);
   // Sanity bound: faster than world-record pace means the entry is wrong.
   if (metresPerMin > 400) return null;
-  const vo2 = metresPerMin >= 107 ? 0.2 * metresPerMin + 3.5 : 0.1 * metresPerMin + 3.5;
+  // The vertical part of the same ACSM equations: a treadmill's incline, so
+  // a walk at 12% is no longer counted like a walk on the flat. Downhill is
+  // not credited as easier than flat.
+  const g = Math.max(0, grade);
+  const vo2 = metresPerMin >= 107 ? 0.2 * metresPerMin + 0.9 * metresPerMin * g + 3.5 : 0.1 * metresPerMin + 1.8 * metresPerMin * g + 3.5;
   return vo2 / 3.5;
 }
 
@@ -2438,7 +2443,7 @@ export function burnForSets(
     // Nothing timed yet (a bare checkmark) — fall back to the set assumption
     // rather than claiming zero for work that was actually done.
     if (seconds <= 0) return workoutBurn(done.length, bodyKg, category, minutes, baseMet);
-    const met = (exercise?.paceModel === 'foot' ? paceMet(meters, seconds) : null) ?? baseMet;
+    const met = (exercise?.paceModel === 'foot' ? paceMet(meters, seconds, inclineGrade(done)) : null) ?? baseMet;
     return Math.round(((met * 3.5 * bodyKg) / 200) * (seconds / 60));
   }
 

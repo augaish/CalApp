@@ -728,6 +728,13 @@ export interface WorkoutSet {
   seconds?: number;
   /** For distance/time exercises (running, rowing). */
   distanceM?: number;
+  /** How a cardio machine was set (see lib/cardio.ts): remembered for next time. */
+  speedKmh?: number;
+  inclinePct?: number;
+  level?: number;
+  floors?: number;
+  rpm?: number;
+  damper?: number;
   done: boolean;
   /** Free note, e.g. a progressive-overload reminder for next session. */
   comment?: string;

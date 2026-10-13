@@ -16,6 +16,7 @@ import { Button, Screen, Stepper } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow, tracking } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { weekWithAdded } from '@/lib/bring-day';
+import { CARDIO_SPEC, autoDistanceM, cardioFieldsFor, cardioLine, distanceText, type CardioField } from '@/lib/cardio';
 import { dayExerciseIds } from '@/lib/day-plan';
 import { resolvePlan } from '@/lib/occurrences';
 import { useCelebrate } from '@/lib/celebrate';
@@ -27,6 +28,7 @@ import { afterSet, completeLabel, setGoal } from '@/lib/session-flow';
 import {
   bestSetEver,
   bestSetIndex,
+  burnForSets,
   dayBurnAllocation,
   isSameDay,
   lastSessionBefore,
@@ -49,7 +51,7 @@ function dayFromKey(key: string): Date {
   return new Date(y, m, d);
 }
 
-type SetShape = Pick<WorkoutSet, 'weightKg' | 'reps' | 'seconds' | 'distanceM'>;
+type SetShape = Pick<WorkoutSet, 'weightKg' | 'reps' | 'seconds' | 'distanceM' | CardioField>;
 
 /** When a rest of `seconds` starting now would end. Module-level because the
  * React Compiler's purity rule forbids reading the clock inside a component. */
@@ -84,6 +86,8 @@ export default function SessionScreen() {
   const session = useAppStore((s) => s.activeSession);
   const workouts = useAppStore((s) => s.workouts);
   const custom = useAppStore((s) => s.exercises);
+  const units = useAppStore((s) => s.units);
+  const bodyKg = useAppStore((s) => s.profile?.weightKg ?? 75);
   const schedule = useAppStore((s) => s.schedule);
   const occurrences = useAppStore((s) => s.occurrences);
   const skips = useAppStore((s) => s.skips);
@@ -152,7 +156,7 @@ export default function SessionScreen() {
   const prefillKey = `${exId ?? ''}:${setNo}`;
   const lastMatching: SetShape | undefined = lastSession?.sets[setNo];
   const prefillSrc = lastMatching ?? target ?? doneSets[doneSets.length - 1] ?? lastSet;
-  const prefill: Required<SetShape> = {
+  const prefill: Required<Pick<SetShape, 'weightKg' | 'reps' | 'seconds' | 'distanceM'>> = {
     weightKg: prefillSrc?.weightKg ?? 0,
     reps: prefillSrc?.reps ?? 0,
     seconds: prefillSrc?.seconds ?? 0,
@@ -165,6 +169,16 @@ export default function SessionScreen() {
   const seconds = live.seconds ?? prefill.seconds;
   const distance = live.distanceM ?? prefill.distanceM;
   const edit = (patch: Partial<SetShape>) => setEdits({ ...live, key: prefillKey, ...patch });
+
+  // Cardio machine settings (treadmill speed and incline, stair-climber
+  // level…): last time's numbers until changed. Optional ones start empty.
+  const cardioFields: CardioField[] = logStyleFor(ex) === 'continuous' ? cardioFieldsFor(ex) : [];
+  const cardioValue = (f: CardioField): number | undefined => (f in live ? (live as Partial<SetShape>)[f] : prefillSrc?.[f]);
+  const speedKmh = cardioFields.includes('speedKmh') ? (cardioValue('speedKmh') ?? 0) : 0;
+  // On a treadmill the distance follows speed × time until it is typed.
+  const autoDistance = speedKmh > 0 ? autoDistanceM(speedKmh, seconds) : 0;
+  const distanceAuto = cardioFields.includes('speedKmh') && live.distanceM === undefined && autoDistance > 0;
+  const distanceNow = distanceAuto ? autoDistance : distance;
 
   // Rep counts one tap away: the usual working range plus whatever last
   // time's matching set and the plan ask for, so a repeat is a tap, not typing.
@@ -229,7 +243,7 @@ export default function SessionScreen() {
   const loggedContinuous = continuous && (todayWorkout?.sets.length ?? 0) > 0;
 
   /** A set in its exercise's own terms: the summary lists every exercise, not just the one on screen. */
-  const label = (s: SetShape | undefined, as: ExerciseType = type): string => {
+  const label = (s: SetShape | undefined, as: ExerciseType = type, cont: boolean = logStyleFor(ex) === 'continuous'): string => {
     if (!s) return t('session.none');
     switch (as) {
       case 'weight_reps':
@@ -238,9 +252,9 @@ export default function SessionScreen() {
       case 'bodyweight_reps':
         return `${s.reps ?? 0} ${t('session.reps')}`;
       case 'time':
-        return `${s.seconds ?? 0} ${t('session.seconds')}`;
+        return cont ? cardioLine(s, units, t) : `${s.seconds ?? 0} ${t('session.seconds')}`;
       case 'distance_time':
-        return `${s.distanceM ?? 0} ${t('session.meters')} · ${s.seconds ?? 0} ${t('session.seconds')}`;
+        return cardioLine(s, units, t);
     }
   };
 
@@ -258,7 +272,21 @@ export default function SessionScreen() {
   /** A set from last time fills the fields; Complete set still does the logging. */
   const fillFromLast = (s: SetShape) => {
     lightHaptic();
-    edit({ weightKg: s.weightKg ?? 0, reps: s.reps ?? 0, seconds: s.seconds ?? 0, distanceM: s.distanceM ?? 0 });
+    const cardio = Object.fromEntries(cardioFields.map((f) => [f, s[f]]));
+    edit({ weightKg: s.weightKg ?? 0, reps: s.reps ?? 0, seconds: s.seconds ?? 0, distanceM: s.distanceM ?? 0, ...cardio });
+  };
+
+  /** The machine settings to store with the set: only the ones that say something. */
+  const cardioSettings = (): Partial<WorkoutSet> => {
+    const out: Partial<WorkoutSet> = {};
+    for (const f of cardioFields) {
+      const v = cardioValue(f);
+      // Zero means "not set" for levels and speed; a flat incline is a real 0
+      // only on a treadmill that has a speed.
+      if (v == null || (v <= 0 && f !== 'inclinePct') || (f === 'inclinePct' && v === 0 && !(speedKmh > 0))) continue;
+      out[f] = v;
+    }
+    return out;
   };
 
   const completeSet = () => {
@@ -270,7 +298,8 @@ export default function SessionScreen() {
       weightKg: type === 'weight_reps' ? weight : undefined,
       reps: type === 'weight_reps' || type === 'bodyweight_reps' ? reps : undefined,
       seconds: type === 'time' || type === 'distance_time' ? seconds : undefined,
-      distanceM: type === 'distance_time' ? distance : undefined,
+      distanceM: type === 'distance_time' ? distanceNow : undefined,
+      ...cardioSettings(),
       done: true,
     };
     const firstContinuousLog = continuous && !(todayWorkout && todayWorkout.sets.length > 0);
@@ -443,7 +472,7 @@ export default function SessionScreen() {
                     {r.e ? exerciseName(r.e, lang) : r.id}
                   </Text>
                   <Text style={{ color: theme.textSecondary, fontSize: 12 }}>
-                    {r.done.length > 0 ? `${t('track.setsSummary', { count: r.done.length })} · ${t('session.sessionBest')} ${label(r.done[bestIdx], r.w!.type)}` : t('session.notStarted')}
+                    {r.done.length > 0 ? `${t('track.setsSummary', { count: r.done.length })} · ${t('session.sessionBest')} ${label(r.done[bestIdx], r.w!.type, logStyleFor(r.e) === 'continuous')}` : t('session.notStarted')}
                   </Text>
                 </View>
                 <Icon name={r.done.length > 0 ? 'checkmark-circle' : 'ellipse-outline'} size={20} color={r.done.length > 0 ? theme.successText : theme.textTertiary} />
@@ -652,11 +681,9 @@ export default function SessionScreen() {
       )}
 
       {/* Target, from the plan; no target past it. Best lives in the Last
-          time box (one line, the record to beat), except for a continuous
-          log (a run, a ride), which has no Last time box. */}
-      {(target || continuous) && (
-      <View style={styles.refRow}>
-        {target && (
+          time box (one line, the record to beat). */}
+      {target && (
+        <View style={styles.refRow}>
           <Pressable
             style={[styles.ref, { backgroundColor: theme.surfaceTint }]}
             accessibilityRole="button"
@@ -669,15 +696,77 @@ export default function SessionScreen() {
               {t('session.weeklyPlan')} · {t('session.edit')}
             </Text>
           </Pressable>
-        )}
-        {continuous && (
-          <View style={[styles.ref, { backgroundColor: theme.surfaceTint }]}>
-            <Text style={[Type.eyebrow, { color: theme.textSecondary }]}>{t('session.best')}</Text>
-            <Text style={[styles.refValue, { color: theme.text }]}>{label(best?.set)}</Text>
-            <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{best ? shortDate(best.at) : t('session.noBestYet')}</Text>
+        </View>
+      )}
+
+      {/* Cardio: last time as one line, Same again, and the best. */}
+      {continuous && (lastSession || best) && (
+        <View style={[styles.block, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <View style={styles.lastTimeHead}>
+            <Text style={{ color: theme.text, fontWeight: '800', fontSize: 14, flex: 1 }} numberOfLines={1}>
+              {lastSession ? `${t('session.lastTime')} · ${whenLabel(lastSession.at)}` : t('session.noLastTime')}
+            </Text>
+            {lastSession && (
+              <Pressable
+                onPress={() => fillFromLast(lastSession.sets[0])}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.sameAgain, { backgroundColor: theme.primary }, pressed && { opacity: 0.8 }]}
+              >
+                <Icon name="repeat" size={14} color={theme.onPrimary} />
+                <Text style={{ color: theme.onPrimary, fontWeight: '800', fontSize: 12.5 }}>{t('cardio.sameAgain')}</Text>
+              </Pressable>
+            )}
           </View>
-        )}
-      </View>
+          {lastSession && <Text style={{ color: theme.text, fontWeight: '800', fontSize: 15 }}>{label(lastSession.sets[0])}</Text>}
+          {best && (
+            <View style={[styles.bestLine, { borderTopColor: theme.border }]} accessible accessibilityLabel={`${t('session.best')} ${label(best.set)} · ${shortDate(best.at)}`}>
+              <Icon name="trophy" size={14} color={theme.carbs} />
+              <Text style={{ color: theme.textSecondary, fontSize: 13, fontWeight: '700' }}>{t('session.best')}</Text>
+              <Text style={{ color: theme.text, fontSize: 13, fontWeight: '800', flexShrink: 1 }}>{label(best.set)}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 12, fontWeight: '600' }}>{`· ${shortDate(best.at)}`}</Text>
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* The machine's settings, last time's until changed. */}
+      {cardioFields.length > 0 && (
+        <View style={[styles.block, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
+          <View style={styles.lastTimeHead}>
+            <Icon name="speedometer-outline" size={15} color={theme.primary} />
+            <Text style={[Type.eyebrow, { color: theme.primaryDark, flex: 1 }]}>{t('cardio.machine')}</Text>
+            {lastSession && <Text style={{ color: theme.textTertiary, fontSize: 12 }}>{t('cardio.fromLast')}</Text>}
+          </View>
+          <View style={[styles.steppers, { marginTop: 0, flexWrap: 'wrap' }]}>
+            {cardioFields.map((f) => {
+              const spec = CARDIO_SPEC[f];
+              const v = cardioValue(f) ?? 0;
+              const imperialSpeed = f === 'speedKmh' && units === 'imperial';
+              const shown = imperialSpeed ? Number((v / 1.609344).toFixed(1)) : v;
+              const unit = f === 'speedKmh' ? t(imperialSpeed ? 'cardio.mph' : 'cardio.kmh') : f === 'inclinePct' ? t('cardio.pct') : spec.optional ? t('cardio.optional') : '';
+              const before = lastSession?.sets[0]?.[f];
+              const diff = before != null && v !== before && v > 0 ? Number((v - before).toFixed(1)) : 0;
+              return (
+                <View key={f} style={{ flex: 1, minWidth: 140 }}>
+                  <Stepper
+                    label={unit ? `${t(`cardio.${f === 'speedKmh' ? 'speed' : f === 'inclinePct' ? 'incline' : f}`)} (${unit})` : t(`cardio.${f}`)}
+                    value={shown}
+                    onChange={(n) => edit({ [f]: imperialSpeed ? Number((n * 1.609344).toFixed(2)) : n } as Partial<SetShape>)}
+                    step={spec.step}
+                    min={spec.min}
+                    max={spec.max}
+                    decimals={spec.decimals}
+                  />
+                  {diff !== 0 && (
+                    <Text style={{ color: theme.successText, fontSize: 11, fontWeight: '700', textAlign: 'center', marginTop: 2 }}>
+                      {diff > 0 ? t('cardio.up', { n: diff }) : t('cardio.down', { n: Math.abs(diff) })}
+                    </Text>
+                  )}
+                </View>
+              );
+            })}
+          </View>
+        </View>
       )}
 
       {/* Last time, set by set, one tap away: a tap puts that set in the
@@ -740,9 +829,59 @@ export default function SessionScreen() {
         <View style={[styles.steppers, { marginTop: 0 }]}>
           {type === 'weight_reps' && <Stepper label={`${t('track.weight')} (${kg})`} value={weight} onChange={(v) => edit({ weightKg: v })} step={2.5} decimals={1} />}
           {(type === 'weight_reps' || type === 'bodyweight_reps') && <Stepper label={t('track.reps')} value={reps} onChange={(v) => edit({ reps: v })} step={1} />}
-          {(type === 'time' || type === 'distance_time') && <Stepper label={t('track.seconds')} value={seconds} onChange={(v) => edit({ seconds: v })} step={5} />}
-          {type === 'distance_time' && <Stepper label={t('track.distance')} value={distance} onChange={(v) => edit({ distanceM: v })} step={100} />}
+          {(type === 'time' || type === 'distance_time') &&
+            (continuous ? (
+              <Stepper label={t('cardio.timeMin')} value={Math.round(seconds / 60)} onChange={(v) => edit({ seconds: v * 60 })} step={1} />
+            ) : (
+              <Stepper label={t('track.seconds')} value={seconds} onChange={(v) => edit({ seconds: v })} step={5} />
+            ))}
+          {type === 'distance_time' &&
+            !distanceAuto &&
+            (continuous ? (
+              <Stepper
+                label={`${t('cardio.distance')} (${t(units === 'imperial' ? 'cardio.mi' : 'cardio.km')})`}
+                value={Number(((distanceNow / 1000) / (units === 'imperial' ? 1.609344 : 1)).toFixed(1))}
+                onChange={(v) => edit({ distanceM: Math.round(v * 1000 * (units === 'imperial' ? 1.609344 : 1)) })}
+                step={0.1}
+                decimals={1}
+              />
+            ) : (
+              <Stepper label={t('track.distance')} value={distance} onChange={(v) => edit({ distanceM: v })} step={100} />
+            ))}
         </View>
+        {continuous && (distanceAuto || seconds > 0) && (
+          <View style={styles.derivedRow}>
+            {distanceAuto && (
+              <Pressable
+                onPress={() => edit({ distanceM: autoDistance })}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('cardio.distance')} ${distanceText(autoDistance, units, t)} · ${t('cardio.edit')}`}
+                style={[styles.derived, { backgroundColor: theme.surfaceTint }]}
+              >
+                <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: '700' }}>{`${t('cardio.distance')} · ${t('cardio.distanceAuto')}`}</Text>
+                <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>
+                  {distanceText(autoDistance, units, t)} <Text style={{ color: theme.primary, fontSize: 12, fontWeight: '800' }}>{t('cardio.edit')}</Text>
+                </Text>
+              </Pressable>
+            )}
+            {seconds > 0 && ex && (
+              <View style={[styles.derived, { backgroundColor: theme.surfaceTint }]}>
+                <Text style={{ color: theme.textSecondary, fontSize: 11, fontWeight: '700' }}>{t('cardio.burned')}</Text>
+                <Text style={{ color: theme.text, fontSize: 17, fontWeight: '800' }}>
+                  {t('cardio.kcal', {
+                    n: burnForSets(
+                      [{ seconds, distanceM: type === 'distance_time' ? distanceNow : undefined, ...cardioSettings(), done: true }],
+                      bodyKg,
+                      ex.category,
+                      undefined,
+                      ex,
+                    ),
+                  })}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
 
         {(type === 'weight_reps' || type === 'bodyweight_reps') && (
           <View style={styles.quickReps}>
@@ -802,7 +941,7 @@ export default function SessionScreen() {
           </>
         )}
 
-        {exId && ex && !setupKindFor(ex) && <SetupAddLink key={exId} exerciseId={exId} exerciseName={exerciseName(ex, lang)} />}
+        {exId && ex && !setupKindFor(ex) && cardioFieldsFor(ex).length === 0 && <SetupAddLink key={exId} exerciseId={exId} exerciseName={exerciseName(ex, lang)} />}
 
         <Pressable onPress={() => setShowGuidance((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: showGuidance }} style={[styles.guidanceHead, { borderColor: theme.border }]}>
           <IconTile icon="document-text-outline" size={32} />
@@ -869,6 +1008,9 @@ const styles = StyleSheet.create({
   block: { borderRadius: Radius.module, padding: Spacing.ms, marginTop: Spacing.sm },
   lastTimeHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: Spacing.sm },
   lastTimeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  sameAgain: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: Radius.full, paddingHorizontal: 11, paddingVertical: 6 },
+  derivedRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm },
+  derived: { flex: 1, borderRadius: Radius.control, paddingHorizontal: 10, paddingVertical: 8, gap: 2 },
   bestLine: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: Spacing.sm, paddingTop: Spacing.sm, borderTopWidth: StyleSheet.hairlineWidth },
   lastChip: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: Radius.control, paddingHorizontal: 10, minHeight: 36 },
   quickReps: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: Spacing.sm },
