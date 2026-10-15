@@ -81,3 +81,10 @@ export async function takeStoreOffer(
 }
 
 export async function manageSubscription(): Promise<void> {}
+
+export async function openAppleCodeSheet(_code?: string): Promise<void> {}
+
+/** On the web a code goes through Calgym's own code screen. */
+export function enterCode(openScreen: () => void): void {
+  openScreen();
+}

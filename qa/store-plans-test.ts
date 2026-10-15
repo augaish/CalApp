@@ -63,6 +63,7 @@ eq('an offer the store does not have is not found', findOfferOption(play, 'summe
 eq('a blank offer id finds nothing', findOfferOption(play, ' '), null);
 
 eq('the App Store redemption link carries the code', offerCodeUrl(' RAMADAN50 '), 'https://apps.apple.com/redeem?ctx=offercodes&id=6793969631&code=RAMADAN50');
+eq('without a code it opens Apple\'s blank code page', offerCodeUrl('  '), 'https://apps.apple.com/redeem?ctx=offercodes&id=6793969631');
 
 // Amounts we work out ourselves, written the way the app's language writes money.
 check('riyals in Arabic are ر.س, not a code', /ر\.س/.test(formatMoney(12.5, 'SAR', 'ar')) && /12\.50/.test(formatMoney(12.5, 'SAR', 'ar')), formatMoney(12.5, 'SAR', 'ar'));

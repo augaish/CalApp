@@ -117,7 +117,8 @@ export const APP_STORE_ID = '6793969631';
  * price in their currency, applies their tax, and takes the payment.
  */
 export function offerCodeUrl(code: string): string {
-  return `https://apps.apple.com/redeem?ctx=offercodes&id=${APP_STORE_ID}&code=${encodeURIComponent(code.trim())}`;
+  const base = `https://apps.apple.com/redeem?ctx=offercodes&id=${APP_STORE_ID}`;
+  return code.trim() ? `${base}&code=${encodeURIComponent(code.trim())}` : base;
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 
@@ -10,7 +10,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { redeemCode, type RedeemResponse } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
-import { loadStorePlans, purchasesStatus, takeStoreOffer } from '@/lib/purchases';
+import { loadStorePlans, openAppleCodeSheet, purchasesStatus, takeStoreOffer } from '@/lib/purchases';
 
 type Done = Extract<RedeemResponse, { ok: true }>;
 
@@ -22,6 +22,9 @@ type Done = Extract<RedeemResponse, { ok: true }>;
  * person to the store, which shows the discounted price with their tax and
  * takes the payment. Opens from the upgrade screen, Profile, or a link
  * (calapp://redeem?code=RAMADAN50) so a code on a poster is one tap.
+ *
+ * Android and web only: on iPhone a code goes to Apple's own offer-code
+ * page (App Store rule 3.1.1), so a link that lands here is passed on.
  */
 export default function Redeem() {
   const { t, i18n } = useTranslation();
@@ -81,7 +84,16 @@ export default function Redeem() {
     }
   };
 
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    void openAppleCodeSheet(typeof params.code === 'string' ? params.code : undefined);
+    if (router.canGoBack()) router.back();
+    else router.replace('/');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const usable = code.replace(/[\s._-]/g, '').length >= 3;
+
+  if (Platform.OS === 'ios') return null;
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">

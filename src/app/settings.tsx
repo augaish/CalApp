@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/brand-header';
 import { RowGroup, SettingsRow } from '@/components/system';
 import { Screen } from '@/components/ui';
 import { applyRTL, setI18nLanguage } from '@/lib/i18n';
+import { enterCode } from '@/lib/purchases';
 import { useAppStore } from '@/lib/store';
 import type { Language, Units } from '@/lib/types';
 
@@ -80,7 +81,7 @@ export default function Settings() {
       </RowGroup>
       <RowGroup>
         <SettingsRow icon="shield-checkmark-outline" title={t('profile.privacyData')} onPress={() => router.push('/privacy')} />
-        <SettingsRow icon="pricetag-outline" title={t('redeem.title')} onPress={() => router.push('/redeem')} last />
+        <SettingsRow icon="pricetag-outline" title={t('redeem.title')} onPress={() => enterCode(() => router.push('/redeem'))} last />
       </RowGroup>
     </Screen>
   );

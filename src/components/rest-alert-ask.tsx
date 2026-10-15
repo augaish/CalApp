@@ -14,8 +14,11 @@ import { useAppStore } from '@/lib/store';
  * "Alert me when rest ends?" — asked once, at the start of a workout, and
  * only while notifications are still off and the phone may still ask. It
  * used to be the system prompt itself, popping up over the first rest
- * countdown. Allow shows the phone's own prompt now, before training; Not
- * now is final (Settings → Notifications can turn alerts on later). The
+ * countdown. Continue shows the phone's own prompt now, before training,
+ * and is the only button: Apple wants a message like this to lead straight
+ * to the prompt (App Store rule 5.1.1(iv), from the review of build 19).
+ * Allow or not is the phone's question. Offered in one workout only: if it
+ * is passed by, Settings → Notifications can turn alerts on later. The
  * on-screen timer works either way.
  */
 export function RestAlertAsk() {
@@ -23,7 +26,9 @@ export function RestAlertAsk() {
   const theme = useTheme();
   const asked = useAppStore((s) => s.notifyPrefs?.restAlertAsked === true);
   const setNotifyPrefs = useAppStore((s) => s.setNotifyPrefs);
-  const [needed, setNeeded] = useState(false);
+  // Shown on this screen, and already counted as offered.
+  const [shown, setShown] = useState(false);
+  const [answered, setAnswered] = useState(false);
 
   useEffect(() => {
     if (asked) return;
@@ -34,20 +39,22 @@ export function RestAlertAsk() {
       .getPermissionsAsync()
       .then((p) => {
         // Already on, or the phone will no longer ask: nothing to offer.
-        if (live) setNeeded(!p.granted && p.canAskAgain !== false);
+        if (!live || p.granted || p.canAskAgain === false) return;
+        setShown(true);
+        setNotifyPrefs({ restAlertAsked: true });
       })
       .catch(() => {});
     return () => {
       live = false;
     };
-  }, [asked]);
+  }, [asked, setNotifyPrefs]);
 
-  if (asked || !needed) return null;
+  if (!shown || answered) return null;
 
-  const answer = async (allow: boolean) => {
-    setNotifyPrefs({ restAlertAsked: true });
+  const answer = async () => {
+    setAnswered(true);
     const mod = notifications();
-    if (allow && mod) await requestPermission(mod).catch(() => false);
+    if (mod) await requestPermission(mod).catch(() => false);
   };
 
   return (
@@ -62,8 +69,7 @@ export function RestAlertAsk() {
         </View>
       </View>
       <View style={styles.buttons}>
-        <Button label={t('session.restAskAllow')} onPress={() => answer(true)} style={{ flex: 1 }} />
-        <Button label={t('session.restAskLater')} variant="secondary" onPress={() => answer(false)} style={{ flex: 1 }} />
+        <Button label={t('common.continue')} onPress={() => void answer()} style={{ flex: 1 }} />
       </View>
       <Text style={{ color: theme.textTertiary, fontSize: 12, marginTop: Spacing.xs }}>{t('session.restAskNote')}</Text>
     </View>

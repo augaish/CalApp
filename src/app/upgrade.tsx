@@ -11,7 +11,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { SERVER_URL } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
-import { manageSubscription } from '@/lib/purchases';
+import { enterCode, manageSubscription } from '@/lib/purchases';
 import { reasonText, useStoreOffer } from '@/lib/use-store-offer';
 
 /**
@@ -82,7 +82,7 @@ export default function Upgrade() {
       <PlanPicker offer={offer} />
 
       <Pressable
-        onPress={() => router.push('/redeem')}
+        onPress={() => enterCode(() => router.push('/redeem'))}
         style={[styles.codeRow, { borderColor: theme.border }]}
         accessibilityRole="button"
       >

@@ -1,11 +1,12 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Svg, { Path } from 'react-native-svg';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   StyleSheet,
   useWindowDimensions,
@@ -46,6 +47,18 @@ export default function Scan() {
 
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
+  // The phone's own camera prompt comes straight up, with nothing of ours in
+  // front of it (App Store rule 5.1.1(iv), from the review of build 19). Only
+  // after a refusal is there a screen: Settings, or on Android, ask again.
+  const [asked, setAsked] = useState(false);
+  const asking = useRef(false);
+  useEffect(() => {
+    if (!permission || permission.granted || !permission.canAskAgain || asked || asking.current) return;
+    asking.current = true;
+    requestPermission()
+      .catch(() => null)
+      .finally(() => setAsked(true));
+  }, [permission, asked, requestPermission]);
   const [analyzing, setAnalyzing] = useState(false);
   // The shot being analysed. Showing it — and unmounting the camera — is what
   // makes the wait feel like "reading your photo" rather than a live viewfinder
@@ -231,6 +244,9 @@ export default function Scan() {
 
   if (!permission) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
 
+  // The phone is asking: keep the screen plain behind its prompt.
+  if (!permission.granted && permission.canAskAgain && !asked) return <View style={{ flex: 1, backgroundColor: theme.background }} />;
+
   if (!permission.granted) {
     return (
       <View style={[styles.permission, { backgroundColor: theme.background }]}>
@@ -238,9 +254,13 @@ export default function Scan() {
           {t('scan.noPermissionTitle')}
         </Text>
         <Text style={[styles.permissionBody, { color: theme.textSecondary }]}>
-          {t('scan.noPermissionBody')}
+          {permission.canAskAgain ? t('scan.askAgainBody') : t('scan.noPermissionBody')}
         </Text>
-        <Button label={t('scan.grantPermission')} onPress={requestPermission} />
+        {permission.canAskAgain ? (
+          <Button label={t('common.continue')} onPress={() => void requestPermission()} />
+        ) : (
+          <Button label={t('notifications.openSettings')} onPress={() => void Linking.openSettings()} />
+        )}
         <Button label={t('common.cancel')} variant="ghost" onPress={() => router.back()} />
       </View>
     );

@@ -11,6 +11,7 @@ import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { SERVER_URL } from '@/lib/api';
 import { useEntitlement } from '@/lib/entitlement';
+import { enterCode } from '@/lib/purchases';
 import { reasonText, useStoreOffer } from '@/lib/use-store-offer';
 
 /**
@@ -78,7 +79,7 @@ export default function Membership() {
                 <Text style={[styles.link, { color: theme.primary }]}>{t('upgrade.restore')}</Text>
               </Pressable>
             ) : null}
-            <Pressable onPress={() => { close(); router.push('/redeem'); }} hitSlop={6} accessibilityRole="button">
+            <Pressable onPress={() => { close(); enterCode(() => router.push('/redeem')); }} hitSlop={6} accessibilityRole="button">
               <Text style={[styles.link, { color: theme.primary }]}>{t('upgrade.haveCode')}</Text>
             </Pressable>
             <Pressable onPress={() => { close(); router.push('/upgrade'); }} hitSlop={6} accessibilityRole="button" style={styles.linkRow}>

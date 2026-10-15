@@ -212,6 +212,32 @@ export async function restorePurchases(): Promise<RestoreOutcome> {
 }
 
 /**
+ * Apple's own offer-code sheet, or its redeem page with the code filled in.
+ * On iPhone this is the only way in for a code (App Store rule 3.1.1, from
+ * the review of build 19): Calgym's own code screen is for Android and the
+ * web. A partner still gets the sale: it carries the offer code, and the
+ * server finds the partner from it (server/src/db.ts).
+ */
+export async function openAppleCodeSheet(code?: string): Promise<void> {
+  const Purchases = load();
+  if (!code?.trim() && Purchases && configured) {
+    try {
+      await Purchases.presentCodeRedemptionSheet();
+      return;
+    } catch {
+      // Fall through to Apple's page.
+    }
+  }
+  await Linking.openURL(offerCodeUrl(code ?? '')).catch(() => {});
+}
+
+/** "Have a code?": Apple's sheet on iPhone, Calgym's code screen elsewhere. */
+export function enterCode(openScreen: () => void): void {
+  if (Platform.OS === 'ios') void openAppleCodeSheet();
+  else openScreen();
+}
+
+/**
  * Take a percent code's discount to the store.
  *
  * iOS: Apple only discounts through its own offer-code sheet, so we open it
