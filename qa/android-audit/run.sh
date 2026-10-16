@@ -14,6 +14,11 @@ adb install -r -g "$APK"
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
 
 adb root >/dev/null; sleep 3
+# The emulator's own launcher can freeze ("isn't responding") and its box
+# covers the app: switch it off, and hide such boxes.
+adb shell settings put global hide_error_dialogs 1 || true
+adb shell pm disable-user --user 0 com.google.android.apps.nexuslauncher >/dev/null 2>&1 || true
+adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
 
 # Cold starts until the preview update has been downloaded (expo-updates
 # keeps it under files/.expo-internal), then one more so it is the one running.
@@ -64,6 +69,7 @@ for lang in ${LANGS:-en ar}; do
     if [ -n "${steps:-}" ] && [ "$lang" != en ]; then continue; fi
     if [ "$kind" != "$current" ]; then seed "$lang" "$kind"; current=$kind; fi
     adb shell am force-stop $PKG
+    adb shell am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS >/dev/null 2>&1 || true
     adb shell am start -W -a android.intent.action.VIEW -d "'$url'" $PKG >/dev/null
     sleep 9
     for step in ${steps:-}; do
