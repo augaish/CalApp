@@ -130,9 +130,11 @@ export function PlanPicker({ offer }: { offer: Offer }) {
             </>
           ) : (
             <>
-              <Text style={{ fontSize: 22, fontWeight: '800' }}>{monthly}</Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}> {t('upgrade.perMonthShort', { currency: fb.currency })}</Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{`  ·  ${t('upgrade.yearlyPlain', { price: yearly, currency: fb.currency })}`}</Text>
+              {/* Formatted for the language (ر.س in Arabic): a Latin "SAR"
+                  inside Arabic text jumbled the line's order. */}
+              <Text style={{ fontSize: 22, fontWeight: '800' }}>{formatMoney(monthly, fb.currency, lang)}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}> {t('upgrade.perMonthShort')}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{`  ·  ${t('upgrade.yearlyPlain', { price: formatMoney(yearly, fb.currency, lang) })}`}</Text>
             </>
           )}
         </Text>

@@ -9,6 +9,7 @@ import { alertProblem } from '@/lib/alerts';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { useStatusBar } from '@/hooks/use-status-bar';
 import { useTheme } from '@/hooks/use-theme';
 import { AiConsentDeclinedError, analyzeBodyReading, ApiError, FeatureLockedError, lockReason, QuotaError } from '@/lib/api';
 import type { LockReason } from '@/lib/api-errors';
@@ -38,6 +39,7 @@ export default function InBodyWeb() {
   const { url } = useLocalSearchParams<{ url?: string }>();
   const { t } = useTranslation();
   const theme = useTheme();
+  useStatusBar('page');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const language = useAppStore((s) => s.language) ?? 'en';

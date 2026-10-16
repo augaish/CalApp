@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/components/icon';
 import { Text, TextInput } from '@/components/text';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
+import { useStatusBar } from '@/hooks/use-status-bar';
 import { useTheme } from '@/hooks/use-theme';
 import { selectionHaptic } from '@/lib/feedback';
 import { normalizeDigits } from '@/lib/numbers';
@@ -49,6 +50,8 @@ export function Screen({
 }) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
+  // A page without a header band starts on the plain background.
+  useStatusBar(header ? null : 'page');
   const content: ViewStyle = {
     flexGrow: 1,
     paddingHorizontal: Spacing.page,

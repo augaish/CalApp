@@ -23,6 +23,7 @@ import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
 import { Text, TextInput } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
 import { usePlanGate } from '@/hooks/use-plan-gate';
+import { useStatusBar } from '@/hooks/use-status-bar';
 import { useTheme } from '@/hooks/use-theme';
 import { analyzeCoachAttachment, coachChat, FeatureLockedError, isMockMode, lockReason, QuotaError } from '@/lib/api';
 import { aiFailureAction } from '@/lib/api-errors';
@@ -55,6 +56,7 @@ const nowIso = () => new Date().toISOString();
 export default function Coach() {
   const { t } = useTranslation();
   const theme = useTheme();
+  useStatusBar('light');
   const router = useRouter();
   const { prompt: openingPrompt, focus: focusParam } = useLocalSearchParams<{ prompt?: string; focus?: string }>();
   const insets = useSafeAreaInsets();

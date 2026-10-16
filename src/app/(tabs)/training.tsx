@@ -676,7 +676,10 @@ export default function Training() {
       {/* Secondary ways in, as a slim row under the day rather than a pinned
           footer that took a fifth of the screen from the workout itself. */}
       <View style={styles.quickRow}>
-        <ActionButton label={t('training.addExercise')} icon="add" variant="secondary" onPress={() => router.push(`/exercise-library?pick=day&date=${dateKey(selected)}`)} style={{ flex: 1 }} />
+        {/* An empty day already leads with Add exercise; the row doesn't repeat it. */}
+        {visiblePlanIds.length > 0 && (
+          <ActionButton label={t('training.addExercise')} icon="add" variant="secondary" onPress={() => router.push(`/exercise-library?pick=day&date=${dateKey(selected)}`)} style={{ flex: 1 }} />
+        )}
         <ActionButton label={t('training.scanCta')} icon="scan-outline" variant="secondary" onPress={() => router.push('/scan?mode=gym')} style={{ flex: 1 }} />
       </View>
 

@@ -20,6 +20,7 @@ import { PhotoProgress } from '@/components/photo-progress';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { Spacing } from '@/constants/theme';
+import { useStatusBar } from '@/hooks/use-status-bar';
 import { useTheme } from '@/hooks/use-theme';
 import { AiConsentDeclinedError, analyzeBodyReading, analyzeEquipment, analyzeMeal, ApiError, FeatureLockedError, isMockMode, lockReason, lookupBarcode, QuotaError, reportBarcode } from '@/lib/api';
 import type { LockReason } from '@/lib/api-errors';
@@ -37,6 +38,7 @@ export default function Scan() {
   const isBody = mode === 'body';
   const { t } = useTranslation();
   const theme = useTheme();
+  useStatusBar('light');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const language = useAppStore((s) => s.language) ?? 'en';

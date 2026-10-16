@@ -11,6 +11,7 @@ import { GlassBacking } from '@/components/glass';
 import { Icon, layoutIsRTL } from '@/components/icon';
 import { Text } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type } from '@/constants/theme';
+import { useStatusBar } from '@/hooks/use-status-bar';
 import { useTheme } from '@/hooks/use-theme';
 
 /** Translucent dark backing keeps white header text legible over the mint end
@@ -49,6 +50,7 @@ export function BrandHeader({
 }) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  useStatusBar('light');
   return (
     <LinearGradient
       colors={[theme.gradientStart, theme.gradientEnd]}
@@ -267,6 +269,7 @@ export function PageHeader({
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  useStatusBar(variant === 'gradient' ? 'light' : 'page');
   const ink = variant === 'gradient' ? theme.onGradient : theme.text;
   const back = onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')));
   // The title is centred on the screen, so it is kept clear of the wider of

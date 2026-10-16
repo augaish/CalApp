@@ -11,6 +11,7 @@ import { alertProblem } from '@/lib/alerts';
 import { Text, TextInput } from '@/components/text';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
+import { useStatusBar } from '@/hooks/use-status-bar';
 import { useTheme } from '@/hooks/use-theme';
 import { sendEmailCode, syncAuthIdentity, verifyEmailCode } from '@/lib/auth';
 import { appleSignInAvailable, signInWithApple } from '@/lib/auth-apple';
@@ -48,6 +49,7 @@ const FOCUS: { key: FocusArea; icon: keyof typeof Ionicons.glyphMap }[] = [
 export default function Login() {
   const { t } = useTranslation();
   const theme = useTheme();
+  useStatusBar('light');
   const insets = useSafeAreaInsets();
   const setAccount = useAppStore((s) => s.setAccount);
   const language = useAppStore((s) => s.language) ?? 'en';

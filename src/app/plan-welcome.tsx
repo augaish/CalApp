@@ -10,6 +10,7 @@ import { Icon } from '@/components/icon';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui';
 import { Radius, Spacing, tracking } from '@/constants/theme';
+import { useStatusBar } from '@/hooks/use-status-bar';
 import { useTheme } from '@/hooks/use-theme';
 import { successHaptic } from '@/lib/feedback';
 import { MOTTO_COUNT, scheduleWelcomeNudge, welcomeContent, type WelcomeFocus, type WelcomeTier } from '@/lib/plan-welcome';
@@ -25,6 +26,7 @@ const CONFETTI = ['#FFFFFF', '#E2F795', '#FFE7DA', '#FFFFFF', '#E2F795'];
 export default function PlanWelcome() {
   const { t } = useTranslation();
   const theme = useTheme();
+  useStatusBar('light');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width, height } = useWindowDimensions();
