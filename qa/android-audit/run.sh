@@ -13,15 +13,20 @@ mkdir -p "$OUT"
 adb install -r -g "$APK"
 adb shell pm grant $PKG android.permission.POST_NOTIFICATIONS || true
 
-# Two cold starts: the first downloads the preview update, the second runs it.
-for i in 1 2; do
+adb root >/dev/null; sleep 3
+
+# Cold starts until the preview update has been downloaded (expo-updates
+# keeps it under files/.expo-internal), then one more so it is the one running.
+for i in 1 2 3 4 5; do
   adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
-  sleep 45
+  sleep 40
   adb exec-out screencap -p > "$OUT/00-launch-$i.png"
   adb shell am force-stop $PKG
+  n=$(adb shell "find /data/data/$PKG/files/.expo-internal -type f 2>/dev/null | wc -l" | tr -d '\r')
+  echo "launch $i: ${n:-0} update files"
+  if [ "${n:-0}" -gt 2 ] && [ "$i" -ge 2 ]; then break; fi
 done
-
-adb root >/dev/null; sleep 3
+adb shell "ls -laR /data/data/$PKG/files/.expo-internal" > "$OUT/updates.txt" 2>&1
 
 # Taps the element showing this text (or with this accessibility label).
 tap() {
@@ -64,6 +69,7 @@ for lang in ${LANGS:-en ar}; do
     for step in ${steps:-}; do
       case $step in
         tap:*) tap "$(echo "${step#tap:}" | tr '_' ' ')" ;;
+        key:back) adb shell input keyevent 4; sleep 3 ;;
         shot:*) adb exec-out screencap -p > "$OUT/$lang-$name-${step#shot:}.png" ;;
       esac
     done

@@ -61,7 +61,7 @@ jobs:
           pip install --quiet pillow
           dest=qa/android-audit/shots/${{ github.run_number }}
           python3 qa/android-audit/pack.py shots "$dest"
-          cp shots/logcat.txt "$dest/" 2>/dev/null || true
+          cp shots/logcat.txt shots/updates.txt "$dest/" 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$dest"
