@@ -11,6 +11,9 @@ on:
         type: string
         default: 'https://expo.dev/artifacts/eas/XRebYAbEZGxJKI0aU-KdaLrpBcJl99jzdnSDervD0FA.apk'
 
+permissions:
+  contents: write
+
 jobs:
   audit:
     runs-on: ubuntu-24.04
@@ -42,8 +45,17 @@ jobs:
         with:
           name: android-audit
           path: shots
-      - name: Screenshots in the log
+      # Small copies go into the repo (qa/android-audit/shots/<run>), where
+      # they can be read without the artifact download.
+      - name: Commit small copies
         if: always()
         run: |
           pip install --quiet pillow
-          python3 qa/android-audit/pack.py shots
+          dest=qa/android-audit/shots/${{ github.run_number }}
+          python3 qa/android-audit/pack.py shots "$dest"
+          cp shots/logcat.txt "$dest/" 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$dest"
+          git commit -m "Android audit screenshots (run ${{ github.run_number }})"
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done

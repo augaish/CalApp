@@ -1,15 +1,13 @@
-# Shrinks the screenshots and prints them as base64 lines in the job log, so
-# they can be read back without downloading the artifact:
-# python3 pack.py <folder>
-import base64, io, os, sys
+# Shrinks the screenshots to JPEGs the session can read back from the repo:
+# python3 pack.py <from folder> <to folder>
+import os, sys
 from PIL import Image
 
-folder = sys.argv[1]
-for name in sorted(os.listdir(folder)):
+src, dst = sys.argv[1], sys.argv[2]
+os.makedirs(dst, exist_ok=True)
+for name in sorted(os.listdir(src)):
     if not name.endswith('.png'):
         continue
-    im = Image.open(os.path.join(folder, name)).convert('RGB')
-    im.thumbnail((432, 960))
-    buf = io.BytesIO()
-    im.save(buf, 'JPEG', quality=72)
-    print(f'SHOT {name[:-4]} {base64.b64encode(buf.getvalue()).decode()}')
+    im = Image.open(os.path.join(src, name)).convert('RGB')
+    im.thumbnail((540, 1200))
+    im.save(os.path.join(dst, name[:-4] + '.jpg'), 'JPEG', quality=78)
