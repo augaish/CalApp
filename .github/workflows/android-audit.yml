@@ -18,6 +18,10 @@ on:
         description: 'Languages'
         type: string
         default: 'en ar'
+      animations:
+        description: 'Keep system animations on, as on a real phone'
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -45,7 +49,7 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
-          disable-animations: true
+          disable-animations: ${{ github.event.inputs.animations != 'true' }}
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           script: ONLY='${{ github.event.inputs.only }}' LANGS='${{ github.event.inputs.langs }}' bash qa/android-audit/run.sh app.apk shots
       - uses: actions/upload-artifact@v4
