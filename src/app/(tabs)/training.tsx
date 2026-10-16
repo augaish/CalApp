@@ -510,6 +510,10 @@ export default function Training() {
 
           <View style={[styles.list, { borderColor: theme.border }]}>
             <Sortable.Grid
+              // No fade-in, and a fresh list for each day (see schedule.tsx).
+              itemEntering={null}
+              itemExiting={null}
+              key={dateKey(selected)}
               columns={1}
               rowGap={0}
               data={visiblePlanIds}

@@ -144,6 +144,11 @@ export function cardShadow(shadowColor: string): ViewStyle {
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 6 },
     },
+    // The same soft shadow on Android (boxShadow, new architecture). Its
+    // `elevation` was a grey, hard-edged one that looked nothing like iOS.
+    android: /^#[0-9a-f]{6}$/i.test(shadowColor)
+      ? { boxShadow: [{ offsetX: 0, offsetY: 6, blurRadius: 24, color: `${shadowColor}1A` }] }
+      : { elevation: 2 },
     default: { elevation: 2 },
   });
 }

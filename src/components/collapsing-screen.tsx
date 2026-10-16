@@ -106,6 +106,16 @@ export function CollapsingScreen({
         <View style={{ paddingHorizontal: Spacing.page, paddingTop: Spacing.sm }}>{children}</View>
       </Animated.ScrollView>
 
+      {/* The status bar's strip stays brand-coloured, so the band never slides
+          under the clock and icons on its way up to the sticky bar. */}
+      <LinearGradient
+        pointerEvents="none"
+        colors={[theme.gradientStart, theme.gradientEnd]}
+        start={{ x: 0, y: 0.4 }}
+        end={{ x: 1, y: 0.6 }}
+        style={[styles.bar, { height: insets.top }]}
+      />
+
       {/* The sticky bar: absolute over the scroll, invisible and untouchable until the band is gone. */}
       <Animated.View
         pointerEvents={barShown ? 'auto' : 'none'}

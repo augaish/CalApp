@@ -178,6 +178,12 @@ export default function ScheduleScreen() {
       ) : (
         <View style={[styles.listCard, { backgroundColor: theme.card }, cardShadow(theme.shadow)]}>
           <Sortable.Grid
+            // Rows appear as they are, with no fade-in (as on the web): on an
+            // Android phone the fade could stall and leave the list blank.
+            // A fresh list for each weekday too.
+            itemEntering={null}
+            itemExiting={null}
+            key={weekday}
             columns={1}
             rowGap={0}
             data={day.exerciseIds}
