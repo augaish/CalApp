@@ -16,3 +16,5 @@ base 15-notifications calapp://notifications
 base 16-redeem calapp://redeem
 base 17-workout-history calapp://workout-history
 session 18-session calapp://session
+base 19-schedule-switch calapp://schedule tap:Sun shot:sun tap:Tue shot:tue tap:Fri
+base 20-training-days calapp://training tap:Previous_day shot:back1 tap:Previous_day shot:back2 tap:Next_day tap:Next_day

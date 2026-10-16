@@ -23,6 +23,15 @@ done
 
 adb root >/dev/null; sleep 3
 
+# Taps the element showing this text (or with this accessibility label).
+tap() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  adb pull /sdcard/ui.xml /tmp/ui.xml >/dev/null 2>&1
+  xy=$(python3 "$HERE/tap.py" /tmp/ui.xml "$1")
+  if [ -n "$xy" ]; then adb shell input tap $xy; else echo "no element: $1"; fi
+  sleep 3
+}
+
 seed() { # $1 lang, $2 kind
   node "$HERE/state.mjs" "$1" "$2" /tmp/state.json
   adb shell am force-stop $PKG
@@ -39,15 +48,25 @@ seed() { # $1 lang, $2 kind
   adb shell am force-stop $PKG
 }
 
-for lang in en ar; do
+for lang in ${LANGS:-en ar}; do
   current=""
   # The list is read on fd 3: adb would otherwise swallow the rest of it.
-  while read -r kind name url <&3; do
+  while read -r kind name url steps <&3; do
     [ -z "$kind" ] && continue
+    # ONLY (a pattern) limits the run to matching screen names.
+    if [ -n "${ONLY:-}" ] && ! echo "$name" | grep -Eq "$ONLY"; then continue; fi
+    # Steps (tap:Label) are English labels: those screens run in English only.
+    if [ -n "${steps:-}" ] && [ "$lang" != en ]; then continue; fi
     if [ "$kind" != "$current" ]; then seed "$lang" "$kind"; current=$kind; fi
     adb shell am force-stop $PKG
     adb shell am start -W -a android.intent.action.VIEW -d "'$url'" $PKG >/dev/null
     sleep 9
+    for step in ${steps:-}; do
+      case $step in
+        tap:*) tap "$(echo "${step#tap:}" | tr '_' ' ')" ;;
+        shot:*) adb exec-out screencap -p > "$OUT/$lang-$name-${step#shot:}.png" ;;
+      esac
+    done
     adb exec-out screencap -p > "$OUT/$lang-$name.png"
     echo "shot $lang-$name"
   done 3< "$HERE/screens.txt"

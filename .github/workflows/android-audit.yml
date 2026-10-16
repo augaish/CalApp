@@ -10,6 +10,14 @@ on:
         description: 'Test app (preview APK) to install'
         type: string
         default: 'https://expo.dev/artifacts/eas/XRebYAbEZGxJKI0aU-KdaLrpBcJl99jzdnSDervD0FA.apk'
+      only:
+        description: 'Only screens whose name matches this pattern (empty: all)'
+        type: string
+        default: ''
+      langs:
+        description: 'Languages'
+        type: string
+        default: 'en ar'
 
 permissions:
   contents: write
@@ -39,7 +47,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
-          script: bash qa/android-audit/run.sh app.apk shots
+          script: ONLY='${{ github.event.inputs.only }}' LANGS='${{ github.event.inputs.langs }}' bash qa/android-audit/run.sh app.apk shots
       - uses: actions/upload-artifact@v4
         if: always()
         with:
