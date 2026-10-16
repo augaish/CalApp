@@ -434,7 +434,7 @@ Apple puts the app version, the subscription group and the subscriptions into **
 
 ## Step 18 ⬜ Launch day (after "Pending Developer Release")
 1. Check your testers have their plan (admin → Users; granted in step 10). The `FOUNDERS` offer code from step 10 works for anyone new.
-2. **admin → Membership → Plan locks → ON.** From now on, new users need a plan (with the 14-day trial).
+2. ~~admin → Membership → Plan locks → ON~~ ✅ **Switched on 16 Oct, during review** (App Review Guideline 2.5.19, revised Oct 2026: no dormant features, so Apple reviews the launch experience itself). New users need a plan (with the 14-day trial); testers and the review account have plans granted in admin.
 3. App Store Connect → your version → **Release This Version**.
 4. Buy once for real on your own phone. You can refund it via reportaproblem.apple.com.
 5. Watch **admin → Overview** for the first days: purchases, AI failures and AI cost.
