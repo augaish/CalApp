@@ -1,0 +1,49 @@
+# Opens the Android test app on an emulator with sample data and takes a
+# screenshot of each main screen, in English and Arabic (qa/android-audit).
+# The app picks up the latest preview update before the screenshots.
+name: Android audit (emulator)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'Test app (preview APK) to install'
+        type: string
+        default: 'https://expo.dev/artifacts/eas/XRebYAbEZGxJKI0aU-KdaLrpBcJl99jzdnSDervD0FA.apk'
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Download the test app
+        run: curl -fsSL -o app.apk "${{ github.event.inputs.apk_url }}"
+      - name: Screens on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash qa/android-audit/run.sh app.apk shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-audit
+          path: shots
+      - name: Screenshots in the log
+        if: always()
+        run: |
+          pip install --quiet pillow
+          python3 qa/android-audit/pack.py shots
