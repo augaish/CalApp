@@ -756,5 +756,5 @@ const styles = StyleSheet.create({
   saveDayBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, marginBottom: 4, minHeight: 44 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   syncRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  quickRow: { flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md },
+  quickRow: { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.sm, marginBottom: Spacing.md },
 });
