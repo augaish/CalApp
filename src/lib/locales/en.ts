@@ -1543,6 +1543,7 @@ export const en = {
     attach: 'Attach a document',
     usesAllowance: 'Uses your AI allowance',
     allowanceLeft: '{{left}} of {{cap}} messages left this month',
+    actionsLeft: '{{remaining}} of {{limit}} AI actions left',
     emptyTitle: 'Ask about your own numbers',
     emptyBody: 'Answered from what you’ve logged. Ask it to log or change something and it prepares a card — nothing changes until you apply it.',
     starter: {
@@ -1643,10 +1644,16 @@ export const en = {
       setsReps: '{{sets}} × {{reps}}',
       add: 'Add to my weekly schedule',
       added: 'Added to your schedule',
-      overwriteTitle: 'Replace existing days?',
-      overwriteBody:
-        'You already have exercises on {{days}}. Adding this plan replaces them — everything else on your schedule stays as it is.',
-      overwriteCta: 'Replace and add',
+      addedNew: 'Saved as a new schedule, now active',
+      chooseTitle: 'How do you want to add it?',
+      chooseBody: 'Save it as a new schedule (your current week is kept in Saved schedules), or add its days to your current week.',
+      chooseBodyOverlap:
+        'Save it as a new schedule (your current week is kept in Saved schedules), or put its days into your current week, replacing {{days}}.',
+      saveAsNew: 'Save as a new schedule',
+      replaceDays: 'Replace {{days}}',
+      addToCurrent: 'Add to my current week',
+      newName: 'AI plan · {{date}}',
+      previousName: 'Before AI plan · {{date}}',
       failed: 'Could not add the plan. Try again.',
     },
   },

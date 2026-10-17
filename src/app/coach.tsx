@@ -19,6 +19,7 @@ import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { PhotoFallback } from '@/components/photo-fallback';
+import { RichText } from '@/components/rich-text';
 import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
 import { Text, TextInput } from '@/components/text';
 import { Radius, Spacing, TOUCH, Type, cardShadow } from '@/constants/theme';
@@ -65,6 +66,7 @@ export default function Coach() {
   const customExercises = useAppStore((s) => s.exercises);
   const schedule = useAppStore((s) => s.schedule);
   const applyCoachScheduleAction = useAppStore((s) => s.applyCoachSchedule);
+  const applyWeekChange = useAppStore((s) => s.applyWeekChange);
 
   // Free plans can use the coach, but only a few messages a month.
   const coachUnlocked = useEntitlement((s) => s.features?.coach !== false);
@@ -170,21 +172,44 @@ export default function Coach() {
    */
   const applySchedulePlan = (plan: CoachSchedulePlan, index: number) => {
     const resolved = resolveCoachSchedule(plan, customExercises, schedule);
-    const commit = () => {
-      applyCoachScheduleAction({ newExercises: resolved.newExercises, days: resolved.days });
+    const done = (message: string) => {
       successHaptic();
-      useCelebrate.getState().celebrate(t('coach.schedulePlan.added'));
+      useCelebrate.getState().celebrate(message);
       markCoachPlanApplied(index);
     };
-    if (resolved.overlapWeekdays.length === 0) {
+    // Into the week you have: the plan's days replace those weekdays only.
+    const commit = () => {
+      applyCoachScheduleAction({ newExercises: resolved.newExercises, days: resolved.days });
+      done(t('coach.schedulePlan.added'));
+    };
+    // A schedule of its own, made active; the week you had is kept in Saved
+    // schedules, so nothing is lost and you can switch back.
+    const saveAsNew = () => {
+      applyCoachScheduleAction({ newExercises: resolved.newExercises, days: [] });
+      const week: typeof schedule = {};
+      for (const d of resolved.days) week[d.weekday] = { title: d.title, exerciseIds: d.exerciseIds, plans: d.plans };
+      const date = new Date().toLocaleDateString(locale, { day: 'numeric', month: 'short' });
+      applyWeekChange(week, 'new', { name: t('coach.schedulePlan.newName', { date }), previous: t('coach.schedulePlan.previousName', { date }) });
+      done(t('coach.schedulePlan.addedNew'));
+    };
+    const hasWeek = Object.values(schedule).some((d) => (d?.exerciseIds?.length ?? 0) > 0);
+    if (!hasWeek) {
       commit();
       return;
     }
+    const overlap = resolved.overlapWeekdays.length > 0;
     const days = resolved.overlapWeekdays.map((wd) => weekdayLabel(wd, locale)).join(' · ');
-    alertDestructive(t('coach.schedulePlan.overwriteTitle'), t('coach.schedulePlan.overwriteBody', { days }), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('coach.schedulePlan.overwriteCta'), style: 'destructive', onPress: commit },
-    ]);
+    Alert.alert(
+      t('coach.schedulePlan.chooseTitle'),
+      overlap ? t('coach.schedulePlan.chooseBodyOverlap', { days }) : t('coach.schedulePlan.chooseBody'),
+      [
+        { text: t('coach.schedulePlan.saveAsNew'), onPress: saveAsNew, isPreferred: true },
+        overlap
+          ? { text: t('coach.schedulePlan.replaceDays', { days }), style: 'destructive', onPress: commit }
+          : { text: t('coach.schedulePlan.addToCurrent'), onPress: commit },
+        { text: t('common.cancel'), style: 'cancel' },
+      ],
+    );
   };
 
   /**
@@ -338,7 +363,7 @@ export default function Coach() {
       : coachLeft !== null
         ? t('coach.allowanceLeft', { left: coachLeft, cap: coachCap })
         : typeof remaining === 'number' && typeof limit === 'number'
-          ? t('upgrade.remaining', { remaining, limit })
+          ? t('coach.actionsLeft', { remaining, limit })
           : !entLoaded
             ? t('coach.allowanceLoading')
             : t('coach.allowanceUnavailable');
@@ -584,7 +609,12 @@ function Bubble({ role, text, at, locale, avatarLabel }: { role: 'user' | 'assis
             isUser ? [styles.user, { backgroundColor: theme.surfaceTint }] : [styles.assistant, { backgroundColor: theme.card }, cardShadow(theme.shadow)],
           ]}
         >
-          <Text style={{ color: isUser ? theme.primaryDark : theme.text, fontSize: 16, lineHeight: 22, textAlign: rtl ? 'right' : 'left', writingDirection: rtl ? 'rtl' : 'ltr' }}>{text}</Text>
+          {isUser ? (
+            <Text style={{ color: theme.primaryDark, fontSize: 16, lineHeight: 22, textAlign: rtl ? 'right' : 'left', writingDirection: rtl ? 'rtl' : 'ltr' }}>{text}</Text>
+          ) : (
+            // Replies come with **bold** and bullet lists: drawn, not shown as symbols.
+            <RichText text={text} rtl={rtl} style={{ color: theme.text, fontSize: 16, lineHeight: 22 }} />
+          )}
         </View>
       </View>
       {time && <Text style={{ color: theme.textTertiary, fontSize: 11, marginTop: 3, marginHorizontal: isUser ? 4 : 44 }}>{time}</Text>}

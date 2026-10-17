@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { Appearance, Platform } from 'react-native';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -71,12 +71,18 @@ export default function RootLayout() {
     SplashScreen.hideAsync();
   }, [hydrated, lang]);
 
+  // White clock and icons to start with (the brand band); each page then sets
+  // its own as it comes into view (hooks/use-status-bar). A <StatusBar>
+  // component here re-applied white on every render, undoing the pages.
+  useEffect(() => {
+    setStatusBarStyle('light');
+  }, []);
+
   if (!hydrated) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider value={navTheme}>
-        <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Protected guard={!account}>
           <Stack.Screen name="login" />

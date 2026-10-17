@@ -498,6 +498,12 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
   - No notification pop-up during a rest: "Alert me when rest ends?" is asked once at the start of a workout, only while notifications are off.
   - The AI usage bar is empty at 0.
 
+**Build 21 has everything above.** Made after it, for the production update once Apple approves (the Android test app has them already):
+- **AI plan → "Save as a new schedule".** Adding a week AI Support suggests asks how: **Save as a new schedule** (made active; the current week stays in Saved schedules), **Replace Monday · Wednesday** (only the days it overlaps), or **Add to my current week**.
+- **AI replies are formatted.** **Bold**, bullet lists, numbered steps and headings are drawn instead of showing `**` and `-`; Arabic bullets sit on the right.
+- **AI Support header** reads "380 of 400 AI actions left", so it fits.
+- **Android:** soft card shadows like iOS; the clock and icons are dark on light pages and white over the brand band (they were white everywhere); the weekly schedule and Training lists draw their rows straight away (a fade-in could leave the schedule blank); a brand strip behind the status bar on the tab screens; plan prices in Arabic read "ر.س"; an empty training day shows Add exercise once.
+
 Already live (server changes go live on push): the updated privacy policy, cancelling access at WHOOP when someone disconnects or deletes their account, keeping WHOOP data away from DeepSeek, the WHOOP sign-in page fix, account deletion that only deletes the sign-in token's own account, and "give plan by email" matching only the email Supabase verified. Also live: the server side of the new AI program (questions, the day and allergy checks, the 2 free changes); phones on the current version keep using the old one-tap build, which still works.
 
 ---
