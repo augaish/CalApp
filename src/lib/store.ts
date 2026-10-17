@@ -12,6 +12,7 @@ import { resolveCoachSchedule } from './coach-schedule';
 import { paceForAnswers } from './plan-answers';
 import { withSetup } from './exercise-setup';
 import { inclineGrade } from './cardio';
+import { moveWeekday } from './move-day';
 import type {
   AppearancePref,
   ActiveSession,
@@ -348,6 +349,8 @@ export interface AppState {
   setDayOrder: (day: Date, exerciseIds: string[]) => void;
   /** Reorder a weekday's plan — every later occurrence of it follows suit. */
   reorderSchedule: (weekday: number, exerciseIds: string[]) => void;
+  /** One weekday's workout onto another day: moved to a rest day, swapped with a training day (lib/move-day). */
+  moveScheduleDay: (from: number, to: number) => void;
   /**
    * Turn a day that was actually trained into a weekday of the weekly
    * schedule, carrying its sets across as the targets. 'replace' makes the
@@ -614,6 +617,7 @@ const WRITE_AREAS: Partial<Record<keyof AppState, WriteArea | ((...args: unknown
   copyDayTo: 'training',
   setDayOrder: 'training',
   reorderSchedule: 'training',
+  moveScheduleDay: 'training',
   saveDayToSchedule: 'training',
   addToSchedule: 'training',
   addToDay: 'training',
@@ -1203,6 +1207,7 @@ export const useAppStore = create<AppState>()(
         }),
       setWhoopBackfilledAt: (iso) => set({ whoopBackfilledAt: iso }),
       setWhoopLastFetchedAt: (iso) => set({ whoopLastFetchedAt: iso }),
+      moveScheduleDay: (from, to) => set((s) => ({ schedule: moveWeekday(s.schedule, from, to) })),
       reorderSchedule: (weekday, exerciseIds) =>
         set((s) => {
           const cur = s.schedule[weekday];

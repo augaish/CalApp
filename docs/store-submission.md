@@ -500,6 +500,7 @@ Pushed to GitHub and tested, but not sent to iPhones yet. **The Android test app
 
 **Build 21 has everything above.** Made after it, for the production update once Apple approves (the Android test app has them already):
 - **AI plan → "Save as a new schedule".** Adding a week AI Support suggests asks how: **Save as a new schedule** (made active; the current week stays in Saved schedules), **Replace Monday · Wednesday** (only the days it overlaps), or **Add to my current week**.
+- **Move a day to another day.** Weekly schedule → **Move Monday to another day**: pick any day; to a rest day the workout moves (its old day becomes rest), to a training day the two swap (the button says which). Exercises, planned sets and the day's name go with it; Undo for a few seconds. Changes every coming week; done workouts stay where they were.
 - **AI replies are formatted.** **Bold**, bullet lists, numbered steps and headings are drawn instead of showing `**` and `-`; Arabic bullets sit on the right.
 - **AI Support header** reads "380 of 400 AI actions left", so it fits.
 - **Android:** soft card shadows like iOS; the clock and icons are dark on light pages and white over the brand band (they were white everywhere); the weekly schedule and Training lists draw their rows straight away (a fade-in could leave the schedule blank); a brand strip behind the status bar on the tab screens; plan prices in Arabic read "ر.س"; an empty training day shows Add exercise once.

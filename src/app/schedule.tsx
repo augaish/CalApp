@@ -1,5 +1,5 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Alert,
@@ -13,6 +13,7 @@ import { useAnimatedRef } from 'react-native-reanimated';
 import Sortable from 'react-native-sortables';
 
 import { Icon } from '@/components/icon';
+import { dayWorkoutName, MoveDaySheet } from '@/components/move-day-sheet';
 import { alertProblem } from '@/lib/alerts';
 import { Text, TextInput } from '@/components/text';
 import { Button, Screen } from '@/components/ui';
@@ -42,6 +43,7 @@ export default function ScheduleScreen() {
   const addToSchedule = useAppStore((s) => s.addToSchedule);
   const removeFromSchedule = useAppStore((s) => s.removeFromSchedule);
   const reorderSchedule = useAppStore((s) => s.reorderSchedule);
+  const moveScheduleDay = useAppStore((s) => s.moveScheduleDay);
   const setScheduleTitle = useAppStore((s) => s.setScheduleTitle);
   const viewDay = useViewDay((s) => s.day);
 
@@ -54,6 +56,37 @@ export default function ScheduleScreen() {
   const pageRef = useAnimatedRef<ScrollView>();
   const [sharing, setSharing] = useState(false);
   const day = schedule[weekday] ?? { exerciseIds: [] };
+  // Move this day's workout to another day; the bar under it offers Undo.
+  const [moving, setMoving] = useState(false);
+  const [moved, setMoved] = useState<{ text: string; from: number; to: number } | null>(null);
+  useEffect(() => {
+    if (!moved) return;
+    const id = setTimeout(() => setMoved(null), 6000);
+    return () => clearTimeout(id);
+  }, [moved]);
+  const moveTo = (to: number) => {
+    const from = weekday;
+    const swap = (schedule[to]?.exerciseIds?.length ?? 0) > 0;
+    const name = dayWorkoutName(schedule, from, locale, t);
+    moveScheduleDay(from, to);
+    lightHaptic();
+    setMoving(false);
+    setWeekday(to);
+    setMoved({
+      text: swap
+        ? t('schedule.swapped', { from: weekdayLabel(from, locale, 'long'), to: weekdayLabel(to, locale, 'long') })
+        : t('schedule.moved', { name, to: weekdayLabel(to, locale, 'long') }),
+      from,
+      to,
+    });
+  };
+  const undoMove = () => {
+    if (!moved) return;
+    // Moving it back undoes a move or a swap alike.
+    moveScheduleDay(moved.to, moved.from);
+    setWeekday(moved.from);
+    setMoved(null);
+  };
 
   const sharePlan = async () => {
     const hasAny = Object.values(schedule).some((d) => d.exerciseIds.length > 0);
@@ -102,7 +135,22 @@ export default function ScheduleScreen() {
   return (
     <Screen
       scrollRef={pageRef}
-      footer={<Button label={t('common.done')} onPress={() => router.back()} />}
+      footer={
+        <View style={{ gap: Spacing.sm }}>
+          {moved && (
+            <View style={[styles.toast, { backgroundColor: theme.text }]} accessibilityLiveRegion="polite">
+              <Icon name="checkmark-circle" size={19} color={theme.success} />
+              <Text style={{ flex: 1, color: theme.background, fontWeight: '700' }} numberOfLines={2}>
+                {moved.text}
+              </Text>
+              <Pressable onPress={undoMove} hitSlop={8} accessibilityRole="button">
+                <Text style={{ color: theme.surfaceTint, fontWeight: '800' }}>{t('schedule.undo')}</Text>
+              </Pressable>
+            </View>
+          )}
+          <Button label={t('common.done')} onPress={() => router.back()} />
+        </View>
+      }
     >
       <View style={styles.header}>
         <Icon name="calendar" size={22} color={theme.text} />
@@ -165,6 +213,19 @@ export default function ScheduleScreen() {
           style={{ flex: 1, color: theme.text, fontSize: 16, padding: 0 }}
         />
       </View>
+
+      {day.exerciseIds.length > 0 && (
+        <Pressable
+          onPress={() => setMoving(true)}
+          accessibilityRole="button"
+          style={({ pressed }) => [styles.moveRow, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
+        >
+          <Icon name="swap-horizontal" size={18} color={theme.primaryDark} />
+          <Text style={{ flex: 1, color: theme.primaryDark, fontWeight: '800' }}>{t('schedule.moveRow', { day: weekdayLabel(weekday, locale, 'long') })}</Text>
+          <Icon name="chevron-forward" size={16} color={theme.primaryDark} />
+        </Pressable>
+      )}
+      {moving && <MoveDaySheet week={schedule} from={weekday} onClose={() => setMoving(false)} onMove={moveTo} />}
 
       {/* Exercises for this weekday */}
       <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -311,6 +372,8 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   listCard: { borderRadius: Radius.md, overflow: 'hidden' },
+  moveRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.control, paddingHorizontal: Spacing.md, paddingVertical: 12, marginBottom: Spacing.md },
+  toast: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, borderRadius: Radius.control, paddingHorizontal: Spacing.md, paddingVertical: 12 },
   row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
   rowTap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
   rowIcon: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
