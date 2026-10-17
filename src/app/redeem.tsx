@@ -1,9 +1,10 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
+import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { Text, TextInput } from '@/components/text';
 import { Button, Card, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -96,7 +97,7 @@ export default function Redeem() {
   if (Platform.OS === 'ios') return null;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+    <KeyboardAvoider style={{ flex: 1 }}>
       <Screen
         footer={
           <View>
@@ -198,7 +199,7 @@ export default function Redeem() {
           </Card>
         )}
       </Screen>
-    </KeyboardAvoidingView>
+    </KeyboardAvoider>
   );
 }
 

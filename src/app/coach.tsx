@@ -7,7 +7,6 @@ import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { KeyboardAvoider, useKeyboardShown } from '@/components/keyboard-avoider';
 import { alertDestructive } from '@/lib/alerts';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { PhotoFallback } from '@/components/photo-fallback';
@@ -61,6 +61,8 @@ export default function Coach() {
   const router = useRouter();
   const { prompt: openingPrompt, focus: focusParam } = useLocalSearchParams<{ prompt?: string; focus?: string }>();
   const insets = useSafeAreaInsets();
+  // With the keyboard up, the home-indicator margin under the box is just a gap.
+  const keyboardShown = useKeyboardShown();
   const language = useAppStore((s) => s.language) ?? 'en';
   const locale = language === 'ar' ? 'ar' : 'en';
   const customExercises = useAppStore((s) => s.exercises);
@@ -373,7 +375,7 @@ export default function Coach() {
   const chips = busy ? [] : messages.length === 0 ? STARTERS.map((k) => t(`coach.starter.${k}`)) : last?.role === 'assistant' ? (last.suggestions ?? []) : [];
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: theme.background }} behavior="padding" keyboardVerticalOffset={0}>
+    <KeyboardAvoider style={{ flex: 1, backgroundColor: theme.background }}>
       {/* One thin brand strip carries everything the two old rows did: the
           brand, Back, the screen name with its allowance, shared context and
           a new conversation — so the thread gets the height back. */}
@@ -530,7 +532,7 @@ export default function Coach() {
         )}
       </ScrollView>
 
-      <View style={{ paddingBottom: insets.bottom + Spacing.sm, backgroundColor: theme.background }}>
+      <View style={{ paddingBottom: (keyboardShown ? 0 : insets.bottom) + Spacing.sm, backgroundColor: theme.background }}>
         {/* Follow-ups the coach offered: one tap sends them as the next message. */}
         {chips.length > 0 && (
           <ScrollView
@@ -579,7 +581,7 @@ export default function Coach() {
           </Pressable>
         </View>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAvoider>
   );
 }
 

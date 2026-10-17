@@ -4,7 +4,6 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
+import { KeyboardAvoider } from '@/components/keyboard-avoider';
 import { Text, TextInput } from '@/components/text';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useStatusBar } from '@/hooks/use-status-bar';
@@ -68,10 +68,7 @@ export function Screen({
     // footer button (Add set, Complete set, Save) sat under it. Where the
     // window does still shrink, the measured overlap is zero and this adds
     // nothing.
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
-    >
+    <KeyboardAvoider style={{ flex: 1 }}>
       <View style={{ flex: 1, backgroundColor: t.background }}>
         {header}
         {scroll ? (
@@ -100,7 +97,7 @@ export function Screen({
           </View>
         ) : null}
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAvoider>
   );
 }
 

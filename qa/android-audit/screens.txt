@@ -19,3 +19,4 @@ session 18-session calapp://session
 base 19-schedule-switch calapp://schedule tap:Sun shot:sun tap:Tue shot:tue tap:Fri
 base 20-training-days calapp://training tap:Previous_day shot:back1 tap:Previous_day shot:back2 tap:Next_day tap:Next_day
 base 21-schedule-add calapp://schedule tap:Lat_Pulldown shot:history tap:Browse_all_exercises tap:Cable_Crossover tap:Cable_Pec_Fly tap:Done shot:library tap:Incline_Bench_Press key:back
+base 22-coach-typing calapp://coach tap:Ask_a_question…
