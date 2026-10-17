@@ -1,0 +1,17 @@
+# Reads what the live server tells a brand-new install (plan, allowance,
+# plan locks), for checks after a server change. Nothing is written.
+name: Server probe
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: A new install's entitlement
+        run: |
+          ref="u_probe_$(date +%s)"
+          curl -sS -m 30 -H "x-calgym-user: $ref" https://calapp-production-ab20.up.railway.app/api/me | tee me.json
+          echo
+          python3 -c "import json;d=json.load(open('me.json'));print('PROBE', json.dumps({k:d.get(k) for k in ['plan','remaining','limit','planLocks','locks','features']}))"
