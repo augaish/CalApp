@@ -16,6 +16,8 @@ const MARKER = 'launch_switch_2026_10';
 const REVIEW_EMAIL = 'review@calgym.org';
 
 export async function runLaunchSwitch(): Promise<void> {
+  // The live server only: local and test servers keep their own settings.
+  if (!process.env.RAILWAY_ENVIRONMENT_NAME && !process.env.RAILWAY_PROJECT_ID) return;
   const done = await getSetting<{ at?: string }>(MARKER, {});
   if (done.at) return;
   const now = Date.now();

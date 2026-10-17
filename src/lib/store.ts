@@ -688,6 +688,52 @@ function guardWrites<A extends unknown[]>(creator: (...args: A) => AppState): (.
   };
 }
 
+/**
+ * Two weeks plan the same training: per weekday, the same title, exercises in
+ * the same order and the same planned sets. Empty days and undefined fields
+ * count as absent, so a copy made by JSON round-trip still matches.
+ */
+export function sameWeek(a: AppState['schedule'], b: AppState['schedule']): boolean {
+  const norm = (w: AppState['schedule']) => {
+    const out: Record<string, string> = {};
+    for (const [wd, d] of Object.entries(w ?? {})) {
+      if (!d || !(d.exerciseIds?.length ?? 0)) continue;
+      const plans = Object.fromEntries(
+        Object.entries(d.plans ?? {})
+          .filter(([, v]) => Array.isArray(v) && v.length > 0)
+          .sort(([x], [y]) => x.localeCompare(y)),
+      );
+      out[wd] = JSON.stringify({ t: d.title?.trim() || '', e: d.exerciseIds, p: plans });
+    }
+    return out;
+  };
+  const x = norm(a);
+  const y = norm(b);
+  const keys = new Set([...Object.keys(x), ...Object.keys(y)]);
+  for (const k of keys) if (x[k] !== y[k]) return false;
+  return true;
+}
+
+/**
+ * Saved schedules once the current week is about to be replaced: kept exactly
+ * once — in the schedule it came from (edits since are saved into it), not
+ * again if it is already saved word for word, and as its own "Before …" copy
+ * only when it is saved nowhere. Copying whenever the active schedule had any
+ * change put the same week in Schedules twice.
+ */
+function keepReplacedWeek(
+  s: Pick<AppState, 'schedule' | 'savedSchedules' | 'activeScheduleId'>,
+  previousName: string,
+  newId: () => string,
+  now: string,
+): AppState['savedSchedules'] {
+  const hasWeek = Object.values(s.schedule).some((d) => (d?.exerciseIds?.length ?? 0) > 0);
+  if (!hasWeek || s.savedSchedules.some((x) => sameWeek(x.days, s.schedule))) return s.savedSchedules;
+  const active = s.savedSchedules.find((x) => x.id === s.activeScheduleId);
+  if (active) return s.savedSchedules.map((x) => (x.id === active.id ? { ...x, days: s.schedule } : x));
+  return [...s.savedSchedules, { id: newId(), name: previousName.trim(), days: s.schedule, createdAt: now }];
+}
+
 export const useAppStore = create<AppState>()(
   persist(
     guardWrites((rawSet, get) => {
@@ -1399,21 +1445,13 @@ export const useAppStore = create<AppState>()(
           // The program's week, whole: a day it does not train is rest.
           const week: AppState['schedule'] = {};
           for (const d of resolved.days) week[d.weekday] = { title: d.title, exerciseIds: d.exerciseIds, plans: d.plans };
-          // Keep the week you had before it is replaced — unless it is already
-          // saved exactly as it is — so Schedules can bring it back.
-          const hasWeek = Object.values(s.schedule).some((d) => (d?.exerciseIds?.length ?? 0) > 0);
-          const activeSaved = s.savedSchedules.find((x) => x.id === s.activeScheduleId);
-          const alreadySaved = !!activeSaved && JSON.stringify(activeSaved.days) === JSON.stringify(s.schedule);
-          const kept: AppState['savedSchedules'] =
-            hasWeek && !alreadySaved
-              ? [{ id: `sched:${id()}`, name: names.previous.trim(), days: s.schedule, createdAt: now }]
-              : [];
+          // Keep the week you had before it is replaced, once, so Schedules can bring it back.
+          const kept = keepReplacedWeek(s, names.previous, () => `sched:${id()}`, now);
           scheduleId = `sched:${id()}`;
           set({
             exercises: [...s.exercises, ...resolved.newExercises],
             schedule: week,
             savedSchedules: [
-              ...s.savedSchedules,
               ...kept,
               { id: scheduleId, name: names.schedule.trim(), days: week, createdAt: now, activatedAt: now },
             ],
@@ -1467,14 +1505,11 @@ export const useAppStore = create<AppState>()(
               savedSchedules: activeSaved ? s.savedSchedules.map((x) => (x.id === activeSaved.id ? { ...x, days: week } : x)) : s.savedSchedules,
             };
           }
-          const hasWeek = Object.values(s.schedule).some((d) => (d?.exerciseIds?.length ?? 0) > 0);
-          const alreadySaved = !!activeSaved && JSON.stringify(activeSaved.days) === JSON.stringify(s.schedule);
-          const kept: AppState['savedSchedules'] =
-            hasWeek && !alreadySaved ? [{ id: `sched:${id()}`, name: names.previous.trim(), days: s.schedule, createdAt: now }] : [];
+          const saved = keepReplacedWeek(s, names.previous, () => `sched:${id()}`, now);
           const sid = `sched:${id()}`;
           return {
             schedule: week,
-            savedSchedules: [...s.savedSchedules, ...kept, { id: sid, name: names.name.trim(), days: week, createdAt: now, activatedAt: now }],
+            savedSchedules: [...saved, { id: sid, name: names.name.trim(), days: week, createdAt: now, activatedAt: now }],
             activeScheduleId: sid,
           };
         }),

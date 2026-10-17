@@ -1,48 +1,56 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, View, type KeyboardAvoidingViewProps } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Dimensions, Keyboard, KeyboardAvoidingView, LayoutAnimation, Platform, View, type KeyboardAvoidingViewProps, type KeyboardEvent } from 'react-native';
 
 /**
- * KeyboardAvoidingView that knows where it sits on the screen.
+ * Keeps a page's bottom (a message box, a Save button) above the keyboard.
  *
- * React Native measures the keyboard against the view's own position inside
- * its parent, so on a screen shown as an iPhone sheet (which starts below the
- * top of the screen) it lifted the content too little and the bottom of it,
- * AI Support's message box for one, stayed half under the keyboard. Here the
- * view's distance from the top of the screen is measured and passed as the
- * offset. A full-screen page measures 0 and behaves as before.
+ * iPhone: the page is lifted by exactly the keyboard's height. React
+ * Native's KeyboardAvoidingView works from the view's position inside its
+ * parent, and on a screen shown as an iPhone sheet (AI Support, the code
+ * screen, every modal) that left the bottom partly under the keyboard; the
+ * position on screen can't be measured reliably inside a sheet either. Every
+ * page using this reaches the bottom of the phone, sheet or not, so the
+ * keyboard's height is the whole overlap.
+ * Android: KeyboardAvoidingView with padding, as before (checked on the
+ * emulator).
  */
 export function KeyboardAvoider({ style, children, behavior = 'padding', ...rest }: KeyboardAvoidingViewProps) {
-  const ref = useRef<View>(null);
-  const [offset, setOffset] = useState(0);
-
-  const measure = useCallback(() => {
-    if (Platform.OS !== 'ios') return;
-    ref.current?.measureInWindow((_x, y) => {
-      if (!Number.isFinite(y)) return;
-      const next = Math.max(0, Math.round(y));
-      setOffset((prev) => (prev === next ? prev : next));
-    });
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return;
-    // Measured again once the sheet has finished sliding up, and whenever the
-    // keyboard is about to show, so a mid-animation position never sticks.
-    const settle = setTimeout(measure, 600);
-    const sub = Keyboard.addListener('keyboardWillShow', measure);
-    return () => {
-      clearTimeout(settle);
-      sub.remove();
-    };
-  }, [measure]);
-
-  return (
-    <View ref={ref} style={{ flex: 1 }} onLayout={measure} collapsable={false}>
-      <KeyboardAvoidingView behavior={behavior} {...rest} keyboardVerticalOffset={offset} style={style ?? { flex: 1 }}>
+  const lift = useKeyboardHeight();
+  if (Platform.OS !== 'ios') {
+    return (
+      <KeyboardAvoidingView behavior={behavior} {...rest} style={style ?? { flex: 1 }}>
         {children}
       </KeyboardAvoidingView>
-    </View>
-  );
+    );
+  }
+  return <View style={[{ flex: 1 }, style, { paddingBottom: lift }]}>{children}</View>;
+}
+
+/** The keyboard's height while it is up on iPhone, 0 otherwise; animated with it. */
+function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const animate = (e: KeyboardEvent) => {
+      if (e.duration) LayoutAnimation.configureNext({ duration: e.duration, update: { duration: e.duration, type: LayoutAnimation.Types.keyboard } });
+    };
+    const show = Keyboard.addListener('keyboardWillChangeFrame', (e) => {
+      animate(e);
+      // How far the keyboard reaches up from the bottom of the screen; one
+      // that is closing (or undocked, off the bottom) ends below it: 0.
+      const overlap = Dimensions.get('window').height - e.endCoordinates.screenY;
+      setHeight(Math.max(0, Math.round(overlap)));
+    });
+    const hide = Keyboard.addListener('keyboardWillHide', (e) => {
+      animate(e);
+      setHeight(0);
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
 }
 
 /** Whether the keyboard is up (iOS: as it starts to show; Android: once shown). */
