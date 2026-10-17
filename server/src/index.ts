@@ -155,6 +155,7 @@ import { estimateCostUsd } from './pricing.js';
 import { decide, planFromSubscriber, type RevenueCatEvent, type SubscriberRecord } from './revenuecat.js';
 import { cleanEarning, cleanPartner } from './partners.js';
 import { deleteAuthUser, deleteAuthUserByEmail, findAuthUserByEmail, supabaseAdminConfigured } from './supabase-admin.js';
+import { runLaunchSwitch } from './launch.js';
 import { bearerOf, identify, isAccountRef, ownStoreId, requireAccountToken, verifyAccessToken } from './identity.js';
 import { partnerNotFoundHtml, partnerPageHtml } from './partner-html.js';
 import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining } from './promo.js';
@@ -3313,7 +3314,8 @@ app.post('/admin/api/sponsor', async (c) => {
 app.get('/admin', (c) => c.html(ADMIN_HTML));
 
 initDb()
-  .then(() => {
+  .then(async () => {
+    await runLaunchSwitch().catch((err) => console.error('launch switch failed:', err));
     serve({ fetch: app.fetch, port: PORT }, (info) => {
       console.log(
         `Calgym AI server listening on :${info.port} (model: ${MODEL}, cache: ${cacheEnabled ? 'on' : 'off'})`,

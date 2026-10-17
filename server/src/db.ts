@@ -2455,3 +2455,23 @@ export async function returnFreeChange(id: string, ref: string): Promise<void> {
   if (!pool) return;
   await pool.query('UPDATE program_drafts SET free_left = free_left + 1 WHERE id = $1 AND ref = $2', [id, ref]);
 }
+
+/**
+ * Accounts on no plan (or a lapsed one) moved to `plan` until `until`, with
+ * the note; accounts already holding a plan that runs later are left alone.
+ * Returns how many changed. Used once, by the launch switch (launch.ts).
+ */
+export async function grantToEveryoneWithoutPlan(plan: Plan, until: string, note: string): Promise<number> {
+  if (!pool) return 0;
+  const res = await pool.query(
+    `UPDATE app_users SET plan = $1, plan_source = 'admin', plan_until = $2, note = $3 WHERE plan = 'free'`,
+    [plan, until, note],
+  );
+  // An earlier admin grant that would end sooner runs to the same date; its plan stays.
+  const extended = await pool.query(
+    `UPDATE app_users SET plan_until = $1
+      WHERE plan <> 'free' AND plan_source = 'admin' AND plan_until IS NOT NULL AND plan_until < $1`,
+    [until],
+  );
+  return (res.rowCount ?? 0) + (extended.rowCount ?? 0);
+}
