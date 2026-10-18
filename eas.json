@@ -19,6 +19,14 @@
       "autoIncrement": true,
       "channel": "production",
       "environment": "production"
+    },
+    "simulator": {
+      "distribution": "internal",
+      "channel": "preview",
+      "environment": "preview",
+      "ios": {
+        "simulator": true
+      }
     }
   },
   "submit": {

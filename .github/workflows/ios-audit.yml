@@ -1,0 +1,87 @@
+# Opens the iPhone app on a simulator with sample data and takes a screenshot
+# of each screen in qa/ios-audit/screens.txt, tapping text boxes so the
+# keyboard shows. Small copies are committed to qa/ios-audit/shots/<run>.
+name: iPhone audit (simulator)
+
+on:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Only screens whose name matches this pattern (empty: all)'
+        type: string
+        default: ''
+      langs:
+        description: 'Languages'
+        type: string
+        default: 'en ar'
+      build_url:
+        description: 'Reuse a simulator build (tar.gz URL); empty builds one'
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    outputs:
+      url: ${{ steps.out.outputs.url }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - uses: expo/expo-github-action@v8
+        if: ${{ github.event.inputs.build_url == '' }}
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+        if: ${{ github.event.inputs.build_url == '' }}
+      - name: Simulator build (EAS)
+        if: ${{ github.event.inputs.build_url == '' }}
+        run: eas build --platform ios --profile simulator --non-interactive --json > build.json
+      - id: out
+        run: |
+          if [ -n "${{ github.event.inputs.build_url }}" ]; then url="${{ github.event.inputs.build_url }}"; else url=$(jq -r '.[0].artifacts.buildUrl // .[0].artifacts.applicationArchiveUrl' build.json); fi
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "::notice title=Simulator build::$url"
+
+  audit:
+    needs: build
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Simulator app
+        run: |
+          curl -fsSL -o app.tar.gz "${{ needs.build.outputs.url }}"
+          mkdir app && tar -xzf app.tar.gz -C app
+          echo "APP=$(find "$PWD/app" -maxdepth 3 -name '*.app' | head -1)" >> "$GITHUB_ENV"
+      - name: Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: Screens
+        run: ONLY='${{ github.event.inputs.only }}' LANGS='${{ github.event.inputs.langs }}' bash qa/ios-audit/run.sh "$APP" shots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-audit
+          path: shots
+      - name: Commit small copies
+        if: always()
+        run: |
+          dest=qa/ios-audit/shots/${{ github.run_number }}
+          mkdir -p "$dest"
+          for f in shots/*.png; do [ -e "$f" ] || continue; sips -s format jpeg -s formatOptions 75 -Z 1100 "$f" --out "$dest/$(basename "${f%.png}").jpg" >/dev/null; done
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$dest"
+          git commit -m "iPhone audit screenshots (run ${{ github.run_number }})" || exit 0
+          for i in 1 2 3; do git pull --rebase origin "${GITHUB_REF_NAME}" && git push origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
