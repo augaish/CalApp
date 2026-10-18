@@ -218,6 +218,7 @@ export default function ScheduleScreen() {
         <Pressable
           onPress={() => setMoving(true)}
           accessibilityRole="button"
+          accessibilityLabel={t('schedule.moveRow', { day: weekdayLabel(weekday, locale, 'long') })}
           style={({ pressed }) => [styles.moveRow, { backgroundColor: theme.surfaceTint }, pressed && { opacity: 0.7 }]}
         >
           <Icon name="swap-horizontal" size={18} color={theme.primaryDark} />
