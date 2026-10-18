@@ -28,6 +28,8 @@ seed() { # $1 lang, $2 kind
   for i in 1 2; do xcrun simctl launch "$UDID" "$BID" >/dev/null; sleep 10; xcrun simctl terminate "$UDID" "$BID"; done
 }
 
+printf 'appId: %s\n---\n- waitForAnimationToEnd\n' "$BID" > /tmp/warm.yaml; maestro --device "$UDID" test /tmp/warm.yaml >/dev/null 2>&1 || true
+
 for lang in ${LANGS:-en ar}; do
   current=""
   while read -r kind name url steps <&3; do
@@ -40,7 +42,10 @@ for lang in ${LANGS:-en ar}; do
     xcrun simctl openurl "$UDID" "$url"; sleep 3
     # iOS asks "Open in “Calgym”?" for a link: Open, then any tap steps.
     {
-      printf 'appId: %s\n---\n- tapOn:\n    text: "Open"\n    optional: true\n- waitForAnimationToEnd\n' "$BID"
+      printf 'appId: %s\n---\n' "$BID"
+      # The link prompt, and the phone's notification question if it shows.
+      for b in Allow Open Allow; do printf -- '- extendedWaitUntil:\n    visible: "%s"\n    timeout: 4000\n    optional: true\n- tapOn:\n    text: "%s"\n    optional: true\n' "$b" "$b"; done
+      printf -- '- waitForAnimationToEnd\n'
       for step in ${steps:-}; do
         case $step in
           tap:*) printf -- '- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$(echo "${step#tap:}" | tr '_' ' ')" ;;
