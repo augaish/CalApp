@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, KeyboardAvoidingView, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 
 import { alertProblem } from '@/lib/alerts';
 import { TextInput } from '@/components/text';
@@ -87,48 +87,45 @@ export default function Describe() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior="padding"
+    // Screen keeps the box and buttons above the keyboard itself; a second
+    // keyboard wrapper here lifted it twice and pushed the box off screen.
+    <Screen
+      scroll={false}
+      footer={
+        <View>
+          <Button
+            label={t('describe.analyze')}
+            icon="sparkles"
+            onPress={analyze}
+            loading={busy}
+            disabled={text.trim().length < 3}
+          />
+          <Button
+            label={t('common.cancel')}
+            variant="ghost"
+            onPress={() => router.back()}
+            style={{ marginTop: Spacing.xs }}
+          />
+        </View>
+      }
     >
-      <Screen
-        scroll={false}
-        footer={
-          <View>
-            <Button
-              label={t('describe.analyze')}
-              icon="sparkles"
-              onPress={analyze}
-              loading={busy}
-              disabled={text.trim().length < 3}
-            />
-            <Button
-              label={t('common.cancel')}
-              variant="ghost"
-              onPress={() => router.back()}
-              style={{ marginTop: Spacing.xs }}
-            />
-          </View>
-        }
-      >
-        <Title close>{t('describe.title')}</Title>
-        <Subtitle>{t('describe.tip')}</Subtitle>
-        {isMockMode && <Subtitle>{t('scan.mockBadge')}</Subtitle>}
-        <TextInput
-          value={text}
-          onChangeText={setText}
-          placeholder={t('describe.placeholder')}
-          placeholderTextColor={theme.textTertiary}
-          multiline
-          autoFocus
-          maxLength={500}
-          style={[
-            styles.input,
-            { backgroundColor: theme.card, borderColor: theme.border, color: theme.text },
-          ]}
-        />
-      </Screen>
-    </KeyboardAvoidingView>
+      <Title close>{t('describe.title')}</Title>
+      <Subtitle>{t('describe.tip')}</Subtitle>
+      {isMockMode && <Subtitle>{t('scan.mockBadge')}</Subtitle>}
+      <TextInput
+        value={text}
+        onChangeText={setText}
+        placeholder={t('describe.placeholder')}
+        placeholderTextColor={theme.textTertiary}
+        multiline
+        autoFocus
+        maxLength={500}
+        style={[
+          styles.input,
+          { backgroundColor: theme.card, borderColor: theme.border, color: theme.text },
+        ]}
+      />
+    </Screen>
   );
 }
 
