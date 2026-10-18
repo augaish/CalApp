@@ -54,7 +54,7 @@ for lang in ${LANGS:-en ar}; do
         esac
       done
     } > /tmp/flow.yaml
-    maestro --device "$UDID" test /tmp/flow.yaml >/tmp/maestro.log 2>&1 || { echo "maestro: $name"; tail -5 /tmp/maestro.log; }
+    maestro --device "$UDID" test /tmp/flow.yaml >/tmp/maestro.log 2>&1 || { echo "maestro: $name"; tail -5 /tmp/maestro.log; tail -40 /tmp/maestro.log > "$OUT/$lang-$name.maestro.txt"; }
     sleep 3
     xcrun simctl io "$UDID" screenshot "$OUT/$lang-$name.png"
     echo "shot $lang-$name"

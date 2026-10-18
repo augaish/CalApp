@@ -80,6 +80,7 @@ jobs:
           dest=qa/ios-audit/shots/${{ github.run_number }}
           mkdir -p "$dest"
           for f in shots/*.png; do [ -e "$f" ] || continue; sips -s format jpeg -s formatOptions 75 -Z 1100 "$f" --out "$dest/$(basename "${f%.png}").jpg" >/dev/null; done
+          cp shots/*.txt "$dest/" 2>/dev/null || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$dest"
