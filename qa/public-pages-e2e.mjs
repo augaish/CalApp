@@ -27,7 +27,7 @@ check('support: contact, cancel, restore and refund help', /Cancel or change a s
 await page.screenshot({ path: `${OUT}/support.png`, fullPage: true });
 
 await page.goto(`${API}/account-deletion`);
-check('deletion page explains the in-app way first', /Profile → Privacy → Delete my account/.test(await page.textContent('body')));
+check('deletion page explains the in-app way first', /Profile → Settings → Privacy &? ?(&amp; )?data → Delete my account|Profile → Settings → Privacy & data → Delete my account/.test(await page.textContent('body')));
 await page.fill('#email', 'not-an-email');
 await page.evaluate(() => document.querySelector('#email').type = 'text'); // let the server see the bad value
 await page.click('button[type=submit]');

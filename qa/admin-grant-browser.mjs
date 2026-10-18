@@ -43,8 +43,12 @@ for (const [label, viewport] of [['desktop', { width: 1280, height: 900 }], ['ph
   // Unknown email.
   await page.fill('#g_who', `nobody.${run}@example.com`);
   await page.click('[data-gplan="pro"]');
-  check(`${label}: unknown email says they must sign up first`, /sign up in the app first/.test(await page.textContent('#g_found')));
-  check(`${label}: unknown email can't be given a plan`, await page.isDisabled('#g_give'));
+  // Not in the list: Give looks the email up in sign-in accounts, and an
+  // address with no account comes back as "sign up in the app first".
+  check(`${label}: unknown email says Give looks it up`, /looks the email up in sign-in accounts/.test(await page.textContent('#g_found')));
+  await page.click('#g_give');
+  await page.waitForTimeout(800);
+  check(`${label}: no account → they must sign up first`, /sign up in the app first/.test(await page.textContent('body')));
 
   // Give Pro+ for 3 months, typed in a different case.
   await page.fill('#g_who', EA.toUpperCase());
