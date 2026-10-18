@@ -3,11 +3,11 @@ base 02-food calapp://food
 base 03-training calapp://training
 base 04-health calapp://health
 base 05-schedule calapp://schedule
-base 06-schedule-move calapp://schedule tap:Move_Friday_to_another_day
+base 06-schedule-move calapp://schedule tap:Move_.*_to_another_day
 base 07-exercise-detail calapp://exercise-detail?id=builtin%3Abench-press
 base 08-coach calapp://coach
-base 09-coach-typing calapp://coach tap:Ask_a_question…
-base 10-describe calapp://describe
+base 09-coach-typing calapp://coach tap:Ask_a_question.* maybe:Continue
+base 10-describe calapp://describe maybe:Continue
 base 11-membership calapp://membership
 base 12-settings calapp://settings
 base 13-notifications calapp://notifications

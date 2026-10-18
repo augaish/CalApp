@@ -49,6 +49,8 @@ for lang in ${LANGS:-en ar}; do
       for step in ${steps:-}; do
         case $step in
           tap:*) printf -- '- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$(echo "${step#tap:}" | tr '_' ' ')" ;;
+          # The keyboard's one-time swipe-typing tip, if it shows.
+          maybe:*) printf -- '- tapOn:\n    text: "%s"\n    optional: true\n- waitForAnimationToEnd\n' "$(echo "${step#maybe:}" | tr '_' ' ')" ;;
         esac
       done
     } > /tmp/flow.yaml
