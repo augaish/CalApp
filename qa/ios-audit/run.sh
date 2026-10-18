@@ -37,16 +37,18 @@ for lang in ${LANGS:-en ar}; do
     if [ "$kind" != "$current" ]; then seed "$lang" "$kind"; current=$kind; fi
     xcrun simctl terminate "$UDID" "$BID" 2>/dev/null
     xcrun simctl launch "$UDID" "$BID" >/dev/null; sleep 6
-    xcrun simctl openurl "$UDID" "$url"; sleep 6
-    for step in ${steps:-}; do
-      case $step in
-        tap:*)
-          label=$(echo "${step#tap:}" | tr '_' ' ')
-          printf 'appId: %s\n---\n- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$BID" "$label" > /tmp/tap.yaml
-          maestro --device "$UDID" test /tmp/tap.yaml >/dev/null 2>&1 || echo "no element: $label"
-          sleep 2 ;;
-      esac
-    done
+    xcrun simctl openurl "$UDID" "$url"; sleep 3
+    # iOS asks "Open in “Calgym”?" for a link: Open, then any tap steps.
+    {
+      printf 'appId: %s\n---\n- tapOn:\n    text: "Open"\n    optional: true\n- waitForAnimationToEnd\n' "$BID"
+      for step in ${steps:-}; do
+        case $step in
+          tap:*) printf -- '- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$(echo "${step#tap:}" | tr '_' ' ')" ;;
+        esac
+      done
+    } > /tmp/flow.yaml
+    maestro --device "$UDID" test /tmp/flow.yaml >/tmp/maestro.log 2>&1 || { echo "maestro: $name"; tail -5 /tmp/maestro.log; }
+    sleep 3
     xcrun simctl io "$UDID" screenshot "$OUT/$lang-$name.png"
     echo "shot $lang-$name"
   done 3< "$HERE/screens.txt"
