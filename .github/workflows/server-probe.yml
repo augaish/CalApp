@@ -15,3 +15,10 @@ jobs:
           curl -sS -m 30 -H "x-calgym-user: $ref" https://calapp-production-ab20.up.railway.app/api/me | tee me.json
           echo
           python3 -c "import json;d=json.load(open('me.json'));print('PROBE', json.dumps({k:d.get(k) for k in ['plan','remaining','limit','planLocks','locks','features']}))"
+      - name: Health and one AI reply
+        run: |
+          curl -sS -m 30 https://calapp-production-ab20.up.railway.app/health; echo
+          ref="u_probe_ai_$(date +%s)"
+          curl -sS -m 90 -H "x-calgym-user: $ref" -H 'content-type: application/json' \
+            -d '{"language":"en","messages":[{"role":"user","content":"Reply with the single word OK."}]}' \
+            -w '\nHTTP %{http_code}\n' https://calapp-production-ab20.up.railway.app/api/coach
