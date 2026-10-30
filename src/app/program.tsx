@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon';
 import { MealPlanCard } from '@/components/meal-plan-card';
 import { ProgramBody } from '@/components/program-body';
 import { SchedulePlanCard } from '@/components/schedule-plan-card';
+import { SourcesLink } from '@/components/sources-link';
 import { InfoLine, StatusPill } from '@/components/system';
 import { Text } from '@/components/text';
 import { Button, Card, MacroTile, Screen } from '@/components/ui';
@@ -130,6 +131,7 @@ export default function ProgramScreen() {
           <Text style={{ color: theme.textSecondary, fontSize: 13, flex: 1 }}>{t('program.draftNote')}</Text>
         </View>
         <ProgramBody program={p} scope={scope} locale={locale} />
+        <SourcesLink style={{ marginTop: Spacing.md }} />
         {allergies.length > 0 && scope !== 'training' && (
           <View style={{ marginTop: Spacing.md }}>
             <InfoLine icon="shield-checkmark-outline">{t('program.allergyChecked', { list: allergies.join(', ') })}</InfoLine>
@@ -237,6 +239,7 @@ export default function ProgramScreen() {
           </>
         )}
 
+        <SourcesLink style={{ marginTop: Spacing.md }} />
         <Button label={t('program.buildNew')} variant="secondary" icon={canBuild ? 'sparkles' : 'lock-closed'} onPress={openBuild} style={{ marginTop: Spacing.md }} />
         <Button label={t('program.endProgram')} variant="ghost" onPress={endProgram} style={{ marginTop: Spacing.xs }} />
       </Screen>

@@ -7,6 +7,7 @@ import { Icon } from '@/components/icon';
 import { alertDestructive } from '@/lib/alerts';
 import { Ring } from '@/components/ring';
 import { Text } from '@/components/text';
+import { SourcesLink } from '@/components/sources-link';
 import { Button, Field, Screen, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -222,6 +223,7 @@ export default function Fasting() {
           </View>
         </>
       )}
+      <SourcesLink style={{ marginTop: Spacing.lg }} />
     </Screen>
   );
 }

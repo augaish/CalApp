@@ -1,0 +1,20 @@
+# Opens every Health sources link (src/lib/health-sources.ts) and prints its
+# status and page title, so a dead or wrong citation is caught before a
+# release. Nothing is written.
+name: Link check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  links:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Open each link
+        run: |
+          grep -oE "https://[^']+" src/lib/health-sources.ts | sort -u | while read -r url; do
+            code=$(curl -sSL -m 40 -A 'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/605.1.15 Safari/605.1.15' -o page.html -w '%{http_code}' "$url" || echo ERR)
+            title=$(python3 -c "import re,sys,html;t=open('page.html',errors='ignore').read();m=re.search(r'<title[^>]*>(.*?)</title>',t,re.S|re.I);print(html.unescape(' '.join(m.group(1).split()))[:160] if m else '-')" 2>/dev/null)
+            echo "LINK $code $url :: $title"
+          done

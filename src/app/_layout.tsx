@@ -111,6 +111,7 @@ export default function RootLayout() {
           <Stack.Screen name="notifications" options={{ presentation: 'modal' }} />
           <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
           <Stack.Screen name="help" options={{ presentation: 'modal' }} />
+          <Stack.Screen name="sources" options={{ presentation: 'modal' }} />
           <Stack.Screen name="coach" options={{ presentation: 'modal' }} />
           <Stack.Screen name="connections" options={{ presentation: 'modal' }} />
           <Stack.Screen name="measurements" options={{ presentation: 'modal' }} />

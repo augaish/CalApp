@@ -9,6 +9,7 @@ import { AllergyBanner } from '@/components/allergy-banner';
 import { Icon } from '@/components/icon';
 import { PortionControl } from '@/components/portion-control';
 import { RefineBox } from '@/components/refine-box';
+import { AiSourcesNote } from '@/components/sources-link';
 import { Text, TextInput } from '@/components/text';
 import { Button, Card, MealTypePicker, Screen, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type } from '@/constants/theme';
@@ -141,6 +142,9 @@ export default function MealResult() {
           <Text style={{ color: theme.warning }}>{t('mealResult.lowConfidence')}</Text>
         </Card>
       )}
+
+      {/* What this is and where its numbers come from (App Store guideline 1.4.1). */}
+      <AiSourcesNote />
 
       {(!!analysis.notes || !!analysis.sources?.length || analysis.source === 'off') && (
         <View style={styles.infoRow}>

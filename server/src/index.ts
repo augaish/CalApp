@@ -1571,7 +1571,10 @@ app.post('/api/coach', async (c) => {
   }
   const ref = (await callerRef(c))!;
   const access = await checkAccess(ref, 'coach');
-  if (!access.spec.coach) return c.json(featureLocked(access), 403);
+  // featureAllowed, not just spec.coach: with plan locks on, an account with
+  // no plan has no AI at all, and is told so up front instead of being
+  // offered free messages its allowance of 0 then refuses.
+  if (!access.featureAllowed) return c.json(featureLocked(access), 403);
   const claim = await reserve(ref, access, 'coach');
   // 'cap' means the coach ration is spent while the plan still has actions
   // left, which the app shows as a coach-specific upsell rather than a wall.
@@ -2099,7 +2102,9 @@ app.get('/api/me', async (c) => {
     period: access.period,
     // What this plan unlocks, so the app can gate its UI consistently.
     features: {
-      coach: access.spec.coach,
+      // No plan with locks on: no coach, so the app shows its lock rather
+      // than a count of free messages that would all be refused.
+      coach: access.spec.coach && !(access.locks && access.plan === 'free'),
       equipment: access.spec.equipment,
       highAccuracy: access.spec.highAccuracy,
       coachCap: access.spec.coachCap ?? null,

@@ -7,6 +7,7 @@ import { Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { Icon } from '@/components/icon';
 import { BodyMap, BodyMapViewSwitch, initialBodyView } from '@/components/body-map';
+import { SourcesLink } from '@/components/sources-link';
 import { Text } from '@/components/text';
 import { Button, Card, Screen, Title } from '@/components/ui';
 import { Radius, Spacing } from '@/constants/theme';
@@ -218,6 +219,7 @@ export default function GymResult() {
       <Text style={[styles.disclaimer, { color: theme.textTertiary }]}>
         {t('common.aiDisclaimer')}
       </Text>
+      <SourcesLink style={{ marginTop: Spacing.sm }} />
     </Screen>
   );
 }

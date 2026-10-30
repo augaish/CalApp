@@ -6,6 +6,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/icon';
 import { alertProblem } from '@/lib/alerts';
 import { PageHeader } from '@/components/brand-header';
+import { SourcesLink } from '@/components/sources-link';
 import { DeltaRows } from '@/components/system';
 import { Text } from '@/components/text';
 import { Button, Field, Screen } from '@/components/ui';
@@ -177,6 +178,7 @@ export default function EditTargets() {
         <Icon name="information-circle-outline" size={14} color={theme.textTertiary} />
         <Text style={{ color: theme.textTertiary, fontSize: 12, flex: 1 }}>{t('editTargets.hint')}</Text>
       </View>
+      <SourcesLink style={{ marginTop: Spacing.md }} />
     </Screen>
   );
 }

@@ -1186,6 +1186,76 @@ export const en = {
     deleteHint: 'Removes your data here and on our server',
     note: 'Each action here asks for confirmation first. Nothing is deleted on a single tap.',
   },
+  sources: {
+    title: 'Health sources',
+    link: 'How we calculate these, with sources',
+    short: 'Sources',
+    aiNote: 'AI estimate, not medical advice',
+    disclaimer: "Calgym gives general fitness and nutrition guidance, not medical advice. Talk to a doctor before big changes to your diet or training, especially if you're pregnant, under 18, or have a medical condition.",
+    footer: 'Links open the source in your browser. Calgym is not affiliated with these organisations.',
+    section: {
+      targets: 'Your daily targets',
+      health: 'Health',
+      training: 'Training',
+      food: 'Food data and AI',
+    },
+    bmr: {
+      title: 'Calories you burn each day',
+      body: 'The Mifflin–St Jeor equation, from your sex, age, height and weight, multiplied by your activity level (1.2 for little exercise up to 1.9 for very hard daily exercise).',
+    },
+    pace: {
+      title: 'Losing or gaining weight',
+      body: 'About 7,000 kcal for each kg, spread over the pace you chose (0.25–1 kg a week). Your target never goes below 1,200 kcal a day.',
+    },
+    protein: {
+      title: 'Protein',
+      body: '1.6 g per kg of body weight a day, or 2.0 g while losing weight, to help keep muscle.',
+    },
+    fatCarbs: {
+      title: 'Fat and carbs',
+      body: 'Fat is 30% of your calories, the upper limit WHO advises; carbs make up the rest.',
+    },
+    bmi: {
+      title: 'BMI',
+      body: "Your weight in kg divided by your height in metres, squared. It's a rough guide for adults and doesn't tell fat from muscle.",
+    },
+    water: {
+      title: 'Water',
+      body: "About 35 ml per kg of body weight a day. EFSA's adequate intake is 2.0 L for women and 2.5 L for men, from all drinks and food.",
+    },
+    fasting: {
+      title: 'Fasting',
+      body: "Fasting windows such as 16:8 are a way of timing meals. Check with a doctor first if you're pregnant, have diabetes or have had an eating disorder.",
+    },
+    readings: {
+      title: 'Body readings and recovery',
+      body: 'Body fat, muscle and recovery come from your scale (such as InBody) or WHOOP. Calgym shows them; it does not calculate them.',
+    },
+    strength: {
+      title: 'Sets, reps and progress',
+      body: 'Workout plans and suggestions follow resistance-training guidance: a few sets per exercise, adding weight or reps over time.',
+    },
+    activity: {
+      title: 'Weekly activity',
+      body: 'For adults, 150–300 minutes of moderate activity a week and muscle-strengthening on 2 or more days.',
+    },
+    burn: {
+      title: 'Calories burned',
+      body: 'Each activity has a MET value: calories = MET × 3.5 × your weight in kg ÷ 200 × minutes.',
+    },
+    foodEnergy: {
+      title: 'Calories in food',
+      body: '4 kcal per gram of protein and carbs and 9 per gram of fat, the factors used on nutrition labels.',
+    },
+    foodData: {
+      title: 'Packaged food',
+      body: 'Barcode scans use the product data in Open Food Facts.',
+    },
+    ai: {
+      title: 'AI estimates',
+      body: "Meal photos, descriptions and AI Support give estimates using the methods on this page and a brand's published figures when known. They can be wrong, so check anything important.",
+    },
+  },
   help: {
     learn: 'Learn',
     tourHint: 'A two-minute walk through every tab',
@@ -1627,6 +1697,8 @@ export const en = {
     messagesLeft_other: '{{count}} free coach messages left this month',
     lockedTitle: 'Free coach messages used up',
     lockedBody: 'Upgrade to keep asking about your meals, macros and training.',
+    noPlanTitle: 'AI Support comes with a plan',
+    noPlanBody: 'Start a free trial to ask about your meals, macros and training.',
     mockReply:
       'Demo mode: connect the AI server to chat with your real coach. Meanwhile: protein at every meal, water before coffee, and never skip leg day. 😉',
     newConversation: 'New conversation',

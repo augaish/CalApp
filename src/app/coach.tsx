@@ -19,6 +19,7 @@ import { KeyboardAvoider, useKeyboardShown } from '@/components/keyboard-avoider
 import { alertDestructive } from '@/lib/alerts';
 import { SchedulePlanCard, weekdayLabel } from '@/components/schedule-plan-card';
 import { PhotoFallback } from '@/components/photo-fallback';
+import { AiSourcesNote } from '@/components/sources-link';
 import { RichText } from '@/components/rich-text';
 import { ActionButton, Chip, IconTile, StatusPill } from '@/components/system';
 import { Text, TextInput } from '@/components/text';
@@ -72,6 +73,8 @@ export default function Coach() {
 
   // Free plans can use the coach, but only a few messages a month.
   const coachUnlocked = useEntitlement((s) => s.features?.coach !== false);
+  // No plan with locks on: the coach isn't included at all (nothing was used up).
+  const noPlan = useEntitlement((s) => s.locks === true && s.plan === 'free');
   const coachCap = useEntitlement((s) => s.features?.coachCap);
   const coachUsed = useEntitlement((s) => s.features?.coachUsed ?? 0);
   const coachLeft = typeof coachCap === 'number' ? Math.max(0, coachCap - coachUsed) : null;
@@ -361,7 +364,7 @@ export default function Coach() {
   // "unavailable"; it never pretends to know.
   const allowance =
     !coachUnlocked
-      ? t('coach.lockedTitle')
+      ? t(noPlan ? 'coach.noPlanTitle' : 'coach.lockedTitle')
       : coachLeft !== null
         ? t('coach.allowanceLeft', { left: coachLeft, cap: coachCap })
         : typeof remaining === 'number' && typeof limit === 'number'
@@ -429,8 +432,8 @@ export default function Coach() {
           <Pressable accessibilityRole="button" onPress={() => router.push('/membership?reason=coach')} style={[styles.lockCard, { backgroundColor: theme.card, borderColor: theme.primary }]}>
             <Icon name="lock-closed" size={22} color={theme.primary} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{t('coach.lockedTitle')}</Text>
-              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t('coach.lockedBody')}</Text>
+              <Text style={{ color: theme.text, fontWeight: '700', fontSize: 15 }}>{t(noPlan ? 'coach.noPlanTitle' : 'coach.lockedTitle')}</Text>
+              <Text style={{ color: theme.textSecondary, fontSize: 13 }}>{t(noPlan ? 'coach.noPlanBody' : 'coach.lockedBody')}</Text>
             </View>
             <Icon name="chevron-forward" size={18} color={theme.textTertiary} />
           </Pressable>
@@ -619,7 +622,15 @@ function Bubble({ role, text, at, locale, avatarLabel }: { role: 'user' | 'assis
           )}
         </View>
       </View>
-      {time && <Text style={{ color: theme.textTertiary, fontSize: 11, marginTop: 3, marginHorizontal: isUser ? 4 : 44 }}>{time}</Text>}
+      {isUser ? (
+        time && <Text style={{ color: theme.textTertiary, fontSize: 11, marginTop: 3, marginHorizontal: 4 }}>{time}</Text>
+      ) : (
+        // Every answer says what it is and where its numbers come from (App Store guideline 1.4.1).
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginTop: 3, marginHorizontal: 44 }}>
+          {time && <Text style={{ color: theme.textTertiary, fontSize: 11 }}>{time} · </Text>}
+          <AiSourcesNote />
+        </View>
+      )}
     </View>
   );
 }

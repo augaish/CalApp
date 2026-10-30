@@ -30,8 +30,8 @@ export default function Help() {
             useTour.getState().start();
             router.dismissTo('/(tabs)');
           }}
-          last
         />
+        <SettingsRow icon="book-outline" title={t('sources.title')} subtitle={t('sources.link')} onPress={() => router.push('/sources')} last />
       </RowGroup>
       <RowGroup title={t('help.contact')}>
         <SettingsRow icon="mail-outline" title={t('help.feedback')} subtitle={t('help.feedbackHint')} onPress={() => Linking.openURL(`mailto:${t('help.email')}?subject=Calgym%20${version}`)} last />

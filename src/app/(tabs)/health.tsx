@@ -254,6 +254,7 @@ export default function Health() {
           onPress={() => router.push('/connections')}
         />
         <SettingsRow icon="stats-chart-outline" title={t('review.title')} subtitle={t('health.reviewShort')} onPress={() => router.push('/review')} />
+        <SettingsRow icon="book-outline" title={t('sources.title')} subtitle={t('sources.link')} onPress={() => router.push('/sources')} />
         <SettingsRow icon="document-text-outline" title={t('legal.exportData')} subtitle={t('health.exportShort')} onPress={exportData} last />
       </RowGroup>
     </CollapsingScreen>

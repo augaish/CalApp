@@ -81,6 +81,7 @@ export default function Settings() {
       </RowGroup>
       <RowGroup>
         <SettingsRow icon="shield-checkmark-outline" title={t('profile.privacyData')} onPress={() => router.push('/privacy')} />
+        <SettingsRow icon="book-outline" title={t('sources.title')} onPress={() => router.push('/sources')} />
         <SettingsRow icon="pricetag-outline" title={t('redeem.title')} onPress={() => enterCode(() => router.push('/redeem'))} last />
       </RowGroup>
     </Screen>
