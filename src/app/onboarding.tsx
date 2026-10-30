@@ -8,6 +8,7 @@ import { alertProblem } from '@/lib/alerts';
 import { DatePickerModal } from '@/components/date-picker';
 import { GoalScenarioCards } from '@/components/goal-scenario-cards';
 import { SourcesLink } from '@/components/sources-link';
+import { InfoLine } from '@/components/system';
 import { Text } from '@/components/text';
 import { Button, Card, Field, OptionRow, Screen, StepDots, Subtitle, Title } from '@/components/ui';
 import { Radius, Spacing, Type, cardShadow } from '@/constants/theme';
@@ -273,6 +274,9 @@ export default function Onboarding() {
             <MacroPill label={t('onboarding.fat')} value={targets.fatG} color={theme.fat} />
           </View>
           <SourcesLink style={{ marginTop: Spacing.md }} />
+          <View style={{ marginTop: Spacing.sm }}>
+            <InfoLine>{t('sources.guidance')}</InfoLine>
+          </View>
         </>
       )}
     </Screen>

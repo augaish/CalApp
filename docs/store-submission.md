@@ -380,6 +380,8 @@ Arabic:
 • AI features (meal photo, describe a meal, body report scan, AI coach, recipe and program generation) ask permission before anything is sent to our AI providers (Anthropic, DeepSeek); this can be changed in Profile → Privacy → AI processing. Calgym's server does not keep the photos or messages after the answer; the providers process them under their own API terms.
 • Account deletion: Profile → Privacy → Delete my account. It deletes the on-device data, the cloud backup, the sign-in account and the server records.
 • Notifications are optional and scheduled on the device from the person's own logs; the app sends no remote push. Their buttons (add water, remind me later, start workout) act inside the app. The background modes (fetch, processing) are used only to re-plan these reminders; the rest timer uses a Live Activity.
+• Health information and citations (guideline 1.4.1): Profile → Settings → Health sources (also in Help and on the Health tab) lists every calculation the app makes — calorie and macro targets, weight-change pace, BMI, water, fasting, calories burned, food energy — with links to the published sources (WHO, NIH, FAO, EFSA, ACSM and peer-reviewed papers). Edit daily targets, the sign-up plan, the AI plan, Fasting and the equipment scan link to it, and every AI Support answer and meal estimate is labelled "AI estimate, not medical advice · Sources".
+• Demo account with Pro already active (no purchase needed): the email in Sign-In Information; on the sign-in screen choose email, enter it, and use the code given there.
 • Nutrition figures are estimates with a disclaimer; the app gives no medical advice.
 ```
 

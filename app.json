@@ -45,11 +45,13 @@
     "locales": {
       "en": {
         "CFBundleDisplayName": "Calgym",
-        "NSCameraUsageDescription": "Calgym uses the camera to analyze your meals and gym equipment."
+        "NSCameraUsageDescription": "Calgym uses the camera to analyze your meals and gym equipment.",
+        "NSPhotoLibraryUsageDescription": "Calgym uses your photos to analyze meals and gym equipment you've already photographed."
       },
       "ar": {
         "CFBundleDisplayName": "\u0643\u0627\u0644\u062c\u064a\u0645",
-        "NSCameraUsageDescription": "\u064a\u0633\u062a\u062e\u062f\u0645 \u0643\u0627\u0644\u062c\u064a\u0645 \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627 \u0644\u062a\u062d\u0644\u064a\u0644 \u0648\u062c\u0628\u0627\u062a\u0643 \u0648\u0623\u062c\u0647\u0632\u0629 \u0627\u0644\u0646\u0627\u062f\u064a."
+        "NSCameraUsageDescription": "\u064a\u0633\u062a\u062e\u062f\u0645 \u0643\u0627\u0644\u062c\u064a\u0645 \u0627\u0644\u0643\u0627\u0645\u064a\u0631\u0627 \u0644\u062a\u062d\u0644\u064a\u0644 \u0648\u062c\u0628\u0627\u062a\u0643 \u0648\u0623\u062c\u0647\u0632\u0629 \u0627\u0644\u0646\u0627\u062f\u064a.",
+        "NSPhotoLibraryUsageDescription": "\u064a\u0633\u062a\u062e\u062f\u0645 \u0643\u0627\u0644\u062c\u064a\u0645 \u0635\u0648\u0631\u0643 \u0644\u062a\u062d\u0644\u064a\u0644 \u0627\u0644\u0648\u062c\u0628\u0627\u062a \u0648\u0623\u062c\u0647\u0632\u0629 \u0627\u0644\u0646\u0627\u062f\u064a \u0627\u0644\u062a\u064a \u0635\u0648\u0651\u0631\u062a\u0647\u0627 \u0645\u0646 \u0642\u0628\u0644."
       }
     },
     "plugins": [
@@ -63,13 +65,16 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Calgym uses the camera to analyze your meals and gym equipment."
+          "cameraPermission": "Calgym uses the camera to analyze your meals and gym equipment.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Calgym uses your photos to analyze meals and gym equipment you've already photographed."
+          "photosPermission": "Calgym uses your photos to analyze meals and gym equipment you've already photographed.",
+          "microphonePermission": false
         }
       ],
       [

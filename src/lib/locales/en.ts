@@ -1190,6 +1190,7 @@ export const en = {
     title: 'Health sources',
     link: 'How we calculate these, with sources',
     short: 'Sources',
+    guidance: 'General guidance, not medical advice. Check with a doctor before big changes to your diet or training.',
     aiNote: 'AI estimate, not medical advice',
     disclaimer: "Calgym gives general fitness and nutrition guidance, not medical advice. Talk to a doctor before big changes to your diet or training, especially if you're pregnant, under 18, or have a medical condition.",
     footer: 'Links open the source in your browser. Calgym is not affiliated with these organisations.',
