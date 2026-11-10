@@ -444,6 +444,7 @@ Apple puts the app version, the subscription group and the subscriptions into **
      - **30 Oct, Railway incident follow-up:** the Anthropic key had been revoked (401 `invalid x-api-key` in admin → AI → Report test), which broke PDF attachments and WHOOP questions in AI Support. New Anthropic and DeepSeek keys are in Railway; both tested OK from admin → AI. The other Railway variables (Supabase secret key, database password, admin token, RevenueCat, WHOOP) were not replaced.
 
 ## Step 18 ⬜ Launch day (after "Pending Developer Release")
+✅ **Approved 10 Nov 2026** (expedited review): version 1.0.0 (build 22), the four subscriptions and the group (submission `5f6977cd-6f21-4f33-a71c-e3c19d8e0d9e`). Build 22 already contains everything in "Waiting for Apple approval" below, and the production update went out on 30 Oct, so step 6 needs nothing more.
 1. Check your testers have their plan (admin → Users; granted in step 10). The `FOUNDERS` offer code from step 10 works for anyone new.
 2. ~~admin → Membership → Plan locks → ON~~ ✅ **Switched on 17 Oct, during review** (App Review Guideline 2.5.19, revised Oct 2026: no dormant features, so Apple reviews the launch experience itself), by the server itself at start-up (server/src/launch.ts, once), since the admin page wasn't reachable: every account that existed then got **Pro for 90 days** (testers, Android testers, the owner) and **review@calgym.org** Pro for a year. New users need a plan (with the 14-day trial). The admin toggle still works.
 3. App Store Connect → your version → **Release This Version**.
