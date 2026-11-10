@@ -122,6 +122,15 @@ try {
   const gf = log.playOffers.find((o) => o.offerId === FREE.toLowerCase());
   check('Google free offer: the 14-day trial plus a free month (P44D)', gf && gf.phases[0].duration === 'P44D' && gf.phases[0].regionalConfigs.every((r) => r.free && !r.relativeDiscount));
 
+  // A code for 5 people: Apple refuses so few, so the smallest it takes.
+  const FEW = `FEW${run}`;
+  await admin('/admin/api/promo', { code: FEW, kind: 'free', plan: 'pro', durationDays: 30, maxRedemptions: 5, active: true, stores: { create: true, productId: 'calgym_pro_monthly', periods: 1 } }).then((r) => {
+    const apple = (r.stores ?? []).find((x) => x.store === 'apple');
+    check('5 uses: Apple refuses, the smallest it takes is used and named', apple?.ok === true && /smallest limit is 10 uses|smallest limit is 100 uses/.test(apple.detail), JSON.stringify(r.stores ?? r));
+  });
+  const few = (await fakeLog()).appleCustom.find((c) => c.attributes.customCode === FEW);
+  check('  the custom code holds 100 uses', few?.attributes.numberOfCodes === 100, JSON.stringify(few?.attributes));
+
   // Check, and a retry that must reuse what exists.
   const before = (await fakeLog()).appleOffers.length;
   const chk = await admin('/admin/api/promo-store', { code: DISC, store: 'apple', action: 'check' });

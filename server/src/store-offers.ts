@@ -211,6 +211,9 @@ export function appleFreeDuration(days: number): string | null {
   return map[days] ?? null;
 }
 
+/** Use counts tried for an Apple custom code when Apple refuses a smaller one. */
+const APPLE_CODE_COUNTS = [10, 50, 100, 500, 1000, 5000, 10000, 25000];
+
 const isYearly = (productId: string) => /year|annual/i.test(productId);
 
 /** The JSON body for a new offer code — exported so the shape is tested. */
@@ -290,27 +293,42 @@ export async function createAppleOffer(spec: OfferSpec): Promise<StoreResult> {
 
   const codes = await ascAll(`/v1/subscriptionOfferCodes/${offer.id}/customCodes?limit=200`);
   let custom = codes.data.find((c) => String(c.attributes?.customCode ?? '').toUpperCase() === spec.code);
+  let raised = 0;
   if (!custom) {
-    const made = await asc('/v1/subscriptionOfferCodeCustomCodes', {
-      method: 'POST',
-      body: {
-        data: {
-          type: 'subscriptionOfferCodeCustomCodes',
-          attributes: {
-            customCode: spec.code,
-            numberOfCodes: spec.maxRedemptions ?? 10000,
-            ...(spec.expiresAt ? { expirationDate: spec.expiresAt.slice(0, 10) } : {}),
+    // Apple refuses a small number of uses ("The given number of codes 5 is
+    // invalid") without saying its minimum: step up to the smallest it takes.
+    const wanted = spec.maxRedemptions ?? 10000;
+    const steps = [...new Set([wanted, ...APPLE_CODE_COUNTS.filter((n) => n > wanted)])];
+    for (const count of steps) {
+      try {
+        const made = await asc('/v1/subscriptionOfferCodeCustomCodes', {
+          method: 'POST',
+          body: {
+            data: {
+              type: 'subscriptionOfferCodeCustomCodes',
+              attributes: {
+                customCode: spec.code,
+                numberOfCodes: count,
+                ...(spec.expiresAt ? { expirationDate: spec.expiresAt.slice(0, 10) } : {}),
+              },
+              relationships: { offerCode: { data: { type: 'subscriptionOfferCodes', id: offer.id } } },
+            },
           },
-          relationships: { offerCode: { data: { type: 'subscriptionOfferCodes', id: offer.id } } },
-        },
-      },
-    });
-    custom = made.data as typeof custom;
+        });
+        custom = made.data as typeof custom;
+        if (count !== wanted) raised = count;
+        break;
+      } catch (err) {
+        if (!(err instanceof StoreError) || !/number of codes/i.test(err.message) || count === steps[steps.length - 1]) throw err;
+      }
+    }
   }
   return {
     store: 'apple',
     ok: true,
-    detail: `offer ${spec.code} on ${sub.name}${price}, custom code ${spec.code}`,
+    detail:
+      `offer ${spec.code} on ${sub.name}${price}, custom code ${spec.code}` +
+      (raised ? ` (Apple's smallest limit is ${raised} uses, so on iPhone up to ${raised} people can use it)` : ''),
     ids: { subscription: sub.id, offer: offer.id, customCode: custom?.id ?? '' },
     offerRef: spec.code,
   };

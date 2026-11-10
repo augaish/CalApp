@@ -189,6 +189,8 @@ http
       const a = body.data?.attributes ?? {};
       const offer = body.data?.relationships?.offerCode?.data?.id;
       if (!a.customCode || !(a.numberOfCodes > 0) || !appleOffers.some((o) => o.id === offer)) return appleError(res, 409, 'Invalid custom code');
+      // As Apple: too few uses is refused (the real minimum isn't published; 100 here).
+      if (a.numberOfCodes < 100) return appleError(res, 409, `The given number of codes ${a.numberOfCodes} is invalid`);
       const c = { id: `cc-${appleCustom.length + 1}`, offer, attributes: a };
       appleCustom.push(c);
       return send(res, 201, { data: { type: 'subscriptionOfferCodeCustomCodes', id: c.id, attributes: a } });
