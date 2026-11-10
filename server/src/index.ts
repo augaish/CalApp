@@ -3282,7 +3282,7 @@ app.post('/admin/api/promo-store', async (c) => {
   }
   if (body.action === 'check') {
     const r = await attempt(store, () => (store === 'apple' ? checkAppleOffer(code, record.productId) : checkGoogleOffer(code, record.productId)));
-    await saveCodeStoreOffer({ ...record, ok: r.ok, detail: r.detail, ids: null });
+    await saveCodeStoreOffer({ ...record, ok: r.ok, detail: r.detail, ids: r.ids ?? null });
     return c.json({ ok: true, result: r });
   }
   const [r] = await makeStoreOffers(promo, record.productId, record.periods, store);

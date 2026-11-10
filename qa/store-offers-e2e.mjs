@@ -156,6 +156,18 @@ try {
   await page.waitForTimeout(800);
   check('  the Stores column: off (limit reached)', /off \(limit reached\)/.test(await page.locator('#pc_rows tr', { hasText: TWO }).textContent()));
 
+  // A code made before the use count was kept: Check reads it back from Apple and asks.
+  const OLD = `OLD${run}`;
+  await admin('/admin/api/promo', { code: OLD, kind: 'free', plan: 'pro', durationDays: 30, maxRedemptions: 5, active: true, stores: { create: true, productId: 'calgym_pro_monthly', periods: 1 } });
+  const oldChk = await admin('/admin/api/promo-store', { code: OLD, store: 'apple', action: 'check' });
+  check('Check reads how many uses Apple holds', oldChk.result?.ids?.uses === '100' && /holds 100 uses/.test(oldChk.result.detail), JSON.stringify(oldChk.result));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.click('#t-codes');
+  await page.waitForTimeout(800);
+  await page.locator('#pc_rows tr', { hasText: OLD }).getByRole('button', { name: 'Check' }).first().click();
+  await page.waitForTimeout(1200);
+  check('  Check on the page asks the limit question', /after 5 uses/.test(await page.textContent('#pc_hardstop').catch(() => '')));
+
   // Check, and a retry that must reuse what exists.
   const before = (await fakeLog()).appleOffers.length;
   const chk = await admin('/admin/api/promo-store', { code: DISC, store: 'apple', action: 'check' });

@@ -354,7 +354,14 @@ export async function checkAppleOffer(code: string, productId: string): Promise<
   const custom = codes.data.find((c) => String(c.attributes?.customCode ?? '').toUpperCase() === code);
   if (!custom) return { store: 'apple', ok: false, detail: `Offer ${code} has no custom code ${code} yet.` };
   const active = offer.attributes?.active !== false && custom.attributes?.active !== false;
-  return { store: 'apple', ok: active, detail: active ? `offer ${code} and custom code are active` : `offer ${code} is turned off in App Store Connect` };
+  const uses = Number(custom.attributes?.numberOfCodes ?? 0);
+  return {
+    store: 'apple',
+    ok: active,
+    detail: (active ? `offer ${code} and custom code are active` : `offer ${code} is turned off in App Store Connect`) + (uses ? ` · holds ${uses} uses` : ''),
+    // Read back, so a code made before the use count was kept still gets the limit question.
+    ids: { subscription: sub.id, offer: offer.id, customCode: custom.id, ...(uses ? { uses: String(uses) } : {}) },
+  };
 }
 
 /** A read-only call that proves the key works. */
