@@ -110,11 +110,13 @@ for lang in ${LANGS:-ar en}; do
       prompts
       pause 2000
       printf -- '- tapOn:\n    text: "%s"\n' "$UPLOAD"
-      pause 2500
-      # The photo picker shows the library: the newest photo is the kabsa.
-      # The newest photo, top left of the picker's grid.
+      # The photo picker: wait for its grid, then the newest photo (top left); once more if it is still open.
+      printf -- '- extendedWaitUntil:\n    visible: "Collections"\n    timeout: 10000\n    optional: true\n'
+      pause 2000
       printf -- '- tapOn:\n    point: "17%%,41%%"\n'
-      printf -- '- extendedWaitUntil:\n    visible: "%s"\n    timeout: 90000\n' "$LOGMEAL"
+      pause 3000
+      printf -- '- runFlow:\n    when:\n      visible: "Collections"\n    commands:\n      - tapOn:\n          point: "17%%,41%%"\n'
+      printf -- '- extendedWaitUntil:\n    visible: "%s"\n    timeout: 240000\n' "$LOGMEAL"
       pause 3000
       printf -- '- scrollUntilVisible:\n    element:\n      text: "%s"\n    optional: true\n' "$LOGMEAL"
       printf -- '- tapOn:\n    text: "%s"\n' "$LOGMEAL"
