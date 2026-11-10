@@ -3451,6 +3451,9 @@ app.get('/admin', (c) => c.html(ADMIN_HTML));
  * answers /health. Exiting right away dropped requests in flight (a meal
  * scan takes 15-30 s), so stop taking new connections and let open requests
  * finish, with a cap so a stuck request can't hold the old server forever.
+ * Railway only waits for this if the service has
+ * RAILWAY_DEPLOYMENT_DRAINING_SECONDS set (100); without it the old server
+ * is killed straight after SIGTERM.
  */
 function stopGently(server: ReturnType<typeof serve>) {
   let stopping = false;

@@ -15,6 +15,10 @@ on:
         description: 'Languages'
         type: string
         default: 'ar en'
+      consent_langs:
+        description: 'Languages that start with the AI permission already given'
+        type: string
+        default: ''
       build_url:
         description: 'Simulator build (tar.gz URL)'
         type: string
@@ -47,6 +51,7 @@ jobs:
           REVIEW_CODE: ${{ secrets.REVIEW_CODE }}
           FLOWS: ${{ github.event.inputs.flows }}
           LANGS: ${{ github.event.inputs.langs }}
+          CONSENT_LANGS: ${{ github.event.inputs.consent_langs }}
         run: bash qa/ios-record/run.sh "$APP" recordings
       - name: Commit the recordings
         if: always()

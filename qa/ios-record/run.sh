@@ -26,6 +26,8 @@ printf 'appId: %s\n---\n- waitForAnimationToEnd\n' "$BID" > /tmp/warm.yaml; maes
 seed() { # $1 lang, $2 kind (signedout: the sample data with no account, so the app opens on sign-in)
   node "$HERE/../android-audit/state.mjs" "$1" "${2/signedout/base}" /tmp/state.json
   if [ "$2" = signedout ]; then node -e "const f='/tmp/state.json',fs=require('fs'),s=JSON.parse(fs.readFileSync(f));delete s.state.account;fs.writeFileSync(f,JSON.stringify(s))"; fi
+  # The AI permission question already answered, for the languages listed in CONSENT_LANGS.
+  if echo " ${CONSENT_LANGS:-} " | grep -q " $1 "; then node -e "const f='/tmp/state.json',fs=require('fs'),s=JSON.parse(fs.readFileSync(f));s.state.aiConsent='granted';fs.writeFileSync(f,JSON.stringify(s))"; fi
   # The sample's workout is set at 18:20; on camera it should be under way now, with no rest running yet.
   if [ "$2" = session ]; then node -e "const f='/tmp/state.json',fs=require('fs'),s=JSON.parse(fs.readFileSync(f));const a=s.state.activeSession;if(a){a.startedAt=new Date(Date.now()-12*60000).toISOString();a.restEndsAt=null;a.restNext=null;}fs.writeFileSync(f,JSON.stringify(s))"; fi
   xcrun simctl terminate "$UDID" "$BID" 2>/dev/null
@@ -109,6 +111,8 @@ for lang in ${LANGS:-ar en}; do
       printf -- '- tapOn:\n    text: "%s"\n' "$SCAN"
       prompts
       pause 2000
+      # Once more if the scan screen didn't open (a tap that lands during an iOS prompt).
+      printf -- '- runFlow:\n    when:\n      notVisible: "%s"\n    commands:\n      - tapOn:\n          text: "%s"\n      - waitForAnimationToEnd\n' "$UPLOAD" "$SCAN"
       printf -- '- tapOn:\n    text: "%s"\n' "$UPLOAD"
       # The photo picker: wait for its grid, then the newest photo (top left); once more if it is still open.
       printf -- '- extendedWaitUntil:\n    visible: "Collections"\n    timeout: 10000\n    optional: true\n'
@@ -116,6 +120,9 @@ for lang in ${LANGS:-ar en}; do
       printf -- '- tapOn:\n    point: "17%%,41%%"\n'
       pause 3000
       printf -- '- runFlow:\n    when:\n      visible: "Collections"\n    commands:\n      - tapOn:\n          point: "17%%,41%%"\n'
+      # What the screen shows soon after the photo is chosen (the AI permission question, if asked).
+      pause 6000
+      printf -- '- takeScreenshot: "%s"\n' "$OUT/$lang-scan-meal.after-pick"
       printf -- '- extendedWaitUntil:\n    visible: "%s"\n    timeout: 240000\n' "$LOGMEAL"
       pause 3000
       printf -- '- scrollUntilVisible:\n    element:\n      text: "%s"\n    optional: true\n' "$LOGMEAL"
