@@ -52,14 +52,17 @@ record() { # $1 name, $2 flow file
   maestro --device "$UDID" test "$2" > "/tmp/$1.log" 2>&1 || { echo "maestro: $1"; tail -20 "/tmp/$1.log"; tail -40 "/tmp/$1.log" > "$OUT/$1.maestro.txt"; evidence "$1"; }
   sleep 2
   kill -INT $REC; wait $REC 2>/dev/null
+  # The test tool takes ~40 s to start: cut the still screen before the first change, keeping 1.5 s.
+  first=$(ffmpeg -i "/tmp/$1.mov" -vf "select='gt(scene,0.003)',showinfo" -f null - 2>&1 | grep -o 'pts_time:[0-9.]*' | head -1 | cut -d: -f2)
+  start=$(python3 -c "print(max(0.0, float('${first:-1.5}') - 1.5))")
   # Smaller for sharing: 886 px wide, H.264.
-  ffmpeg -loglevel error -y -i "/tmp/$1.mov" -vf "scale=886:-2" -c:v libx264 -crf 24 -preset veryfast -pix_fmt yuv420p -movflags +faststart "$OUT/$1.mp4"
+  ffmpeg -loglevel error -y -ss "$start" -i "/tmp/$1.mov" -vf "scale=886:-2" -c:v libx264 -crf 24 -preset veryfast -pix_fmt yuv420p -movflags +faststart "$OUT/$1.mp4"
   echo "recorded $1 ($(du -h "$OUT/$1.mp4" | cut -f1))"
 }
 
 for lang in ${LANGS:-ar en}; do
   # Matched by part of the name: iPhone reads a button's icon into its name.
-  if [ "$lang" = ar ]; then COMPLETE='.*إتمام المجموعة.*'; SKIP='.*تخطي الراحة.*'; SCAN='.*مسح وجبة.*'; UPLOAD='.*من الصور.*'; SIGNIN='.*تسجيل الدخول.*'; SEND='.*أرسل لي رمزاً.*'; LOGMEAL='.*سجّل هذه الوجبة.*'; else COMPLETE='.*Complete set.*'; SKIP='.*Skip rest.*'; SCAN='.*Scan meal.*'; UPLOAD='.*Upload.*'; SIGNIN='Sign in'; SEND='.*Send me a code.*'; LOGMEAL='.*Log this meal.*'; fi
+  if [ "$lang" = ar ]; then COMPLETE='.*إتمام المجموعة.*'; SKIP='.*تخطي الراحة.*'; SCAN='.*مسح وجبة.*'; UPLOAD='.*من الصور.*'; SIGNIN='.*تسجيل الدخول.*'; SEND='.*أرسل لي رمزاً.*'; LOGMEAL='.*سجّل هذه الوجبة.*'; else COMPLETE='.*Complete.*set.*'; SKIP='.*Skip rest.*'; SCAN='.*Scan meal.*'; UPLOAD='.*Upload.*'; SIGNIN='Sign in'; SEND='.*Send me a code.*'; LOGMEAL='.*Log this meal.*'; fi
 
   if echo "${FLOWS:-set meal}" | grep -q set; then
     seed "$lang" session
