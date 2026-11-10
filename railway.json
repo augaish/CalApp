@@ -8,6 +8,8 @@
   "deploy": {
     "healthcheckPath": "/health",
     "healthcheckTimeout": 120,
-    "drainingSeconds": 100
+    "drainingSeconds": 100,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 10
   }
 }
