@@ -1,5 +1,6 @@
 # Reads what the live server tells a brand-new install (plan, allowance,
-# plan locks), for checks after a server change. Nothing is written.
+# plan locks), for checks after a server change, and times one meal photo
+# estimate as the review account. Nothing else is written.
 name: Server probe
 
 on:
@@ -9,6 +10,7 @@ jobs:
   probe:
     runs-on: ubuntu-24.04
     steps:
+      - uses: actions/checkout@v4
       - name: A new install's entitlement
         run: |
           ref="u_probe_$(date +%s)"
@@ -22,3 +24,26 @@ jobs:
           curl -sS -m 90 -H "x-calgym-user: $ref" -H 'content-type: application/json' \
             -d '{"language":"en","messages":[{"role":"user","content":"Reply with the single word OK."}]}' \
             -w '\nHTTP %{http_code}\n' https://calapp-production-ab20.up.railway.app/api/coach
+      - name: One meal photo estimate, timed (review account)
+        if: ${{ env.REVIEW_CODE != '' }}
+        env:
+          REVIEW_CODE: ${{ secrets.REVIEW_CODE }}
+        run: |
+          SB=https://uvhvxcvwpwkqvnvqdtyf.supabase.co
+          KEY=sb_publishable_No3nDw01Bu7U5l2m5k_pnA_zYxl919V
+          python3 - <<'PY' > login.json
+          import json, os
+          print(json.dumps({"email": "review@calgym.org", "password": os.environ["REVIEW_CODE"]}))
+          PY
+          curl -sS -m 30 -H "apikey: $KEY" -H 'content-type: application/json' -d @login.json "$SB/auth/v1/token?grant_type=password" > session.json
+          TOKEN=$(python3 -c "import json;print(json.load(open('session.json')).get('access_token',''))")
+          [ -n "$TOKEN" ] || { echo "sign-in failed"; python3 -c "import json;d=json.load(open('session.json'));print({k:d.get(k) for k in ['error','error_code','msg']})"; exit 1; }
+          ffmpeg -loglevel error -y -i assets/dishes/rice_chicken.webp -vf "scale=1024:-2" -q:v 4 meal.jpg
+          ls -l meal.jpg
+          for lang in en ar; do
+            python3 -c "import base64,json,sys;print(json.dumps({'image':base64.b64encode(open('meal.jpg','rb').read()).decode(),'language':sys.argv[1]}))" "$lang" > body.json
+            ref="u_probe_meal_$(date +%s)"
+            curl -sS -m 200 -H "x-calgym-user: $ref" -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+              -d @body.json -o meal.json -w "MEAL $lang HTTP %{http_code} in %{time_total}s\n" https://calapp-production-ab20.up.railway.app/api/analyze-meal || echo "MEAL $lang curl failed ($?)"
+            head -c 600 meal.json; echo
+          done
