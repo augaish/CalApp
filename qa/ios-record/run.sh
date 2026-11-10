@@ -23,8 +23,9 @@ sips -s format jpeg "$HERE/../../assets/dishes/rice_chicken.webp" --out /tmp/kab
 xcrun simctl launch "$UDID" "$BID"; sleep 20; xcrun simctl terminate "$UDID" "$BID"
 printf 'appId: %s\n---\n- waitForAnimationToEnd\n' "$BID" > /tmp/warm.yaml; maestro --device "$UDID" test /tmp/warm.yaml >/dev/null 2>&1 || true
 
-seed() { # $1 lang, $2 kind
-  node "$HERE/../android-audit/state.mjs" "$1" "$2" /tmp/state.json
+seed() { # $1 lang, $2 kind (signedout: the sample data with no account, so the app opens on sign-in)
+  node "$HERE/../android-audit/state.mjs" "$1" "${2/signedout/base}" /tmp/state.json
+  if [ "$2" = signedout ]; then node -e "const f='/tmp/state.json',fs=require('fs'),s=JSON.parse(fs.readFileSync(f));delete s.state.account;fs.writeFileSync(f,JSON.stringify(s))"; fi
   xcrun simctl terminate "$UDID" "$BID" 2>/dev/null
   DATA=$(xcrun simctl get_app_container "$UDID" "$BID" data)
   python3 "$HERE/../ios-audit/seed.py" "$DATA" /tmp/state.json
@@ -39,10 +40,14 @@ open_url() { # $1 url: opens it and answers iOS's "Open in Calgym?"
   { printf 'appId: %s\n---\n' "$BID"; prompts; printf -- '- waitForAnimationToEnd\n'; } > /tmp/pre.yaml
   maestro --device "$UDID" test /tmp/pre.yaml >/dev/null 2>&1 || true
 }
+evidence() { # $1 name: what the screen showed when a step failed
+  xcrun simctl io "$UDID" screenshot "$OUT/$1.fail.png" >/dev/null 2>&1
+  maestro --device "$UDID" hierarchy > "$OUT/$1.hierarchy.json" 2>/dev/null || true
+}
 record() { # $1 name, $2 flow file
   xcrun simctl io "$UDID" recordVideo --codec=h264 --force "/tmp/$1.mov" & REC=$!
   sleep 2
-  maestro --device "$UDID" test "$2" > "/tmp/$1.log" 2>&1 || { echo "maestro: $1"; tail -20 "/tmp/$1.log"; tail -40 "/tmp/$1.log" > "$OUT/$1.maestro.txt"; }
+  maestro --device "$UDID" test "$2" > "/tmp/$1.log" 2>&1 || { echo "maestro: $1"; tail -20 "/tmp/$1.log"; tail -40 "/tmp/$1.log" > "$OUT/$1.maestro.txt"; evidence "$1"; }
   sleep 2
   kill -INT $REC; wait $REC 2>/dev/null
   # Smaller for sharing: 886 px wide, H.264.
@@ -51,7 +56,8 @@ record() { # $1 name, $2 flow file
 }
 
 for lang in ${LANGS:-ar en}; do
-  if [ "$lang" = ar ]; then COMPLETE='إتمام المجموعة.*'; SKIP='تخطي الراحة'; SCAN='مسح وجبة'; UPLOAD='من الصور'; SIGNIN='تسجيل الدخول'; SEND='أرسل لي رمزاً'; LOGMEAL='سجّل هذه الوجبة'; else COMPLETE='Complete set.*'; SKIP='Skip rest'; SCAN='Scan meal'; UPLOAD='Upload'; SIGNIN='Sign in'; SEND='Send me a code'; LOGMEAL='Log this meal'; fi
+  # Matched by part of the name: iPhone reads a button's icon into its name.
+  if [ "$lang" = ar ]; then COMPLETE='.*إتمام المجموعة.*'; SKIP='.*تخطي الراحة.*'; SCAN='.*مسح وجبة.*'; UPLOAD='.*من الصور.*'; SIGNIN='.*تسجيل الدخول.*'; SEND='.*أرسل لي رمزاً.*'; LOGMEAL='.*سجّل هذه الوجبة.*'; else COMPLETE='.*Complete set.*'; SKIP='.*Skip rest.*'; SCAN='.*Scan meal.*'; UPLOAD='.*Upload.*'; SIGNIN='Sign in'; SEND='.*Send me a code.*'; LOGMEAL='.*Log this meal.*'; fi
 
   if echo "${FLOWS:-set meal}" | grep -q set; then
     seed "$lang" session
@@ -71,18 +77,20 @@ for lang in ${LANGS:-ar en}; do
   fi
 
   if echo "${FLOWS:-set meal}" | grep -q meal && [ -n "${REVIEW_CODE:-}" ]; then
-    seed "$lang" base
+    seed "$lang" signedout
     # Signed in as the review account (it has a plan), before recording.
-    open_url "calapp://login"
+    xcrun simctl launch "$UDID" "$BID" >/dev/null; sleep 8
     {
       printf 'appId: %s\n---\n' "$BID"
+      prompts
+      printf -- '- scrollUntilVisible:\n    element:\n      text: "%s"\n    optional: true\n' "$SIGNIN"
       printf -- '- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$SIGNIN"
       printf -- '- inputText: "review@calgym.org"\n- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$SEND"
       printf -- '- inputText: "%s"\n' "$REVIEW_CODE"
       pause 8000
       printf -- '- tapOn:\n    text: "OK"\n    optional: true\n- tapOn:\n    text: "حسناً"\n    optional: true\n'
     } > /tmp/login.yaml
-    maestro --device "$UDID" test /tmp/login.yaml > "/tmp/$lang-login.log" 2>&1 || { echo "login failed"; tail -20 "/tmp/$lang-login.log"; tail -40 "/tmp/$lang-login.log" > "$OUT/$lang-login.maestro.txt"; }
+    maestro --device "$UDID" test /tmp/login.yaml > "/tmp/$lang-login.log" 2>&1 || { echo "login failed"; tail -20 "/tmp/$lang-login.log"; tail -40 "/tmp/$lang-login.log" > "$OUT/$lang-login.maestro.txt"; evidence "$lang-login"; }
     xcrun simctl terminate "$UDID" "$BID"
     open_url "calapp://food"
     {
