@@ -26,6 +26,8 @@ printf 'appId: %s\n---\n- waitForAnimationToEnd\n' "$BID" > /tmp/warm.yaml; maes
 seed() { # $1 lang, $2 kind (signedout: the sample data with no account, so the app opens on sign-in)
   node "$HERE/../android-audit/state.mjs" "$1" "${2/signedout/base}" /tmp/state.json
   if [ "$2" = signedout ]; then node -e "const f='/tmp/state.json',fs=require('fs'),s=JSON.parse(fs.readFileSync(f));delete s.state.account;fs.writeFileSync(f,JSON.stringify(s))"; fi
+  # The sample's workout is set at 18:20; on camera it should be under way now, with no rest running yet.
+  if [ "$2" = session ]; then node -e "const f='/tmp/state.json',fs=require('fs'),s=JSON.parse(fs.readFileSync(f));const a=s.state.activeSession;if(a){a.startedAt=new Date(Date.now()-12*60000).toISOString();a.restEndsAt=null;a.restNext=null;}fs.writeFileSync(f,JSON.stringify(s))"; fi
   xcrun simctl terminate "$UDID" "$BID" 2>/dev/null
   DATA=$(xcrun simctl get_app_container "$UDID" "$BID" data)
   python3 "$HERE/../ios-audit/seed.py" "$DATA" /tmp/state.json
