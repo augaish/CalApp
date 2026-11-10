@@ -370,7 +370,7 @@ export const ADMIN_HTML = `<!doctype html>
       <details class="how"><summary>How to connect Apple (App Store Connect API)</summary><div>
         1. App Store Connect → <b>Users and Access → Integrations → App Store Connect API</b> → Team Keys → <b>+</b>. Name <code>calgym-codes</code>, access <b>App Manager</b>. Generate.<br>
         2. Note the <b>Issuer ID</b> (top of the page) and the key's <b>Key ID</b>; <b>Download</b> the .p8 file (Apple lets you download it once).<br>
-        3. Railway → the server → Variables: <code>ASC_ISSUER_ID</code>, <code>ASC_KEY_ID</code>, and <code>ASC_PRIVATE_KEY</code> = the whole text of the .p8 file. Deploy.<br>
+        3. Railway → the server → Variables: <code>ASC_ISSUER_ID</code>, <code>ASC_KEY_ID</code>, and <code>ASC_PRIVATE_KEY</code> = the whole text of the .p8 file. Deploy. (An <b>Individual</b> key has no Issuer ID: leave <code>ASC_ISSUER_ID</code> out.)<br>
         4. Back here: <b>Test connections</b>. To stop it any time, revoke the key in App Store Connect.
       </div></details>
       <details class="how"><summary>How to connect Google (Play Developer API)</summary><div>

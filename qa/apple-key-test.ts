@@ -2,7 +2,7 @@
 // variable: as downloaded, on one line with \n, with its line breaks turned
 // into spaces, in quotes, with Windows line ends, or without BEGIN/END.
 import { createVerify, generateKeyPairSync } from 'node:crypto';
-import { appleKeyPem, appleToken } from '../server/src/store-offers';
+import { appleKeyId, appleKeyPem, appleToken } from '../server/src/store-offers';
 
 let fails = 0;
 const check = (l: string, c: boolean, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  → ' + e : ''}`); };
@@ -35,5 +35,12 @@ for (const [name, value] of variants) {
   check(`signs with the key ${name}`, ok, err);
 }
 check('re-wrapped as PKCS#8 in 64-character lines', appleKeyPem(body).split('\n').slice(1, -2).every((l) => l.length <= 64));
+check('Key ID from the file name', appleKeyId('AuthKey_7q2xabcd12.p8') === '7Q2XABCD12' && appleKeyId(' 7Q2XABCD12 ') === '7Q2XABCD12');
+process.env.ASC_PRIVATE_KEY = p8;
+const claims = (t: string) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString());
+const team = claims(appleToken(Date.now(), 'team'));
+const indiv = claims(appleToken(Date.now(), 'individual'));
+check('team key: iss, no sub', team.iss === 'issuer-1' && !team.sub && team.aud === 'appstoreconnect-v1' && team.exp - team.iat <= 1200);
+check('individual key: sub "user", no iss', indiv.sub === 'user' && !indiv.iss && indiv.aud === 'appstoreconnect-v1');
 console.log(fails ? `\n${fails} FAILED` : '\nALL PASS');
 process.exit(fails ? 1 : 0);

@@ -67,9 +67,23 @@ const ascAppId = () => env('ASC_APP_ID') || '6793969631';
 /** Calgym's prices are set in Saudi riyals; the other countries follow Apple's equalized prices. */
 const ANCHOR_TERRITORY = 'SAU';
 
+/** A team key needs the issuer; an individual key (App Store Connect → Individual Keys) has none. */
 export function appleConfigured(): boolean {
-  return !!(env('ASC_KEY_ID') && env('ASC_ISSUER_ID') && env('ASC_PRIVATE_KEY'));
+  return !!(env('ASC_KEY_ID') && env('ASC_PRIVATE_KEY'));
 }
+
+/** The Key ID as Apple shows it, even when pasted from the file name (AuthKey_ABC123.p8). */
+export function appleKeyId(raw = env('ASC_KEY_ID')): string {
+  return raw.replace(/^AuthKey_/i, '').replace(/\.p8$/i, '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+}
+
+/**
+ * Team keys sign with the issuer (iss); individual keys with sub "user" and
+ * no issuer. Which one this key is gets learned from Apple's answer: a
+ * refused token is tried once the other way, and the way that worked is kept.
+ */
+let appleKeyKind: 'team' | 'individual' | null = null;
+const defaultKind = (): 'team' | 'individual' => (env('ASC_ISSUER_ID') ? 'team' : 'individual');
 
 function pem(key: string): string {
   // Railway variables often carry the .p8 with literal \n.
@@ -93,10 +107,11 @@ export function appleKeyPem(key: string): string {
 const b64url = (v: Buffer | string) => Buffer.from(v).toString('base64url');
 
 /** A 15-minute ES256 token, as App Store Connect requires. */
-export function appleToken(now = Date.now()): string {
-  const header = b64url(JSON.stringify({ alg: 'ES256', kid: env('ASC_KEY_ID'), typ: 'JWT' }));
+export function appleToken(now = Date.now(), kind: 'team' | 'individual' = appleKeyKind ?? defaultKind()): string {
+  const header = b64url(JSON.stringify({ alg: 'ES256', kid: appleKeyId(), typ: 'JWT' }));
   const iat = Math.floor(now / 1000);
-  const payload = b64url(JSON.stringify({ iss: env('ASC_ISSUER_ID'), iat, exp: iat + 15 * 60, aud: 'appstoreconnect-v1' }));
+  const who = kind === 'team' ? { iss: env('ASC_ISSUER_ID') } : { sub: 'user' };
+  const payload = b64url(JSON.stringify({ ...who, iat, exp: iat + 15 * 60, aud: 'appstoreconnect-v1' }));
   const signer = createSign('SHA256');
   signer.update(`${header}.${payload}`);
   const sig = signer.sign({ key: appleKeyPem(env('ASC_PRIVATE_KEY')), dsaEncoding: 'ieee-p1363' });
@@ -112,12 +127,27 @@ interface JsonApiDoc {
 
 async function asc(path: string, init: { method?: string; body?: unknown } = {}): Promise<JsonApiDoc> {
   const url = path.startsWith('http') ? path : `${ASC_BASE()}${path}`;
-  const res = await fetch(url, {
-    method: init.method ?? 'GET',
-    headers: { Authorization: `Bearer ${appleToken()}`, 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: init.body ? JSON.stringify(init.body) : undefined,
-    signal: AbortSignal.timeout(30000),
-  });
+  const send = (kind: 'team' | 'individual') =>
+    fetch(url, {
+      method: init.method ?? 'GET',
+      headers: { Authorization: `Bearer ${appleToken(Date.now(), kind)}`, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: init.body ? JSON.stringify(init.body) : undefined,
+      signal: AbortSignal.timeout(30000),
+    });
+  const first = appleKeyKind ?? defaultKind();
+  let res = await send(first);
+  // Not yet known which kind of key this is: a refused token tries the other kind once.
+  if (res.status === 401 && !appleKeyKind) {
+    const other = first === 'team' ? 'individual' : 'team';
+    if (other === 'individual' || env('ASC_ISSUER_ID')) {
+      const retry = await send(other);
+      if (retry.status !== 401) {
+        appleKeyKind = other;
+        res = retry;
+      }
+    }
+  }
+  if (res.ok && !appleKeyKind) appleKeyKind = first;
   const text = await res.text();
   const json = (text ? JSON.parse(text) : {}) as JsonApiDoc;
   if (!res.ok) {
@@ -294,8 +324,20 @@ export async function checkAppleOffer(code: string, productId: string): Promise<
 
 /** A read-only call that proves the key works. */
 export async function testApple(): Promise<StoreResult> {
-  const subs = await appleSubscriptions();
-  return { store: 'apple', ok: true, detail: `connected · ${subs.size} subscription${subs.size === 1 ? '' : 's'} found` };
+  const id = appleKeyId();
+  const issuer = env('ASC_ISSUER_ID');
+  // What the token carries, without the secret, so a refusal can be matched against App Store Connect.
+  const using = `Key ID ${id}${issuer ? `, Issuer ID ${issuer.slice(0, 8)}…` : ', no Issuer ID'}`;
+  try {
+    const subs = await appleSubscriptions();
+    return { store: 'apple', ok: true, detail: `connected · ${subs.size} subscription${subs.size === 1 ? '' : 's'} found · ${appleKeyKind === 'individual' ? 'individual' : 'team'} key` };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (err instanceof StoreError && err.status === 401) {
+      throw new StoreError('apple', `Apple refused the key (${using}). Check that the Key ID and Issuer ID match the key in App Store Connect → Users and Access → Integrations, and that the key isn't revoked.`, 401);
+    }
+    throw new StoreError('apple', msg, err instanceof StoreError ? err.status : undefined);
+  }
 }
 
 // ── Google: Play Developer API ───────────────────────────────────────────
