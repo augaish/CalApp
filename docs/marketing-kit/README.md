@@ -1,6 +1,18 @@
 # Calgym marketing kit
 
-Everything to present Calgym: logos, screenshots, store graphics, social posts, copy and the brand guide. English and Arabic throughout. Made 30 September 2026; screenshots, store graphics, social images and the brand guide's screens updated 8 October 2026 with the redesign (workout card, dish photos, new workout screen).
+Everything to present Calgym: logos, screenshots, store graphics, social posts, copy and the brand guide. English and Arabic throughout. Made 30 September 2026; screenshots, store graphics, social images and the brand guide's screens updated 8 October 2026 with the redesign (workout card, dish photos, new workout screen). **Screenshots (plain and captioned, all three sizes) and social images updated again 10 November 2026** from the app as it launched; the logos, Google Play graphics and the brand guide are unchanged.
+
+## What changed in the app since 30 September
+
+Use the 10 November screens; the 30 September ones are out of date in these places:
+
+- **Training:** today's card has **Do another day's workout**; the weekly schedule has **Move a day to another day**.
+- **Workout screen:** the rest timer at the top, then Target, **Last time** with every set one tap away, Best inside Last time, weight and reps, exercise notes; **My setup** for machines; **Finish workout** is a link under Complete set.
+- **Food:** real dish photos next to meals, plans and recipes; the calories card first; **Log food** and **Plan** on an empty meal.
+- **AI Support** (the coach's name in the app): every answer ends "AI estimate, not medical advice · Sources"; a new account without a plan sees "AI Support comes with a plan".
+- **Health sources:** a page listing every calculation with its published source (Settings, Help, Health tab), linked from targets and AI answers.
+- **Plans:** "Have a code?" on iPhone opens Apple's own offer-code sheet.
+- **Camera:** the scanner asks for the camera straight away (iPhone's own prompt).
 
 Start with **calgym-brand-guide.pdf**: it shows the whole brand on 11 pages.
 
@@ -39,7 +51,7 @@ Kinds:
 |---|---|---|
 | `app-store-6.9` | 1290 × 2796 | App Store Connect → iPhone 6.9" Display |
 | `app-store-6.5` | 1284 × 2778 | App Store Connect → iPhone 6.5" Display |
-| `google-play` | 1080 × 2160 | Play Console → Phone screenshots (Play allows at most 2:1) |
+| `google-play` | 1080 × 1920 | Play Console → Phone screenshots (9:16) |
 
 Order: 01 Overview · 02 Food · 03 Recipe · 04 Meal plan · 05 Training · 06 Workout & rest timer · 07 Health · 08 AI coach · 09 Plans · 10 Welcome.
 
