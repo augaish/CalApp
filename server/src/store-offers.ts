@@ -349,8 +349,15 @@ export async function testApple(): Promise<StoreResult> {
 
 const PLAY_BASE = () => env('GOOGLE_PLAY_BASE_URL') || 'https://androidpublisher.googleapis.com';
 const playPackage = () => env('GOOGLE_PLAY_PACKAGE') || 'com.augaish.calapp';
-/** The regions version Play prices are given against (see the API's regionsVersion). */
-const REGIONS_VERSION = '2022/02';
+/**
+ * The regions versions Play prices can be given against (the API's
+ * regionsVersion), newest first. Play adds billable countries in new
+ * versions: a base plan made in Play Console today can include a country
+ * (Ethiopia, ET) that 2022/02 doesn't bill in, and Play then refuses the
+ * whole offer. So the newest is tried first, an older one if Play doesn't
+ * know it, and a country Play still won't bill is left out of the offer.
+ */
+const REGIONS_VERSIONS = ['2025/03', '2022/02'];
 
 interface ServiceAccount {
   client_email: string;
@@ -435,9 +442,9 @@ export function googleFreePeriod(days: number): string {
 }
 
 /** The JSON body for a new offer — exported so the shape is tested. */
-export function googleOfferBody(spec: OfferSpec, plan: PlayBasePlan) {
+export function googleOfferBody(spec: OfferSpec, plan: PlayBasePlan, leaveOut: string[] = []) {
   const free = spec.kind === 'free';
-  const regions = (plan.regionalConfigs ?? []).map((r) => r.regionCode);
+  const regions = (plan.regionalConfigs ?? []).map((r) => r.regionCode).filter((r) => !leaveOut.includes(r));
   if (!regions.length) throw new StoreError('google', `Base plan ${plan.basePlanId} has no countries.`);
   const yearly = (plan.autoRenewingBasePlanType?.billingPeriodDuration ?? '').endsWith('Y');
   const phasePrice = (regionCode?: string) =>
@@ -475,12 +482,8 @@ export async function createGoogleOffer(spec: OfferSpec): Promise<StoreResult> {
   const offerId = googleOfferId(spec.code);
   const path = `/subscriptions/${spec.productId}/basePlans/${plan.basePlanId}/offers`;
   let offer = await play<{ state?: string }>(`${path}/${offerId}`, { allow404: true });
-  if (!offer) {
-    offer = await play<{ state?: string }>(`${path}?offerId=${encodeURIComponent(offerId)}&regionsVersion.version=${encodeURIComponent(REGIONS_VERSION)}`, {
-      method: 'POST',
-      body: googleOfferBody(spec, plan),
-    });
-  }
+  const leftOut: string[] = [];
+  if (!offer) offer = await postGoogleOffer(spec, plan, `${path}?offerId=${encodeURIComponent(offerId)}`, leftOut);
   if (offer?.state !== 'ACTIVE') {
     offer = await play<{ state?: string }>(`${path}/${offerId}:activate`, {
       method: 'POST',
@@ -490,10 +493,40 @@ export async function createGoogleOffer(spec: OfferSpec): Promise<StoreResult> {
   return {
     store: 'google',
     ok: offer?.state === 'ACTIVE',
-    detail: offer?.state === 'ACTIVE' ? `offer ${offerId} active on ${spec.productId} (${plan.basePlanId})` : `offer ${offerId} made but not active (${offer?.state ?? 'unknown'})`,
+    detail:
+      (offer?.state === 'ACTIVE' ? `offer ${offerId} active on ${spec.productId} (${plan.basePlanId})` : `offer ${offerId} made but not active (${offer?.state ?? 'unknown'})`) +
+      (leftOut.length ? `; not offered in ${leftOut.join(', ')} (Play doesn't bill there yet)` : ''),
     ids: { basePlan: plan.basePlanId, offer: offerId },
     offerRef: offerId,
   };
+}
+
+/** Makes the offer, working round regions versions and countries Play won't bill (see REGIONS_VERSIONS). */
+async function postGoogleOffer(spec: OfferSpec, plan: PlayBasePlan, url: string, leftOut: string[]): Promise<{ state?: string } | null> {
+  let last: unknown;
+  for (const version of REGIONS_VERSIONS) {
+    leftOut.length = 0;
+    for (let tries = 0; tries < 10; tries++) {
+      try {
+        return await play<{ state?: string }>(`${url}&regionsVersion.version=${encodeURIComponent(version)}`, {
+          method: 'POST',
+          body: googleOfferBody(spec, plan, leftOut),
+        });
+      } catch (err) {
+        last = err;
+        const msg = err instanceof Error ? err.message : '';
+        const region = /Region code ([A-Z]{2}) is not billable/i.exec(msg)?.[1]?.toUpperCase();
+        if (region && !leftOut.includes(region)) {
+          leftOut.push(region);
+          continue;
+        }
+        // Another 400 (most likely a regions version Play doesn't know): try the next version.
+        if (err instanceof StoreError && err.status === 400) break;
+        throw err;
+      }
+    }
+  }
+  throw last;
 }
 
 export async function checkGoogleOffer(code: string, productId: string): Promise<StoreResult> {

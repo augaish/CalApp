@@ -72,7 +72,7 @@ http
           productId: m[1],
           basePlans: [
             { basePlanId: 'old-prepaid', state: 'INACTIVE', prepaidBasePlanType: {} },
-            { basePlanId: yearly ? 'annual' : 'monthly', state: 'ACTIVE', autoRenewingBasePlanType: { billingPeriodDuration: yearly ? 'P1Y' : 'P1M' }, regionalConfigs: [{ regionCode: 'SA' }, { regionCode: 'US' }, { regionCode: 'AE' }], otherRegionsConfig: { usdPrice: {} } },
+            { basePlanId: yearly ? 'annual' : 'monthly', state: 'ACTIVE', autoRenewingBasePlanType: { billingPeriodDuration: yearly ? 'P1Y' : 'P1M' }, regionalConfigs: [{ regionCode: 'SA' }, { regionCode: 'US' }, { regionCode: 'AE' }, { regionCode: 'ET' }, { regionCode: 'XK' }], otherRegionsConfig: { usdPrice: {} } },
           ],
         });
       }
@@ -92,19 +92,25 @@ http
         const id = url.searchParams.get('offerId');
         const problems = [];
         if (!id || !/^[a-z0-9][a-z0-9-]{0,62}$/.test(id)) problems.push('offerId');
-        if (!url.searchParams.get('regionsVersion.version')) problems.push('regionsVersion');
+        // As Play: versions it knows, ET billable only from 2025/03, XK in none.
+        const version = url.searchParams.get('regionsVersion.version');
+        if (!['2022/02', '2025/03'].includes(version)) return send(res, 400, { error: { message: `Invalid regions version: ${version}` } });
+        for (const r of body.regionalConfigs ?? []) {
+          if (r.regionCode === 'XK' || (r.regionCode === 'ET' && version === '2022/02'))
+            return send(res, 400, { error: { message: `Region code ${r.regionCode} is not billable at the specified regions version ${version}.` } });
+        }
         if (body.offerId !== id || body.basePlanId !== plan || body.productId !== product || body.packageName !== PKG) problems.push('ids');
         if (!Array.isArray(body.phases) || body.phases.length < 1 || body.phases.length > 2) problems.push('phases');
         for (const ph of body.phases ?? []) {
           if (!/^P\d+[DWMY]$/.test(ph.duration) || !(ph.recurrenceCount >= 1)) problems.push('phase timing');
           const regions = (ph.regionalConfigs ?? []).map((r) => r.regionCode).sort().join();
-          if (regions !== 'AE,SA,US') problems.push('phase regions');
+          if (regions !== 'AE,ET,SA,US') problems.push('phase regions');
           for (const r of ph.regionalConfigs ?? []) {
             const kinds = ['free', 'relativeDiscount', 'price', 'absoluteDiscount'].filter((k) => r[k] !== undefined);
             if (kinds.length !== 1 || (r.relativeDiscount !== undefined && !(r.relativeDiscount > 0 && r.relativeDiscount < 1))) problems.push('phase price');
           }
         }
-        if ((body.regionalConfigs ?? []).map((r) => r.regionCode).sort().join() !== 'AE,SA,US') problems.push('regions');
+        if ((body.regionalConfigs ?? []).map((r) => r.regionCode).sort().join() !== 'AE,ET,SA,US') problems.push('regions');
         if (problems.length) return send(res, 400, { error: { message: 'Invalid offer: ' + problems.join(', ') } });
         const offer = { ...body, state: 'DRAFT' };
         playOffers.set(key, offer);
