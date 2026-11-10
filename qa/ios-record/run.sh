@@ -86,8 +86,10 @@ for lang in ${LANGS:-ar en}; do
       printf 'appId: %s\n---\n' "$BID"
       prompts
       printf -- '- scrollUntilVisible:\n    element:\n      text: "%s"\n    optional: true\n' "$SIGNIN"
-      printf -- '- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$SIGNIN"
-      printf -- '- inputText: "review@calgym.org"\n- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$SEND"
+      printf -- '- waitForAnimationToEnd\n- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$SIGNIN"
+      # A tap that lands during the screen's entrance does nothing: try once more if the email step isn't up.
+      printf -- '- extendedWaitUntil:\n    visible: "you@example.com"\n    timeout: 4000\n    optional: true\n- runFlow:\n    when:\n      notVisible: "you@example.com"\n    commands:\n      - tapOn:\n          text: "%s"\n      - waitForAnimationToEnd\n' "$SIGNIN"
+      printf -- '- tapOn:\n    text: "you@example.com"\n- inputText: "review@calgym.org"\n- tapOn:\n    text: "%s"\n- waitForAnimationToEnd\n' "$SEND"
       printf -- '- inputText: "%s"\n' "$REVIEW_CODE"
       pause 8000
       printf -- '- tapOn:\n    text: "OK"\n    optional: true\n- tapOn:\n    text: "حسناً"\n    optional: true\n'
@@ -104,7 +106,8 @@ for lang in ${LANGS:-ar en}; do
       printf -- '- tapOn:\n    text: "%s"\n' "$UPLOAD"
       pause 2500
       # The photo picker shows the library: the newest photo is the kabsa.
-      printf -- '- tapOn:\n    text: "Photo.*"\n    index: 0\n    optional: true\n'
+      # The newest photo, top left of the picker's grid.
+      printf -- '- tapOn:\n    point: "17%%,41%%"\n'
       printf -- '- extendedWaitUntil:\n    visible: "%s"\n    timeout: 90000\n' "$LOGMEAL"
       pause 3000
       printf -- '- scrollUntilVisible:\n    element:\n      text: "%s"\n    optional: true\n' "$LOGMEAL"
