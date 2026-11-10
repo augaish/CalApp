@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Icon } from '@/components/icon';
@@ -26,6 +27,9 @@ export default function Membership() {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { height: screenH } = useWindowDimensions();
+  // The buttons' height, measured: the plan details scroll in what's left.
+  const [footerH, setFooterH] = useState(0);
   const { reason } = useLocalSearchParams<{ reason?: string }>();
   const used = useEntitlement((s) => s.used);
   const limit = useEntitlement((s) => s.limit);
@@ -44,7 +48,7 @@ export default function Membership() {
       <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel={t('common.close')} />
       <View
         onStartShouldSetResponder={() => true}
-        style={[styles.sheet, { backgroundColor: theme.background, maxHeight: '94%' }, cardShadow(theme.shadow)]}
+        style={[styles.sheet, { backgroundColor: theme.background, maxHeight: screenH * SHEET_MAX }, cardShadow(theme.shadow)]}
       >
         <View style={[styles.grabber, { backgroundColor: theme.border }]} />
         <Pressable
@@ -57,7 +61,14 @@ export default function Membership() {
           <Icon name="close" size={26} color={theme.textSecondary} />
         </Pressable>
 
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: Spacing.sm }}>
+        {/* Sized to the room above the buttons. Left to the sheet's own cap it
+            grew to its full content height, so on a phone the price and plan
+            details ran under the buttons and couldn't be scrolled to. */}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          style={{ flexGrow: 0, maxHeight: Math.max(160, screenH * SHEET_MAX - footerH - SHEET_TOP) }}
+          contentContainerStyle={{ paddingBottom: Spacing.sm }}
+        >
           <View style={styles.hero}>
             <Text style={[Type.title, styles.center, { color: theme.text }]} accessibilityRole="header">
               {t('membership.title')}
@@ -102,7 +113,10 @@ export default function Membership() {
           ) : null}
         </ScrollView>
 
-        <View style={{ paddingTop: Spacing.sm, paddingBottom: insets.bottom + Spacing.sm }}>
+        <View
+          onLayout={(e) => setFooterH(e.nativeEvent.layout.height)}
+          style={{ paddingTop: Spacing.sm, paddingBottom: insets.bottom + Spacing.sm }}
+        >
           {action.terms ? (
             <Text style={[styles.center, { color: theme.textSecondary, fontSize: 12, lineHeight: 17, marginBottom: Spacing.xs }]}>{action.terms}</Text>
           ) : null}
@@ -113,6 +127,10 @@ export default function Membership() {
     </View>
   );
 }
+
+/** The sheet's tallest, as a share of the screen, and what sits above the scrolling part (padding and grabber). */
+const SHEET_MAX = 0.94;
+const SHEET_TOP = Spacing.sm + 5 + Spacing.xs;
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: 'rgba(33,27,46,0.5)', justifyContent: 'flex-end' },
