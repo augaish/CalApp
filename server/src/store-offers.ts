@@ -76,6 +76,20 @@ function pem(key: string): string {
   return key.includes('\\n') ? key.replace(/\\n/g, '\n') : key;
 }
 
+/**
+ * The .p8 as a key Node can read, however it was pasted: with its line
+ * breaks turned into spaces or \n, wrapped in quotes, or without the BEGIN
+ * and END lines. Only the base64 body matters; it is re-wrapped as PKCS#8.
+ */
+export function appleKeyPem(key: string): string {
+  const body = key
+    .replace(/\\n/g, '\n')
+    .replace(/-----BEGIN [A-Z ]+-----/, '')
+    .replace(/-----END [A-Z ]+-----/, '')
+    .replace(/[^A-Za-z0-9+/=]/g, '');
+  return `-----BEGIN PRIVATE KEY-----\n${(body.match(/.{1,64}/g) ?? []).join('\n')}\n-----END PRIVATE KEY-----\n`;
+}
+
 const b64url = (v: Buffer | string) => Buffer.from(v).toString('base64url');
 
 /** A 15-minute ES256 token, as App Store Connect requires. */
@@ -85,7 +99,7 @@ export function appleToken(now = Date.now()): string {
   const payload = b64url(JSON.stringify({ iss: env('ASC_ISSUER_ID'), iat, exp: iat + 15 * 60, aud: 'appstoreconnect-v1' }));
   const signer = createSign('SHA256');
   signer.update(`${header}.${payload}`);
-  const sig = signer.sign({ key: pem(env('ASC_PRIVATE_KEY')), dsaEncoding: 'ieee-p1363' });
+  const sig = signer.sign({ key: appleKeyPem(env('ASC_PRIVATE_KEY')), dsaEncoding: 'ieee-p1363' });
   return `${header}.${payload}.${b64url(sig)}`;
 }
 
