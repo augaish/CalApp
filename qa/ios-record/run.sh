@@ -35,10 +35,11 @@ seed() { # $1 lang, $2 kind (signedout: the sample data with no account, so the 
 }
 # Waits that Maestro has no step for: wait for text that never shows.
 pause() { printf -- '- extendedWaitUntil:\n    visible: "zzz-never-zzz"\n    timeout: %s\n    optional: true\n' "$1"; }
-prompts() { for b in Allow Open Allow; do printf -- '- extendedWaitUntil:\n    visible: "%s"\n    timeout: 3000\n    optional: true\n- tapOn:\n    text: "%s"\n    optional: true\n' "$b" "$b"; done; }
+# iOS's "Open in Calgym?" and the notification question; on iOS 26 the first can take several seconds.
+prompts() { for b in Open Allow Open; do printf -- '- extendedWaitUntil:\n    visible: "%s"\n    timeout: 7000\n    optional: true\n- tapOn:\n    text: "%s"\n    optional: true\n' "$b" "$b"; done; }
 open_url() { # $1 url: opens it and answers iOS's "Open in Calgym?"
   xcrun simctl launch "$UDID" "$BID" >/dev/null; sleep 6
-  xcrun simctl openurl "$UDID" "$1"; sleep 2
+  xcrun simctl openurl "$UDID" "$1"; sleep 5
   { printf 'appId: %s\n---\n' "$BID"; prompts; printf -- '- waitForAnimationToEnd\n'; } > /tmp/pre.yaml
   maestro --device "$UDID" test /tmp/pre.yaml >/dev/null 2>&1 || true
 }
@@ -69,6 +70,7 @@ for lang in ${LANGS:-ar en}; do
     open_url "calapp://session"
     {
       printf 'appId: %s\n---\n' "$BID"
+      prompts
       pause 2500
       printf -- '- tapOn:\n    text: "%s"\n' "$COMPLETE"
       pause 6000
@@ -102,6 +104,7 @@ for lang in ${LANGS:-ar en}; do
     open_url "calapp://food"
     {
       printf 'appId: %s\n---\n' "$BID"
+      prompts
       pause 2000
       printf -- '- tapOn:\n    text: "%s"\n' "$SCAN"
       prompts
