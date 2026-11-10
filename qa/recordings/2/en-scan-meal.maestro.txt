@@ -1,0 +1,17 @@
+Running on iPhone 16 Pro Max - iOS 26.2 - FA1105A3-CFB2-45AC-B4DB-EBAC55DD946D
+ > Flow meal
+Assert that (Optional) "zzz-never-zzz" is visible... WARNED
+Tap on "Scan meal"... FAILED
+
+Element not found: Text matching regex: Scan meal
+
+Element with Text matching regex: Scan meal not found. Check the UI hierarchy in debug artifacts to verify if the element exists.
+
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state.
+- This could be a real regression that needs to be addressed.
+
+==== Debug output (logs & screenshots) ====
+
+/Users/runner/.maestro/tests/2026-11-10_170834
