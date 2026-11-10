@@ -1,10 +1,13 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
   "build": {
-    "watchPatterns": ["/server/**"]
+    "watchPatterns": [
+      "/server/**"
+    ]
   },
   "deploy": {
     "healthcheckPath": "/health",
-    "healthcheckTimeout": 120
+    "healthcheckTimeout": 120,
+    "drainingSeconds": 100
   }
 }

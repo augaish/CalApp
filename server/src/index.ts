@@ -3446,18 +3446,41 @@ app.post('/admin/api/sponsor', async (c) => {
 
 app.get('/admin', (c) => c.html(ADMIN_HTML));
 
+/**
+ * On a redeploy Railway stops the old server with SIGTERM once the new one
+ * answers /health. Exiting right away dropped requests in flight (a meal
+ * scan takes 15-30 s), so stop taking new connections and let open requests
+ * finish, with a cap so a stuck request can't hold the old server forever.
+ */
+function stopGently(server: ReturnType<typeof serve>) {
+  let stopping = false;
+  const stop = (signal: string) => {
+    if (stopping) return;
+    stopping = true;
+    console.log(`${signal}: finishing open requests before exit`);
+    server.close(() => process.exit(0));
+    setTimeout(() => process.exit(0), 100_000).unref();
+  };
+  process.on('SIGTERM', () => stop('SIGTERM'));
+  process.on('SIGINT', () => stop('SIGINT'));
+}
+
 initDb()
   .then(async () => {
     await runLaunchSwitch().catch((err) => console.error('launch switch failed:', err));
-    serve({ fetch: app.fetch, port: PORT }, (info) => {
-      console.log(
-        `Calgym AI server listening on :${info.port} (model: ${MODEL}, cache: ${cacheEnabled ? 'on' : 'off'})`,
-      );
-    });
+    stopGently(
+      serve({ fetch: app.fetch, port: PORT }, (info) => {
+        console.log(
+          `Calgym AI server listening on :${info.port} (model: ${MODEL}, cache: ${cacheEnabled ? 'on' : 'off'})`,
+        );
+      }),
+    );
   })
   .catch((err) => {
     console.error('DB init failed, starting without cache:', err);
-    serve({ fetch: app.fetch, port: PORT }, (info) => {
-      console.log(`Calgym AI server listening on :${info.port} (model: ${MODEL}, cache: off)`);
-    });
+    stopGently(
+      serve({ fetch: app.fetch, port: PORT }, (info) => {
+        console.log(`Calgym AI server listening on :${info.port} (model: ${MODEL}, cache: off)`);
+      }),
+    );
   });

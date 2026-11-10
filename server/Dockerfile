@@ -5,4 +5,5 @@ RUN npm install --omit=dev
 COPY src ./src
 COPY tsconfig.json ./
 EXPOSE 3000
-CMD ["npm", "start"]
+# node itself (not npm) so Railway's stop signal reaches the server and open requests can finish.
+CMD ["node", "--import", "tsx", "src/index.ts"]
