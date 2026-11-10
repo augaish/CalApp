@@ -327,6 +327,11 @@ export async function testApple(): Promise<StoreResult> {
   const id = appleKeyId();
   const issuer = env('ASC_ISSUER_ID');
   // What the token carries, without the secret, so a refusal can be matched against App Store Connect.
+  // Shown only when they look like Apple's IDs, so a key pasted in the wrong box is never echoed.
+  const idOk = /^[A-Z0-9]{10}$/.test(id);
+  const issuerOk = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(issuer);
+  if (!idOk) throw new StoreError('apple', 'ASC_KEY_ID is not a Key ID: Apple\'s Key IDs are 10 letters and digits (e.g. 2X9R4HXF34), shown in the Key ID column and in the .p8 file name.');
+  if (issuer && !issuerOk) throw new StoreError('apple', 'ASC_ISSUER_ID is not an Issuer ID: it looks like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx and is shown at the top of the Team Keys page.');
   const using = `Key ID ${id}${issuer ? `, Issuer ID ${issuer.slice(0, 8)}…` : ', no Issuer ID'}`;
   try {
     const subs = await appleSubscriptions();
