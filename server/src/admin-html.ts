@@ -52,6 +52,14 @@ export const ADMIN_HTML = `<!doctype html>
   .metric .label { font-size:14px; font-weight:600; }
   .metric .value { font-size:34px; font-weight:800; letter-spacing:-.5px; margin:6px 0 2px; font-variant-numeric:tabular-nums; color:var(--text); }
   .metric .note { font-size:13px; opacity:.85; }
+  .ln-form { display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap; margin-top:10px; }
+  .ln-form.hide { display:none; }
+  .launch-pill { border-radius:99px; padding:6px 12px; font-weight:700; font-size:14px; background:#ffe8d9; color:#8a3b12; }
+  .launch-pill.live { background:#e3f7c9; color:#2f5b1a; }
+  .launch-table td { padding:9px 10px; vertical-align:top; }
+  .launch-table td.big { font-weight:700; font-size:18px; white-space:nowrap; }
+  .launch-table td.since { color:#2f5b1a; }
+  .launch-table th { text-align:start; }
   .strip { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:var(--gap) 0; }
   .stat { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
   .stat b { display:block; font-size:22px; font-variant-numeric:tabular-nums; }
@@ -159,9 +167,24 @@ export const ADMIN_HTML = `<!doctype html>
     </nav>
 
     <section class="panel" role="tabpanel" id="p-overview" aria-labelledby="t-overview">
+      <div class="card" id="launch">
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <h2 style="margin:0;flex:1">Launch</h2>
+          <span class="launch-pill" id="ln_pill">—</span>
+          <button class="ghost" id="ln_edit" onclick="launchEdit(true)">Set launch day</button>
+        </div>
+        <div id="ln_form" class="ln-form hide">
+          <div><label for="ln_day">Launch day</label><input id="ln_day" type="date" /></div>
+          <button onclick="launchSave()">Save</button>
+          <button class="ghost" onclick="launchSave(true)">Clear</button>
+          <button class="ghost" onclick="launchEdit(false)">Cancel</button>
+        </div>
+        <p class="sub" id="ln_sub" style="margin:6px 0 10px"></p>
+        <div class="scroll"><table class="compact launch-table" id="ln_table"><tbody><tr><td class="muted">Loading…</td></tr></tbody></table></div>
+      </div>
       <h3>This month</h3>
       <div class="grid cols-3">
-        <div class="metric lime"><div class="label">Paying members</div><div class="value" id="s_pro">—</div><div class="note">≈ <span id="s_mrr">—</span> <span id="s_cur">SAR</span> a month after store fees (est.)</div></div>
+        <div class="metric lime"><div class="label">Paying members</div><div class="value" id="s_pro">—</div><div class="note">≈ <span id="s_mrr">—</span> <span id="s_cur">SAR</span> a month after store fees (est.)</div><div class="note" id="s_pro_more"></div></div>
         <div class="metric peach"><div class="label">Active this month</div><div class="value" id="s_active">—</div><div class="note">of <span id="s_users">—</span> users in total</div></div>
         <div class="metric"><div class="label muted">AI cost this month</div><div class="value" id="s_cost">—</div><div class="note muted">SAR (est.) · <span id="s_actions">—</span> AI actions</div></div>
       </div>
@@ -427,8 +450,9 @@ export const ADMIN_HTML = `<!doctype html>
       <h3 style="margin-top:22px">Your codes</h3>
       <div class="scroll">
         <table>
-          <thead><tr><th>Code</th><th>Gives</th><th>Earns</th><th title="People who typed it in the app">Used</th><th>Left</th><th title="Discount codes: people who then paid">Paid</th><th>Dates</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Code</th><th>Gives</th><th>Earns</th><th title="People who typed it in the app">Used</th><th>Left</th><th title="People who paid at least once through this code (App Store, Google Play)">Paid</th><th title="What its buyers paid, after store fees and refunds, renewals included">Brought in</th><th>Dates</th><th>Status</th><th></th></tr></thead>
           <tbody id="pc_rows"></tbody>
+          <tfoot id="pc_total"></tfoot>
         </table>
       </div>
       <div id="pc_detail" class="hide" style="margin-top:12px"></div>
@@ -598,11 +622,15 @@ export const ADMIN_HTML = `<!doctype html>
   function render() {
     var s = data.stats;
     document.getElementById('s_users').textContent = s.totalUsers;
-    document.getElementById('s_pro').textContent = s.proUsers;
+    // Real store subscriptions only: trials, gifts and test purchases are listed apart.
+    var paying = s.payingUsers != null ? s.payingUsers : s.proUsers;
+    document.getElementById('s_pro').textContent = paying;
+    document.getElementById('s_pro_more').textContent = s.payingUsers != null
+      ? (s.trialUsers || 0) + ' on a free trial · ' + (s.giftedUsers || 0) + ' with a gifted plan' : '';
     document.getElementById('s_active').textContent = s.activeThisMonth;
     document.getElementById('s_actions').textContent = s.actionsThisMonth;
     document.getElementById('s_mrr').textContent =
-      Math.round(s.proUsers * monthlyPrice() * (1 - STORE_CUT)).toLocaleString();
+      Math.round(paying * monthlyPrice() * (1 - STORE_CUT)).toLocaleString();
     document.getElementById('s_cur').textContent = (data.prices && data.prices.currency) || 'SAR';
     document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     document.getElementById('s_cost').textContent =
@@ -1515,9 +1543,11 @@ export const ADMIN_HTML = `<!doctype html>
     var body = document.getElementById('pc_rows');
     body.innerHTML = '';
     if (!promos.length) {
-      body.innerHTML = '<tr><td colspan="9" class="muted">No codes yet.</td></tr>';
+      body.innerHTML = '<tr><td colspan="10" class="muted">No codes yet.</td></tr>';
+      document.getElementById('pc_total').innerHTML = '';
       return;
     }
+    var total = 0, totalBuyers = 0;
     promos.forEach(function (p) {
       var tr = document.createElement('tr');
       var tier = PLAN_LABEL[p.plan] || p.plan;
@@ -1532,7 +1562,8 @@ export const ADMIN_HTML = `<!doctype html>
         '<td>' + earnsCell(p) + '</td>' +
         '<td>' + p.redeemedCount + (p.maxRedemptions ? ' / ' + p.maxRedemptions : '') + '</td>' +
         '<td>' + (p.remaining == null ? '∞' : p.remaining) + '</td>' +
-        '<td>' + (p.kind === 'percent' ? (p.convertedCount || 0) : '<span class="muted">—</span>') + '</td>' +
+        '<td>' + Math.max(p.buyers || 0, p.kind === 'percent' ? (p.convertedCount || 0) : 0) + '</td>' +
+        '<td>' + (p.broughtUsd ? '<b>' + sar(p.broughtUsd) + '</b>' : '<span class="muted">0</span>') + '</td>' +
         '<td class="muted">' + esc(win) + '</td>' +
         '<td><span class="pill ' + (p.problem ? 'free' : 'pro') + '">' + esc(status) + '</span></td>' +
         '<td style="white-space:nowrap"></td>';
@@ -1547,8 +1578,14 @@ export const ADMIN_HTML = `<!doctype html>
         actions.appendChild(b);
       });
       body.appendChild(tr);
+      total += p.broughtUsd || 0;
+      totalBuyers += p.buyers || 0;
     });
+    document.getElementById('pc_total').innerHTML = '<tr><td colspan="5"><b>All codes</b> <span class="muted">· after store fees and refunds; test purchases are not counted</span></td>' +
+      '<td><b>' + totalBuyers + '</b></td><td><b>' + sar(total) + '</b></td><td colspan="3"></td></tr>';
   }
+  /** USD from the store, shown in SAR like the rest of the page. */
+  function sar(usd) { return Math.round(usd * USD_TO_SAR).toLocaleString() + ' SAR'; }
   function loadPromos() {
     fetch('/admin/api/promos', { headers: { 'x-admin-token': tok() } })
       .then(function (r) { return r.json(); })
@@ -1804,8 +1841,48 @@ export const ADMIN_HTML = `<!doctype html>
     ovData.series.forEach(function (d) { if (d[key] != null) { total += d[key]; seen = true; } });
     return seen ? total : null;
   }
+  function renderLaunch(L) {
+    var pill = document.getElementById('ln_pill'), edit = document.getElementById('ln_edit');
+    if (!L) { document.getElementById('ln_table').innerHTML = '<tbody><tr><td class="muted">Needs the database.</td></tr></tbody>'; return; }
+    var live = !!L.day;
+    var dayN = live ? Math.floor((Date.now() - new Date(L.day + 'T00:00:00').getTime()) / 86400000) + 1 : 0;
+    pill.className = 'launch-pill' + (live ? ' live' : '');
+    pill.textContent = live ? (dayN >= 1 ? 'Live since ' + fmtDay(L.day, true) + ' · day ' + dayN : 'Launch day ' + fmtDay(L.day, true)) : 'Not launched yet';
+    edit.textContent = live ? 'Change launch day' : 'Set launch day';
+    document.getElementById('ln_sub').textContent = live
+      ? 'Left: everyone who joined before launch day (testers, the review account). Right: everyone who joined from launch day on. Plans are as they stand now; store money is counted by the day it was paid.'
+      : 'Everyone is counted as "before launch" until you set the launch day — set it on the day you press Release and Publish.';
+    var B = L.before, S = L.since, n = function (x) { return (x || 0).toLocaleString(); };
+    var ends = B.giftNextEnds || S.giftNextEnds;
+    var rows = [
+      ['Users', n(B.users), live ? '+' + n(S.users) : '—', live ? n(L.newToday) + ' joined today' : ''],
+      ['On a free trial', n(B.trial), live ? n(S.trial) : '—', 'App Store / Google Play trial, not yet paid'],
+      ['Paying (store)', n(B.paying), live ? n(S.paying) : '—', ((B.payingPro + S.payingPro) || 0) + ' Pro · ' + ((B.payingEssentials + S.payingEssentials) || 0) + ' Essentials · test purchases not counted'],
+      ['Gifted plan', n(B.gifted), live ? n(S.gifted) : '—', ends ? 'next ends ' + fmtDay(ends) + ' · ' + ((B.giftEndingSoon + S.giftEndingSoon) || 0) + ' end in the next 30 days' : 'given in admin or by a free code'],
+      ['No plan (view only)', n(B.noPlan), live ? n(S.noPlan) : '—', 'signed up, no trial or plan'],
+      ['Active last 7 days', n(B.active7d), live ? n(S.active7d) : '—', ''],
+      ['AI actions · cost', n(B.aiActionsMonth) + ' · ' + (B.aiCostUsdMonth * USD_TO_SAR).toFixed(2) + ' SAR', live ? n(S.aiActionsMonth) + ' · ' + (S.aiCostUsdMonth * USD_TO_SAR).toFixed(2) + ' SAR' : '—', 'this month'],
+      ['Store money', sar(B.revenueUsd), live ? sar(S.revenueUsd) : '—', 'after store fees and refunds'],
+      ['Trial → paid', '—', L.trialsEnded ? L.trialsConverted + ' of ' + L.trialsEnded + ' ended (' + Math.round(100 * L.trialsConverted / L.trialsEnded) + '%)' : 'no trial has ended yet', 'trials that reached their end date'],
+    ];
+    document.getElementById('ln_table').innerHTML = '<thead><tr><th></th><th>Before launch</th><th>Since launch</th><th></th></tr></thead><tbody>' +
+      rows.map(function (r) { return '<tr><td class="muted">' + r[0] + '</td><td class="big">' + r[1] + '</td><td class="big since">' + r[2] + '</td><td class="muted">' + esc(r[3]) + '</td></tr>'; }).join('') + '</tbody>';
+  }
+  function launchEdit(open) {
+    document.getElementById('ln_form').classList.toggle('hide', !open);
+    if (open) {
+      var L = ovData && ovData.launch;
+      var t = new Date(), today = t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+      document.getElementById('ln_day').value = (L && L.day) || today;
+    }
+  }
+  function launchSave(clear) {
+    var day = clear ? null : document.getElementById('ln_day').value || null;
+    api('/admin/api/launch-day', { day: day }).then(function () { launchEdit(false); loadOverview(); }).catch(function (e) { alert('Could not save: ' + (e.message || e)); });
+  }
   function renderOverview() {
     var d = ovData;
+    renderLaunch(d.launch);
     var strip = [
       ['New users', sumOf('newUsers')],
       ['Purchases', sumOf('purchases')],
@@ -1905,6 +1982,12 @@ export const ADMIN_HTML = `<!doctype html>
     ticks.forEach(function (i) {
       svg += '<text x="' + x(i) + '" y="' + (H - 8) + '" text-anchor="' + (i === 0 ? 'start' : i === S.length - 1 ? 'end' : 'middle') + '" font-size="11" fill="#646D7A">' + esc(fmtDay(S[i].day)) + '</text>';
     });
+    // Launch day, when it falls in the range shown.
+    var li = ovData.launch && ovData.launch.day ? S.findIndex(function (d) { return d.day === ovData.launch.day; }) : -1;
+    if (li >= 0) {
+      svg += '<line x1="' + x(li) + '" x2="' + x(li) + '" y1="' + T + '" y2="' + (H - B) + '" stroke="#6D5AAB" stroke-width="1.5" stroke-dasharray="4 3"/>' +
+        '<text x="' + (x(li) > W - 70 ? x(li) - 4 : x(li) + 4) + '" y="' + (T + 10) + '" text-anchor="' + (x(li) > W - 70 ? 'end' : 'start') + '" font-size="11" font-weight="700" fill="#6D5AAB">Launch</text>';
+    }
     // One line per unbroken run: a missing day ends the line rather than
     // being drawn as zero or bridged over.
     [['a', 3], ['b', 2]].forEach(function (pair) {

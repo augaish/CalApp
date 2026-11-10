@@ -79,6 +79,8 @@ import {
   clearPromo,
   recordPromoConversion,
   recordPartnerEarnings,
+  recordStoreSale,
+  adminLaunchSplit,
   adminOverview,
   addDeletionRequest,
   listDeletionRequests,
@@ -2288,6 +2290,7 @@ app.post('/api/billing/revenuecat', async (c) => {
     if (event.app_user_id) {
       const payer = await resolveRef(event.app_user_id);
       await recordPartnerEarnings(payer, event).catch((err) => console.error('partner earnings failed:', err));
+      await recordStoreSale(payer, event).catch((err) => console.error('store sale record failed:', err));
     }
 
     // A product change names the old product, and a downgrade only takes
@@ -3123,7 +3126,13 @@ app.post('/admin/api/promo-delete', async (c) => {
 app.get('/admin/api/overview', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const days = Number(c.req.query('days') ?? 30);
-  const [overview, partners, deletions] = await Promise.all([adminOverview(Number.isFinite(days) ? days : 30), listPartners(), openDeletionRequests()]);
+  const launchDay = (await getSetting<{ day?: string | null }>('launch_day', {})).day ?? null;
+  const [overview, partners, deletions, launch] = await Promise.all([
+    adminOverview(Number.isFinite(days) ? days : 30),
+    listPartners(),
+    openDeletionRequests(),
+    adminLaunchSplit(launchDay),
+  ]);
   if (!overview) return c.json({ error: 'no_database' }, 503);
   const set = (k: string) => !!process.env[k];
   const checklist = [
@@ -3140,7 +3149,17 @@ app.get('/admin/api/overview', async (c) => {
     { id: 'support_email', done: true, label: 'Support email for the legal pages', how: 'Set SUPPORT_EMAIL on Railway (the pages use support@calgym.org until then).' },
   ];
   const owed = Math.round(partners.reduce((sum, p) => sum + p.balance.owed, 0) * 100) / 100;
-  return c.json({ ...overview, attention: { ...overview.attention, partnersOwedUsd: owed, deletionRequests: deletions }, checklist });
+  return c.json({ ...overview, attention: { ...overview.attention, partnersOwedUsd: owed, deletionRequests: deletions }, checklist, launch });
+});
+
+/** Set (YYYY-MM-DD, the admin's time zone) or clear the launch day the Overview splits users by. */
+app.post('/admin/api/launch-day', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ day?: unknown }>().catch(() => ({}) as never);
+  const day = body.day == null || body.day === '' ? null : String(body.day);
+  if (day !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(day)))) return c.json({ error: 'invalid_day' }, 400);
+  await setSetting('launch_day', { day });
+  return c.json({ ok: true, day });
 });
 
 /** Deletion requests from the public page, open ones first. */

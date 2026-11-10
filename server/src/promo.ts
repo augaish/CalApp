@@ -53,6 +53,10 @@ export interface PromoCode {
   createdAt: string;
   /** Redemptions a purchase was matched to (percent codes). */
   convertedCount?: number;
+  /** Store money its buyers paid, after store fees and refunds, in USD (sales, renewals). */
+  broughtUsd?: number;
+  /** People who paid at least once through this code. */
+  buyers?: number;
   /** Who earns from this code's sales, and how much — see partners.ts. */
   earning?: Omit<CodeEarning, 'code'>;
 }

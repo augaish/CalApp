@@ -353,6 +353,33 @@ export async function initDb(): Promise<void> {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS partner_earnings_partner ON partner_earnings (partner_id, at DESC)`);
   await pool.query(`CREATE INDEX IF NOT EXISTS partner_earnings_sold ON partner_earnings (sold_code)`);
+  // Every real store sale, trial start and refund, with the code behind it
+  // when there is one — whether or not that code has a partner. This is what
+  // "money brought in" per code and the launch figures read; partner_earnings
+  // only holds the commission side, and only for partner codes.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS store_sales (
+      id              BIGSERIAL PRIMARY KEY,
+      transaction_id  TEXT NOT NULL,
+      original_transaction_id TEXT,
+      kind            TEXT NOT NULL,
+      ref             TEXT NOT NULL,
+      code            TEXT,
+      product_id      TEXT,
+      event_type      TEXT,
+      store           TEXT,
+      net_usd         NUMERIC(12,2) NOT NULL DEFAULT 0,
+      estimated       BOOLEAN NOT NULL DEFAULT false,
+      ends_at         TIMESTAMPTZ,
+      at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (transaction_id, kind)
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS store_sales_code ON store_sales (code)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS store_sales_ref ON store_sales (ref, at)`);
+  // Whether the account's store plan came from a sandbox (TestFlight / test
+  // track) purchase, so test subscriptions are never counted as paying.
+  await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS store_sandbox BOOLEAN NOT NULL DEFAULT false`);
   await pool.query(`
     CREATE TABLE IF NOT EXISTS partner_payouts (
       id         BIGSERIAL PRIMARY KEY,
@@ -423,6 +450,8 @@ function promoRow(r: Record<string, unknown>): PromoCode {
     note: (r.note as string) ?? null,
     createdAt: new Date(r.created_at as string).toISOString(),
     convertedCount: r.converted_count == null ? undefined : Number(r.converted_count),
+    broughtUsd: r.brought_usd == null ? undefined : Math.round(Number(r.brought_usd) * 100) / 100,
+    buyers: r.buyers == null ? undefined : Number(r.buyers),
     earning: {
       partnerId: (r.partner_id as string) ?? null,
       commissionPct: Number(r.commission_pct ?? 0),
@@ -436,7 +465,11 @@ function promoRow(r: Record<string, unknown>): PromoCode {
 }
 
 const CONVERTED_SQL = `(SELECT COUNT(*) FROM promo_redemptions r
-                          WHERE r.code = promo_codes.code AND r.converted_at IS NOT NULL)::int AS converted_count`;
+                          WHERE r.code = promo_codes.code AND r.converted_at IS NOT NULL)::int AS converted_count,
+                       (SELECT COALESCE(SUM(s.net_usd), 0) FROM store_sales s
+                          WHERE s.code = promo_codes.code AND s.kind IN ('sale', 'refund')) AS brought_usd,
+                       (SELECT COUNT(DISTINCT s.ref) FROM store_sales s
+                          WHERE s.code = promo_codes.code AND s.kind = 'sale')::int AS buyers`;
 
 /** Create a code, or edit one that already exists. Counters are never reset. */
 export async function upsertPromo(v: CleanPromo): Promise<PromoCode | null> {
@@ -1434,7 +1467,12 @@ export async function listUsers(limit = 1000): Promise<AdminRow[]> {
 
 export interface AdminStats {
   totalUsers: number;
+  /** Any plan in force, paid or not (kept for older admin pages). */
   proUsers: number;
+  /** Real store subscriptions, not trials, gifts or test purchases. */
+  payingUsers: number;
+  trialUsers: number;
+  giftedUsers: number;
   activeThisMonth: number;
   actionsThisMonth: number;
   /** Estimated USD cost of every AI call this period, across all users. */
@@ -1446,7 +1484,7 @@ export interface AdminStats {
 
 export async function adminStats(): Promise<AdminStats> {
   if (!pool) {
-    return { totalUsers: 0, proUsers: 0, activeThisMonth: 0, actionsThisMonth: 0, costUsdThisMonth: 0, whoopConnected: 0 };
+    return { totalUsers: 0, proUsers: 0, payingUsers: 0, trialUsers: 0, giftedUsers: 0, activeThisMonth: 0, actionsThisMonth: 0, costUsdThisMonth: 0, whoopConnected: 0 };
   }
   const period = currentPeriod();
   const res = await pool.query(
@@ -1455,6 +1493,15 @@ export async function adminStats(): Promise<AdminStats> {
        (SELECT COUNT(*)::int FROM app_users
          WHERE (plan <> 'free' AND (plan_until IS NULL OR plan_until > now()))
             OR (promo_plan IS NOT NULL AND promo_until > now())) AS pro_users,
+       (SELECT COUNT(*)::int FROM app_users
+         WHERE plan <> 'free' AND (plan_until IS NULL OR plan_until > now()) AND plan_source LIKE 'revenuecat:%'
+           AND plan_source NOT LIKE '%:trial' AND NOT store_sandbox) AS paying_users,
+       (SELECT COUNT(*)::int FROM app_users
+         WHERE plan <> 'free' AND (plan_until IS NULL OR plan_until > now()) AND plan_source LIKE 'revenuecat:%:trial'
+           AND NOT store_sandbox) AS trial_users,
+       (SELECT COUNT(*)::int FROM app_users
+         WHERE (plan <> 'free' AND plan_source = 'admin' AND (plan_until IS NULL OR plan_until > now()))
+            OR (promo_plan IS NOT NULL AND promo_until > now())) AS gifted_users,
        (SELECT COUNT(DISTINCT ref)::int FROM usage_counters WHERE period = $1) AS active_month,
        (SELECT COALESCE(SUM(count), 0)::int FROM usage_counters WHERE period = $1) AS actions_month,
        (SELECT COALESCE(SUM(cost_usd), 0)::numeric FROM usage_counters WHERE period = $1) AS cost_month,
@@ -1465,6 +1512,9 @@ export async function adminStats(): Promise<AdminStats> {
   return {
     totalUsers: r.total_users,
     proUsers: r.pro_users,
+    payingUsers: r.paying_users,
+    trialUsers: r.trial_users,
+    giftedUsers: r.gifted_users,
     activeThisMonth: r.active_month,
     actionsThisMonth: r.actions_month,
     costUsdThisMonth: Number(r.cost_month),
@@ -2174,6 +2224,212 @@ export async function recordPartnerEarnings(ref: string, event: EarningEvent, no
   // The term counts from the first sale, whether or not it paid anyone.
   if (!firstSaleAt) await pool.query(`UPDATE app_users SET first_sale_at = $2 WHERE ref = $1 AND first_sale_at IS NULL`, [ref, saleAt.toISOString()]);
   return n ? { kind: 'credited', lines: n } : { kind: 'skipped', reason: lines.length ? 'already_recorded' : 'no_shares' };
+}
+
+/** Sandbox (TestFlight, test-track) events are not money; PARTNER_COUNT_SANDBOX=1 counts them, for testing. */
+function isTestPurchase(event: { environment?: string }): boolean {
+  return (event.environment ?? '').toUpperCase() === 'SANDBOX' && process.env.PARTNER_COUNT_SANDBOX !== '1';
+}
+
+/**
+ * The code a sale came through: the store's own offer code first (an App
+ * Store offer code typed in Apple's sheet never reaches our redeem screen),
+ * then the account's partner attribution, then the last code it redeemed.
+ */
+async function codeForSale(ref: string, offerCode: string | null | undefined): Promise<string | null> {
+  if (!pool) return null;
+  const offer = offerCode ? normalizeCode(offerCode) : '';
+  if (offer) {
+    const match = await pool.query(
+      `SELECT code FROM promo_codes
+        WHERE code = $1 OR regexp_replace(upper(COALESCE(offer_ios, '')), '[^A-Z0-9]', '', 'g') = $1
+                        OR regexp_replace(upper(COALESCE(offer_android, '')), '[^A-Z0-9]', '', 'g') = $1
+        LIMIT 1`,
+      [offer],
+    );
+    if (match.rows[0]) return match.rows[0].code as string;
+  }
+  const user = await pool.query(`SELECT attributed_code FROM app_users WHERE ref = $1`, [ref]);
+  if (user.rows[0]?.attributed_code) return user.rows[0].attributed_code as string;
+  const redeemed = await pool.query(`SELECT code FROM promo_redemptions WHERE ref = $1 ORDER BY at DESC LIMIT 1`, [ref]);
+  return (redeemed.rows[0]?.code as string) ?? null;
+}
+
+export type StoreSaleOutcome = { kind: 'recorded'; as: 'trial' | 'sale' | 'refund'; code: string | null } | { kind: 'skipped'; reason: string };
+
+/**
+ * Record one store event as money (a sale or renewal, or a refund) or as a
+ * trial start, with the code behind it. Safe for every webhook event:
+ * anything else, a test purchase or a repeat is skipped. Also remembers
+ * whether the account's store plan is a test one, so it isn't counted as paying.
+ */
+export async function recordStoreSale(
+  ref: string,
+  event: EarningEvent & { store?: string; period_type?: string | null; expiration_at_ms?: number | null },
+  now: Date = new Date(),
+): Promise<StoreSaleOutcome> {
+  if (!pool) return { kind: 'skipped', reason: 'no_database' };
+  if (event.environment) {
+    // The account may not exist yet: this runs before the plan is applied.
+    await pool.query(
+      `INSERT INTO app_users (ref, store_sandbox) VALUES ($1, $2) ON CONFLICT (ref) DO UPDATE SET store_sandbox = EXCLUDED.store_sandbox`,
+      [ref, isTestPurchase(event)],
+    );
+  }
+  if (isTestPurchase(event)) return { kind: 'skipped', reason: 'sandbox' };
+  const txn = event.transaction_id || event.id;
+  if (!txn) return { kind: 'skipped', reason: 'no_transaction' };
+  const type = (event.type ?? '').toUpperCase();
+  const at = event.purchased_at_ms ? new Date(Number(event.purchased_at_ms)) : now;
+
+  if (isRefundEvent(event)) {
+    const sale = await pool.query(
+      `SELECT * FROM store_sales WHERE kind = 'sale' AND ref = $3 AND (transaction_id = $1 OR ($2::text IS NOT NULL AND original_transaction_id = $2))
+        ORDER BY (transaction_id = $1) DESC, at DESC LIMIT 1`,
+      [txn, event.original_transaction_id ?? null, ref],
+    );
+    const s = sale.rows[0];
+    if (!s) return { kind: 'skipped', reason: 'nothing_to_refund' };
+    const ins = await pool.query(
+      `INSERT INTO store_sales (transaction_id, original_transaction_id, kind, ref, code, product_id, event_type, store, net_usd, estimated, at)
+       VALUES ($1,$2,'refund',$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT (transaction_id, kind) DO NOTHING`,
+      [s.transaction_id, s.original_transaction_id, ref, s.code, s.product_id, type, s.store, -Number(s.net_usd), s.estimated, now.toISOString()],
+    );
+    return ins.rowCount ? { kind: 'recorded', as: 'refund', code: s.code ?? null } : { kind: 'skipped', reason: 'already_recorded' };
+  }
+
+  const trial = type === 'INITIAL_PURCHASE' && (event.period_type ?? '').toUpperCase() === 'TRIAL';
+  const net = trial ? null : isSaleEvent(event.type) ? netRevenue(event) : null;
+  if (!trial && (!net || net.usd <= 0)) return { kind: 'skipped', reason: isSaleEvent(event.type) ? 'no_revenue' : 'not_a_sale' };
+  const code = await codeForSale(ref, event.offer_code);
+  const endsAt = typeof event.expiration_at_ms === 'number' && event.expiration_at_ms > 0 ? new Date(event.expiration_at_ms).toISOString() : null;
+  const kind = trial ? 'trial' : 'sale';
+  const ins = await pool.query(
+    `INSERT INTO store_sales (transaction_id, original_transaction_id, kind, ref, code, product_id, event_type, store, net_usd, estimated, ends_at, at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT (transaction_id, kind) DO NOTHING`,
+    [txn, event.original_transaction_id ?? null, kind, ref, code, event.product_id ?? null, type, event.store ?? null,
+     net?.usd ?? 0, net?.estimated ?? false, endsAt, at.toISOString()],
+  );
+  return ins.rowCount ? { kind: 'recorded', as: kind, code } : { kind: 'skipped', reason: 'already_recorded' };
+}
+
+export interface LaunchSide {
+  users: number;
+  trial: number;
+  paying: number;
+  /** Paying, by plan. */
+  payingPro: number;
+  payingEssentials: number;
+  /** Given in admin or by a free code, still running. */
+  gifted: number;
+  /** The earliest end of a running gift, and how many end in the next 30 days. */
+  giftNextEnds: string | null;
+  giftEndingSoon: number;
+  noPlan: number;
+  active7d: number;
+  aiActionsMonth: number;
+  aiCostUsdMonth: number;
+  /** Store money after fees and refunds, by the day it was paid. */
+  revenueUsd: number;
+}
+
+export interface LaunchSplit {
+  /** YYYY-MM-DD in the admin time zone, or null before it is set. */
+  day: string | null;
+  before: LaunchSide;
+  since: LaunchSide;
+  /** New accounts on launch day's calendar day so far ("today"). */
+  newToday: number;
+  /** Trials that have reached their end date, and how many of those people then paid. */
+  trialsEnded: number;
+  trialsConverted: number;
+}
+
+/**
+ * Everyone who joined before launch day against everyone from launch day on.
+ * Without a launch day, everyone is "before". Plans are counted as they
+ * stand now: paying (a store plan that isn't a trial or a test purchase), a
+ * store trial, gifted (admin or a free code), or none.
+ */
+export async function adminLaunchSplit(day: string | null): Promise<LaunchSplit | null> {
+  if (!pool) return null;
+  const tz = ADMIN_TZ.replace(/'/g, '');
+  const valid = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? day : null;
+  // The moment launch day starts in the admin's time zone; far future when unset.
+  const start = `COALESCE((($1::date)::timestamp AT TIME ZONE '${tz}'), 'infinity'::timestamptz)`;
+  const params = [valid, currentPeriod()];
+  const res = await pool.query(
+    `WITH u AS (
+       SELECT u.ref, (u.created_at >= ${start}) AS since,
+         CASE
+           WHEN u.plan <> 'free' AND (u.plan_until IS NULL OR u.plan_until > now()) AND u.plan_source LIKE 'revenuecat:%'
+                AND u.plan_source NOT LIKE '%:trial' AND NOT u.store_sandbox THEN 'paying'
+           WHEN u.plan <> 'free' AND (u.plan_until IS NULL OR u.plan_until > now()) AND u.plan_source LIKE 'revenuecat:%:trial'
+                AND NOT u.store_sandbox THEN 'trial'
+           WHEN (u.plan <> 'free' AND u.plan_source = 'admin' AND (u.plan_until IS NULL OR u.plan_until > now()))
+                OR (u.promo_plan IS NOT NULL AND u.promo_until > now()) THEN 'gifted'
+           ELSE 'none' END AS status,
+         u.plan,
+         CASE WHEN u.plan_source = 'admin' AND u.plan <> 'free' AND u.plan_until > now() THEN u.plan_until
+              WHEN u.promo_plan IS NOT NULL AND u.promo_until > now() THEN u.promo_until END AS gift_until
+       FROM app_users u
+     )
+     SELECT since,
+       COUNT(*)::int AS users,
+       COUNT(*) FILTER (WHERE status = 'trial')::int AS trial,
+       COUNT(*) FILTER (WHERE status = 'paying')::int AS paying,
+       COUNT(*) FILTER (WHERE status = 'paying' AND plan IN ('pro', 'proPlus'))::int AS paying_pro,
+       COUNT(*) FILTER (WHERE status = 'paying' AND plan = 'essentials')::int AS paying_ess,
+       COUNT(*) FILTER (WHERE status = 'gifted')::int AS gifted,
+       to_char(MIN(gift_until) FILTER (WHERE status = 'gifted') AT TIME ZONE '${tz}', 'YYYY-MM-DD') AS gift_next,
+       COUNT(*) FILTER (WHERE status = 'gifted' AND gift_until < now() + interval '30 days')::int AS gift_soon,
+       COUNT(*) FILTER (WHERE status = 'none')::int AS no_plan,
+       COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM user_days d WHERE d.ref = u.ref AND d.day > ${TODAY_SQL} - 7))::int AS active7,
+       COALESCE(SUM((SELECT SUM(c.count) FROM usage_counters c WHERE c.ref = u.ref AND c.period = $2)), 0)::int AS ai_actions,
+       COALESCE(SUM((SELECT SUM(c.cost_usd) FROM usage_counters c WHERE c.ref = u.ref AND c.period = $2)), 0) AS ai_cost
+     FROM u GROUP BY since`,
+    params,
+  );
+  const money = await pool.query(
+    `SELECT (at >= ${start}) AS since, COALESCE(SUM(net_usd), 0) AS usd
+       FROM store_sales WHERE kind IN ('sale', 'refund') GROUP BY 1`,
+    [valid],
+  );
+  const extra = await pool.query(
+    `SELECT
+       (SELECT COUNT(*) FROM app_users WHERE ${TODAY_SQL} = (created_at AT TIME ZONE '${tz}')::date)::int AS new_today,
+       (SELECT COUNT(*) FROM store_sales t WHERE t.kind = 'trial' AND t.ends_at < now())::int AS trials_ended,
+       (SELECT COUNT(*) FROM store_sales t WHERE t.kind = 'trial' AND t.ends_at < now()
+          AND EXISTS (SELECT 1 FROM store_sales s WHERE s.kind = 'sale' AND s.ref = t.ref AND s.at >= t.at))::int AS trials_converted`,
+  );
+  const side = (since: boolean): LaunchSide => {
+    const r = res.rows.find((x) => x.since === since) ?? {};
+    const m = money.rows.find((x) => x.since === since);
+    return {
+      users: Number(r.users ?? 0),
+      trial: Number(r.trial ?? 0),
+      paying: Number(r.paying ?? 0),
+      payingPro: Number(r.paying_pro ?? 0),
+      payingEssentials: Number(r.paying_ess ?? 0),
+      gifted: Number(r.gifted ?? 0),
+      giftNextEnds: (r.gift_next as string) ?? null,
+      giftEndingSoon: Number(r.gift_soon ?? 0),
+      noPlan: Number(r.no_plan ?? 0),
+      active7d: Number(r.active7 ?? 0),
+      aiActionsMonth: Number(r.ai_actions ?? 0),
+      aiCostUsdMonth: Math.round(Number(r.ai_cost ?? 0) * 100) / 100,
+      revenueUsd: Math.round(Number(m?.usd ?? 0) * 100) / 100,
+    };
+  };
+  const e = extra.rows[0] ?? {};
+  return {
+    day: valid,
+    before: side(false),
+    since: side(true),
+    newToday: Number(e.new_today ?? 0),
+    trialsEnded: Number(e.trials_ended ?? 0),
+    trialsConverted: Number(e.trials_converted ?? 0),
+  };
 }
 
 export interface PartnerReport {
