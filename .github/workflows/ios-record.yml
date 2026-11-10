@@ -1,0 +1,61 @@
+# Screen recordings for the launch videos on an iPhone simulator: logging a
+# set, and scanning a meal through to saving it (needs the REVIEW_CODE secret:
+# the review account's sign-in code). The .mp4 files are committed to
+# qa/recordings/<run>.
+name: iPhone recordings (simulator)
+
+on:
+  workflow_dispatch:
+    inputs:
+      flows:
+        description: 'Which recordings: set, meal'
+        type: string
+        default: 'set meal'
+      langs:
+        description: 'Languages'
+        type: string
+        default: 'ar en'
+      build_url:
+        description: 'Simulator build (tar.gz URL)'
+        type: string
+        default: 'https://expo.dev/artifacts/eas/zYNXbXqvBxMYnYvbpDpPM720_eZv8o6NuEkjw3L2enE.tar.gz'
+
+permissions:
+  contents: write
+
+jobs:
+  record:
+    runs-on: macos-15
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Simulator app
+        run: |
+          curl -fsSL -o app.tar.gz "${{ github.event.inputs.build_url }}"
+          mkdir app && tar -xzf app.tar.gz -C app
+          echo "APP=$(find "$PWD/app" -maxdepth 3 -name '*.app' | head -1)" >> "$GITHUB_ENV"
+      - name: Maestro and ffmpeg
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          command -v ffmpeg || brew install ffmpeg
+      - name: Record
+        env:
+          REVIEW_CODE: ${{ secrets.REVIEW_CODE }}
+          FLOWS: ${{ github.event.inputs.flows }}
+          LANGS: ${{ github.event.inputs.langs }}
+        run: bash qa/ios-record/run.sh "$APP" recordings
+      - name: Commit the recordings
+        if: always()
+        run: |
+          dest=qa/recordings/${{ github.run_number }}
+          mkdir -p "$dest"
+          cp recordings/* "$dest/" 2>/dev/null || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$dest"
+          git commit -m "iPhone recordings (run ${{ github.run_number }})" || exit 0
+          for i in 1 2 3; do git pull --rebase -q origin "${GITHUB_REF_NAME}" && git push -q origin "HEAD:${GITHUB_REF_NAME}" && break; sleep 5; done
