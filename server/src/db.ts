@@ -376,6 +376,21 @@ export async function initDb(): Promise<void> {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS store_sales_code ON store_sales (code)`);
+  // Each code's offer in each store, when admin made it there: what was asked
+  // for (product, periods), how it went, and the store's ids.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS code_store_offers (
+      code        TEXT NOT NULL,
+      store       TEXT NOT NULL,
+      product_id  TEXT NOT NULL,
+      periods     INTEGER NOT NULL DEFAULT 1,
+      ok          BOOLEAN NOT NULL DEFAULT false,
+      detail      TEXT,
+      ids         JSONB,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (code, store)
+    )
+  `);
   await pool.query(`CREATE INDEX IF NOT EXISTS store_sales_ref ON store_sales (ref, at)`);
   // Whether the account's store plan came from a sandbox (TestFlight / test
   // track) purchase, so test subscriptions are never counted as paying.
@@ -2430,6 +2445,52 @@ export async function adminLaunchSplit(day: string | null): Promise<LaunchSplit 
     trialsEnded: Number(e.trials_ended ?? 0),
     trialsConverted: Number(e.trials_converted ?? 0),
   };
+}
+
+export interface CodeStoreOffer {
+  code: string;
+  store: 'apple' | 'google';
+  productId: string;
+  periods: number;
+  ok: boolean;
+  detail: string | null;
+  ids: Record<string, string> | null;
+  updatedAt: string;
+}
+
+export async function saveCodeStoreOffer(v: Omit<CodeStoreOffer, 'updatedAt'>): Promise<void> {
+  if (!pool) return;
+  await pool.query(
+    `INSERT INTO code_store_offers (code, store, product_id, periods, ok, detail, ids, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7, now())
+     ON CONFLICT (code, store) DO UPDATE SET product_id = EXCLUDED.product_id, periods = EXCLUDED.periods,
+       ok = EXCLUDED.ok, detail = EXCLUDED.detail, ids = COALESCE(EXCLUDED.ids, code_store_offers.ids), updated_at = now()`,
+    [v.code, v.store, v.productId, v.periods, v.ok, v.detail, v.ids ? JSON.stringify(v.ids) : null],
+  );
+}
+
+export async function listCodeStoreOffers(code?: string): Promise<CodeStoreOffer[]> {
+  if (!pool) return [];
+  const res = await pool.query(
+    `SELECT * FROM code_store_offers ${code ? 'WHERE code = $1' : ''} ORDER BY code, store`,
+    code ? [code] : [],
+  );
+  return res.rows.map((r) => ({
+    code: r.code,
+    store: r.store,
+    productId: r.product_id,
+    periods: Number(r.periods),
+    ok: !!r.ok,
+    detail: r.detail ?? null,
+    ids: r.ids ?? null,
+    updatedAt: new Date(r.updated_at).toISOString(),
+  }));
+}
+
+/** Point the code at the offer the store now has, so the app opens the right one. */
+export async function setPromoOfferRef(code: string, store: 'apple' | 'google', ref: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(`UPDATE promo_codes SET ${store === 'apple' ? 'offer_ios' : 'offer_android'} = $2 WHERE code = $1`, [code, ref]);
 }
 
 export interface PartnerReport {

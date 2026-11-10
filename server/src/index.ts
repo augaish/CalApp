@@ -81,6 +81,9 @@ import {
   recordPartnerEarnings,
   recordStoreSale,
   adminLaunchSplit,
+  saveCodeStoreOffer,
+  listCodeStoreOffers,
+  setPromoOfferRef,
   adminOverview,
   addDeletionRequest,
   listDeletionRequests,
@@ -160,7 +163,22 @@ import { deleteAuthUser, deleteAuthUserByEmail, findAuthUserByEmail, supabaseAdm
 import { runLaunchSwitch } from './launch.js';
 import { bearerOf, identify, isAccountRef, ownStoreId, requireAccountToken, verifyAccessToken } from './identity.js';
 import { partnerNotFoundHtml, partnerPageHtml } from './partner-html.js';
-import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining } from './promo.js';
+import { cleanDraft, codeProblem, normalizeCode, redeemPromo, remaining, type PromoCode } from './promo.js';
+import {
+  appleConfigured,
+  attempt,
+  checkAppleOffer,
+  checkGoogleOffer,
+  createAppleOffer,
+  createGoogleOffer,
+  googleConfigured,
+  googleOfferId,
+  testApple,
+  testGoogle,
+  type OfferSpec,
+  type StoreName,
+  type StoreResult,
+} from './store-offers.js';
 import {
   bodyReadingPrompt,
   coachAttachmentSummaryPrompt,
@@ -3083,9 +3101,16 @@ app.post('/admin/api/plan-locks', async (c) => {
 /** Every code with its counters, newest first. */
 app.get('/admin/api/promos', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const [rows, totals] = await Promise.all([listPromos(), codeEarningTotals()]);
+  const [rows, totals, offers] = await Promise.all([listPromos(), codeEarningTotals(), listCodeStoreOffers()]);
   return c.json({
-    promos: rows.map((r) => ({ ...r, remaining: remaining(r), problem: codeProblem(r), earned: totals[r.code] ?? null })),
+    promos: rows.map((r) => ({
+      ...r,
+      remaining: remaining(r),
+      problem: codeProblem(r),
+      earned: totals[r.code] ?? null,
+      stores: offers.filter((o) => o.code === r.code),
+    })),
+    connections: { apple: appleConfigured(), google: googleConfigured() },
   });
 });
 
@@ -3093,6 +3118,15 @@ app.get('/admin/api/promos', async (c) => {
 app.post('/admin/api/promo', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as never);
+  // "Make the store offers for me": the offers will be named after the code,
+  // so the code points at them from the start.
+  const stores = storeRequest(body.stores);
+  if (stores && 'error' in stores) return c.json({ error: stores.error }, 400);
+  if (stores) {
+    const code = normalizeCode(String(body.code ?? ''));
+    if (appleConfigured() && !String(body.offerIos ?? '').trim()) body.offerIos = code;
+    if (googleConfigured() && !String(body.offerAndroid ?? '').trim()) body.offerAndroid = googleOfferId(code);
+  }
   const clean = cleanDraft({ ...body, code: String(body.code ?? '') });
   if (!clean.ok) return c.json({ error: clean.error }, 400);
   // Who earns from it: checked against the codes that exist, for the link.
@@ -3104,7 +3138,82 @@ app.post('/admin/api/promo', async (c) => {
   if (!saved) return c.json({ error: 'unavailable' }, 503);
   await setCodeEarning(saved.code, earning.value);
   saved.earning = earning.value;
-  return c.json({ ok: true, promo: { ...saved, remaining: remaining(saved), problem: codeProblem(saved) } });
+  const storeResults = stores ? await makeStoreOffers(saved, stores.productId, stores.periods) : [];
+  return c.json({ ok: true, promo: { ...saved, remaining: remaining(saved), problem: codeProblem(saved) }, stores: storeResults });
+});
+
+/** The "make the offers for me" part of a code form: which product, and for how many periods. */
+function storeRequest(v: unknown): { productId: string; periods: number } | { error: string } | null {
+  if (!v || typeof v !== 'object' || (v as { create?: unknown }).create !== true) return null;
+  const r = v as { productId?: unknown; periods?: unknown };
+  const productId = String(r.productId ?? '');
+  if (!/^calgym_(pro|essentials)_(monthly|yearly)$/.test(productId)) return { error: 'store_product_invalid' };
+  if (!appleConfigured() && !googleConfigured()) return { error: 'stores_not_connected' };
+  const periods = Math.round(Number(r.periods ?? 1));
+  if (!Number.isFinite(periods) || periods < 1 || periods > 12) return { error: 'store_periods_out_of_range' };
+  return { productId, periods };
+}
+
+function offerSpec(p: PromoCode, productId: string, periods: number): OfferSpec {
+  return {
+    code: p.code,
+    productId,
+    kind: p.kind,
+    percentOff: p.percentOff,
+    periods,
+    freeDays: p.durationDays ?? 30,
+    maxRedemptions: p.maxRedemptions,
+    expiresAt: p.expiresAt,
+  };
+}
+
+/** Make (or finish) the code's offer in each connected store and record how it went. */
+async function makeStoreOffers(p: PromoCode, productId: string, periods: number, only?: StoreName): Promise<StoreResult[]> {
+  const spec = offerSpec(p, productId, periods);
+  const jobs: [StoreName, () => Promise<StoreResult>][] = [];
+  if (appleConfigured() && (!only || only === 'apple')) jobs.push(['apple', () => createAppleOffer(spec)]);
+  if (googleConfigured() && (!only || only === 'google')) jobs.push(['google', () => createGoogleOffer(spec)]);
+  const results = await Promise.all(jobs.map(([store, run]) => attempt(store, run)));
+  for (const r of results) {
+    await saveCodeStoreOffer({ code: p.code, store: r.store, productId, periods, ok: r.ok, detail: r.detail, ids: r.ids ?? null });
+    if (r.ok && r.offerRef) await setPromoOfferRef(p.code, r.store, r.offerRef);
+  }
+  return results;
+}
+
+/** Retry a store that failed, or check that a store still has the offer. */
+app.post('/admin/api/promo-store', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const body = await c.req.json<{ code?: string; store?: string; action?: string }>().catch(() => ({}) as never);
+  const code = normalizeCode(String(body.code ?? ''));
+  const store = body.store === 'apple' || body.store === 'google' ? body.store : null;
+  const promo = await getPromo(code);
+  if (!promo || !store) return c.json({ error: 'not_found' }, 404);
+  const record = (await listCodeStoreOffers(code)).find((o) => o.store === store);
+  if (!record) return c.json({ error: 'not_made_here' }, 404);
+  if (store === 'apple' ? !appleConfigured() : !googleConfigured()) return c.json({ error: 'store_not_connected' }, 400);
+  if (body.action === 'check') {
+    const r = await attempt(store, () => (store === 'apple' ? checkAppleOffer(code, record.productId) : checkGoogleOffer(code, record.productId)));
+    await saveCodeStoreOffer({ ...record, ok: r.ok, detail: r.detail, ids: null });
+    return c.json({ ok: true, result: r });
+  }
+  const [r] = await makeStoreOffers(promo, record.productId, record.periods, store);
+  return c.json({ ok: true, result: r });
+});
+
+/** Which stores admin can make offers in, and (with ?test=1) a read-only call to prove each key works. */
+app.get('/admin/api/store-connections', async (c) => {
+  if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
+  const test = c.req.query('test') === '1';
+  const one = async (store: StoreName, configured: boolean, run: () => Promise<StoreResult>) => ({
+    store,
+    configured,
+    ...(configured && test ? { test: await attempt(store, run) } : {}),
+  });
+  return c.json({
+    apple: await one('apple', appleConfigured(), testApple),
+    google: await one('google', googleConfigured(), testGoogle),
+  });
 });
 
 /** Delete a code and its redemption history. */

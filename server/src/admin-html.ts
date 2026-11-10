@@ -360,6 +360,27 @@ export const ADMIN_HTML = `<!doctype html>
     </section>
 
     <section class="panel" role="tabpanel" id="p-codes" aria-labelledby="t-codes" hidden>
+    <div class="card" id="sc_card">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <h2 style="margin:0;flex:1">Store connections</h2>
+        <button class="ghost" onclick="loadConnections(true)">Test connections</button>
+      </div>
+      <p class="sub" style="margin:6px 0 4px">Connected stores get each code's offer made for you when you save it. The keys stay on the server (Railway).</p>
+      <ul class="list" id="sc_list"><li class="empty">Loading…</li></ul>
+      <details class="how"><summary>How to connect Apple (App Store Connect API)</summary><div>
+        1. App Store Connect → <b>Users and Access → Integrations → App Store Connect API</b> → Team Keys → <b>+</b>. Name <code>calgym-codes</code>, access <b>App Manager</b>. Generate.<br>
+        2. Note the <b>Issuer ID</b> (top of the page) and the key's <b>Key ID</b>; <b>Download</b> the .p8 file (Apple lets you download it once).<br>
+        3. Railway → the server → Variables: <code>ASC_ISSUER_ID</code>, <code>ASC_KEY_ID</code>, and <code>ASC_PRIVATE_KEY</code> = the whole text of the .p8 file. Deploy.<br>
+        4. Back here: <b>Test connections</b>. To stop it any time, revoke the key in App Store Connect.
+      </div></details>
+      <details class="how"><summary>How to connect Google (Play Developer API)</summary><div>
+        1. Google Cloud console (the project linked to Play Console, or a new one) → <b>APIs &amp; Services → Enable APIs</b> → enable <b>Google Play Android Developer API</b>.<br>
+        2. <b>IAM &amp; Admin → Service accounts → Create</b>, name <code>calgym-codes</code>, no roles. Open it → <b>Keys → Add key → JSON</b>: a .json file downloads.<br>
+        3. Play Console → <b>Users and permissions → Invite new users</b> → the service account's email → <b>App permissions</b>: Calgym, with <b>Manage store presence</b> (subscriptions and offers) and <b>View app information</b>. Invite.<br>
+        4. Railway → Variables: <code>GOOGLE_PLAY_SERVICE_ACCOUNT</code> = the whole text of the .json file. Deploy.<br>
+        5. Back here: <b>Test connections</b>. Permissions can take up to a day to reach a new service account; if the test says so, try again later. To stop it, delete the key or remove the user.
+      </div></details>
+    </div>
     <div class="card intro">
       <h2>How codes and partners work</h2>
       <ol class="steps-list">
@@ -398,7 +419,15 @@ export const ADMIN_HTML = `<!doctype html>
 
       <div class="step"><div class="step-no">2</div><div class="step-body">
         <h3 class="step-title">Apple and Google offer <span class="muted" style="font-weight:600">(needed for the apps)</span></h3>
-        <div class="row">
+        <div id="pc_make_box" class="hide" style="margin-bottom:10px">
+          <label style="display:flex;gap:8px;align-items:center;font-weight:700;margin:0 0 8px"><input type="checkbox" id="pc_make" checked onchange="pcSummary()" style="width:auto;min-height:0"> Make the offers in <span id="pc_make_where">the stores</span> when I save</label>
+          <div class="row pc-make-on">
+            <div><label for="pc_billing">Applies to</label><select id="pc_billing" onchange="pcStores()"><option value="monthly">the monthly plan</option><option value="yearly">the yearly plan</option></select></div>
+            <div class="pc-pct"><label for="pc_periods">Discount lasts</label><select id="pc_periods" onchange="pcStores()"><option value="1">1 month</option><option value="2">2 months</option><option value="3" selected>3 months</option><option value="6">6 months</option><option value="12">12 months</option></select></div>
+          </div>
+          <div class="summary pc-make-on" id="pc_price"></div>
+        </div>
+        <div class="row" id="pc_manual">
           <div><label for="pc_ios">App Store offer code</label><input id="pc_ios" placeholder="the custom code made in App Store Connect" oninput="pcSummary()" /></div>
           <button type="button" class="ghost" style="flex:0 0 auto" onclick="pcSame('pc_ios')">Same as the code</button>
           <div><label for="pc_android">Google Play offer id</label><input id="pc_android" placeholder="offerId, or basePlanId:offerId" oninput="pcSummary()" /></div>
@@ -450,7 +479,7 @@ export const ADMIN_HTML = `<!doctype html>
       <h3 style="margin-top:22px">Your codes</h3>
       <div class="scroll">
         <table>
-          <thead><tr><th>Code</th><th>Gives</th><th>Earns</th><th title="People who typed it in the app">Used</th><th>Left</th><th title="People who paid at least once through this code (App Store, Google Play)">Paid</th><th title="What its buyers paid, after store fees and refunds, renewals included">Brought in</th><th>Dates</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Code</th><th>Gives</th><th title="The code's offer in each store, when admin made it">Stores</th><th>Earns</th><th title="People who typed it in the app">Used</th><th>Left</th><th title="People who paid at least once through this code (App Store, Google Play)">Paid</th><th title="What its buyers paid, after store fees and refunds, renewals included">Brought in</th><th>Dates</th><th>Status</th><th></th></tr></thead>
           <tbody id="pc_rows"></tbody>
           <tfoot id="pc_total"></tfoot>
         </table>
@@ -654,6 +683,7 @@ export const ADMIN_HTML = `<!doctype html>
     loadQueue();
     loadAiFailures();
     loadPartners();
+    loadConnections(false);
     var W = data.weights || {};
     WEIGHT_KINDS.forEach(function (k) {
       var el = document.getElementById('w_' + k);
@@ -1341,6 +1371,9 @@ export const ADMIN_HTML = `<!doctype html>
     parent_has_no_partner: 'The linked code has no owner to pay — give it a partner first.',
     shares_over_100: 'The shares add up to more than 100%.',
     has_earnings: 'This code has earned partners money, so it is kept for their history. Turn it off instead.',
+    store_product_invalid: 'The stores sell Pro and Essentials only (monthly or yearly). Pro+ is not on sale.',
+    stores_not_connected: 'No store is connected yet: see Store connections at the top.',
+    store_periods_out_of_range: 'A discount can last 1 to 12 months.',
   };
   var PC_PROBLEMS = { inactive: 'off', not_started: 'not started', expired: 'ended', exhausted: 'used up' };
   var promos = [];
@@ -1375,8 +1408,10 @@ export const ADMIN_HTML = `<!doctype html>
     var parts = [];
     parts.push(code + ' gives ' + (pct ? (v('pc_pct') ? v('pc_pct') + '% off ' : 'a discount on ') + plan : plan + ' free for ' + (days > 0 ? lengthText(days) : '…')) + '.');
     var missing = [];
-    if (!v('pc_ios')) missing.push('the App Store offer code');
-    if (!v('pc_android')) missing.push('the Google Play offer id');
+    // Offers admin will make on save count as there.
+    var making = document.getElementById('pc_make') && document.getElementById('pc_make').checked && !document.getElementById('pc_code').disabled;
+    if (!v('pc_ios') && !(making && connections.apple)) missing.push('the App Store offer code');
+    if (!v('pc_android') && !(making && connections.google)) missing.push('the Google Play offer id');
     if (missing.length === 2) parts.push('The apps will refuse it until you add ' + missing.join(' and ') + ' (step 2).');
     else if (missing.length === 1) parts.push('It works on ' + (v('pc_ios') ? 'iPhone' : 'Android') + ' only until you add ' + missing[0] + '.');
     var owner = document.getElementById('pc_partner');
@@ -1394,6 +1429,7 @@ export const ADMIN_HTML = `<!doctype html>
     parts.push(lim.length ? 'Valid ' + lim.join(', ') + '.' : 'No limit on people or dates.');
     box.className = 'summary' + (missing.length === 2 ? ' bad' : '');
     box.textContent = parts.join(' ');
+    if (typeof pcStores === 'function') pcStores();
   }
   function toLocalInput(iso) {
     if (!iso) return '';
@@ -1457,6 +1493,69 @@ export const ADMIN_HTML = `<!doctype html>
     pcMsg('Editing ' + p.code + ' — its counters are kept when you save.', false);
     document.getElementById('codes').scrollIntoView({ behavior: 'smooth' });
   }
+  var connections = { apple: false, google: false };
+  function loadConnections(test) {
+    var list = document.getElementById('sc_list');
+    if (test) list.innerHTML = '<li class="empty">Testing…</li>';
+    fetch('/admin/api/store-connections' + (test ? '?test=1' : ''), { headers: { 'x-admin-token': tok() } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        connections = { apple: !!(d.apple && d.apple.configured), google: !!(d.google && d.google.configured) };
+        list.innerHTML = [['apple', 'App Store Connect'], ['google', 'Google Play']].map(function (s) {
+          var x = d[s[0]] || {}, t = x.test;
+          var state = !x.configured ? ['todo', '○', 'not connected · see how below'] : t ? (t.ok ? ['ok', '✓', t.detail] : ['bad', '!', 'key set, but: ' + t.detail]) : ['ok', '✓', 'key set · press Test connections to try it'];
+          return '<li><span class="dot ' + state[0] + '" aria-hidden="true">' + state[1] + '</span><div class="grow"><b>' + s[1] + '</b> · ' + esc(state[2]) + '</div></li>';
+        }).join('');
+        pcStores();
+      }).catch(function () { list.innerHTML = '<li class="empty">Could not load.</li>'; });
+  }
+  /** Step 2 when a store is connected: what will be made, and at what price. */
+  function pcStores() {
+    var any = connections.apple || connections.google;
+    document.getElementById('pc_make_box').classList.toggle('hide', !any);
+    if (!any) { document.getElementById('pc_manual').classList.remove('hide'); return; }
+    var on = document.getElementById('pc_make').checked;
+    document.querySelectorAll('.pc-make-on').forEach(function (el) { el.classList.toggle('hide', !on); });
+    document.getElementById('pc_make_where').textContent = connections.apple && connections.google ? 'App Store Connect and Google Play' : connections.apple ? 'App Store Connect' : 'Google Play';
+    var yearly = document.getElementById('pc_billing').value === 'yearly';
+    var periods = document.getElementById('pc_periods');
+    periods.disabled = yearly;
+    if (yearly) periods.value = '1';
+    // Typed offer names are only needed for a store that isn't connected.
+    document.getElementById('pc_manual').classList.toggle('hide', on && connections.apple && connections.google);
+    var plan = document.getElementById('pc_plan').value, pct = document.getElementById('pc_kind').value === 'percent';
+    var P = (data && data.prices) || {}, cur = P.currency || 'SAR';
+    var full = P[(plan === 'essentials' ? 'essentials' : 'pro') + (yearly ? 'Yearly' : '')];
+    var box = document.getElementById('pc_price');
+    var off = parseInt(document.getElementById('pc_pct').value, 10);
+    var n = parseInt(periods.value, 10);
+    var unit = yearly ? 'year' : 'month';
+    if (pct) {
+      box.innerHTML = typeof full === 'number' && off > 0 && off < 100
+        ? 'Store price: <b>' + cur + ' ' + full.toFixed(2) + ' → about ' + cur + ' ' + (full * (1 - off / 100)).toFixed(2) + ' a ' + unit + (yearly ? ' for the first year' : ' for ' + n + ' month' + (n === 1 ? '' : 's')) + '</b>, then ' + cur + ' ' + full.toFixed(2) + '. Apple uses its nearest price step; both stores set the matching price in every other country. It comes after the 14-day free trial.'
+        : 'Type the % off in step 1 to see the price.';
+    } else {
+      var days = parseInt(document.getElementById('pc_days').value, 10);
+      box.textContent = 'Free for ' + (days > 0 ? lengthText(days) : '…') + ' instead of the 14-day trial, then the normal price. Apple offers 3 days, 1 or 2 weeks, or 1, 2, 3, 6 or 12 months.';
+    }
+  }
+  function storeBody() {
+    if (!(connections.apple || connections.google) || !document.getElementById('pc_make').checked || document.getElementById('pc_code').disabled) return undefined;
+    var plan = { pro: 'pro', essentials: 'essentials', proPlus: 'proplus' }[document.getElementById('pc_plan').value] || 'pro';
+    var billing = document.getElementById('pc_billing').value;
+    return { create: true, productId: 'calgym_' + plan + '_' + billing, periods: parseInt(document.getElementById('pc_periods').value, 10) || 1 };
+  }
+  var STORE_LABEL = { apple: 'App Store', google: 'Google Play' };
+  function storeLines(results) {
+    return (results || []).map(function (r) {
+      return '<li><span class="dot ' + (r.ok ? 'ok' : 'bad') + '" aria-hidden="true">' + (r.ok ? '✓' : '✕') + '</span><div class="grow"><b>' + STORE_LABEL[r.store] + ':</b> ' + esc(r.detail) + '</div></li>';
+    }).join('');
+  }
+  function storeRetry(p, store, action) {
+    api('/admin/api/promo-store', { code: p.code, store: store, action: action || 'retry' })
+      .then(function (d) { pcMsg(STORE_LABEL[store] + ' · ' + p.code + ': ' + (d.result.ok ? '✓ ' : '✕ ') + d.result.detail, !d.result.ok); loadPromos(); })
+      .catch(function (e) { pcMsg('Request failed: ' + e, true); });
+  }
   function promoBody(overrides) {
     var max = parseInt(document.getElementById('pc_max').value, 10);
     var body = {
@@ -1479,6 +1578,7 @@ export const ADMIN_HTML = `<!doctype html>
       parentCode: document.getElementById('pc_parent').value,
       parentPct: document.getElementById('pc_ppct').value,
       grandparentPct: document.getElementById('pc_gpct').value,
+      stores: storeBody(),
     };
     Object.keys(overrides || {}).forEach(function (k) { body[k] = overrides[k]; });
     return body;
@@ -1493,7 +1593,17 @@ export const ADMIN_HTML = `<!doctype html>
   function savePromo() {
     postPromo(promoBody()).then(function (r) {
       if (!r.ok) { pcMsg(PC_ERRORS[r.body.error] || ('Not saved: ' + (r.body.error || 'error')), true); return; }
-      pcMsg('Saved ' + r.body.promo.code + '.', false);
+      var st = r.body.stores || [];
+      if (st.length) {
+        var allOk = st.every(function (x) { return x.ok; });
+        var box = document.getElementById('pc_msg');
+        box.className = allOk ? 'sub' : 'err';
+        box.innerHTML = '<b>' + esc(r.body.promo.code) + (allOk ? ' is ready' : ' is saved; a store needs another try (Retry in the Stores column)') + '</b>' +
+          '<ul class="list" style="margin:6px 0 0"><li><span class="dot ok" aria-hidden="true">✓</span><div class="grow"><b>Calgym:</b> code saved</div></li>' + storeLines(st) + '</ul>' +
+          (st.some(function (x) { return x.store === 'apple' && x.ok; }) ? '<div class="muted" style="margin-top:4px">Apple can take up to an hour before a new custom code works.</div>' : '');
+      } else {
+        pcMsg('Saved ' + r.body.promo.code + '.', false);
+      }
       clearPromoForm();
       loadPromos();
     }).catch(function (e) { pcMsg('Request failed: ' + e, true); });
@@ -1543,7 +1653,7 @@ export const ADMIN_HTML = `<!doctype html>
     var body = document.getElementById('pc_rows');
     body.innerHTML = '';
     if (!promos.length) {
-      body.innerHTML = '<tr><td colspan="10" class="muted">No codes yet.</td></tr>';
+      body.innerHTML = '<tr><td colspan="11" class="muted">No codes yet.</td></tr>';
       document.getElementById('pc_total').innerHTML = '';
       return;
     }
@@ -1559,6 +1669,7 @@ export const ADMIN_HTML = `<!doctype html>
       tr.innerHTML =
         '<td><span style="font-family:monospace;font-weight:700">' + esc(p.code) + '</span>' + (p.note ? '<div class="muted">' + esc(p.note) + '</div>' : '') + '</td>' +
         '<td>' + esc(gives) + '</td>' +
+        '<td class="stores" style="white-space:nowrap"></td>' +
         '<td>' + earnsCell(p) + '</td>' +
         '<td>' + p.redeemedCount + (p.maxRedemptions ? ' / ' + p.maxRedemptions : '') + '</td>' +
         '<td>' + (p.remaining == null ? '∞' : p.remaining) + '</td>' +
@@ -1567,6 +1678,24 @@ export const ADMIN_HTML = `<!doctype html>
         '<td class="muted">' + esc(win) + '</td>' +
         '<td><span class="pill ' + (p.problem ? 'free' : 'pro') + '">' + esc(status) + '</span></td>' +
         '<td style="white-space:nowrap"></td>';
+      var storesCell = tr.querySelector('td.stores');
+      var made = p.stores || [];
+      if (!made.length) storesCell.innerHTML = '<span class="muted">' + (p.offerIos || p.offerAndroid ? 'typed by hand' : '—') + '</span>';
+      made.forEach(function (o) {
+        var span = document.createElement('span');
+        span.style.marginInlineEnd = '6px';
+        span.title = o.detail || '';
+        span.innerHTML = (o.ok ? '<span style="color:#2f5b1a;font-weight:800">✓</span> ' : '<span style="color:#B42318;font-weight:800">✕</span> ') + (o.store === 'apple' ? 'Apple' : 'Google');
+        storesCell.appendChild(span);
+        var b = document.createElement('button');
+        b.className = 'ghost';
+        b.style.padding = '2px 8px';
+        b.style.marginInlineEnd = '8px';
+        b.textContent = o.ok ? 'Check' : 'Retry';
+        b.title = o.ok ? 'Ask the store whether the offer is still there and active' : 'Try making it again: ' + (o.detail || '');
+        b.addEventListener('click', function () { storeRetry(p, o.store, o.ok ? 'check' : 'retry'); });
+        storesCell.appendChild(b);
+      });
       var actions = tr.lastChild;
       [['Who', showRedemptions], ['Edit', editPromo], [p.active ? 'Turn off' : 'Turn on', togglePromo], ['Delete', removePromo]].forEach(function (a) {
         var b = document.createElement('button');
@@ -1581,7 +1710,7 @@ export const ADMIN_HTML = `<!doctype html>
       total += p.broughtUsd || 0;
       totalBuyers += p.buyers || 0;
     });
-    document.getElementById('pc_total').innerHTML = '<tr><td colspan="5"><b>All codes</b> <span class="muted">· after store fees and refunds; test purchases are not counted</span></td>' +
+    document.getElementById('pc_total').innerHTML = '<tr><td colspan="6"><b>All codes</b> <span class="muted">· after store fees and refunds; test purchases are not counted</span></td>' +
       '<td><b>' + totalBuyers + '</b></td><td><b>' + sar(total) + '</b></td><td colspan="3"></td></tr>';
   }
   /** USD from the store, shown in SAR like the rest of the page. */
