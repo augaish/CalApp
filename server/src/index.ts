@@ -2233,7 +2233,23 @@ app.post('/api/redeem', async (c) => {
   if (!ref) return c.json({ error: 'identify_required' }, 400);
   const body = await c.req.json<{ code?: string; platform?: string }>().catch(() => ({}) as never);
   const platform = body.platform === 'ios' || body.platform === 'android' ? body.platform : 'web';
-  const result = await redeemPromo(String(body.code ?? ''), ref, platform);
+  const key = process.env.REVENUECAT_SECRET_KEY;
+  const header = validRef(c.req.header('x-calgym-user') ?? '');
+  // Android members: a free code's days go on the end of their Play subscription.
+  const extendStore =
+    platform === 'android' && key && header
+      ? async (days: number) => {
+          const storeId = await ownStoreId(header, ref, resolveRef);
+          const until = await extendPlaySubscription(storeId, key, days);
+          if (until) {
+            const read = await subscriberPlan(storeId, key).catch(() => null);
+            const found = read?.ok ? read.found : null;
+            await setUserPlan(ref, found?.plan ?? 'pro', found?.trial ? 'revenuecat:code:trial' : 'revenuecat:code', until);
+          }
+          return until;
+        }
+      : undefined;
+  const result = await redeemPromo(String(body.code ?? ''), ref, platform, extendStore);
   if (!result.ok) return c.json({ error: result.reason }, result.reason === 'unknown' ? 404 : 409);
   if (result.kind === 'free') {
     const access = await checkAccess(ref, 'coach');
@@ -2243,6 +2259,7 @@ app.post('/api/redeem', async (c) => {
       code: result.code,
       plan: result.plan,
       until: result.until,
+      ...(result.extended ? { extended: true } : {}),
       entitlement: { plan: access.plan, used: access.used, limit: access.limit, period: access.period },
     });
   }
@@ -2281,6 +2298,41 @@ async function subscriberPlan(
   });
   if (!res.ok) return { ok: false, result: `revenuecat_${res.status}` };
   return { ok: true, found: planFromSubscriber((await res.json()) as SubscriberRecord) };
+}
+
+const REVENUECAT_API = () => process.env.REVENUECAT_API_URL || 'https://api.revenuecat.com';
+
+/**
+ * Push a Play subscription's end back by `days` (RevenueCat's "defer a
+ * Google subscription"), counting from its current end — so a code's free
+ * month starts where the free trial or paid month stops. Returns the new
+ * end, or null when there's no running Play subscription or the store
+ * refused.
+ */
+async function extendPlaySubscription(appUserId: string, key: string, days: number): Promise<string | null> {
+  const base = `${REVENUECAT_API()}/v1/subscribers/${encodeURIComponent(appUserId)}`;
+  const headers = { Authorization: `Bearer ${key}`, Accept: 'application/json', 'Content-Type': 'application/json' };
+  const res = await fetch(base, { headers, signal: AbortSignal.timeout(8000) });
+  if (!res.ok) return null;
+  const rec = (await res.json()) as { subscriber?: { subscriptions?: Record<string, { store?: string; expires_date?: string | null; refunded_at?: string | null } | undefined> } };
+  const running = Object.entries(rec.subscriber?.subscriptions ?? {})
+    .filter(([, s]) => s?.store === 'play_store' && !s.refunded_at && s.expires_date && new Date(s.expires_date).getTime() > Date.now())
+    .sort(([, a], [, b]) => new Date(b!.expires_date!).getTime() - new Date(a!.expires_date!).getTime())[0];
+  if (!running) return null;
+  const [productKey, sub] = running;
+  const target = new Date(sub!.expires_date!).getTime() + days * 86_400_000;
+  // RevenueCat names a Play subscription "product:base-plan"; try the product alone if it wants that.
+  for (const id of productKey.includes(':') ? [productKey, productKey.split(':')[0]] : [productKey]) {
+    const r = await fetch(`${base}/subscriptions/${encodeURIComponent(id)}/defer`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ expiry_time_ms: target }),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (r.ok) return new Date(target).toISOString();
+    console.error(`defer ${id} for ${appUserId} answered ${r.status}: ${(await r.text().catch(() => '')).slice(0, 300)}`);
+  }
+  return null;
 }
 
 app.post('/api/billing/revenuecat', async (c) => {

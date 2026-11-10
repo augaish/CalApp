@@ -72,13 +72,18 @@ export type RedeemFailure =
   | 'already_subscribed'
   /** A free code with no store offer for this platform: the apps may not unlock it themselves. */
   | 'store_only'
+  /** Android: Google can't discount a subscription that's already running. */
+  | 'member_discount'
+  /** Android: the store didn't take the extra days, so the code wasn't spent. */
+  | 'extend_failed'
   | 'unavailable';
 
 /** Where a code is being redeemed. The apps pass it; anything else is treated as the web. */
 export type RedeemPlatform = 'ios' | 'android' | 'web';
 
 export type RedeemResult =
-  | { ok: true; kind: 'free'; code: string; plan: Plan; until: string }
+  /** `extended`: the days went on the end of a store subscription, which renews after them as before. */
+  | { ok: true; kind: 'free'; code: string; plan: Plan; until: string; extended?: boolean }
   | {
       ok: true;
       kind: 'percent';
@@ -305,7 +310,14 @@ function storeOffer(row: PromoCode, platform: RedeemPlatform): string | null {
   return platform === 'ios' ? row.offerIos : platform === 'android' ? row.offerAndroid : null;
 }
 
-export async function redeemPromo(rawCode: string, ref: string, platform: RedeemPlatform = 'web'): Promise<RedeemResult> {
+/**
+ * Android only: adds days to the end of the person's running Play
+ * subscription (their free trial included), returning the new end, or null
+ * if the store didn't take it.
+ */
+export type ExtendStore = (days: number) => Promise<string | null>;
+
+export async function redeemPromo(rawCode: string, ref: string, platform: RedeemPlatform = 'web', extendStore?: ExtendStore): Promise<RedeemResult> {
   const { attributeUser, claimPromo, getOrCreateUser, getPromo, getRedemption, grantPromo } = await import('./db.js');
   const code = normalizeCode(rawCode);
   if (code.length < 3) return { ok: false, reason: 'unknown' };
@@ -314,6 +326,28 @@ export async function redeemPromo(rawCode: string, ref: string, platform: Redeem
   if (!existing) return { ok: false, reason: 'unknown' };
 
   const user = await getOrCreateUser(ref);
+  const paying = user?.storePlan?.plan ?? 'free';
+  // Members in the apps (a free trial counts) may use codes too. On iPhone
+  // Apple's offer code does it: it starts when the current period ends. On
+  // Android Google has no such offer for a running subscription, so a free
+  // code's days go on the end of it, and a discount has nothing to apply to.
+  // (A store subscription, that is: an admin grant has nothing in Play to extend.)
+  const storeMember = paying !== 'free' && (user?.storePlan?.source ?? '').startsWith('revenuecat');
+  if (platform === 'android' && storeMember) {
+    if (existing.kind === 'percent') return { ok: false, reason: 'member_discount' };
+    if (extendStore && existing.durationDays) {
+      if (PLAN_RANK[paying] !== PLAN_RANK[existing.plan]) return { ok: false, reason: 'already_subscribed' };
+      const problem = codeProblem(existing);
+      if (problem) return { ok: false, reason: problem };
+      if (await getRedemption(code, ref)) return { ok: false, reason: 'already_redeemed' };
+      const until = await extendStore(existing.durationDays);
+      if (!until) return { ok: false, reason: 'extend_failed' };
+      // The days are given: a full campaign racing this one only misses the count.
+      if (!(await claimPromo(code, ref, until))) console.error(`code ${code}: days added for ${ref} but the claim was refused`);
+      await attributeUser(ref, code).catch((err) => console.error('attribution failed:', err));
+      return { ok: true, kind: 'free', code, plan: existing.plan, until, extended: true };
+    }
+  }
   // In the apps a free code goes through the store, or not at all.
   const viaStore = existing.kind === 'free' && platform !== 'web';
   if (viaStore && !storeOffer(existing, platform)) return { ok: false, reason: 'store_only' };
@@ -322,8 +356,8 @@ export async function redeemPromo(rawCode: string, ref: string, platform: Redeem
     // Days of a tier someone already pays for would simply be lost, and the
     // redemption counted against the campaign for nothing. Checked before
     // the claim so the code stays unspent for them.
-    const paying = user?.storePlan?.plan ?? 'free';
-    if (PLAN_RANK[paying] >= PLAN_RANK[existing.plan]) return { ok: false, reason: 'already_subscribed' };
+    // (On iPhone Apple starts the offer after the current period instead.)
+    if (platform !== 'ios' && PLAN_RANK[paying] >= PLAN_RANK[existing.plan]) return { ok: false, reason: 'already_subscribed' };
     // A second gift starts where a running one ends, rather than overlapping it.
     if (!viaStore) {
       const base = user?.promo?.until ? new Date(user.promo.until) : new Date();

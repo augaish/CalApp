@@ -307,6 +307,8 @@ export async function fetchEntitlement(): Promise<Entitlement | null> {
 
 export type RedeemFailure =
   | 'unknown'
+  | 'member_discount'
+  | 'extend_failed'
   | 'inactive'
   | 'not_started'
   | 'expired'
@@ -319,7 +321,7 @@ export type RedeemFailure =
   | 'offline';
 
 export type RedeemResponse =
-  | { ok: true; kind: 'free'; code: string; plan: 'essentials' | 'pro' | 'proPlus'; until: string }
+  | { ok: true; kind: 'free'; code: string; plan: 'essentials' | 'pro' | 'proPlus'; until: string; extended?: boolean }
   | {
       ok: true;
       kind: 'percent';
@@ -348,6 +350,7 @@ export async function redeemCode(code: string): Promise<RedeemResponse> {
     const known: RedeemFailure[] = [
       'unknown', 'inactive', 'not_started', 'expired', 'exhausted',
       'already_redeemed', 'already_subscribed', 'store_only', 'unavailable', 'identify_required',
+      'member_discount', 'extend_failed',
     ];
     const reason = known.includes(data.error as RedeemFailure) ? (data.error as RedeemFailure) : 'unavailable';
     return { ok: false, reason };

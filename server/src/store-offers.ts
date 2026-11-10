@@ -214,7 +214,7 @@ export function appleFreeDuration(days: number): string | null {
 const isYearly = (productId: string) => /year|annual/i.test(productId);
 
 /** The JSON body for a new offer code — exported so the shape is tested. */
-export function appleOfferBody(spec: OfferSpec, subscriptionId: string, prices: { territory: string; pointId: string | null }[]) {
+export function appleOfferBody(spec: OfferSpec, subscriptionId: string, prices: { territory: string; pointId: string | null }[], stack = true) {
   const free = spec.kind === 'free';
   const duration = free ? appleFreeDuration(spec.freeDays) : isYearly(spec.productId) ? 'ONE_YEAR' : 'ONE_MONTH';
   if (!duration) throw new StoreError('apple', 'Apple offers free time of 3 days, 1 or 2 weeks, or 1, 2, 3, 6 or 12 months.');
@@ -223,10 +223,11 @@ export function appleOfferBody(spec: OfferSpec, subscriptionId: string, prices: 
       type: 'subscriptionOfferCodes',
       attributes: {
         name: spec.code,
-        // New subscribers and people who had Calgym before; current members keep their plan.
-        customerEligibilities: ['NEW', 'EXPIRED'],
-        // A free code replaces the 14-day trial; a discount comes after it.
-        offerEligibility: free ? 'REPLACE_INTRO_OFFERS' : 'STACK_WITH_INTRO_OFFERS',
+        // Anyone: new, lapsed, and current members (a free trial counts), for
+        // whom Apple starts the offer when their current period ends.
+        customerEligibilities: ['NEW', 'EXISTING', 'EXPIRED'],
+        // The code comes after the 14-day trial rather than replacing it.
+        offerEligibility: stack ? 'STACK_WITH_INTRO_OFFERS' : 'REPLACE_INTRO_OFFERS',
         offerMode: free ? 'FREE_TRIAL' : 'PAY_AS_YOU_GO',
         duration,
         numberOfPeriods: free ? 1 : Math.max(1, Math.min(12, spec.periods)),
@@ -275,7 +276,14 @@ export async function createAppleOffer(spec: OfferSpec): Promise<StoreResult> {
         .map((p) => ({ territory: p.relationships?.territory?.data?.id ?? '', pointId: spec.kind === 'percent' ? p.id : null }))
         .filter((p) => p.territory && p.territory !== ANCHOR_TERRITORY),
     ];
-    const made = await asc('/v1/subscriptionOfferCodes', { method: 'POST', body: appleOfferBody(spec, sub.id, prices) });
+    let made;
+    try {
+      made = await asc('/v1/subscriptionOfferCodes', { method: 'POST', body: appleOfferBody(spec, sub.id, prices) });
+    } catch (err) {
+      // If Apple won't put free time after the trial, the code's free time replaces it.
+      if (spec.kind !== 'free' || !(err instanceof StoreError) || err.status === 401) throw err;
+      made = await asc('/v1/subscriptionOfferCodes', { method: 'POST', body: appleOfferBody(spec, sub.id, prices, false) });
+    }
     offer = made.data as typeof offer;
   }
   if (!offer) throw new StoreError('apple', 'App Store Connect did not return the new offer.');
@@ -442,7 +450,7 @@ export function googleFreePeriod(days: number): string {
 }
 
 /** The JSON body for a new offer — exported so the shape is tested. */
-export function googleOfferBody(spec: OfferSpec, plan: PlayBasePlan, leaveOut: string[] = []) {
+export function googleOfferBody(spec: OfferSpec, plan: PlayBasePlan, leaveOut: string[] = [], trialDays = 0) {
   const free = spec.kind === 'free';
   const regions = (plan.regionalConfigs ?? []).map((r) => r.regionCode).filter((r) => !leaveOut.includes(r));
   if (!regions.length) throw new StoreError('google', `Base plan ${plan.basePlanId} has no countries.`);
@@ -456,7 +464,8 @@ export function googleOfferBody(spec: OfferSpec, plan: PlayBasePlan, leaveOut: s
     offerId: googleOfferId(spec.code),
     phases: [
       {
-        duration: free ? googleFreePeriod(spec.freeDays) : yearly ? 'P1Y' : 'P1M',
+        // Play gives one offer per purchase, so a free code carries the trial's days too.
+        duration: free ? googleFreePeriod(spec.freeDays + trialDays) : yearly ? 'P1Y' : 'P1M',
         recurrenceCount: free ? 1 : Math.max(1, Math.min(12, spec.periods)),
         regionalConfigs: regions.map((r) => phasePrice(r)),
         ...(plan.otherRegionsConfig ? { otherRegionsConfig: phasePrice() } : {}),
@@ -483,7 +492,17 @@ export async function createGoogleOffer(spec: OfferSpec): Promise<StoreResult> {
   const path = `/subscriptions/${spec.productId}/basePlans/${plan.basePlanId}/offers`;
   let offer = await play<{ state?: string }>(`${path}/${offerId}`, { allow404: true });
   const leftOut: string[] = [];
-  if (!offer) offer = await postGoogleOffer(spec, plan, `${path}?offerId=${encodeURIComponent(offerId)}`, leftOut);
+  if (!offer) {
+    const url = `${path}?offerId=${encodeURIComponent(offerId)}`;
+    const trialDays = spec.kind === 'free' ? await googleTrialDays(path, offerId).catch(() => 0) : 0;
+    try {
+      offer = await postGoogleOffer(spec, plan, url, leftOut, trialDays);
+    } catch (err) {
+      // If Play won't take the longer free time, the code's own days.
+      if (!trialDays || !(err instanceof StoreError) || err.status !== 400) throw err;
+      offer = await postGoogleOffer(spec, plan, url, leftOut, 0);
+    }
+  }
   if (offer?.state !== 'ACTIVE') {
     offer = await play<{ state?: string }>(`${path}/${offerId}:activate`, {
       method: 'POST',
@@ -502,7 +521,27 @@ export async function createGoogleOffer(spec: OfferSpec): Promise<StoreResult> {
 }
 
 /** Makes the offer, working round regions versions and countries Play won't bill (see REGIONS_VERSIONS). */
-async function postGoogleOffer(spec: OfferSpec, plan: PlayBasePlan, url: string, leftOut: string[]): Promise<{ state?: string } | null> {
+/** Days in an ISO 8601 period as Play writes them (P14D, P2W, P1M). */
+export function isoDays(period: string): number {
+  const m = /^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?$/.exec(period ?? '');
+  if (!m) return 0;
+  return Number(m[1] ?? 0) * 365 + Number(m[2] ?? 0) * 30 + Number(m[3] ?? 0) * 7 + Number(m[4] ?? 0);
+}
+
+/** The base plan's own free trial: the longest free first phase among its other active offers. */
+async function googleTrialDays(path: string, offerId: string): Promise<number> {
+  const list = await play<{ subscriptionOffers?: { offerId?: string; state?: string; phases?: { duration?: string; regionalConfigs?: { free?: unknown }[]; otherRegionsConfig?: { free?: unknown } }[] }[] }>(path);
+  let days = 0;
+  for (const o of list?.subscriptionOffers ?? []) {
+    if (o.offerId === offerId || o.state !== 'ACTIVE') continue;
+    const first = o.phases?.[0];
+    const free = first && ((first.regionalConfigs ?? []).some((r) => r.free !== undefined) || first.otherRegionsConfig?.free !== undefined);
+    if (free) days = Math.max(days, isoDays(first.duration ?? ''));
+  }
+  return days;
+}
+
+async function postGoogleOffer(spec: OfferSpec, plan: PlayBasePlan, url: string, leftOut: string[], trialDays = 0): Promise<{ state?: string } | null> {
   let last: unknown;
   for (const version of REGIONS_VERSIONS) {
     leftOut.length = 0;
@@ -510,7 +549,7 @@ async function postGoogleOffer(spec: OfferSpec, plan: PlayBasePlan, url: string,
       try {
         return await play<{ state?: string }>(`${url}&regionsVersion.version=${encodeURIComponent(version)}`, {
           method: 'POST',
-          body: googleOfferBody(spec, plan, leftOut),
+          body: googleOfferBody(spec, plan, leftOut, trialDays),
         });
       } catch (err) {
         last = err;

@@ -181,7 +181,7 @@ export default function Redeem() {
                 </Text>
                 <Text style={{ color: theme.textSecondary, marginTop: 4, lineHeight: 20 }}>
                   {done.kind === 'free'
-                    ? t('redeem.freeBody', { date: date(done.until) })
+                    ? t(done.extended ? 'redeem.extendedBody' : 'redeem.freeBody', { date: date(done.until) })
                     : done.freeDays
                       ? t('redeem.storeFreeBody', { store: Platform.OS === 'android' ? 'Google Play' : 'App Store' })
                       : t('redeem.percentBody')}

@@ -88,7 +88,7 @@ try {
 
   let log = await fakeLog();
   const offer = log.appleOffers.find((o) => o.attributes.name === DISC);
-  check('Apple offer: pay as you go, 1 month × 3, new and lapsed', offer && offer.attributes.offerMode === 'PAY_AS_YOU_GO' && offer.attributes.duration === 'ONE_MONTH' && offer.attributes.numberOfPeriods === 3 && offer.attributes.customerEligibilities.join() === 'NEW,EXPIRED' && offer.attributes.offerEligibility === 'STACK_WITH_INTRO_OFFERS', JSON.stringify(offer?.attributes));
+  check('Apple offer: pay as you go, 1 month × 3, new, current members and lapsed', offer && offer.attributes.offerMode === 'PAY_AS_YOU_GO' && offer.attributes.duration === 'ONE_MONTH' && offer.attributes.numberOfPeriods === 3 && offer.attributes.customerEligibilities.join() === 'NEW,EXISTING,EXPIRED' && offer.attributes.offerEligibility === 'STACK_WITH_INTRO_OFFERS', JSON.stringify(offer?.attributes));
   const sau = offer?.prices.find((p) => p.relationships.territory.data.id === 'SAU');
   check('Apple price: the Saudi step nearest 17.49, found on page 2', sau?.relationships.subscriptionPricePoint.data.id === 'pp-sau-1749', sau?.relationships.subscriptionPricePoint.data.id);
   check('Apple price: equalized in the other countries', ['USA', 'ARE', 'GBR'].every((t) => offer.prices.some((p) => p.relationships.territory.data.id === t && p.relationships.subscriptionPricePoint.data.id === `pp-sau-1749-${t}`)));
@@ -118,9 +118,9 @@ try {
   check('free code: ready in both stores', msg.includes(`${FREE} is ready`), msg);
   log = await fakeLog();
   const fo = log.appleOffers.find((o) => o.attributes.name === FREE);
-  check('Apple free offer: 1 month free, replaces the trial, no price points', fo && fo.attributes.offerMode === 'FREE_TRIAL' && fo.attributes.duration === 'ONE_MONTH' && fo.attributes.offerEligibility === 'REPLACE_INTRO_OFFERS' && fo.prices.every((p) => !p.relationships.subscriptionPricePoint));
+  check('Apple free offer: 1 month free after the trial, members too, no price points', fo && fo.attributes.offerMode === 'FREE_TRIAL' && fo.attributes.duration === 'ONE_MONTH' && fo.attributes.offerEligibility === 'STACK_WITH_INTRO_OFFERS' && fo.attributes.customerEligibilities.join() === 'NEW,EXISTING,EXPIRED' && fo.prices.every((p) => !p.relationships.subscriptionPricePoint));
   const gf = log.playOffers.find((o) => o.offerId === FREE.toLowerCase());
-  check('Google free offer: a free month', gf && gf.phases[0].duration === 'P1M' && gf.phases[0].regionalConfigs.every((r) => r.free && !r.relativeDiscount));
+  check('Google free offer: the 14-day trial plus a free month (P44D)', gf && gf.phases[0].duration === 'P44D' && gf.phases[0].regionalConfigs.every((r) => r.free && !r.relativeDiscount));
 
   // Check, and a retry that must reuse what exists.
   const before = (await fakeLog()).appleOffers.length;

@@ -80,6 +80,11 @@ http
       if (m) {
         const [, product, plan, offerId, activate] = m;
         const key = `${product}/${plan}/${offerId ?? url.searchParams.get('offerId')}`;
+        // The base plan's offers: its own 14-day free trial, and any made here.
+        if (req.method === 'GET' && !offerId && !url.searchParams.get('offerId')) {
+          const trial = { offerId: 'freetrial', state: 'ACTIVE', phases: [{ duration: 'P14D', recurrenceCount: 1, regionalConfigs: [{ regionCode: 'SA', free: {} }], otherRegionsConfig: { free: {} } }] };
+          return send(res, 200, { subscriptionOffers: [trial, ...[...playOffers.entries()].filter(([k]) => k.startsWith(`${product}/${plan}/`)).map(([, o]) => o)] });
+        }
         if (req.method === 'GET') return playOffers.has(key) ? send(res, 200, playOffers.get(key)) : send(res, 404, { error: { message: 'Offer not found' } });
         if (activate) {
           const o = playOffers.get(key);
