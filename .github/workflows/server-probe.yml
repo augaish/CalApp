@@ -5,6 +5,10 @@ name: Server probe
 
 on:
   workflow_dispatch:
+    inputs:
+      watch_minutes:
+        description: 'Also watch a redeploy: poll /health and keep scanning meals for this many minutes (0 = off)'
+        default: '0'
 
 jobs:
   probe:
@@ -37,6 +41,7 @@ jobs:
           curl -sS -m 30 -H "apikey: $KEY" -H 'content-type: application/json' -d @login.json "$SB/auth/v1/token?grant_type=password" > session.json
           TOKEN=$(python3 -c "import json;print(json.load(open('session.json')).get('access_token',''))")
           [ -n "$TOKEN" ] || { echo "sign-in failed"; python3 -c "import json;d=json.load(open('session.json'));print({k:d.get(k) for k in ['error','error_code','msg']})"; exit 1; }
+          echo "$TOKEN" > token.txt
           cp qa/fixtures/meal.jpg meal.jpg
           ls -l meal.jpg
           for lang in en ar; do
@@ -46,3 +51,21 @@ jobs:
               -d @body.json -o meal.json -w "MEAL $lang HTTP %{http_code} in %{time_total}s\n" https://calapp-production-ab20.up.railway.app/api/analyze-meal || echo "MEAL $lang curl failed ($?)"
             head -c 600 meal.json; echo
           done
+      - name: Watch a redeploy (health every 3 s, meal scans back to back)
+        if: ${{ inputs.watch_minutes != '0' }}
+        env:
+          MINUTES: ${{ inputs.watch_minutes }}
+        run: |
+          URL=https://calapp-production-ab20.up.railway.app
+          end=$(( $(date +%s) + MINUTES * 60 ))
+          ( last=""; while [ $(date +%s) -lt $end ]; do
+              out=$(curl -sS -m 10 -w ' %{http_code}' $URL/health 2>&1 | tail -c 200)
+              code=${out##* }; commit=$(echo "$out" | grep -o '"commit":"[0-9a-f]*"')
+              now="$code $commit"; [ "$now" != "$last" ] && echo "$(date -u +%T) HEALTH $now"; last=$now; sleep 3
+            done ) &
+          n=0; while [ $(date +%s) -lt $end ]; do
+            n=$((n+1)); python3 -c "import base64,json;print(json.dumps({'image':base64.b64encode(open('meal.jpg','rb').read()).decode(),'language':'en'}))" > body.json
+            curl -sS -m 150 -H "x-calgym-user: u_probe_watch_$(date +%s)" -H "Authorization: Bearer $(cat token.txt)" -H 'content-type: application/json' \
+              -d @body.json -o scan.json -w "$(date -u +%T) SCAN $n HTTP %{http_code} in %{time_total}s\n" $URL/api/analyze-meal || echo "SCAN $n curl failed"
+          done
+          wait
