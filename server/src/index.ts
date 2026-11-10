@@ -83,6 +83,10 @@ import {
   adminLaunchSplit,
   saveCodeStoreOffer,
   listCodeStoreOffers,
+  setCodeHardStop,
+  markCodeStopped,
+  noteStoreCodeUse,
+  codeUses,
   setPromoOfferRef,
   adminOverview,
   addDeletionRequest,
@@ -168,6 +172,7 @@ import {
   appleConfigured,
   attempt,
   checkAppleOffer,
+  turnOffAppleCustomCode,
   checkGoogleOffer,
   createAppleOffer,
   createGoogleOffer,
@@ -2251,6 +2256,7 @@ app.post('/api/redeem', async (c) => {
       : undefined;
   const result = await redeemPromo(String(body.code ?? ''), ref, platform, extendStore);
   if (!result.ok) return c.json({ error: result.reason }, result.reason === 'unknown' ? 404 : 409);
+  await enforceCodeLimit(result.code);
   if (result.kind === 'free') {
     const access = await checkAccess(ref, 'coach');
     return c.json({
@@ -2361,6 +2367,8 @@ app.post('/api/billing/revenuecat', async (c) => {
       const payer = await resolveRef(event.app_user_id);
       await recordPartnerEarnings(payer, event).catch((err) => console.error('partner earnings failed:', err));
       await recordStoreSale(payer, event).catch((err) => console.error('store sale record failed:', err));
+      const used = await noteStoreCodeUse(payer, event).catch((err) => { console.error('code use note failed:', err); return null; });
+      if (used) await enforceCodeLimit(used);
     }
 
     // A product change names the old product, and a downgrade only takes
@@ -3234,9 +3242,30 @@ async function makeStoreOffers(p: PromoCode, productId: string, periods: number,
 }
 
 /** Retry a store that failed, or check that a store still has the offer. */
+/**
+ * Apple won't take fewer uses for a custom code than its own minimum. When
+ * the admin chose to, switch the Apple code off once Calgym has counted the
+ * code's limit (both stores together). Never throws: a failure is logged and
+ * shown on the code.
+ */
+async function enforceCodeLimit(code: string): Promise<void> {
+  try {
+    const promo = await getPromo(code);
+    if (!promo?.maxRedemptions) return;
+    const apple = (await listCodeStoreOffers(code)).find((o) => o.store === 'apple');
+    if (!apple?.hardStop || apple.stoppedAt || !apple.ids?.customCode || !appleConfigured()) return;
+    const uses = await codeUses(code);
+    if (uses < promo.maxRedemptions) return;
+    await turnOffAppleCustomCode(apple.ids.customCode);
+    await markCodeStopped(code, `turned off in the App Store after ${uses} use${uses === 1 ? '' : 's'} (the code's limit is ${promo.maxRedemptions})`);
+  } catch (err) {
+    console.error(`turning off the Apple code ${code} failed:`, err);
+  }
+}
+
 app.post('/admin/api/promo-store', async (c) => {
   if (!adminOk(c)) return c.json({ error: 'unauthorized' }, 401);
-  const body = await c.req.json<{ code?: string; store?: string; action?: string }>().catch(() => ({}) as never);
+  const body = await c.req.json<{ code?: string; store?: string; action?: string; on?: boolean }>().catch(() => ({}) as never);
   const code = normalizeCode(String(body.code ?? ''));
   const store = body.store === 'apple' || body.store === 'google' ? body.store : null;
   const promo = await getPromo(code);
@@ -3244,6 +3273,13 @@ app.post('/admin/api/promo-store', async (c) => {
   const record = (await listCodeStoreOffers(code)).find((o) => o.store === store);
   if (!record) return c.json({ error: 'not_made_here' }, 404);
   if (store === 'apple' ? !appleConfigured() : !googleConfigured()) return c.json({ error: 'store_not_connected' }, 400);
+  if (body.action === 'hardstop' && store === 'apple') {
+    await setCodeHardStop(code, body.on === true);
+    // The limit may already be reached.
+    if (body.on === true) await enforceCodeLimit(code);
+    const now = (await listCodeStoreOffers(code)).find((o) => o.store === 'apple');
+    return c.json({ ok: true, hardStop: now?.hardStop ?? null, stoppedAt: now?.stoppedAt ?? null, uses: await codeUses(code) });
+  }
   if (body.action === 'check') {
     const r = await attempt(store, () => (store === 'apple' ? checkAppleOffer(code, record.productId) : checkGoogleOffer(code, record.productId)));
     await saveCodeStoreOffer({ ...record, ok: r.ok, detail: r.detail, ids: null });

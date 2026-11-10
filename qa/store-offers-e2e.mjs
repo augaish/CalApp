@@ -131,6 +131,31 @@ try {
   const few = (await fakeLog()).appleCustom.find((c) => c.attributes.customCode === FEW);
   check('  the custom code holds 100 uses', few?.attributes.numberOfCodes === 100, JSON.stringify(few?.attributes));
 
+  // A code for 2 people, saved from the page: asked whether to turn Apple's code off after 2.
+  const TWO = `TWO${run}`;
+  await page.fill('#pc_code', TWO);
+  await page.selectOption('#pc_kind', 'free');
+  await page.fill('#pc_days', '30');
+  await page.fill('#pc_max', '2');
+  await page.getByRole('button', { name: 'Save code' }).click();
+  await page.waitForTimeout(2500);
+  const ask = await page.textContent('#pc_hardstop').catch(() => '');
+  check('limit 2: asked to turn the Apple code off after 2 uses', /smallest limit Apple accepts is 100 uses/.test(ask) && /after 2 uses/.test(ask), ask);
+  await page.locator('#pc_hardstop').getByRole('button', { name: 'Yes' }).click();
+  await page.waitForTimeout(800);
+  check('  Yes: confirmed, none used yet', /turns off after 2 uses \(0 used so far\)/.test(await page.textContent('#pc_hardstop')), await page.textContent('#pc_hardstop'));
+  check('  the Stores column says so', /off after 2/.test(await page.locator('#pc_rows tr', { hasText: TWO }).textContent()));
+  // Use 1: Android, through the redeem screen. Use 2: Apple's own sheet, seen in the store event.
+  await fetch(`${API}/api/redeem`, { method: 'POST', headers: { 'x-calgym-user': `u_two_a_${run}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ code: TWO, platform: 'android' }) });
+  const customTwo = () => fakeLog().then((l) => l.appleCustom.find((c) => c.attributes.customCode === TWO));
+  check('  after 1 use the Apple code is still on', (await customTwo())?.attributes.active !== false);
+  await fetch(`${API}/api/billing/revenuecat`, { method: 'POST', headers: { authorization: 'e2e-hook', 'Content-Type': 'application/json' }, body: JSON.stringify({ event: { id: `ev_two_${run}`, type: 'INITIAL_PURCHASE', app_user_id: `u_two_b_${run}`, product_id: 'calgym_pro_monthly', entitlement_ids: ['pro'], period_type: 'TRIAL', price: 0, offer_code: TWO, store: 'APP_STORE', environment: 'PRODUCTION', transaction_id: `t_two_${run}`, purchased_at_ms: Date.now(), expiration_at_ms: Date.now() + 44 * 86400000, event_timestamp_ms: Date.now() } }) });
+  check('  after the 2nd use (in Apple\'s sheet) the Apple code is turned off', (await customTwo())?.attributes.active === false, JSON.stringify((await customTwo())?.attributes));
+  await page.reload({ waitUntil: 'networkidle' });
+  await page.click('#t-codes');
+  await page.waitForTimeout(800);
+  check('  the Stores column: off (limit reached)', /off \(limit reached\)/.test(await page.locator('#pc_rows tr', { hasText: TWO }).textContent()));
+
   // Check, and a retry that must reuse what exists.
   const before = (await fakeLog()).appleOffers.length;
   const chk = await admin('/admin/api/promo-store', { code: DISC, store: 'apple', action: 'check' });

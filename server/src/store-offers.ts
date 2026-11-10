@@ -329,9 +329,18 @@ export async function createAppleOffer(spec: OfferSpec): Promise<StoreResult> {
     detail:
       `offer ${spec.code} on ${sub.name}${price}, custom code ${spec.code}` +
       (raised ? ` (Apple's smallest limit is ${raised} uses, so on iPhone up to ${raised} people can use it)` : ''),
-    ids: { subscription: sub.id, offer: offer.id, customCode: custom?.id ?? '' },
+    // How many uses Apple's code holds (more than the code's own limit when Apple's minimum is higher).
+    ids: { subscription: sub.id, offer: offer.id, customCode: custom?.id ?? '', uses: String(Number(custom?.attributes?.numberOfCodes ?? 0) || raised || (spec.maxRedemptions ?? 10000)) },
     offerRef: spec.code,
   };
+}
+
+/** Switch an Apple custom code off, so Apple's sheet stops accepting it. */
+export async function turnOffAppleCustomCode(customCodeId: string): Promise<void> {
+  await asc(`/v1/subscriptionOfferCodeCustomCodes/${customCodeId}`, {
+    method: 'PATCH',
+    body: { data: { type: 'subscriptionOfferCodeCustomCodes', id: customCodeId, attributes: { active: false } } },
+  });
 }
 
 /** Whether the offer and its custom code are there and active. */

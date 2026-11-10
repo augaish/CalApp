@@ -1551,9 +1551,46 @@ export const ADMIN_HTML = `<!doctype html>
       return '<li><span class="dot ' + (r.ok ? 'ok' : 'bad') + '" aria-hidden="true">' + (r.ok ? '✓' : '✕') + '</span><div class="grow"><b>' + STORE_LABEL[r.store] + ':</b> ' + esc(r.detail) + '</div></li>';
     }).join('');
   }
+  // Apple won't take fewer uses than its minimum: ask whether to switch its code off at the code's own limit.
+  function appleLimitQuestion(code, max, uses) {
+    var box = document.getElementById('pc_msg');
+    var q = document.createElement('div');
+    q.id = 'pc_hardstop';
+    q.style.cssText = 'margin-top:10px;padding:10px 12px;border:1px solid #E7D9A6;background:#FFF8E1;border-radius:10px;color:#3d3420';
+    q.innerHTML = '<b>The smallest limit Apple accepts is ' + uses + ' uses.</b> Turn the Apple code off automatically after ' + max + ' use' + (max === 1 ? '' : 's') + '? <span class="muted">Uses are counted across both stores.</span><div style="margin-top:8px"></div>';
+    [['Yes', true], ['No', false]].forEach(function (a) {
+      var b = document.createElement('button');
+      b.textContent = a[0];
+      if (!a[1]) b.className = 'ghost';
+      b.style.marginInlineEnd = '6px';
+      b.addEventListener('click', function () {
+        api('/admin/api/promo-store', { code: code, store: 'apple', action: 'hardstop', on: a[1] }).then(function (d) {
+          q.innerHTML = a[1]
+            ? '✓ The Apple code turns off after ' + max + ' use' + (max === 1 ? '' : 's') + (d.stoppedAt ? ' — already reached, so it is off now.' : ' (' + d.uses + ' used so far).')
+            : 'OK — on iPhone up to ' + uses + ' people can use it.';
+          loadPromos();
+        }).catch(function (e) { q.textContent = 'Request failed: ' + e; });
+      });
+      q.lastChild.appendChild(b);
+    });
+    var old = document.getElementById('pc_hardstop');
+    if (old) old.remove();
+    box.appendChild(q);
+    box.classList.remove('hide');
+  }
+  function maybeAskLimit(code, max, results) {
+    if (!max) return;
+    var a = (results || []).filter(function (x) { return x.store === 'apple' && x.ok && x.ids && Number(x.ids.uses) > max; })[0];
+    if (a) appleLimitQuestion(code, max, Number(a.ids.uses));
+  }
   function storeRetry(p, store, action) {
     api('/admin/api/promo-store', { code: p.code, store: store, action: action || 'retry' })
-      .then(function (d) { pcMsg(STORE_LABEL[store] + ' · ' + p.code + ': ' + (d.result.ok ? '✓ ' : '✕ ') + d.result.detail, !d.result.ok); loadPromos(); })
+      .then(function (d) {
+        pcMsg(STORE_LABEL[store] + ' · ' + p.code + ': ' + (d.result.ok ? '✓ ' : '✕ ') + d.result.detail, !d.result.ok);
+        var rec = (p.stores || []).filter(function (o) { return o.store === 'apple'; })[0];
+        if (store === 'apple' && (!rec || rec.hardStop == null)) maybeAskLimit(p.code, p.maxRedemptions, [d.result]);
+        loadPromos();
+      })
       .catch(function (e) { pcMsg('Request failed: ' + e, true); });
   }
   function promoBody(overrides) {
@@ -1601,6 +1638,7 @@ export const ADMIN_HTML = `<!doctype html>
         box.innerHTML = '<b>' + esc(r.body.promo.code) + (allOk ? ' is ready' : ' is saved; a store needs another try (Retry in the Stores column)') + '</b>' +
           '<ul class="list" style="margin:6px 0 0"><li><span class="dot ok" aria-hidden="true">✓</span><div class="grow"><b>Calgym:</b> code saved</div></li>' + storeLines(st) + '</ul>' +
           (st.some(function (x) { return x.store === 'apple' && x.ok; }) ? '<div class="muted" style="margin-top:4px">Apple can take up to an hour before a new custom code works.</div>' : '');
+        maybeAskLimit(r.body.promo.code, r.body.promo.maxRedemptions, st);
       } else {
         pcMsg('Saved ' + r.body.promo.code + '.', false);
       }
@@ -1687,6 +1725,32 @@ export const ADMIN_HTML = `<!doctype html>
         span.title = o.detail || '';
         span.innerHTML = (o.ok ? '<span style="color:#2f5b1a;font-weight:800">✓</span> ' : '<span style="color:#B42318;font-weight:800">✕</span> ') + (o.store === 'apple' ? 'Apple' : 'Google');
         storesCell.appendChild(span);
+        var appleUses = o.store === 'apple' && o.ids ? Number(o.ids.uses) : 0;
+        if (o.store === 'apple' && o.stoppedAt) {
+          var off = document.createElement('span');
+          off.className = 'muted';
+          off.style.marginInlineEnd = '8px';
+          off.textContent = '· off (limit reached)';
+          storesCell.appendChild(off);
+          return;
+        }
+        if (o.store === 'apple' && o.ok && p.maxRedemptions && appleUses > p.maxRedemptions) {
+          if (o.hardStop === true || o.hardStop === false) {
+            var note = document.createElement('span');
+            note.className = 'muted';
+            note.style.marginInlineEnd = '6px';
+            note.textContent = o.hardStop ? '· off after ' + p.maxRedemptions : '· up to ' + appleUses + ' on iPhone';
+            storesCell.appendChild(note);
+          }
+          var ask = document.createElement('button');
+          ask.className = 'ghost';
+          ask.style.padding = '2px 8px';
+          ask.style.marginInlineEnd = '6px';
+          ask.textContent = o.hardStop == null ? 'Limit?' : 'Change';
+          ask.title = 'Apple holds ' + appleUses + ' uses; turn it off after ' + p.maxRedemptions + '?';
+          ask.addEventListener('click', function () { appleLimitQuestion(p.code, p.maxRedemptions, appleUses); });
+          storesCell.appendChild(ask);
+        }
         var b = document.createElement('button');
         b.className = 'ghost';
         b.style.padding = '2px 8px';

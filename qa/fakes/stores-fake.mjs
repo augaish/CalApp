@@ -183,7 +183,13 @@ http
       return send(res, 201, { data: { type: 'subscriptionOfferCodes', id: offer.id, attributes: a } });
     }
     if ((m = url.pathname.match(/^\/v1\/subscriptionOfferCodes\/([^/]+)\/customCodes$/))) {
-      return send(res, 200, { data: appleCustom.filter((c) => c.offer === m[1]).map((c) => ({ type: 'subscriptionOfferCodeCustomCodes', id: c.id, attributes: { ...c.attributes, active: true } })) });
+      return send(res, 200, { data: appleCustom.filter((c) => c.offer === m[1]).map((c) => ({ type: 'subscriptionOfferCodeCustomCodes', id: c.id, attributes: { ...c.attributes, active: c.attributes.active !== false } })) });
+    }
+    if ((m = url.pathname.match(/^\/v1\/subscriptionOfferCodeCustomCodes\/([^/]+)$/)) && req.method === 'PATCH') {
+      const c = appleCustom.find((x) => x.id === m[1]);
+      if (!c || body.data?.id !== m[1] || body.data?.type !== 'subscriptionOfferCodeCustomCodes') return appleError(res, 409, 'Invalid update');
+      Object.assign(c.attributes, body.data.attributes ?? {});
+      return send(res, 200, { data: { type: 'subscriptionOfferCodeCustomCodes', id: c.id, attributes: c.attributes } });
     }
     if (url.pathname === '/v1/subscriptionOfferCodeCustomCodes' && req.method === 'POST') {
       const a = body.data?.attributes ?? {};

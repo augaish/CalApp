@@ -392,6 +392,20 @@ export async function initDb(): Promise<void> {
     )
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS store_sales_ref ON store_sales (ref, at)`);
+  // An Apple custom code takes no fewer uses than Apple's minimum; when the
+  // admin asks, it's switched off once Calgym has counted the code's own
+  // limit (hard_stop: null = not asked yet). Uses typed in Apple's sheet
+  // never reach the redeem screen, so they're noted from the store events.
+  await pool.query(`ALTER TABLE code_store_offers ADD COLUMN IF NOT EXISTS hard_stop BOOLEAN`);
+  await pool.query(`ALTER TABLE code_store_offers ADD COLUMN IF NOT EXISTS stopped_at TIMESTAMPTZ`);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS code_store_uses (
+      code TEXT NOT NULL,
+      ref  TEXT NOT NULL,
+      at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (code, ref)
+    )
+  `);
   // Whether the account's store plan came from a sandbox (TestFlight / test
   // track) purchase, so test subscriptions are never counted as paying.
   await pool.query(`ALTER TABLE app_users ADD COLUMN IF NOT EXISTS store_sandbox BOOLEAN NOT NULL DEFAULT false`);
@@ -2456,6 +2470,9 @@ export interface CodeStoreOffer {
   detail: string | null;
   ids: Record<string, string> | null;
   updatedAt: string;
+  /** Apple only: switch the custom code off at the code's own limit (null: not asked). */
+  hardStop?: boolean | null;
+  stoppedAt?: string | null;
 }
 
 export async function saveCodeStoreOffer(v: Omit<CodeStoreOffer, 'updatedAt'>): Promise<void> {
@@ -2484,7 +2501,45 @@ export async function listCodeStoreOffers(code?: string): Promise<CodeStoreOffer
     detail: r.detail ?? null,
     ids: r.ids ?? null,
     updatedAt: new Date(r.updated_at).toISOString(),
+    hardStop: r.hard_stop ?? null,
+    stoppedAt: r.stopped_at ? new Date(r.stopped_at).toISOString() : null,
   }));
+}
+
+export async function setCodeHardStop(code: string, on: boolean): Promise<void> {
+  if (!pool) return;
+  await pool.query(`UPDATE code_store_offers SET hard_stop = $2 WHERE code = $1 AND store = 'apple'`, [code, on]);
+}
+
+export async function markCodeStopped(code: string, detail: string): Promise<void> {
+  if (!pool) return;
+  await pool.query(`UPDATE code_store_offers SET stopped_at = now(), detail = $2 WHERE code = $1 AND store = 'apple'`, [code, detail]);
+}
+
+/** A store event that came through one of our codes (its offer code), noted once per person. Test purchases don't count. */
+export async function noteStoreCodeUse(ref: string, event: { offer_code?: string | null; environment?: string }): Promise<string | null> {
+  if (!pool || !event.offer_code || isTestPurchase(event)) return null;
+  const offer = normalizeCode(event.offer_code);
+  const match = await pool.query(
+    `SELECT code FROM promo_codes
+      WHERE code = $1 OR regexp_replace(upper(COALESCE(offer_ios, '')), '[^A-Z0-9]', '', 'g') = $1
+                      OR regexp_replace(upper(COALESCE(offer_android, '')), '[^A-Z0-9]', '', 'g') = $1
+      LIMIT 1`,
+    [offer],
+  );
+  const code = (match.rows[0]?.code as string) ?? null;
+  if (code) await pool.query(`INSERT INTO code_store_uses (code, ref) VALUES ($1, $2) ON CONFLICT DO NOTHING`, [code, ref]);
+  return code;
+}
+
+/** People who have used a code: through the redeem screen or a store's own code sheet. */
+export async function codeUses(code: string): Promise<number> {
+  if (!pool) return 0;
+  const res = await pool.query(
+    `SELECT count(*)::int AS n FROM (SELECT ref FROM promo_redemptions WHERE code = $1 UNION SELECT ref FROM code_store_uses WHERE code = $1) u`,
+    [code],
+  );
+  return Number(res.rows[0]?.n ?? 0);
 }
 
 /** Point the code at the offer the store now has, so the app opens the right one. */
