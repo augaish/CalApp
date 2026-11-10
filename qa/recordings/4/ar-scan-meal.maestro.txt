@@ -1,0 +1,28 @@
+Running on iPhone 16 Pro Max - iOS 26.2 - FA1105A3-CFB2-45AC-B4DB-EBAC55DD946D
+ > Flow meal
+Assert that (Optional) "zzz-never-zzz" is visible... WARNED
+Tap on ".*مسح وجبة.*"... COMPLETED
+Assert that (Optional) "Allow" is visible... COMPLETED
+Tap on (Optional) "Allow"... COMPLETED
+Assert that (Optional) "Open" is visible... WARNED
+Tap on (Optional) "Open"... WARNED
+Assert that (Optional) "Allow" is visible... WARNED
+Tap on (Optional) "Allow"... WARNED
+Assert that (Optional) "zzz-never-zzz" is visible... WARNED
+Tap on ".*من الصور.*"... COMPLETED
+Assert that (Optional) "zzz-never-zzz" is visible... WARNED
+Tap on (Optional) "Photo.*", Index: 0... WARNED
+Assert that ".*سجّل هذه الوجبة.*" is visible... FAILED
+
+Assertion is false: ".*سجّل هذه الوجبة.*" is visible
+
+Assertion '".*سجّل هذه الوجبة.*" is visible' failed. Check the UI hierarchy in debug artifacts to verify the element state and properties.
+
+Possible causes:
+- Element selector may be incorrect - check if there are similar elements with slightly different names/properties.
+- Element may be temporarily unavailable due to loading state
+- This could be a real regression that needs to be addressed
+
+==== Debug output (logs & screenshots) ====
+
+/Users/runner/.maestro/tests/2026-11-10_172633
